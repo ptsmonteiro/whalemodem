@@ -138,7 +138,8 @@ def _sync_template(sps, sample_rate, freq0, freq1):
 
 
 def frame_seconds(payload_len=framing.MAX_PAYLOAD_BYTES, profile: Profile = PROFILE_300):
-    n_bits = len(framing.SYNC_BITS) + 8 + 8 * payload_len + 16 + len(framing.tail_pad_bits(profile.baud))
+    n_bits = (len(framing.head_pad_bits(profile.baud)) + len(framing.SYNC_BITS) + 8 + 8 * payload_len + 16
+              + len(framing.tail_pad_bits(profile.baud)))
     return n_bits / profile.baud
 
 

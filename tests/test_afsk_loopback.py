@@ -17,7 +17,8 @@ from whale import afsk, framing, link, mode_history
 def test_framing_roundtrip():
     for payload in (b"", b"hello", bytes(range(256))[:255]):
         bits = framing.build_frame_bits(payload)
-        decoded = framing.parse_frame_bits(bits[len(framing.SYNC_BITS):])
+        after_sync = len(framing.head_pad_bits(300)) + len(framing.SYNC_BITS)
+        decoded = framing.parse_frame_bits(bits[after_sync:])
         assert decoded == payload, (payload, decoded)
     print("test_framing_roundtrip OK")
 

@@ -67,6 +67,28 @@ def tail_pad_bits(baud):
     return [i % 2 for i in range(n)]
 
 
+# Mirrors tail_pad_bits, but in front of SYNC_BITS. Squelch/AGC opening on
+# the receive side corrupts a roughly fixed *duration* at the start of a
+# capture too, not just the end -- at 300/600 baud that was invisible
+# because it landed inside the 63-bit SYNC preamble with slack left over
+# (630ms/210ms of preamble vs ~0.2s of settling), so the correlator still
+# found a clean lock. At higher baud the same preamble is proportionally
+# much shorter (63 bits = 70ms at 900 baud), so a fixed-duration settling
+# artifact eats into real sync/length/payload bits instead of being
+# absorbed by preamble slack -- seen on the bench as strong sync confidence
+# (the correlator still finds *a* peak) but CRC/parse failing every trial,
+# the same signature TAIL_PAD_SECONDS was added to fix, just on the other
+# end of the frame. Content doesn't matter (thrown away, never parsed) --
+# only that it buys the same real settling time the tail pad buys, scaled
+# to duration rather than bit count so it doesn't shrink as baud rises.
+HEAD_PAD_SECONDS = TAIL_PAD_SECONDS
+
+
+def head_pad_bits(baud):
+    n = round(HEAD_PAD_SECONDS * baud)
+    return [i % 2 for i in range(n)]
+
+
 def bytes_to_bits(data: bytes):
     bits = []
     for byte in data:
@@ -92,7 +114,7 @@ def build_frame_bits(payload: bytes, baud=300):
     body = bytes([len(payload)]) + payload
     crc = crc16_ccitt_false(body)
     crc_bytes = bytes([(crc >> 8) & 0xFF, crc & 0xFF])
-    return SYNC_BITS + bytes_to_bits(body + crc_bytes) + tail_pad_bits(baud)
+    return head_pad_bits(baud) + SYNC_BITS + bytes_to_bits(body + crc_bytes) + tail_pad_bits(baud)
 
 
 def parse_frame_bits(bits_after_sync):
