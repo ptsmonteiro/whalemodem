@@ -21,14 +21,14 @@ PT_DISC_ACK = 0x04
 PT_DATA = 0x05
 PT_DATA_ACK = 0x06
 
-CHUNK_SIZE = 40           # payload bytes per DATA frame -- kept small so a single
-                          # real-hardware bit error (observed near the tail of
-                          # longer frames) only costs a short retransmit instead
-                          # of derailing a large chunk
 EOF_BIT = 0x80             # top bit of the seq byte marks the last chunk of a message
 
-FRAME_AIRTIME = afsk.frame_seconds(CHUNK_SIZE + 2)  # ~ worst case for a DATA frame
-ACK_TIMEOUT = FRAME_AIRTIME + 3.0      # time to wait for a reply after tx
+# CHUNK_SIZE (payload bytes per DATA frame -- kept small so a single
+# real-hardware bit error, observed near the tail of longer frames, only
+# costs a short retransmit instead of derailing a large chunk) and the
+# frame-airtime-derived ACK timeout both depend on the active afsk.Profile
+# (baud, in particular) -- see Link.__init__, which computes them per
+# instance from self.profile instead of as module constants.
 MAX_RETRIES = 6
 DECODE_POLL_INTERVAL = 0.15
 TX_TURNAROUND_DELAY = 1.0  # settling time before keying up, see _tx_packet
@@ -56,12 +56,16 @@ class Link:
     flight and nothing here needs to be reentrant.
     """
 
-    def __init__(self, transport, mycall, on_event=None):
+    def __init__(self, transport, mycall, on_event=None, profile=afsk.PROFILE_300):
         self.transport = transport
         self.mycall = mycall
         self.peer_call = None
         self.state = "IDLE"
         self.on_event = on_event or (lambda name, **kw: None)
+        self.profile = profile
+
+        frame_airtime = afsk.frame_seconds(profile.chunk_size + 2, profile)  # ~ worst case for a DATA frame
+        self.ack_timeout = frame_airtime + 3.0
 
         self._rx_packets = queue.Queue()
         self._partial_rx_buf = None  # in-progress recv_message() reassembly, see recv_message()
@@ -83,7 +87,7 @@ class Link:
         while not self._stop.is_set():
             snap = self.transport.snapshot_rx()
             if len(snap) > 0:
-                result = afsk.demodulate(snap)
+                result = afsk.demodulate(snap, profile=self.profile)
                 if result.get("payload") is not None:
                     end = result.get("end_index", len(snap))
                     self.transport.consume_rx(end)
@@ -132,7 +136,7 @@ class Link:
         # every transmission gives it that settling time.
         time.sleep(TX_TURNAROUND_DELAY)
         payload = bytes([ptype]) + body
-        audio = afsk.modulate(payload)
+        audio = afsk.modulate(payload, profile=self.profile)
         self.transport.send(audio)
 
     def _wait_packet(self, want_types, timeout):
@@ -161,7 +165,8 @@ class Link:
 
     # -- connection setup -------------------------------------------------
 
-    def connect(self, dst_call, timeout_per_try=ACK_TIMEOUT, retries=MAX_RETRIES):
+    def connect(self, dst_call, timeout_per_try=None, retries=MAX_RETRIES):
+        timeout_per_try = self.ack_timeout if timeout_per_try is None else timeout_per_try
         self._drain_packets()
         self.state = "CONNECTING"
         body = _encode_call_pair(self.mycall, dst_call)
@@ -216,7 +221,8 @@ class Link:
         chunk is acknowledged or raises LinkError."""
         if self.state != "CONNECTED":
             raise LinkError("not connected")
-        chunks = [data[i:i + CHUNK_SIZE] for i in range(0, len(data), CHUNK_SIZE)] or [b""]
+        chunk_size = self.profile.chunk_size
+        chunks = [data[i:i + chunk_size] for i in range(0, len(data), chunk_size)] or [b""]
         toggle = 0
         for i, chunk in enumerate(chunks):
             is_last = i == len(chunks) - 1
@@ -233,7 +239,7 @@ class Link:
             self.on_event("PTT", on=True)
             self._tx_packet(PT_DATA, body)
             self.on_event("PTT", off=True)
-            got = self._wait_packet({PT_DATA_ACK, PT_DISC}, ACK_TIMEOUT)
+            got = self._wait_packet({PT_DATA_ACK, PT_DISC}, self.ack_timeout)
             if got is None:
                 logger.warning("DATA seq=0x%02x: no ACK, retry %d/%d", seq, attempt, MAX_RETRIES)
                 continue
@@ -304,7 +310,8 @@ class Link:
         self.peer_call = None
         self.on_event("DISCONNECTED")
 
-    def disconnect(self, timeout=ACK_TIMEOUT, retries=3):
+    def disconnect(self, timeout=None, retries=3):
+        timeout = self.ack_timeout if timeout is None else timeout
         if self.state != "CONNECTED":
             self.state = "IDLE"
             return

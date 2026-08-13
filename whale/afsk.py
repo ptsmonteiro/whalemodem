@@ -17,10 +17,13 @@ reference) and found:
     STA1 -> STA2: ~15 dB
     STA2 -> STA1: ~12 dB
 
-Both comfortably clear CONFIDENCE_THRESHOLD below. Re-run measure_snr.py
-after any antenna, power, or placement change on the bench; these numbers
-drift with the physical setup, not with anything in this module.
+Both comfortably clear PROFILE_300's confidence_threshold below. Re-run
+measure_snr.py after any antenna, power, or placement change on the bench;
+these numbers drift with the physical setup, not with anything in this
+module.
 """
+
+from dataclasses import dataclass
 
 import numpy as np
 from scipy.signal import correlate
@@ -31,8 +34,30 @@ SAMPLE_RATE = 48000
 BAUD = 300
 FREQ_0 = 700.0
 FREQ_1 = 1300.0
+CONFIDENCE_THRESHOLD = 4.0
+CHUNK_SIZE = 40  # link-layer payload bytes per DATA frame, see whale/link.py
 
 MAX_FRAME_BITS = len(framing.SYNC_BITS) + 8 + 8 * framing.MAX_PAYLOAD_BYTES + 16
+
+
+@dataclass(frozen=True)
+class Profile:
+    """One speed/tone setting for the modem. Everything that depends on
+    baud or tone frequencies -- modulate(), demodulate(), frame timing, and
+    the link layer's chunk size and ACK timeouts -- should come from a
+    Profile passed around explicitly, not from these module constants.
+    The constants above exist only to define PROFILE_300, today's only
+    profile and the default everywhere a caller doesn't pass one."""
+
+    name: str
+    baud: int
+    freq0: float
+    freq1: float
+    confidence_threshold: float = CONFIDENCE_THRESHOLD
+    chunk_size: int = CHUNK_SIZE
+
+
+PROFILE_300 = Profile(name="300baud", baud=BAUD, freq0=FREQ_0, freq1=FREQ_1)
 
 
 def _cpfsk_tone(bits, sps, sample_rate, freq0, freq1):
@@ -53,11 +78,10 @@ def _apply_ramp(signal, sample_rate, ramp_ms=5):
     return signal
 
 
-def modulate(payload: bytes, sample_rate=SAMPLE_RATE, baud=BAUD,
-             freq0=FREQ_0, freq1=FREQ_1, amplitude=0.6):
-    sps = round(sample_rate / baud)
+def modulate(payload: bytes, profile: Profile = PROFILE_300, sample_rate=SAMPLE_RATE, amplitude=0.6):
+    sps = round(sample_rate / profile.baud)
     bits = framing.build_frame_bits(payload)
-    tone = _cpfsk_tone(bits, sps, sample_rate, freq0, freq1)
+    tone = _cpfsk_tone(bits, sps, sample_rate, profile.freq0, profile.freq1)
     audio = amplitude * tone
     return _apply_ramp(audio, sample_rate).astype(np.float32)
 
@@ -79,22 +103,19 @@ def _sync_template(sps, sample_rate, freq0, freq1):
     return _tone_energy_diff(tone, sample_rate, sps, freq0, freq1)
 
 
-def frame_seconds(payload_len=framing.MAX_PAYLOAD_BYTES, baud=BAUD):
+def frame_seconds(payload_len=framing.MAX_PAYLOAD_BYTES, profile: Profile = PROFILE_300):
     n_bits = len(framing.SYNC_BITS) + 8 + 8 * payload_len + 16 + len(framing.TAIL_PAD_BITS)
-    return n_bits / baud
+    return n_bits / profile.baud
 
 
-CONFIDENCE_THRESHOLD = 4.0
-
-
-def demodulate(audio, sample_rate=SAMPLE_RATE, baud=BAUD, freq0=FREQ_0, freq1=FREQ_1):
+def demodulate(audio, profile: Profile = PROFILE_300, sample_rate=SAMPLE_RATE):
     """Tries to find and decode one frame in `audio`. Returns a dict with at
     least 'synced' and 'payload' (None if nothing usable was found)."""
-    sps = round(sample_rate / baud)
+    sps = round(sample_rate / profile.baud)
     audio = np.asarray(audio, dtype=np.float64)
 
-    diff = _tone_energy_diff(audio, sample_rate, sps, freq0, freq1)
-    template = _sync_template(sps, sample_rate, freq0, freq1)
+    diff = _tone_energy_diff(audio, sample_rate, sps, profile.freq0, profile.freq1)
+    template = _sync_template(sps, sample_rate, profile.freq0, profile.freq1)
     if len(diff) < len(template):
         return {"synced": False, "payload": None}
 
@@ -104,7 +125,7 @@ def demodulate(audio, sample_rate=SAMPLE_RATE, baud=BAUD, freq0=FREQ_0, freq1=FR
     noise_floor = float(np.median(np.abs(corr)))
     confidence = peak / noise_floor if noise_floor > 0 else 0.0
 
-    if confidence < CONFIDENCE_THRESHOLD:
+    if confidence < profile.confidence_threshold:
         return {"synced": False, "confidence": confidence, "payload": None}
 
     n_sync = len(framing.SYNC_BITS)
