@@ -5,6 +5,21 @@ survives the amplitude gating/compression this HT+IC-705 hardware chain shows
 on receive (AGC, limiting) far better than an amplitude-sensitive scheme
 would. Values chosen for this reason, not for throughput -- this is a
 correctness-first v1.
+
+Measured channel: the hardware test bench is one IC-705 (STA1) and one HT via
+a Digirig-style interface (STA2), both squelched, on the bench per
+whale/hw/radios.py. scripts/measure_snr.py measures in-band SNR (500-1600 Hz,
+signal RMS in that band vs. a PSD-scaled noise estimate from the adjacent
+300-550/1750-2050 Hz side bands, taken from a live squelch-open reception --
+squelch-closed audio is just the receiver muted, not a usable noise
+reference) and found:
+
+    STA1 -> STA2: ~15 dB
+    STA2 -> STA1: ~12 dB
+
+Both comfortably clear CONFIDENCE_THRESHOLD below. Re-run measure_snr.py
+after any antenna, power, or placement change on the bench; these numbers
+drift with the physical setup, not with anything in this module.
 """
 
 import numpy as np
