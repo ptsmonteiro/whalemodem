@@ -15,43 +15,71 @@ Usage:
 
 import argparse
 import hashlib
+import queue
 import socket
 import sys
+import threading
 import time
 
 
 class StationClient:
-    def __init__(self, host, cmd_port, data_port):
+    """Owns one command connection + one data connection to a station
+    server. The command socket is drained continuously by a background
+    thread from the moment it connects -- status lines (PTT ON/OFF, etc.)
+    arrive throughout the whole session, including during long data
+    transfers when nothing is actively calling wait_for(). Reading them
+    only inside wait_for() (as this used to) left them sitting in the OS
+    receive buffer for the entire transfer, so a burst of perfectly normal
+    ACK traffic from minutes earlier would all print at once, right before
+    whatever status line a later wait_for() call happened to be waiting on
+    -- indistinguishable at a glance from a real problem at that moment.
+    """
+
+    def __init__(self, name, host, cmd_port, data_port):
+        self.name = name
         self.cmd = socket.create_connection((host, cmd_port), timeout=10)
-        self.cmd.settimeout(0.5)
-        self._cmd_buf = b""
+        self._lines = queue.Queue()
+        self._reader = threading.Thread(target=self._read_loop, daemon=True)
+        self._reader.start()
         self.data_port_addr = (host, data_port)
         self.data = None
 
+    def _read_loop(self):
+        buf = b""
+        while True:
+            try:
+                chunk = self.cmd.recv(4096)
+            except OSError:
+                return
+            if not chunk:
+                return
+            buf += chunk
+            while b"\r" in buf or b"\n" in buf:
+                for sep in (b"\r\n", b"\r", b"\n"):
+                    if sep in buf:
+                        line, buf = buf.split(sep, 1)
+                        break
+                text = line.decode("ascii", "replace")
+                if text:
+                    print(f"     [{self.name}] status: {text}")
+                    self._lines.put(text)
+
     def send_cmd(self, line):
-        print(f"  -> CMD: {line}")
+        print(f"  -> [{self.name}] CMD: {line}")
         self.cmd.sendall((line + "\r").encode("ascii"))
 
     def wait_for(self, prefix, timeout):
         deadline = time.time() + timeout
-        while time.time() < deadline:
-            while b"\r" in self._cmd_buf or b"\n" in self._cmd_buf:
-                for sep in (b"\r\n", b"\r", b"\n"):
-                    if sep in self._cmd_buf:
-                        line, self._cmd_buf = self._cmd_buf.split(sep, 1)
-                        break
-                text = line.decode("ascii", "replace")
-                if text:
-                    print(f"     status: {text}")
-                if text.startswith(prefix):
-                    return text
+        while True:
+            remaining = deadline - time.time()
+            if remaining <= 0:
+                raise TimeoutError(f"[{self.name}] never saw a status line starting with {prefix!r}")
             try:
-                chunk = self.cmd.recv(4096)
-                if chunk:
-                    self._cmd_buf += chunk
-            except socket.timeout:
-                pass
-        raise TimeoutError(f"never saw a status line starting with {prefix!r}")
+                text = self._lines.get(timeout=remaining)
+            except queue.Empty:
+                raise TimeoutError(f"[{self.name}] never saw a status line starting with {prefix!r}")
+            if text.startswith(prefix):
+                return text
 
     def open_data(self):
         self.data = socket.create_connection(self.data_port_addr, timeout=10)
@@ -87,8 +115,8 @@ def main():
     args = ap.parse_args()
 
     print("== connecting to station servers ==")
-    a = StationClient(args.host, args.a_cmd, args.a_data)
-    b = StationClient(args.host, args.b_cmd, args.b_data)
+    a = StationClient("A", args.host, args.a_cmd, args.a_data)
+    b = StationClient("B", args.host, args.b_cmd, args.b_data)
 
     print("== B: LISTEN ON ==")
     b.send_cmd(f"MYCALL {args.b_call}")
