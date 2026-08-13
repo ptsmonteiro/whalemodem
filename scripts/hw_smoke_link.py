@@ -6,7 +6,18 @@ hardware/protocol issue, since it prints per-frame timing and events
 directly instead of through the VARA status-line layer.
 
 Run: python scripts/hw_smoke_link.py
+       python scripts/hw_smoke_link.py --profile 600baud
+
+--profile seeds both sides' mode_history so connect() proposes/negotiates
+straight into that profile instead of starting at CONTROL_PROFILE (300baud)
+and stepping up -- lets you bench a specific speed mode directly, including
+the pre-TX (TX_TURNAROUND_DELAY) and post-TX (ptt_lead/ptt_tail) settling
+that has to hold up at that profile's shorter frame timing. Printed timings
+below (PTT-on -> PTT-off wall clock per TX) are how you check that math:
+compare against afsk.frame_seconds(...) for the payload sent -- the gap
+between them is turnaround/PTT margin actually consumed, not just assumed.
 """
+import argparse
 import logging
 import sys
 import threading
@@ -16,6 +27,7 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(name)s: %(message)s")
 
+from whale import afsk, link as link_mod, mode_history
 from whale.link import Link
 from whale.transport import RadioTransport
 
@@ -24,11 +36,43 @@ MSG_BA = b"reply from STA2 to STA1 " * 4   # 96 bytes
 
 
 def main():
-    print("opening radios...")
+    ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
+    profile_names = sorted(p.name for p in afsk.PROFILES)
+    ap.add_argument("--profile", default=None, choices=profile_names,
+                     help="seed mode_history so both sides connect straight into this profile "
+                          "(default: start at the control profile, as a normal connect would)")
+    args = ap.parse_args()
+
+    print(f"opening radios... (TX_TURNAROUND_DELAY={link_mod.TX_TURNAROUND_DELAY}s, "
+          f"ptt_lead=0.3s, ptt_tail=0.3s -- see whale/transport.py RadioTransport.send "
+          f"for the latter two, both baud-independent PTT/AGC settling on this hardware)")
     t1 = RadioTransport("ic705")
     t2 = RadioTransport("ht")
-    link1 = Link(t1, "STA1", on_event=lambda name, **kw: print(f"[STA1 event] {name} {kw}"))
-    link2 = Link(t2, "STA2", on_event=lambda name, **kw: print(f"[STA2 event] {name} {kw}"))
+
+    history_a, history_b = {}, {}
+    if args.profile is not None:
+        profile = next(p for p in afsk.PROFILES if p.name == args.profile)
+        mode_history.record_good_mode(history_a, "STA1", "STA2", profile.mode_id)
+        mode_history.record_good_mode(history_b, "STA2", "STA1", profile.mode_id)
+        print(f"forcing connect to start at profile {profile.name} via seeded mode_history")
+
+    def _make_ptt_logger(station):
+        """Prints keyed-PTT duration per TX (PTT on -> PTT off wall clock),
+        so pre/post-TX delay margins are visible numbers, not assumptions."""
+        state = {}
+
+        def on_event(name, **kw):
+            if name == "PTT" and kw.get("on"):
+                state["t0"] = time.time()
+            elif name == "PTT" and kw.get("off"):
+                dt = time.time() - state.pop("t0", time.time())
+                print(f"[{station} event] PTT keyed for {dt:.2f}s")
+            else:
+                print(f"[{station} event] {name} {kw}")
+        return on_event
+
+    link1 = Link(t1, "STA1", on_event=_make_ptt_logger("STA1"), mode_history_store=history_a)
+    link2 = Link(t2, "STA2", on_event=_make_ptt_logger("STA2"), mode_history_store=history_b)
 
     ok = {}
     try:

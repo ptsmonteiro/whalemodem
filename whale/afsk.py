@@ -46,10 +46,21 @@ class Profile:
     baud or tone frequencies -- modulate(), demodulate(), frame timing, and
     the link layer's chunk size and ACK timeouts -- should come from a
     Profile passed around explicitly, not from these module constants.
-    The constants above exist only to define PROFILE_300, today's only
-    profile and the default everywhere a caller doesn't pass one."""
+    The constants above exist only to define PROFILE_300, the baseline
+    control profile and the default everywhere a caller doesn't pass one.
+
+    mode_id is the on-air identifier used by whale/link.py's speed
+    negotiation -- it's what gets sent over the radio, not `name`, so it
+    must stay stable once anything has shipped with it.
+
+    If a future speed mode needs a genuinely different modulation (not just
+    different baud/tones on this same CPFSK scheme), Profile would need a
+    codec_id and a dispatch table for modulate/demodulate. Not needed yet:
+    every profile below still uses the CPFSK code in this module.
+    """
 
     name: str
+    mode_id: int
     baud: int
     freq0: float
     freq1: float
@@ -57,7 +68,30 @@ class Profile:
     chunk_size: int = CHUNK_SIZE
 
 
-PROFILE_300 = Profile(name="300baud", baud=BAUD, freq0=FREQ_0, freq1=FREQ_1)
+PROFILE_300 = Profile(name="300baud", mode_id=0, baud=BAUD, freq0=FREQ_0, freq1=FREQ_1)
+
+# Second speed. Originally tried at 700/1900 Hz (same 2:1 tone-separation-
+# to-baud ratio as PROFILE_300); that measured 9-10 dB SNR on the bench
+# (vs. 17-20 dB for PROFILE_300) and DATA frames failed outright (0/5
+# ACKed) -- the IC-705/HT/Digirig audio chain's FM discriminator +
+# de-emphasis rolls off well before 1900 Hz. Dropped freq1 to 1500 Hz to
+# stay inside the flatter part of that passband; re-validated on the bench
+# with scripts/measure_snr.py --profile 600baud and scripts/hw_smoke_link.py
+# --profile 600baud, see whale/afsk.py module docstring for the numbers.
+PROFILE_600 = Profile(name="600baud", mode_id=1, baud=600, freq0=700.0, freq1=1500.0)
+
+# Slowest -> fastest. Index order is also step order for mid-session
+# adaptation (whale/link.py steps to PROFILES[i-1] / PROFILES[i+1]).
+PROFILES = [PROFILE_300, PROFILE_600]
+PROFILES_BY_ID = {p.mode_id: p for p in PROFILES}
+
+# Always used for CONNECT/CONNECT_ACK (before speed is agreed) and, per
+# whale/link.py's design, for every other control-plane packet (DISC,
+# MODE_REQ/MODE_ACK) regardless of the currently negotiated data speed --
+# the control plane always runs at the most robust profile so it keeps
+# working even when the data channel is struggling. Only PT_DATA/PT_DATA_ACK
+# ever use the negotiated profile.
+CONTROL_PROFILE = PROFILE_300
 
 
 def _cpfsk_tone(bits, sps, sample_rate, freq0, freq1):
@@ -80,7 +114,7 @@ def _apply_ramp(signal, sample_rate, ramp_ms=5):
 
 def modulate(payload: bytes, profile: Profile = PROFILE_300, sample_rate=SAMPLE_RATE, amplitude=0.6):
     sps = round(sample_rate / profile.baud)
-    bits = framing.build_frame_bits(payload)
+    bits = framing.build_frame_bits(payload, baud=profile.baud)
     tone = _cpfsk_tone(bits, sps, sample_rate, profile.freq0, profile.freq1)
     audio = amplitude * tone
     return _apply_ramp(audio, sample_rate).astype(np.float32)
@@ -104,7 +138,7 @@ def _sync_template(sps, sample_rate, freq0, freq1):
 
 
 def frame_seconds(payload_len=framing.MAX_PAYLOAD_BYTES, profile: Profile = PROFILE_300):
-    n_bits = len(framing.SYNC_BITS) + 8 + 8 * payload_len + 16 + len(framing.TAIL_PAD_BITS)
+    n_bits = len(framing.SYNC_BITS) + 8 + 8 * payload_len + 16 + len(framing.tail_pad_bits(profile.baud))
     return n_bits / profile.baud
 
 

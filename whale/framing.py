@@ -49,7 +49,22 @@ MAX_PAYLOAD_BYTES = 255
 # reads the exact prefix it needs and ignores anything after, tacking these
 # throwaway bits onto the end means it's the padding that eats the tail
 # corruption instead of the real CRC/payload bits.
-TAIL_PAD_BITS = [0, 1] * 32  # ~213ms at 300 baud
+#
+# The corruption is a roughly fixed *duration* (squelch/PTT tail behavior,
+# not symbol count), so the padding has to be sized in bits-per-profile to
+# cover the same ~213ms at any baud -- a fixed bit count tuned for
+# PROFILE_300 (64 bits = 213ms at 300 baud) silently shrinks to ~107ms at
+# 600baud and stops covering the real tail corruption, corrupting the CRC's
+# last bits instead of the padding. See scripts/probe_600_ack.py, which
+# caught this directly: sync locked, length byte and payload decoded
+# correctly, but the CRC's last byte was off by one bit on every trial --
+# consistent with tail corruption reaching past a too-short pad.
+TAIL_PAD_SECONDS = 64 / 300  # ~213ms, the reference duration at PROFILE_300
+
+
+def tail_pad_bits(baud):
+    n = round(TAIL_PAD_SECONDS * baud)
+    return [i % 2 for i in range(n)]
 
 
 def bytes_to_bits(data: bytes):
@@ -71,13 +86,13 @@ def bits_to_bytes(bits) -> bytes:
     return bytes(out)
 
 
-def build_frame_bits(payload: bytes):
+def build_frame_bits(payload: bytes, baud=300):
     if len(payload) > MAX_PAYLOAD_BYTES:
         raise ValueError(f"payload too long ({len(payload)} > {MAX_PAYLOAD_BYTES})")
     body = bytes([len(payload)]) + payload
     crc = crc16_ccitt_false(body)
     crc_bytes = bytes([(crc >> 8) & 0xFF, crc & 0xFF])
-    return SYNC_BITS + bytes_to_bits(body + crc_bytes) + TAIL_PAD_BITS
+    return SYNC_BITS + bytes_to_bits(body + crc_bytes) + tail_pad_bits(baud)
 
 
 def parse_frame_bits(bits_after_sync):

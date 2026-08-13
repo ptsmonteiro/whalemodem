@@ -71,6 +71,7 @@ class RadioTransport:
         self._buf_lock = threading.Lock()
         self._stream = None
         self._tx_lock = threading.Lock()  # serializes TX attempts
+        self._transmitting = threading.Event()
 
     # -- receive ------------------------------------------------------
 
@@ -118,6 +119,12 @@ class RadioTransport:
                 self._chunks_len = len(flat)
             return flat.copy()
 
+    def is_transmitting(self):
+        """True for the whole span of a send() call, so callers polling the
+        RX buffer (the decode thread) can sit out our own TX instead of
+        racing send()'s pre/post clears and decoding our own leaked audio."""
+        return self._transmitting.is_set()
+
     def consume_rx(self, upto_sample: int):
         """Drops everything up to `upto_sample` (index into the array
         `snapshot_rx()` returned) from the buffer. Must be called shortly
@@ -145,6 +152,7 @@ class RadioTransport:
         """
         with self._tx_lock:
             _ensure_com_initialized()
+            self._transmitting.set()
             self._clear_buffer()
             try:
                 last_exc = None
@@ -170,6 +178,7 @@ class RadioTransport:
                 # blanket post-TX mute risks eating the peer's real reply
                 # when turnaround is fast.
                 self._clear_buffer()
+                self._transmitting.clear()
 
     def close(self):
         self.stop_receiving()

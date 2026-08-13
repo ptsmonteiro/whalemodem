@@ -15,6 +15,7 @@ import argparse
 import socket
 import subprocess
 import sys
+import threading
 import time
 from pathlib import Path
 
@@ -39,19 +40,32 @@ def _wait_for_port(host, port, timeout):
     return False
 
 
-def _start_server(radio, mycall, cmd_port, data_port, host, log_path):
+def _pump_output(name, proc, log_file):
+    """Streams a station's stdout to the console (prefixed) and the log file
+    in realtime, line by line, until the process closes stdout."""
+    for line in iter(proc.stdout.readline, b""):
+        text = line.decode(errors="replace")
+        sys.stdout.write(f"[{name}] {text}")
+        sys.stdout.flush()
+        log_file.write(text)
+        log_file.flush()
+
+
+def _start_server(radio, mycall, cmd_port, data_port, host, log_path, name):
     log_file = open(log_path, "w")
     proc = subprocess.Popen(
         [sys.executable, "-m", "whale.vara_server",
          "--radio", radio, "--mycall", mycall,
          "--cmd-port", str(cmd_port), "--data-port", str(data_port),
-         "--host", host],
-        cwd=ROOT, stdout=log_file, stderr=subprocess.STDOUT,
+         "--host", host, "--verbose"],
+        cwd=ROOT, stdout=subprocess.PIPE, stderr=subprocess.STDOUT,
     )
-    return proc, log_file
+    pump = threading.Thread(target=_pump_output, args=(name, proc, log_file), daemon=True)
+    pump.start()
+    return proc, log_file, pump
 
 
-def _stop_server(name, proc, log_file):
+def _stop_server(name, proc, log_file, pump):
     if proc.poll() is None:
         proc.terminate()
         try:
@@ -60,6 +74,7 @@ def _stop_server(name, proc, log_file):
             print(f"station {name} did not exit after terminate(), killing it")
             proc.kill()
             proc.wait(timeout=5)
+    pump.join(timeout=5)
     log_file.close()
 
 
@@ -85,12 +100,12 @@ def main():
 
     print(f"starting station A ({args.a_radio}, {args.a_call}) on cmd={args.a_cmd} data={args.a_data}, "
           f"logging to {log_dir / 'sta1.log'}...")
-    proc_a, log_a = _start_server(args.a_radio, args.a_call, args.a_cmd, args.a_data, args.host,
-                                   log_dir / "sta1.log")
+    proc_a, log_a, pump_a = _start_server(args.a_radio, args.a_call, args.a_cmd, args.a_data, args.host,
+                                           log_dir / "sta1.log", "A")
     print(f"starting station B ({args.b_radio}, {args.b_call}) on cmd={args.b_cmd} data={args.b_data}, "
           f"logging to {log_dir / 'sta2.log'}...")
-    proc_b, log_b = _start_server(args.b_radio, args.b_call, args.b_cmd, args.b_data, args.host,
-                                   log_dir / "sta2.log")
+    proc_b, log_b, pump_b = _start_server(args.b_radio, args.b_call, args.b_cmd, args.b_data, args.host,
+                                           log_dir / "sta2.log", "B")
 
     exit_code = 1
     try:
@@ -136,8 +151,8 @@ def main():
         # PTT is off -- stopping the servers here doesn't cut off a live
         # transmission in the normal (non-Ctrl-C) case.
         print("stopping station servers...")
-        _stop_server("A", proc_a, log_a)
-        _stop_server("B", proc_b, log_b)
+        _stop_server("A", proc_a, log_a, pump_a)
+        _stop_server("B", proc_b, log_b, pump_b)
 
     return exit_code
 

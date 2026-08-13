@@ -10,7 +10,7 @@ import queue
 import threading
 import time
 
-from whale import afsk
+from whale import afsk, mode_history
 
 logger = logging.getLogger(__name__)
 
@@ -20,6 +20,14 @@ PT_DISC = 0x03
 PT_DISC_ACK = 0x04
 PT_DATA = 0x05
 PT_DATA_ACK = 0x06
+PT_MODE_REQ = 0x07         # body: [proposed_mode_id] -- mid-session speed step, see _request_mode_step
+PT_MODE_ACK = 0x08         # body: [accepted_mode_id] (may differ from proposed if rejected)
+
+# Packet types whose bodies are small and must survive even when the
+# negotiated data profile is struggling -- these always go out on
+# afsk.CONTROL_PROFILE (see _tx_packet), never on self.profile. Only bulk
+# data (PT_DATA/PT_DATA_ACK) ever rides the negotiated speed.
+_CONTROL_PLANE_TYPES = {PT_CONNECT, PT_CONNECT_ACK, PT_DISC, PT_DISC_ACK, PT_MODE_REQ, PT_MODE_ACK}
 
 EOF_BIT = 0x80             # top bit of the seq byte marks the last chunk of a message
 
@@ -27,11 +35,32 @@ EOF_BIT = 0x80             # top bit of the seq byte marks the last chunk of a m
 # real-hardware bit error, observed near the tail of longer frames, only
 # costs a short retransmit instead of derailing a large chunk) and the
 # frame-airtime-derived ACK timeout both depend on the active afsk.Profile
-# (baud, in particular) -- see Link.__init__, which computes them per
+# (baud, in particular) -- see Link._apply_profile, which computes them per
 # instance from self.profile instead of as module constants.
 MAX_RETRIES = 6
 DECODE_POLL_INTERVAL = 0.15
 TX_TURNAROUND_DELAY = 1.0  # settling time before keying up, see _tx_packet
+
+# Mid-session speed adaptation thresholds -- deliberately just ARQ-outcome
+# based (no SNR estimate, no throughput math). React fast to trouble, be
+# conservative about speeding up.
+STEP_DOWN_AFTER_ATTEMPTS = 3   # a chunk needing this many tries triggers an immediate step down
+STEP_UP_AFTER_CLEAN_STREAK = 3  # this many first-try chunks in a row triggers a step up
+
+# Rough control-frame payload size used to size the control-plane ACK
+# timeout (callsigns + mode list all comfortably fit) -- not a hard limit.
+_CONTROL_FRAME_LEN_ESTIMATE = 32
+
+_PTYPE_NAMES = {
+    PT_CONNECT: "CONNECT", PT_CONNECT_ACK: "CONNECT_ACK",
+    PT_DISC: "DISC", PT_DISC_ACK: "DISC_ACK",
+    PT_DATA: "DATA", PT_DATA_ACK: "DATA_ACK",
+    PT_MODE_REQ: "MODE_REQ", PT_MODE_ACK: "MODE_ACK",
+}
+
+
+def _ptype_name(ptype):
+    return _PTYPE_NAMES.get(ptype, f"0x{ptype:02x}")
 
 
 def _encode_call_pair(src, dst):
@@ -41,6 +70,33 @@ def _encode_call_pair(src, dst):
 def _decode_call_pair(payload):
     src, _, dst = payload.partition(b"\x00")
     return src.decode("ascii", "replace"), dst.decode("ascii", "replace")
+
+
+def _encode_call_and_modes(a, b, supported_ids, extra_id):
+    """CONNECT/CONNECT_ACK body: "a\\x00b\\x00" + one byte per supported
+    mode_id + one trailing byte (proposed mode_id for CONNECT, negotiated
+    mode_id for CONNECT_ACK)."""
+    return (a.encode("ascii") + b"\x00" + b.encode("ascii") + b"\x00" +
+            bytes(sorted(supported_ids)) + bytes([extra_id]))
+
+
+def _decode_call_and_modes(payload):
+    a, _, rest = payload.partition(b"\x00")
+    b, _, mode_section = rest.partition(b"\x00")
+    a = a.decode("ascii", "replace")
+    b = b.decode("ascii", "replace")
+    if not mode_section:
+        return a, b, [], afsk.CONTROL_PROFILE.mode_id
+    return a, b, list(mode_section[:-1]), mode_section[-1]
+
+
+def _negotiate_mode(own_supported_ids, proposed_id):
+    """Listener's rule for picking a starting data profile: accept the
+    caller's proposal if we can decode it, else fall back to the always-
+    supported control profile."""
+    if proposed_id in own_supported_ids:
+        return proposed_id
+    return afsk.CONTROL_PROFILE.mode_id
 
 
 class LinkError(Exception):
@@ -56,16 +112,24 @@ class Link:
     flight and nothing here needs to be reentrant.
     """
 
-    def __init__(self, transport, mycall, on_event=None, profile=afsk.PROFILE_300):
+    def __init__(self, transport, mycall, on_event=None, mode_history_store=None):
         self.transport = transport
         self.mycall = mycall
         self.peer_call = None
+        self.peer_supported_modes = set()
         self.state = "IDLE"
         self.on_event = on_event or (lambda name, **kw: None)
-        self.profile = profile
+        self.mode_history = {} if mode_history_store is None else mode_history_store
+        self._clean_streak = 0
 
-        frame_airtime = afsk.frame_seconds(profile.chunk_size + 2, profile)  # ~ worst case for a DATA frame
-        self.ack_timeout = frame_airtime + 3.0
+        # Control-plane frames always use afsk.CONTROL_PROFILE (see
+        # _tx_packet), so this timeout is fixed for the life of the Link.
+        self.control_ack_timeout = afsk.frame_seconds(_CONTROL_FRAME_LEN_ESTIMATE, afsk.CONTROL_PROFILE) + 3.0
+
+        # self.profile is the *negotiated data* profile -- only meaningful
+        # once CONNECTED. Starts at CONTROL_PROFILE as a harmless default;
+        # _apply_profile() also sets self.data_ack_timeout to match.
+        self._apply_profile(afsk.CONTROL_PROFILE)
 
         self._rx_packets = queue.Queue()
         self._partial_rx_buf = None  # in-progress recv_message() reassembly, see recv_message()
@@ -81,35 +145,92 @@ class Link:
         self._stop.set()
         self.transport.stop_receiving()
 
+    # -- profile management -----------------------------------------------
+
+    def _apply_profile(self, profile):
+        """Sets the negotiated data profile and its derived ACK timeout.
+        Control-plane frames are unaffected -- they always use
+        afsk.CONTROL_PROFILE regardless of this."""
+        self.profile = profile
+        frame_airtime = afsk.frame_seconds(profile.chunk_size + 2, profile)  # ~ worst case for a DATA frame
+        self.data_ack_timeout = frame_airtime + 3.0
+
+    def _candidate_decode_profiles(self):
+        """Which afsk.Profile(s) an incoming frame might be using right
+        now: control-plane traffic always uses CONTROL_PROFILE, and DATA
+        traffic uses whatever self.profile currently is -- try both since
+        the decode loop can't otherwise tell which is arriving next."""
+        if self.profile is afsk.CONTROL_PROFILE:
+            return (afsk.CONTROL_PROFILE,)
+        return (afsk.CONTROL_PROFILE, self.profile)
+
     # -- decode loop (background) ---------------------------------------
 
     def _decode_loop(self):
         while not self._stop.is_set():
+            if self.transport.is_transmitting():
+                # Don't touch the RX buffer mid-TX: transport.send() clears
+                # it before and after keying up specifically so our own
+                # leaked audio is never handed to the decoder, but this loop
+                # polls independently on its own timer, so without this check
+                # it can grab a snapshot *during* the TX and decode our own
+                # frame before send()'s post-TX clear ever runs.
+                time.sleep(DECODE_POLL_INTERVAL)
+                continue
             snap = self.transport.snapshot_rx()
             if len(snap) > 0:
-                result = afsk.demodulate(snap, profile=self.profile)
-                if result.get("payload") is not None:
-                    end = result.get("end_index", len(snap))
-                    self.transport.consume_rx(end)
-                    self._handle_raw(result["payload"])
+                if self._decode_one(snap):
                     continue  # try again immediately in case another frame follows
-                elif "end_index" in result:
-                    # Sync was found (confidence cleared the threshold) but
-                    # the frame itself didn't check out (corrupt bits, e.g.
-                    # a garbled self-echo of our own last TX). If we don't
-                    # advance past it, this same strong-but-bad match stays
-                    # the global correlation peak on every future poll --
-                    # snapshot_rx() keeps accumulating, argmax keeps landing
-                    # right back here, and a later, weaker, genuine frame
-                    # elsewhere in the buffer never gets a look in. Consume
-                    # up to its end estimate so the search moves on.
-                    logger.debug("[%s] near-miss decode: confidence=%.1f len(snap)=%d",
-                                 self.mycall, result.get("confidence", 0), len(snap))
-                    self.transport.consume_rx(result["end_index"])
-                    continue
             time.sleep(DECODE_POLL_INTERVAL)
 
-    def _handle_raw(self, raw: bytes):
+    def _decode_one(self, snap) -> bool:
+        """Tries every candidate profile against `snap`; handles/consumes
+        the first usable result. Returns True if it made progress (decoded
+        a frame or skipped a near-miss) so the caller should retry the
+        buffer immediately instead of sleeping.
+
+        With two candidate profiles (control + a faster negotiated data
+        profile), a lower-baud profile's correlator can pick up a spurious
+        sync lock on audio that's actually a still-arriving higher-baud
+        frame -- their tones can overlap enough for that -- and, once it
+        reads far enough to hit a garbage length byte, report a near-miss
+        end_index of its own. Consuming on that would truncate the real
+        frame before the other candidate ever gets the full thing to look
+        at. So: if any candidate has a genuine sync lock (confidence over
+        its own threshold) but hasn't seen enough samples yet for a verdict,
+        this poll holds off consuming anything and just waits for more
+        audio, rather than letting a different candidate's near-miss win."""
+        near_miss = None  # (end_index, confidence) of the best non-decoding sync, if any
+        still_arriving = False
+        for profile in self._candidate_decode_profiles():
+            result = afsk.demodulate(snap, profile=profile)
+            if result.get("payload") is not None:
+                end = result.get("end_index", len(snap))
+                self.transport.consume_rx(end)
+                logger.info("[%s] decoded frame at profile %s (confidence=%.1f)",
+                            self.mycall, profile.name, result.get("confidence", 0.0))
+                self._handle_raw(result["payload"], profile)
+                return True
+            if "end_index" not in result and result.get("confidence", 0) >= profile.confidence_threshold:
+                still_arriving = True
+            if "end_index" in result:
+                # Sync was found (confidence cleared the threshold) but the
+                # frame itself didn't check out -- most often a genuine
+                # frame at the *other* candidate profile, or a garbled
+                # self-echo of our own last TX. If we don't advance past
+                # it, this same strong-but-bad match stays the correlation
+                # peak on every future poll and a later, weaker, genuine
+                # frame elsewhere in the buffer never gets a look in.
+                if near_miss is None or result["end_index"] > near_miss[0]:
+                    near_miss = (result["end_index"], result.get("confidence", 0))
+        if near_miss is not None and not still_arriving:
+            logger.info("[%s] near-miss decode: sync found but frame invalid (confidence=%.1f len(snap)=%d)",
+                        self.mycall, near_miss[1], len(snap))
+            self.transport.consume_rx(near_miss[0])
+            return True
+        return False
+
+    def _handle_raw(self, raw: bytes, profile):
         if len(raw) < 1:
             return
         ptype, body = raw[0], raw[1:]
@@ -122,9 +243,9 @@ class Link:
             # it before it can be mistaken for the peer's reply.
             src, _ = _decode_call_pair(body)
             if src == self.mycall:
-                logger.debug("[%s] dropping self-echoed type=0x%02x", self.mycall, ptype)
+                logger.info("[%s] dropping self-echoed %s", self.mycall, _ptype_name(ptype))
                 return
-        logger.debug("[%s] rx packet type=0x%02x len=%d", self.mycall, ptype, len(body))
+        logger.info("[%s] RX %s at %s (%d body byte(s))", self.mycall, _ptype_name(ptype), profile.name, len(body))
         self._rx_packets.put((ptype, body))
 
     def _tx_packet(self, ptype: int, body: bytes):
@@ -135,8 +256,11 @@ class Link:
         # fully settled from RX back to TX yet. A short fixed pause before
         # every transmission gives it that settling time.
         time.sleep(TX_TURNAROUND_DELAY)
+        profile = afsk.CONTROL_PROFILE if ptype in _CONTROL_PLANE_TYPES else self.profile
         payload = bytes([ptype]) + body
-        audio = afsk.modulate(payload, profile=self.profile)
+        audio = afsk.modulate(payload, profile=profile)
+        logger.info("[%s] TX %s at %s (%d body byte(s), %.2fs airtime)",
+                    self.mycall, _ptype_name(ptype), profile.name, len(body), len(audio) / afsk.SAMPLE_RATE)
         self.transport.send(audio)
 
     def _wait_packet(self, want_types, timeout):
@@ -153,8 +277,8 @@ class Link:
                 return ptype, body
             # Not what we're waiting for right now (e.g. a stray DISC from a
             # previous session) -- drop it and keep waiting.
-            logger.debug("[%s] dropping unexpected packet type=0x%02x while waiting for %s", self.mycall,
-                         ptype, want_types)
+            logger.info("[%s] dropping unexpected %s while waiting for %s", self.mycall,
+                        _ptype_name(ptype), {_ptype_name(t) for t in want_types})
 
     def _drain_packets(self):
         while True:
@@ -166,25 +290,34 @@ class Link:
     # -- connection setup -------------------------------------------------
 
     def connect(self, dst_call, timeout_per_try=None, retries=MAX_RETRIES):
-        timeout_per_try = self.ack_timeout if timeout_per_try is None else timeout_per_try
+        timeout_per_try = self.control_ack_timeout if timeout_per_try is None else timeout_per_try
         self._drain_packets()
         self.state = "CONNECTING"
-        body = _encode_call_pair(self.mycall, dst_call)
+        own_supported = [p.mode_id for p in afsk.PROFILES]
+        proposed_id = mode_history.last_good_mode(self.mode_history, self.mycall, dst_call)
+        if proposed_id is None or proposed_id not in own_supported:
+            proposed_id = afsk.CONTROL_PROFILE.mode_id  # no history with this peer -- start slow
+        body = _encode_call_and_modes(self.mycall, dst_call, own_supported, proposed_id)
         for attempt in range(1, retries + 1):
-            logger.info("[%s] CONNECT attempt %d/%d to %s", self.mycall, attempt, retries, dst_call)
+            logger.info("[%s] CONNECT attempt %d/%d to %s (proposing mode %d)",
+                        self.mycall, attempt, retries, dst_call, proposed_id)
             self.on_event("PTT", on=True)
             self._tx_packet(PT_CONNECT, body)
             self.on_event("PTT", off=True)
             got = self._wait_packet({PT_CONNECT_ACK}, timeout_per_try)
             if got is not None:
                 _, ack_body = got
-                src, dst = _decode_call_pair(ack_body)
+                src, dst, peer_supported, negotiated_id = _decode_call_and_modes(ack_body)
                 if dst == self.mycall:
                     self.peer_call = src
+                    self.peer_supported_modes = set(peer_supported)
+                    self._apply_profile(afsk.PROFILES_BY_ID.get(negotiated_id, afsk.CONTROL_PROFILE))
+                    self._clean_streak = 0
                     self.state = "CONNECTED"
                     self._partial_rx_buf = None
                     self._partial_rx_last_seq = None
                     self.on_event("CONNECTED", mycall=self.mycall, peer=self.peer_call)
+                    logger.info("[%s] connected to %s at profile %s", self.mycall, self.peer_call, self.profile.name)
                     return True
         self.state = "IDLE"
         self.on_event("CONNECT_FAILED")
@@ -200,18 +333,24 @@ class Link:
         if got is None:
             return None
         _, body = got
-        src, dst = _decode_call_pair(body)
+        src, dst, peer_supported, proposed_id = _decode_call_and_modes(body)
         if dst != self.mycall:
             return None
         self.peer_call = src
-        ack_body = _encode_call_pair(self.mycall, src)
+        self.peer_supported_modes = set(peer_supported)
+        own_supported = [p.mode_id for p in afsk.PROFILES]
+        negotiated_id = _negotiate_mode(own_supported, proposed_id)
+        ack_body = _encode_call_and_modes(self.mycall, src, own_supported, negotiated_id)
         self.on_event("PTT", on=True)
         self._tx_packet(PT_CONNECT_ACK, ack_body)
         self.on_event("PTT", off=True)
+        self._apply_profile(afsk.PROFILES_BY_ID.get(negotiated_id, afsk.CONTROL_PROFILE))
+        self._clean_streak = 0
         self.state = "CONNECTED"
         self._partial_rx_buf = None
         self._partial_rx_last_seq = None
         self.on_event("CONNECTED", mycall=self.mycall, peer=self.peer_call)
+        logger.info("[%s] accepted connection from %s at profile %s", self.mycall, src, self.profile.name)
         return self.peer_call
 
     # -- data transfer ------------------------------------------------------
@@ -227,19 +366,22 @@ class Link:
         for i, chunk in enumerate(chunks):
             is_last = i == len(chunks) - 1
             seq = toggle | (EOF_BIT if is_last else 0)
-            ok = self._send_chunk_with_arq(seq, chunk)
-            if not ok:
+            attempts = self._send_chunk_with_arq(seq, chunk)
+            if attempts is None:
                 raise LinkError(f"no ACK for chunk {i+1}/{len(chunks)} after {MAX_RETRIES} tries")
+            self._maybe_adapt(attempts)
             toggle ^= 1
         logger.info("send_message: %d bytes in %d chunk(s) acked", len(data), len(chunks))
 
     def _send_chunk_with_arq(self, seq, chunk):
+        """Returns the number of attempts it took to get ACKed, or None if
+        it never got ACKed after MAX_RETRIES."""
         body = bytes([seq]) + chunk
         for attempt in range(1, MAX_RETRIES + 1):
             self.on_event("PTT", on=True)
             self._tx_packet(PT_DATA, body)
             self.on_event("PTT", off=True)
-            got = self._wait_packet({PT_DATA_ACK, PT_DISC}, self.ack_timeout)
+            got = self._wait_packet({PT_DATA_ACK, PT_DISC}, self.data_ack_timeout)
             if got is None:
                 logger.warning("DATA seq=0x%02x: no ACK, retry %d/%d", seq, attempt, MAX_RETRIES)
                 continue
@@ -248,9 +390,56 @@ class Link:
                 self._handle_peer_disc()
                 raise LinkError("peer disconnected mid-transfer")
             if len(body_in) >= 1 and body_in[0] == seq:
-                return True
+                logger.info("[%s] DATA seq=0x%02x acked after %d attempt(s)", self.mycall, seq, attempt)
+                return attempt
             # ACK for a different seq (stale retransmit) -- keep waiting.
-        return False
+        return None
+
+    # -- mid-session speed adaptation ---------------------------------------
+
+    def _maybe_adapt(self, attempts):
+        """Called after each ACKed chunk with how many tries it took.
+        Purely ARQ-outcome based: no SNR estimate, just react to trouble
+        fast and only speed up after a solid run of clean chunks."""
+        if attempts >= STEP_DOWN_AFTER_ATTEMPTS:
+            self._clean_streak = 0
+            self._request_mode_step(-1)
+            return
+        self._clean_streak += 1
+        if self._clean_streak >= STEP_UP_AFTER_CLEAN_STREAK:
+            self._clean_streak = 0
+            self._request_mode_step(+1)
+
+    def _request_mode_step(self, direction):
+        idx = afsk.PROFILES.index(self.profile)
+        new_idx = idx + direction
+        if not (0 <= new_idx < len(afsk.PROFILES)):
+            return
+        candidate = afsk.PROFILES[new_idx]
+        if candidate.mode_id not in self.peer_supported_modes:
+            return
+        logger.info("[%s] requesting mode step to %s", self.mycall, candidate.name)
+        self.on_event("PTT", on=True)
+        self._tx_packet(PT_MODE_REQ, bytes([candidate.mode_id]))
+        self.on_event("PTT", off=True)
+        got = self._wait_packet({PT_MODE_ACK}, self.control_ack_timeout)
+        if got is None:
+            logger.warning("[%s] MODE_REQ to %s: no ack, staying at %s", self.mycall, candidate.name, self.profile.name)
+            return
+        _, body = got
+        accepted_id = body[0] if body else afsk.CONTROL_PROFILE.mode_id
+        self._apply_profile(afsk.PROFILES_BY_ID.get(accepted_id, afsk.CONTROL_PROFILE))
+        logger.info("[%s] switched to profile %s", self.mycall, self.profile.name)
+
+    def _handle_mode_req(self, body):
+        proposed_id = body[0] if body else afsk.CONTROL_PROFILE.mode_id
+        own_supported = {p.mode_id for p in afsk.PROFILES}
+        accepted_id = proposed_id if proposed_id in own_supported else afsk.CONTROL_PROFILE.mode_id
+        self.on_event("PTT", on=True)
+        self._tx_packet(PT_MODE_ACK, bytes([accepted_id]))
+        self.on_event("PTT", off=True)
+        self._apply_profile(afsk.PROFILES_BY_ID.get(accepted_id, afsk.CONTROL_PROFILE))
+        logger.info("[%s] accepted peer mode step to %s", self.mycall, self.profile.name)
 
     def recv_message(self, timeout=None):
         """Blocks for the chunks of one message (as delimited by the EOF bit)
@@ -276,10 +465,13 @@ class Link:
             remaining = None if deadline is None else max(0.0, deadline - time.time())
             if deadline is not None and remaining <= 0:
                 return None
-            got = self._wait_packet({PT_DATA, PT_DISC}, remaining if remaining is not None else 1e9)
+            got = self._wait_packet({PT_DATA, PT_DISC, PT_MODE_REQ}, remaining if remaining is not None else 1e9)
             if got is None:
                 return None
             ptype, body = got
+            if ptype == PT_MODE_REQ:
+                self._handle_mode_req(body)
+                continue  # still waiting on the actual DATA
             if ptype == PT_DISC:
                 self._handle_peer_disc()
                 return None
@@ -303,6 +495,8 @@ class Link:
     # -- teardown ------------------------------------------------------
 
     def _handle_peer_disc(self):
+        if self.peer_call is not None:
+            mode_history.record_good_mode(self.mode_history, self.mycall, self.peer_call, self.profile.mode_id)
         self.on_event("PTT", on=True)
         self._tx_packet(PT_DISC_ACK, b"")
         self.on_event("PTT", off=True)
@@ -311,10 +505,12 @@ class Link:
         self.on_event("DISCONNECTED")
 
     def disconnect(self, timeout=None, retries=3):
-        timeout = self.ack_timeout if timeout is None else timeout
+        timeout = self.control_ack_timeout if timeout is None else timeout
         if self.state != "CONNECTED":
             self.state = "IDLE"
             return
+        if self.peer_call is not None:
+            mode_history.record_good_mode(self.mode_history, self.mycall, self.peer_call, self.profile.mode_id)
         for attempt in range(1, retries + 1):
             self.on_event("PTT", on=True)
             self._tx_packet(PT_DISC, b"")
