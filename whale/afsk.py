@@ -80,9 +80,34 @@ PROFILE_300 = Profile(name="300baud", mode_id=0, baud=BAUD, freq0=FREQ_0, freq1=
 # --profile 600baud, see whale/afsk.py module docstring for the numbers.
 PROFILE_600 = Profile(name="600baud", mode_id=1, baud=600, freq0=700.0, freq1=1500.0)
 
+# Third speed. PROFILE_600's tone-widening approach (700/1500 -> pushing
+# further apart) hit a hard wall: scripts/measure_band_edges.py found the
+# usable band runs from ~600 Hz to ~2300 Hz, but scripts/sweep_baud_600_2300.py
+# showed that even at those edges, baud tops out at 600 -- 700 baud fails
+# 0/5 both directions, and padding 1s of settle noise before/after the frame
+# ruled out a PTT/timing transient as the cause. The failure is the tone
+# placement itself: wide separation pushed to the passband edges spends
+# more of each symbol transition in the region of worst group delay/rolloff
+# for this FM audio chain (mic/speaker filtering, de-emphasis).
+#
+# Bell 202 (AX.25 1200bps) tones -- 1200/2200 Hz, narrower 1000 Hz
+# separation, centered in the flat part of the passband -- don't have that
+# problem. Re-running the baud sweep at 1200/2200 Hz cleared 1200 baud
+# cleanly (100% both directions) and broke down at 1400 (0/5 ht->ic705,
+# confidence flatlined -- a real passband wall, not a marginal case).
+# scripts/sweep_payload_1200_2200.py then found the frame-size ceiling at
+# that baud: 120-byte AFSK payloads passed 100% both directions; 160 bytes
+# broke down on the ic705->ht leg specifically via false/duplicate sync
+# lock (end_index ~2x the expected frame length), not gradual SNR falloff.
+# chunk_size=100 (-> 102-byte AFSK payload for DATA, see whale/link.py's
+# frame_airtime calc) keeps meaningful margin below both the 120-byte
+# clean point and the 160-byte failure mode.
+PROFILE_1200 = Profile(name="1200baud", mode_id=2, baud=1200, freq0=1200.0, freq1=2200.0,
+                        chunk_size=100)
+
 # Slowest -> fastest. Index order is also step order for mid-session
 # adaptation (whale/link.py steps to PROFILES[i-1] / PROFILES[i+1]).
-PROFILES = [PROFILE_300, PROFILE_600]
+PROFILES = [PROFILE_300, PROFILE_600, PROFILE_1200]
 PROFILES_BY_ID = {p.mode_id: p for p in PROFILES}
 
 # Always used for CONNECT/CONNECT_ACK (before speed is agreed) and, per
