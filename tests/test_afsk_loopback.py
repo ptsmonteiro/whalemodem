@@ -68,6 +68,14 @@ def test_connect_body_roundtrip():
     print("test_connect_body_roundtrip OK")
 
 
+def test_connect_ack_body_roundtrip():
+    body = link._encode_connect_ack("STA2", "STA1", [0, 1, 2], 1, 0)
+    a, b, supported, accepted_id, own_id = link._decode_connect_ack(body)
+    assert (a, b, supported, accepted_id, own_id) == ("STA2", "STA1", [0, 1, 2], 1, 0), \
+        (a, b, supported, accepted_id, own_id)
+    print("test_connect_ack_body_roundtrip OK")
+
+
 def test_negotiate_mode():
     assert link._negotiate_mode([0, 1], 1) == 1
     assert link._negotiate_mode([0], 1) == afsk.CONTROL_PROFILE.mode_id
@@ -121,18 +129,24 @@ class _FakeTransport:
 
 
 def test_link_negotiation_and_mode_step():
+    """Each direction of the link negotiates and adapts independently: A's
+    TX rate to B need not match B's TX rate to A (see whale/afsk.py's
+    measured per-direction SNR on the real bench, which is what motivates
+    this)."""
     link.TX_TURNAROUND_DELAY = 0.05  # keep the test fast; real hardware needs the settling time, this doesn't
 
     ta, tb = _FakeTransport(), _FakeTransport()
     ta.peer, tb.peer = tb, ta
     history = {}
     a = link.Link(ta, "STA1", mode_history_store=history)
-    b = link.Link(tb, "STA2", mode_history_store={})
+    b = link.Link(tb, "STA2", mode_history_store=history)
     a.start()
     b.start()
     try:
-        # History says STA1<->STA2 last spoke at PROFILE_600 -- connect
-        # should start there directly instead of at the control profile.
+        # History says STA1->STA2 last spoke at PROFILE_600, but STA2->STA1
+        # has no history at all -- connect should bring up an asymmetric
+        # link: A's tx (and B's rx) at 600baud, B's tx (and A's rx) still
+        # at the control profile since B has nothing to go on yet.
         mode_history.record_good_mode(history, "STA1", "STA2", afsk.PROFILE_600.mode_id)
 
         listen_result = {}
@@ -147,13 +161,16 @@ def test_link_negotiation_and_mode_step():
 
         assert ok, "connect() failed"
         assert listen_result["peer"] == "STA1", listen_result
-        assert a.profile.mode_id == afsk.PROFILE_600.mode_id, a.profile
-        assert b.profile.mode_id == afsk.PROFILE_600.mode_id, b.profile
+        assert a.tx_profile.mode_id == afsk.PROFILE_600.mode_id, a.tx_profile
+        assert a.rx_profile.mode_id == afsk.CONTROL_PROFILE.mode_id, a.rx_profile
+        assert b.rx_profile.mode_id == afsk.PROFILE_600.mode_id, b.rx_profile
+        assert b.tx_profile.mode_id == afsk.CONTROL_PROFILE.mode_id, b.tx_profile
         assert a.peer_supported_modes == {p.mode_id for p in afsk.PROFILES}
         assert b.peer_supported_modes == {p.mode_id for p in afsk.PROFILES}
 
-        # Mid-session step down: B must be listening (recv_message) to
-        # catch and ack A's PT_MODE_REQ.
+        # Mid-session step down of A's tx (600 -> 300): B must be listening
+        # (recv_message) to catch and ack A's PT_MODE_REQ. B's own tx
+        # direction (already at the control profile) must be unaffected.
         def do_recv():
             b.recv_message(timeout=20)
 
@@ -162,8 +179,9 @@ def test_link_negotiation_and_mode_step():
         a._request_mode_step(-1)
         t.join(timeout=20)
 
-        assert a.profile.mode_id == afsk.PROFILE_300.mode_id, a.profile
-        assert b.profile.mode_id == afsk.PROFILE_300.mode_id, b.profile
+        assert a.tx_profile.mode_id == afsk.PROFILE_300.mode_id, a.tx_profile
+        assert b.rx_profile.mode_id == afsk.PROFILE_300.mode_id, b.rx_profile
+        assert b.tx_profile.mode_id == afsk.CONTROL_PROFILE.mode_id, b.tx_profile
         print("test_link_negotiation_and_mode_step OK")
     finally:
         a.stop()
@@ -176,6 +194,7 @@ if __name__ == "__main__":
     test_afsk_noisy_delayed_loopback()
     test_link_packet_roundtrip()
     test_connect_body_roundtrip()
+    test_connect_ack_body_roundtrip()
     test_negotiate_mode()
     test_mode_change_packet_roundtrip()
     test_link_negotiation_and_mode_step()
