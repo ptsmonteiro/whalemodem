@@ -78,7 +78,20 @@ PROFILE_300 = Profile(name="300baud", mode_id=0, baud=BAUD, freq0=FREQ_0, freq1=
 # stay inside the flatter part of that passband; re-validated on the bench
 # with scripts/measure_snr.py --profile 600baud and scripts/hw_smoke_link.py
 # --profile 600baud, see whale/afsk.py module docstring for the numbers.
-PROFILE_600 = Profile(name="600baud", mode_id=1, baud=600, freq0=700.0, freq1=1500.0)
+#
+# scripts/sweep_baud_payload.py --skip-baud --baud 600 found the frame-size
+# ceiling at this baud: 2-120 byte AFSK payloads passed 100% both
+# directions; 160 bytes broke down 0/5 on the ic705->ht leg specifically
+# (ht->ic705 stayed 100%) via the same false/duplicate-sync-lock signature
+# PROFILE_1200 hit at its own ceiling (end_index ~1.2x the expected frame
+# length), not gradual SNR falloff -- and notably the leg that failed here
+# is the *stronger*-SNR one, so this ceiling is a framing effect, not
+# simply "whichever leg has less SNR." chunk_size=100 (-> 102-byte AFSK
+# payload for DATA, see whale/link.py's frame_airtime calc) mirrors
+# PROFILE_1200's margin choice, keeping clearance below both the 120-byte
+# clean point and the 160-byte failure mode.
+PROFILE_600 = Profile(name="600baud", mode_id=1, baud=600, freq0=700.0, freq1=1500.0,
+                       chunk_size=100)
 
 # Third speed. PROFILE_600's tone-widening approach (700/1500 -> pushing
 # further apart) hit a hard wall: scripts/measure_band_edges.py found the
