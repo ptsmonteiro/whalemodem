@@ -115,6 +115,16 @@ class StationServer:
             except queue.Empty:
                 data = None
             if data:
+                # Coalesce whatever else is already queued so send_message
+                # gets a full buffer to split into chunk_size-sized frames,
+                # instead of one small frame per raw recv() burst.
+                pending = [data]
+                while True:
+                    try:
+                        pending.append(self._outbound_q.get_nowait())
+                    except queue.Empty:
+                        break
+                data = b"".join(pending)
                 try:
                     self.link.send_message(data)
                 except LinkError as exc:
