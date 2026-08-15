@@ -32,7 +32,11 @@ def try_one_way(tx_name, tx, rx_name, rx, settle_s=2.0, listen_s=6.0):
 
     audio = afsk.modulate(PAYLOAD)
     print(f"   sending {len(PAYLOAD)} bytes, tx audio {len(audio)/afsk.SAMPLE_RATE:.2f}s")
-    tx.send(audio, ptt_lead=0.5, ptt_tail=0.5)
+    # Deliberately the production PTT margins rather than generous ones, so
+    # this stays a real test of them (they are measured, not guessed -- see
+    # whale/transport.py PTT_LEAD/PTT_TAIL).
+    keyed = tx.send(audio)
+    print(f"   keyed {keyed:.2f}s (PTT on -> PTT off)")
 
     print(f"   listening on {rx_name} for {listen_s}s...")
     time.sleep(listen_s)

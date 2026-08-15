@@ -43,23 +43,28 @@ SYNC_BITS = _lfsr_bits(63, 6, (1, 6), seed=1)
 MAX_PAYLOAD_BYTES = 255
 
 # Extra dummy bits appended after the CRC, purely as on-air padding. Real
-# hardware (radio audio tail / squelch release / our own ramp-down) reliably
-# corrupts the last symbol or two of a transmission -- observed on this rig
-# as a wrong final byte even on short frames. Since parse_frame_bits only
-# reads the exact prefix it needs and ignores anything after, tacking these
-# throwaway bits onto the end means it's the padding that eats the tail
-# corruption instead of the real CRC/payload bits.
+# hardware corrupts the very end of a transmission -- our own 5ms amplitude
+# ramp-down, plus a symbol or so of radio audio tail -- and since
+# parse_frame_bits only reads the exact prefix it needs and ignores anything
+# after, these throwaway bits eat that instead of the real CRC bits.
 #
-# The corruption is a roughly fixed *duration* (squelch/PTT tail behavior,
-# not symbol count), so the padding has to be sized in bits-per-profile to
-# cover the same ~213ms at any baud -- a fixed bit count tuned for
-# PROFILE_300 (64 bits = 213ms at 300 baud) silently shrinks to ~107ms at
-# 600baud and stops covering the real tail corruption, corrupting the CRC's
-# last bits instead of the padding. See scripts/probe_600_ack.py, which
-# caught this directly: sync locked, length byte and payload decoded
-# correctly, but the CRC's last byte was off by one bit on every trial --
-# consistent with tail corruption reaching past a too-short pad.
-TAIL_PAD_SECONDS = 64 / 300  # ~213ms, the reference duration at PROFILE_300
+# This was 213ms, sized against a "tail corruption" that turned out to be a
+# software bug, not the radios: audio_io.transmit()'s output callback used
+# to raise CallbackStop on the last partial block, and PortAudio then tore
+# the stream down with roughly one `latency` -- ~100ms -- of the signal
+# still sitting in the device buffer, unplayed. Every transmission was
+# silently truncated by that much, and 213ms of padding was what it took to
+# keep the truncation off the CRC. With the zero-fill fix in transmit(), a
+# bench measurement (modulate a 500ms alternating tail pad, count how many
+# of its bits decode at the far end) shows 598-600 of 600 bits surviving in
+# both directions even when PTT drops the instant the audio ends -- i.e.
+# the genuine on-air tail costs 1-2 bits, ~1ms. 30ms is that plus the 5ms
+# ramp plus an order of magnitude of margin.
+#
+# Still expressed as a duration rather than a bit count: what the radio
+# corrupts is a span of time, so a fixed bit count tuned at one baud
+# silently shrinks at the next. See scripts/sweep_ptt_timing.py.
+TAIL_PAD_SECONDS = 0.03
 
 
 def tail_pad_bits(baud):
@@ -67,21 +72,21 @@ def tail_pad_bits(baud):
     return [i % 2 for i in range(n)]
 
 
-# Mirrors tail_pad_bits, but in front of SYNC_BITS. Squelch/AGC opening on
-# the receive side corrupts a roughly fixed *duration* at the start of a
-# capture too, not just the end -- at 300/600 baud that was invisible
-# because it landed inside the 63-bit SYNC preamble with slack left over
-# (630ms/210ms of preamble vs ~0.2s of settling), so the correlator still
-# found a clean lock. At higher baud the same preamble is proportionally
-# much shorter (63 bits = 70ms at 900 baud), so a fixed-duration settling
-# artifact eats into real sync/length/payload bits instead of being
-# absorbed by preamble slack -- seen on the bench as strong sync confidence
-# (the correlator still finds *a* peak) but CRC/parse failing every trial,
-# the same signature TAIL_PAD_SECONDS was added to fix, just on the other
-# end of the frame. Content doesn't matter (thrown away, never parsed) --
-# only that it buys the same real settling time the tail pad buys, scaled
-# to duration rather than bit count so it doesn't shrink as baud rises.
-HEAD_PAD_SECONDS = TAIL_PAD_SECONDS
+# Mirrors tail_pad_bits, but in front of SYNC_BITS. Content doesn't matter
+# (thrown away, never parsed); what it buys is settling time, scaled to
+# duration rather than bit count so it doesn't shrink as baud rises.
+#
+# Note this is *not* the whole leading allowance, and not the expensive
+# part of it: the transmitter needs a few hundred ms between PTT keying and
+# being usably on air, and that is bought by transport.PTT_LEAD (see its
+# comment for the measurement). By the time these bits go out the radio is
+# already up. Their job is the last stretch before the sync word -- give
+# the receiver's audio AGC in-band tone to settle on, and keep modulate()'s
+# 5ms amplitude ramp-in off the front of the sync word, where it would eat
+# real correlation energy. 80ms is comfortably more than both need; the
+# bench sweep decoded 100% at every value tested from 0 up, so this is
+# margin rather than a measured floor.
+HEAD_PAD_SECONDS = 0.08
 
 
 def head_pad_bits(baud):

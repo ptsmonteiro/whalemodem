@@ -41,13 +41,32 @@ acceptance_test.py            drives the full acceptance scenario over TCP
 information in frequency, not amplitude, so it survives the AGC/limiting
 this hardware chain applies on receive far better than an amplitude-coded
 scheme would. Frames carry a 63-bit PN sync word, an 8-bit length, the
-payload, a CRC16, and a short block of on-air padding after the CRC --
-padding because this hardware reliably corrupts the last symbol or two of
-a transmission (radio audio tail / squelch release), and the padding gives
-the real CRC bits a cushion instead of eating that corruption directly.
-See the docstrings in `whale/afsk.py` and `whale/framing.py` for the
-details, and `whale/link.py` / `whale/transport.py` for the half-duplex,
-self-echo, and WASAPI quirks this radio pair required working around.
+payload, a CRC16, and short blocks of on-air padding before the sync word
+and after the CRC, so that settling artifacts at either end of a
+transmission eat padding rather than real bits. See the docstrings in
+`whale/afsk.py` and `whale/framing.py` for the details, and
+`whale/link.py` / `whale/transport.py` for the half-duplex, self-echo, and
+WASAPI quirks this radio pair required working around.
+
+## Air time
+
+Everything held around a frame -- PTT lead-in, the two padding blocks, PTT
+tail -- is dead air, and all of it is measured rather than guessed:
+`scripts/sweep_ptt_timing.py` sweeps each allowance over the real radios in
+both directions and lets the worst direction decide. The constants it
+produced live in `whale/transport.py` (`PTT_LEAD`/`PTT_TAIL`) and
+`whale/framing.py` (`HEAD_PAD_SECONDS`/`TAIL_PAD_SECONDS`), each with the
+measurement behind it in a comment. Re-run the sweep after any change to
+the radios, the audio chain, or the PTT wiring.
+
+The binding constraint is the transmitter: the IC-705 takes 129-310ms
+(variable, 28 samples) between the CI-V key command and being usably on
+air, which is most of the ~430ms of lead-in. The trailing side costs
+almost nothing by comparison.
+
+Note that `link.TX_TURNAROUND_DELAY` -- a 1s pause *before* keying -- is
+not air time, but it is now the largest single delay per frame, and it has
+not had the same measurement treatment.
 
 ## Dependencies
 

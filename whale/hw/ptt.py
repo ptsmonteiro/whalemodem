@@ -13,7 +13,9 @@ HT:      keyed via a Digirig-style interface that toggles RTS (or DTR) on a
 COM port numbers move around between reboots and USB ports, so the radios are
 located by USB VID:PID (see icom_civ_candidates()) rather than hardcoded.
 
-Copied from radiomodem's shark/hw/ptt.py (unchanged).
+Copied from radiomodem's shark/hw/ptt.py, since diverged: IcomCivPtt._transact
+no longer blocks for a fixed serial timeout on every key() (see its docstring),
+because that time is transmitter-on dead air here.
 """
 
 import re
@@ -66,14 +68,38 @@ class IcomCivPtt:
 
     def __init__(self, port, baud=115200, radio_addr=IC705_DEFAULT_ADDR, timeout=0.3):
         self.radio_addr = radio_addr
+        self.timeout = timeout
         self.ser = _open_quiet(port, baud, timeout)
 
     def _transact(self, cmd: bytes) -> bytes:
+        """Sends one CI-V command and returns whatever came back.
+
+        Reads frame-at-a-time up to self.timeout rather than "sleep, then
+        read a fixed 64 bytes": a CI-V reply is 6 bytes (12 with echo-back
+        on), so read(64) never fills and always blocks for the full serial
+        timeout. Combined with the fixed sleep that made every key() call
+        take timeout + 0.1s -- 0.4s by default -- and the key(True) half of
+        that is spent with the transmitter already keyed, so it was 0.4s of
+        dead air on the front of every single frame. Reading until the CI-V
+        frame terminator instead returns as soon as the radio has answered
+        (a few ms), which is the whole point of asking for an ack.
+        """
         frame = CIV_FRAME_START + bytes([self.radio_addr, CONTROLLER_ADDR]) + cmd + CIV_FRAME_END
         self.ser.reset_input_buffer()
         self.ser.write(frame)
-        time.sleep(0.1)
-        return self.ser.read(64)
+        deadline = time.monotonic() + self.timeout
+        reply = b""
+        while time.monotonic() < deadline:
+            # One CI-V frame per read; with "CI-V USB Echo Back" enabled the
+            # first one back is our own command, so keep reading until the
+            # real ack shows up (or the deadline does).
+            chunk = self.ser.read_until(CIV_FRAME_END)
+            if not chunk:
+                break
+            reply += chunk
+            if _OK_RE.search(reply) or _NG_RE.search(reply):
+                break
+        return reply
 
     def key(self, on: bool) -> bool:
         """Sends transmit ON/OFF. Returns True on CI-V 'OK', False on 'NG'."""

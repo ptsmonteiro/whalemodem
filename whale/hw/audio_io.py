@@ -52,13 +52,27 @@ def transmit(tx_signal, tx_device, ptt, samplerate=SAMPLE_RATE, ptt_lead=0.3, pt
     callback-driven output stream and same generous latency, for the same
     reason: PortAudio's callback thread does not suffer the GIL and scheduler
     jitter that starve a blocking write loop into micro-dropouts.
+
+    The callback pads with zeros once the signal runs out and the *caller*
+    decides when playing has finished, rather than the callback raising
+    CallbackStop on the last partial block. CallbackStop tears the stream
+    down as soon as that block is handed over, and on this WASAPI output
+    that discards whatever is still queued in the device buffer -- one
+    `latency` worth, ~100ms, silently chopped off the end of every single
+    transmission. Measured on the bench by modulating a long alternating
+    tail pad and counting how many of its bits came back intact: 471/600
+    with CallbackStop, 600/600 with the zero-fill below. That missing 100ms
+    is what framing.TAIL_PAD_SECONDS was sized to absorb; see its comment.
+
+    ptt_tail is therefore carrier held after the last sample is genuinely on
+    air, not after the last sample was queued.
     """
     tx_signal = np.asarray(tx_signal, dtype=np.float32).reshape(-1, 1)
     tx_duration = len(tx_signal) / samplerate
 
     tx_pos = 0
     output_underflows = 0
-    done = threading.Event()
+    queued = threading.Event()
 
     def out_callback(outdata, frames, time_, status):
         nonlocal tx_pos, output_underflows
@@ -70,8 +84,8 @@ def transmit(tx_signal, tx_device, ptt, samplerate=SAMPLE_RATE, ptt_lead=0.3, pt
             outdata[: len(chunk)] = chunk
             outdata[len(chunk):] = 0
             tx_pos = len(tx_signal)
-            done.set()
-            raise sd.CallbackStop
+            queued.set()
+            return
         outdata[:] = chunk
         tx_pos = end
 
@@ -79,9 +93,17 @@ def transmit(tx_signal, tx_device, ptt, samplerate=SAMPLE_RATE, ptt_lead=0.3, pt
     ptt.key(True)
     try:
         time.sleep(ptt_lead)
-        with sd.OutputStream(device=tx_device, samplerate=samplerate, channels=1,
-                             dtype="float32", latency=0.1, callback=out_callback):
-            done.wait(tx_duration + 5.0)
+        stream = sd.OutputStream(device=tx_device, samplerate=samplerate, channels=1,
+                                 dtype="float32", latency=0.1, callback=out_callback)
+        with stream:
+            playing_since = time.time()
+            queued.wait(tx_duration + 5.0)
+            # Sound starts leaving the card about `latency` after the stream
+            # starts, so the last sample lands that much after the last one
+            # was handed to the callback.
+            remaining = (playing_since + tx_duration + stream.latency) - time.time()
+            if remaining > 0:
+                time.sleep(remaining)
         time.sleep(ptt_tail)
     finally:
         ptt.key(False)
@@ -105,8 +127,9 @@ def capture_while_transmitting(
     """Keys `ptt`, plays `tx_signal` out `tx_device`, and records `rx_device`
     for the whole timeline. Returns the recording as a 1-D float32 array.
 
-    Timeline: [pre_roll] [ptt_lead] [tx_signal] [ptt_tail] [post_roll], all
-    covered by one continuous recording started at t=0.
+    Timeline: [pre_roll] [ptt_lead] [output-stream latency] [tx_signal]
+    [ptt_tail] [post_roll], all covered by one continuous recording started
+    at t=0.
 
     Both streams are callback-driven rather than using the blocking
     read()/write() API: the blocking API's record loop runs its own
@@ -117,17 +140,17 @@ def capture_while_transmitting(
     us directly detect and report input overflow / output underflow (xrun)
     events instead of just inferring them from a distorted spectrum.
     """
-    tx_signal = np.asarray(tx_signal, dtype=np.float32).reshape(-1, 1)
-    tx_duration = len(tx_signal) / samplerate
-    total_duration = pre_roll + ptt_lead + tx_duration + ptt_tail + post_roll
-    rec_frames = int(round(total_duration * samplerate))
-    recorded = np.zeros((rec_frames, 1), dtype=np.float32)
-
     # Default PortAudio latency for these devices is ~3ms (their reported
     # default_low_output_latency), which is thin enough to underrun under
     # any scheduling jitter. Request explicit, generous latency on both
     # streams to give PortAudio enough buffer headroom.
     stream_latency = 0.1
+
+    tx_signal = np.asarray(tx_signal, dtype=np.float32).reshape(-1, 1)
+    tx_duration = len(tx_signal) / samplerate
+    total_duration = pre_roll + ptt_lead + stream_latency + tx_duration + ptt_tail + post_roll
+    rec_frames = int(round(total_duration * samplerate))
+    recorded = np.zeros((rec_frames, 1), dtype=np.float32)
 
     rec_pos = 0
     input_overflows = 0
@@ -147,8 +170,10 @@ def capture_while_transmitting(
 
     tx_pos = 0
     output_underflows = 0
-    tx_done = threading.Event()
+    tx_queued = threading.Event()
 
+    # Zero-fill rather than CallbackStop, so the device buffer is not
+    # discarded with ~`latency` of the signal still in it -- see transmit().
     def out_callback(outdata, frames, time_, status):
         nonlocal tx_pos, output_underflows
         if status.output_underflow:
@@ -159,8 +184,8 @@ def capture_while_transmitting(
             outdata[: len(chunk)] = chunk
             outdata[len(chunk) :] = 0
             tx_pos = len(tx_signal)
-            tx_done.set()
-            raise sd.CallbackStop
+            tx_queued.set()
+            return
         outdata[:] = chunk
         tx_pos = end
 
@@ -174,11 +199,16 @@ def capture_while_transmitting(
         ptt.key(True)
         try:
             time.sleep(ptt_lead)
-            with sd.OutputStream(
+            out_stream = sd.OutputStream(
                 device=tx_device, samplerate=samplerate, channels=1, dtype="float32",
                 latency=stream_latency, callback=out_callback,
-            ):
-                tx_done.wait(tx_duration + 5.0)
+            )
+            with out_stream:
+                playing_since = time.time()
+                tx_queued.wait(tx_duration + 5.0)
+                remaining = (playing_since + tx_duration + out_stream.latency) - time.time()
+                if remaining > 0:
+                    time.sleep(remaining)
             time.sleep(ptt_tail)
         finally:
             ptt.key(False)

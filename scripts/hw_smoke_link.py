@@ -27,7 +27,7 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(name)s: %(message)s")
 
-from whale import afsk, link as link_mod, mode_history
+from whale import afsk, link as link_mod, mode_history, transport as transport_mod
 from whale.link import Link
 from whale.transport import RadioTransport
 
@@ -44,8 +44,9 @@ def main():
     args = ap.parse_args()
 
     print(f"opening radios... (TX_TURNAROUND_DELAY={link_mod.TX_TURNAROUND_DELAY}s, "
-          f"ptt_lead=0.3s, ptt_tail=0.3s -- see whale/transport.py RadioTransport.send "
-          f"for the latter two, both baud-independent PTT/AGC settling on this hardware)")
+          f"ptt_lead={transport_mod.PTT_LEAD}s, ptt_tail={transport_mod.PTT_TAIL}s -- see "
+          f"whale/transport.py for the latter two, both baud-independent radio settling "
+          f"measured by scripts/sweep_ptt_timing.py)")
     t1 = RadioTransport("ic705")
     t2 = RadioTransport("ht")
 

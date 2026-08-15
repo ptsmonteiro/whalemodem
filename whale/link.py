@@ -303,9 +303,13 @@ class Link:
         profile = afsk.CONTROL_PROFILE if ptype in _CONTROL_PLANE_TYPES else self.tx_profile
         payload = bytes([ptype]) + body
         audio = afsk.modulate(payload, profile=profile)
-        logger.info("[%s] TX %s at %s (%d body byte(s), %.2fs airtime)",
-                    self.mycall, _ptype_name(ptype), profile.name, len(body), len(audio) / afsk.SAMPLE_RATE)
-        self.transport.send(audio)
+        keyed = self.transport.send(audio)
+        # Both numbers, because the gap between them is the PTT/settling
+        # overhead this frame actually paid -- the thing to watch if air
+        # time regresses. See scripts/sweep_ptt_timing.py.
+        logger.info("[%s] TX %s at %s (%d body byte(s), %.2fs audio, %.2fs keyed)",
+                    self.mycall, _ptype_name(ptype), profile.name, len(body),
+                    len(audio) / afsk.SAMPLE_RATE, keyed)
 
     def _wait_packet(self, want_types, timeout):
         deadline = time.time() + timeout

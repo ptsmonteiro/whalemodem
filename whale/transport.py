@@ -44,6 +44,33 @@ def _ensure_com_initialized():
     ctypes.windll.ole32.CoInitializeEx(None, _COINIT_APARTMENTTHREADED)
     _com_ready.done = True
 
+# Dead time held around each transmission, and the reason for each.
+#
+# PTT_LEAD covers the gap between keying and actually being usably on air.
+# Measured on the bench (scripts/sweep_ptt_timing.py, plus the head-pad bit
+# probe it documents): send a frame with a long alternating head pad and
+# ptt_lead=0, then count how many of those pad bits decode at the far end.
+# ht->ic705 loses only 22-72ms, but ic705->ht loses 129-310ms across 28
+# samples -- the IC-705's T/R switch is slow and, more awkwardly, variable.
+# Worst direction decides, so budget the full 310ms.
+#
+# Opening the output stream and filling its first buffer already spends
+# ~130ms of that with the carrier up, so PTT_LEAD only has to find the
+# rest: 0.22 + 0.13 + framing.HEAD_PAD_SECONDS puts the sync word ~430ms
+# after keying, ~120ms clear of the worst case seen. Note that shrinking
+# the stream latency would buy nothing -- it is dead air the radio needs
+# anyway, and PTT_LEAD would simply have to grow to replace it.
+#
+# PTT_TAIL is carrier held after the last sample is genuinely on air (see
+# audio_io.transmit, which now waits for playout rather than returning when
+# the last block was merely queued). The measured on-air tail costs 1-2
+# bits even when PTT drops immediately, so this is nearly all margin.
+#
+# Validated at 100% over 120 trials -- both directions, all three profiles,
+# DATA and ACK frame sizes.
+PTT_LEAD = 0.22
+PTT_TAIL = 0.05
+
 # How much recent audio the receiver keeps around for the decoder to search.
 # Generous relative to one frame's ~7s worst case (255-byte payload at 300
 # baud) so a frame straddling two decode attempts is never lost.
@@ -141,10 +168,11 @@ class RadioTransport:
 
     # -- transmit -------------------------------------------------------
 
-    def send(self, tx_audio, ptt_lead=0.3, ptt_tail=0.3, retries=5):
-        """Keys PTT, plays tx_audio, un-keys. RX capture keeps running
-        throughout (see module docstring); half duplex is enforced by
-        dropping whatever it picked up around our own transmission rather
+    def send(self, tx_audio, ptt_lead=PTT_LEAD, ptt_tail=PTT_TAIL, retries=5):
+        """Keys PTT, plays tx_audio, un-keys. Returns the key-to-unkey
+        duration in seconds -- the frame's actual air time. RX capture keeps
+        running throughout (see module docstring); half duplex is enforced
+        by dropping whatever it picked up around our own transmission rather
         than by stopping the stream.
 
         A short retry loop remains as a fallback for ordinary WASAPI
@@ -156,10 +184,12 @@ class RadioTransport:
             self._clear_buffer()
             try:
                 last_exc = None
+                keyed_seconds = None
                 for attempt in range(1, retries + 1):
                     try:
-                        audio_io.transmit(tx_audio, self.out_device, self.ptt,
-                                           samplerate=SAMPLE_RATE, ptt_lead=ptt_lead, ptt_tail=ptt_tail)
+                        keyed_seconds = audio_io.transmit(
+                            tx_audio, self.out_device, self.ptt,
+                            samplerate=SAMPLE_RATE, ptt_lead=ptt_lead, ptt_tail=ptt_tail)
                         last_exc = None
                         break
                     except sd.PortAudioError as exc:
@@ -169,6 +199,7 @@ class RadioTransport:
                         time.sleep(min(1.0, 0.2 * attempt))
                 if last_exc is not None:
                     raise last_exc
+                return keyed_seconds
             finally:
                 # Whatever leaked into the RX buffer during our own keyed
                 # transmission (sidetone, RF front-end artifacts) is not a
