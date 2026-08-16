@@ -8,13 +8,16 @@ open, i.e. during reception of the far end's transmission.
 
 So SNR here is measured in a single window (the received tone burst, from a
 squelch-open reception) by comparing:
-  - "signal" power: RMS in the AFSK tone band (500-1600 Hz), dominated by the
-    700/1300 Hz CPFSK tones.
+  - "signal" power: RMS in the AFSK tone band, i.e. the profile's two tones
+    plus BAND_MARGIN either side (1000-2000 Hz for PROFILE_300's 1200/1800 Hz
+    CPFSK tones).
   - "noise" power: RMS in two side bands just outside the tone band
-    (300-550 Hz and 1750-2050 Hz, chosen to dodge the 2100 Hz 3rd harmonic of
-    the 700 Hz tone), power-spectral-density-normalized and scaled up to the
-    tone band's bandwidth, as an estimate of what the noise floor contributes
-    inside the tone band.
+    (700-950 Hz and 2050-2300 Hz for that same profile),
+    power-spectral-density-normalized and scaled up to the tone band's
+    bandwidth, as an estimate of what the noise floor contributes inside the
+    tone band. _bands_for_profile flags a noise band landing on a tone's 3rd
+    harmonic; none of the current profiles' do, since every profile is
+    centred on 1500 Hz and their harmonics all sit above 2900 Hz.
 
 SNR_dB = 10*log10(signal_power / estimated_noise_power_in_band)
 
@@ -50,10 +53,9 @@ NOISE_WIDTH = 250.0   # Hz width of each noise band
 
 def _bands_for_profile(profile):
     """Signal band spans the two CPFSK tones (plus margin); noise bands sit
-    just outside it on each side. For PROFILE_300 (700/1300 Hz) this
-    reproduces the original hardcoded (500-1600)/(300-550, 1750-2050) bands.
-    Flags (doesn't avoid) a noise band that lands near either tone's 3rd
-    harmonic, since that skewed PROFILE_300's original band choice too."""
+    just outside it on each side. Flags (doesn't avoid) a noise band that
+    lands near either tone's 3rd harmonic, since that skewed PROFILE_300's
+    original band choice back when its lower tone was at 700 Hz."""
     lo_tone, hi_tone = sorted((profile.freq0, profile.freq1))
     signal_band = (lo_tone - BAND_MARGIN, hi_tone + BAND_MARGIN)
     noise_bands = [

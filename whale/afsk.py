@@ -1,23 +1,56 @@
 """Continuous-phase binary FSK modulate/demodulate for the AFSK link.
 
-300 baud, 700/1300 Hz tones: FSK carries information in frequency only, so it
+300 baud, 1200/1800 Hz tones: FSK carries information in frequency only, so it
 survives the amplitude gating/compression this HT+IC-705 hardware chain shows
 on receive (AGC, limiting) far better than an amplitude-sensitive scheme
 would. Values chosen for this reason, not for throughput -- this is a
 correctness-first v1.
 
+PROFILE_300 and PROFILE_600 are centred on 1500 Hz, the middle of the
+~600-2300 Hz usable band scripts/measure_band_edges.py measured on this bench.
+Each keeps the tone *separation* its own sweeps established -- 600 Hz at 300
+baud, 800 at 600 -- and places that separation symmetrically about 1500 Hz
+rather than wherever its own history happened to leave it. The profiles were
+developed one at a time and had drifted to different centres (1000 and 1100
+Hz), so the passband margin a profile had was an accident of when it was
+tuned; a common centre gives each the most headroom its separation allows, and
+equal headroom on both sides. Both measured better after the move, not just
+no worse -- see the SNR figures below.
+
+PROFILE_1200 is the exception, and it is a measured one rather than an
+oversight: it stays at 1200/2200 Hz (centre 1700). Centring it was tried on
+the radios and does not work on this chain. See PROFILE_1200's note for the
+runs.
+
 Measured channel: the hardware test bench is one IC-705 (STA1) and one HT via
 a Digirig-style interface (STA2), both squelched, on the bench per
-whale/hw/radios.py. scripts/measure_snr.py measures in-band SNR (500-1600 Hz,
-signal RMS in that band vs. a PSD-scaled noise estimate from the adjacent
-300-550/1750-2050 Hz side bands, taken from a live squelch-open reception --
+whale/hw/radios.py. scripts/measure_snr.py measures in-band SNR (signal RMS
+across the profile's tone pair vs. a PSD-scaled noise estimate from the side
+bands just outside it, taken from a live squelch-open reception --
 squelch-closed audio is just the receiver muted, not a usable noise
-reference) and found:
+reference) and found, at the tone placements below:
 
-    STA1 -> STA2: ~15 dB
-    STA2 -> STA1: ~12 dB
+                          STA1 -> STA2    STA2 -> STA1
+    PROFILE_300               21.2 dB         15.2 dB
+    PROFILE_600               13.0 dB          8.8 dB
+    PROFILE_1200              16.3 dB          7.5 dB
 
-Both are comfortable for PROFILE_300. Note that SNR no longer shows up in
+The 300/600 figures are with those profiles centred on 1500 Hz. PROFILE_300
+improved by re-centring, from ~15/~12 dB at its old 700/1300 Hz.
+
+Do not read PROFILE_600's row as worse than the others, or as worse than the
+16.3/11.3 dB its previous 1100/1900 Hz tones scored. These bands are derived
+per profile from the profile's own tones, so a narrower tone pair is scored
+through a narrower band and the rows are not comparable with each other.
+Measured properly -- both pairs through one fixed band, interleaved -- the
+1200/1800 Hz pair this profile now uses beats 1100/1900 by 2.2 dB in one
+direction and ties in the other. See PROFILE_600's note.
+
+The ht->ic705 leg is consistently the weaker of the two, and PROFILE_1200
+leans on it hardest -- that is the leg that fails first whenever this profile
+is moved (see its note).
+
+Note that SNR no longer shows up in
 the sync-detection margin: the normalised measure demodulate() uses scores
 a genuine sync word around 0.98 whether the link is at 20 dB or 0 dB (see
 CONFIDENCE_THRESHOLD). What SNR buys at these levels is bit errors in the
@@ -37,8 +70,19 @@ from whale import framing
 
 SAMPLE_RATE = 48000
 BAUD = 300
-FREQ_0 = 700.0
-FREQ_1 = 1300.0
+
+# The centre the profiles share: a profile's tone pair is CENTER_FREQ +/-
+# half its own separation. PROFILE_1200 is the one exception and spells its
+# tones out literally -- see its comment for the bench runs behind that.
+CENTER_FREQ = 1500.0
+
+
+def tones(separation, center=CENTER_FREQ):
+    """The (freq0, freq1) pair `separation` Hz apart, centred on `center`."""
+    return center - separation / 2, center + separation / 2
+
+
+FREQ_0, FREQ_1 = tones(600.0)  # 1200/1800 Hz
 
 # Sync-detection threshold, as a normalised correlation in [0, 1]: 1 means
 # the window has exactly the sync word's shape. See
@@ -101,14 +145,16 @@ class Profile:
 
 PROFILE_300 = Profile(name="300baud", mode_id=0, baud=BAUD, freq0=FREQ_0, freq1=FREQ_1)
 
-# Second speed. Originally tried at 700/1900 Hz (same 2:1 tone-separation-
-# to-baud ratio as PROFILE_300); that measured 9-10 dB SNR on the bench
-# (vs. 17-20 dB for PROFILE_300) and DATA frames failed outright (0/5
-# ACKed) -- the IC-705/HT/Digirig audio chain's FM discriminator +
-# de-emphasis rolls off well before 1900 Hz. Dropped freq1 to 1500 Hz to
-# stay inside the flatter part of that passband; re-validated on the bench
-# with scripts/measure_snr.py --profile 600baud and scripts/hw_smoke_link.py
-# --profile 600baud, see whale/afsk.py module docstring for the numbers.
+# Second speed. 800 Hz of tone separation, which was arrived at the hard
+# way: 700/1900 Hz (a 1200 Hz spread, the same 2:1 separation-to-baud ratio
+# as PROFILE_300) measured 9-10 dB SNR on the bench and failed outright
+# (0/5 DATA frames ACKed), and narrowing to 700/1500 fixed it. That was
+# read at the time as "the audio chain rolls off well before 1900 Hz",
+# which the later band-edge measurement contradicts -- PROFILE_1200 runs a
+# tone at 2200 Hz. The separation, not the upper tone, is what mattered.
+# Centred on 1500 Hz that separation is 1100/1900: the same spread that
+# worked, now with 500 Hz of band either side instead of 100 Hz below and
+# 800 Hz above.
 #
 # scripts/sweep_baud_payload.py --skip-baud --baud 600 found the frame-size
 # ceiling at this baud: 2-120 byte AFSK payloads passed 100% both
@@ -121,8 +167,36 @@ PROFILE_300 = Profile(name="300baud", mode_id=0, baud=BAUD, freq0=FREQ_0, freq1=
 # payload for DATA, see whale/link.py's frame_airtime calc) mirrors
 # PROFILE_1200's margin choice, keeping clearance below both the 120-byte
 # clean point and the 160-byte failure mode.
-PROFILE_600 = Profile(name="600baud", mode_id=1, baud=600, freq0=700.0, freq1=1500.0,
-                       chunk_size=100)
+# The separation was then narrowed again, from 800 Hz to 600, after the
+# re-centring: 1200/1800 A/B'd against 1100/1900 on the bench, interleaved
+# trial by trial so drift could not favour either. Both decoded 100% (32/32
+# at the 102-byte production frame, 12/12 at 160 bytes), but the narrower
+# pair scored better everywhere it differed -- 18.8 dB vs 16.6 dB
+# ic705->ht through one fixed measurement band, level on the reverse leg,
+# and steadier sync confidence on large frames (0.985 min vs a 0.847
+# wobble). Careful with the SNR figure: scoring each pair through bands
+# derived from its own tones, as measure_snr.py does by default, reverses
+# the result and flatters the wider pair -- the comparison has to hold the
+# band fixed.
+#
+# Why narrower wins here, most likely: non-coherent FSK detection is
+# orthogonal when the tone separation is an integer multiple of the baud
+# rate. 600 Hz at 600 baud is exactly 1.0 -- the matched filter for one
+# tone sees a null from the other. 800 Hz gave 1.33, which sits between
+# orthogonality points and leaks each tone into the other's filter.
+# PROFILE_300 lands on 2.0 by the same arithmetic. (PROFILE_1200's 0.833 is
+# the odd one out, and it is also the profile that will not move -- see its
+# note, though the mechanism there looks like absolute tone placement
+# rather than this.)
+#
+# These are now the same two tones PROFILE_300 uses, which is safe and was
+# checked rather than assumed: the sync template discriminates on symbol
+# timing, not tone frequency, so a 300 baud frame scores 0.61 against the
+# 600 baud correlator and vice versa 0.38 -- both far below the 0.7 lock
+# threshold, and unchanged from when the tones differed. A full acceptance
+# run with both profiles live on air produced no near-miss decodes.
+PROFILE_600 = Profile(name="600baud", mode_id=1, baud=600, freq0=tones(600.0)[0],
+                       freq1=tones(600.0)[1], chunk_size=100)
 
 # Third speed. PROFILE_600's tone-widening approach (700/1500 -> pushing
 # further apart) hit a hard wall: scripts/measure_band_edges.py found the
@@ -135,17 +209,46 @@ PROFILE_600 = Profile(name="600baud", mode_id=1, baud=600, freq0=700.0, freq1=15
 # for this FM audio chain (mic/speaker filtering, de-emphasis).
 #
 # Bell 202 (AX.25 1200bps) tones -- 1200/2200 Hz, narrower 1000 Hz
-# separation, centered in the flat part of the passband -- don't have that
-# problem. Re-running the baud sweep at 1200/2200 Hz cleared 1200 baud
-# cleanly (100% both directions) and broke down at 1400 (0/5 ht->ic705,
-# confidence flatlined -- a real passband wall, not a marginal case).
-# scripts/sweep_payload_1200_2200.py then found the frame-size ceiling at
-# that baud: 120-byte AFSK payloads passed 100% both directions; 160 bytes
-# broke down on the ic705->ht leg specifically via false/duplicate sync
-# lock (end_index ~2x the expected frame length), not gradual SNR falloff.
-# chunk_size=100 (-> 102-byte AFSK payload for DATA, see whale/link.py's
-# frame_airtime calc) keeps meaningful margin below both the 120-byte
-# clean point and the 160-byte failure mode.
+# separation -- don't have that problem. Re-running the baud sweep at
+# 1200/2200 Hz cleared 1200 baud cleanly (100% both directions) and broke
+# down at 1400 (0/5 ht->ic705, confidence flatlined -- a real passband
+# wall, not a marginal case). scripts/sweep_payload_1200_2200.py then found
+# the frame-size ceiling at that baud: 120-byte AFSK payloads passed 100%
+# both directions; 160 bytes broke down on the ic705->ht leg specifically
+# via false/duplicate sync lock (end_index ~2x the expected frame length),
+# not gradual SNR falloff. chunk_size=100 (-> 102-byte AFSK payload for
+# DATA, see whale/link.py's frame_airtime calc) keeps meaningful margin
+# below both the 120-byte clean point and the 160-byte failure mode.
+#
+# These tones are NOT centred on 1500 Hz the way the two slower profiles
+# are, and the exception is deliberate. Moving this profile down to the
+# common centre was tried on the bench (connect + 96 bytes each direction
+# per placement, the hw_smoke_link flow) and this profile alone will not
+# take it:
+#
+#   1200/2200  sep 1000  centre 1700   PASS, both directions, first try
+#   1100/2100  sep 1000  centre 1600   ic705->ht passed only after retries
+#                                      (9.2s vs 2.6s), ht->ic705 0/6
+#   1000/2000  sep 1000  centre 1500   both directions 0/6, twice
+#   1100/1900  sep  800  centre 1500   both directions 0/6
+#   1200/1800  sep  600  centre 1500   both directions 0/6
+#
+# Narrowing the separation does not rescue it, so this is the placement,
+# not the spread: performance falls off monotonically as the pair moves
+# down from 1700, and every centred variant is unusable. The ht->ic705 leg
+# goes first, which is the same weaker leg measure_snr.py reads at 6.2 dB
+# for 1000/2000 against 16.5 dB the other way.
+#
+# Note what does *not* explain it: none of this reproduces in software,
+# where 1000/2000 modulates and demodulates at 0.99 confidence like any
+# other pair. It is a property of the radio chain. One suggestive detail
+# for whoever picks this up -- _tone_energy_diff integrates each tone over
+# exactly one symbol, so at 1200 baud a 1000 Hz tone gives the detector
+# only 0.83 cycles to work with, 1100 Hz gives 0.92, and 1200 Hz gives a
+# full one. The three placements above line up with that ordering. If that
+# is the mechanism, the fix is in the detector (a longer integration, or a
+# coherent one), not in the tone table, and this profile could join the
+# others at 1500 Hz afterwards.
 PROFILE_1200 = Profile(name="1200baud", mode_id=2, baud=1200, freq0=1200.0, freq1=2200.0,
                         chunk_size=100)
 

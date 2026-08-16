@@ -22,7 +22,7 @@ station's request. Verified byte-for-byte on real hardware (see
 ```
 whale/
   framing.py     bit-level framing: sync word, length+CRC16, bit packing
-  afsk.py         CPFSK modulate/demodulate (300 baud, 700/1300 Hz tones)
+  afsk.py         CPFSK modulate/demodulate (300 baud, 1200/1800 Hz tones)
   transport.py    one radio: continuous RX capture + keyed TX
   link.py         stop-and-wait ARQ: connect / send / recv / disconnect
   vara_server.py  VARA-API-shaped TCP front end (StationServer, CLI)
@@ -120,10 +120,29 @@ explains the ceiling.
 
 ## Why CPFSK, why these numbers
 
-300 baud, continuous-phase binary FSK at 700/1300 Hz: FSK carries
+300 baud, continuous-phase binary FSK at 1200/1800 Hz: FSK carries
 information in frequency, not amplitude, so it survives the AGC/limiting
 this hardware chain applies on receive far better than an amplitude-coded
-scheme would. Frames carry a 63-bit PN sync word, an 8-bit length, the
+scheme would.
+
+300 and 600 baud are both centred on 1500 Hz, the middle of the
+~600-2300 Hz band `scripts/measure_band_edges.py` measured, rather than
+wherever each profile's history left them; both share the pair 1200/1800
+Hz, which is safe because the sync correlator discriminates on symbol
+timing rather than tone frequency. 600 baud's separation was narrowed from
+800 Hz to 600 on the bench evidence: A/B'd against 1100/1900 it decoded
+100% either way but scored 2.2 dB better through a fixed measurement band
+and held steadier sync confidence on large frames. Both separations now sit
+on an exact multiple of their baud rate (2.0 and 1.0), which is the
+orthogonality condition for the non-coherent detector this modem
+uses. 1200 baud is the exception and stays at 1200/2200 Hz -- centring it
+was tried at three separations on the radios and every centred variant
+failed outright, while 1200/2200 passes first try. The runs and a candidate
+explanation (the detector integrates one symbol, so a tone below the baud
+rate gives it less than a full cycle) are in `PROFILE_1200`'s comment in
+`whale/afsk.py`.
+
+Frames carry a 63-bit PN sync word, an 8-bit length, the
 payload, a CRC16, and short blocks of on-air padding before the sync word
 and after the CRC, so that settling artifacts at either end of a
 transmission eat padding rather than real bits. See the docstrings in
