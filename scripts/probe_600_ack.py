@@ -46,18 +46,22 @@ def _demod_debug(audio, profile):
     if len(diff) < len(template):
         return {"ok": False, "reason": "audio shorter than sync template"}
 
+    # Same normalised measure demodulate() uses -- a raw correlation peak
+    # scored against the buffer's median is not comparable between one
+    # capture and the next, which is most of what made this probe's
+    # original numbers hard to read.
+    ncc = afsk._normalised_correlation(diff, template)
     corr = correlate(diff, template, mode="valid", method="fft")
-    i_star = int(np.argmax(corr))
-    peak = float(corr[i_star])
-    noise_floor = float(np.median(np.abs(corr)))
-    confidence = peak / noise_floor if noise_floor > 0 else 0.0
+    i_star = int(np.argmax(ncc))
+    confidence = float(ncc[i_star])
 
     n_sync = len(framing.SYNC_BITS)
     first_index = i_star + (sps - 1)
     max_symbols = (len(diff) - 1 - first_index) // sps + 1
 
     info = {
-        "ok": True, "confidence": confidence, "peak": peak, "noise_floor": noise_floor,
+        "ok": True, "confidence": confidence, "peak": float(corr[i_star]),
+        "raw_peak_over_median": float(np.max(corr)) / float(np.median(np.abs(corr)) or 1.0),
         "sync_locked": confidence >= profile.confidence_threshold,
         "max_symbols": max_symbols, "symbols_needed_for_length_byte": n_sync + 8,
     }
@@ -110,7 +114,7 @@ def _analyze(captured, profile):
         print(f"  {info['reason']}")
         return
     print(f"  confidence={info['confidence']:.1f} (threshold={profile.confidence_threshold}) "
-          f"peak={info['peak']:.3g} noise_floor={info['noise_floor']:.3g} "
+          f"peak={info['peak']:.3g} raw_peak_over_median={info['raw_peak_over_median']:.3g} "
           f"sync_locked={info['sync_locked']}")
     print(f"  max_symbols={info['max_symbols']} (need {info['symbols_needed_for_length_byte']} for length byte)")
     if "declared_length_byte" in info:

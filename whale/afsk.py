@@ -17,7 +17,12 @@ reference) and found:
     STA1 -> STA2: ~15 dB
     STA2 -> STA1: ~12 dB
 
-Both comfortably clear PROFILE_300's confidence_threshold below. Re-run
+Both are comfortable for PROFILE_300. Note that SNR no longer shows up in
+the sync-detection margin: the normalised measure demodulate() uses scores
+a genuine sync word around 0.98 whether the link is at 20 dB or 0 dB (see
+CONFIDENCE_THRESHOLD). What SNR buys at these levels is bit errors in the
+frame body, which the CRC catches -- so it governs how often a frame has
+to be retransmitted, not whether the receiver notices it at all. Re-run
 measure_snr.py after any antenna, power, or placement change on the bench;
 these numbers drift with the physical setup, not with anything in this
 module.
@@ -34,7 +39,33 @@ SAMPLE_RATE = 48000
 BAUD = 300
 FREQ_0 = 700.0
 FREQ_1 = 1300.0
-CONFIDENCE_THRESHOLD = 4.0
+
+# Sync-detection threshold, as a normalised correlation in [0, 1]: 1 means
+# the window has exactly the sync word's shape. See
+# _normalised_correlation for why the measure is normalised rather than the
+# ratio-to-noise-floor this used to be, and demodulate() for how it's used.
+#
+# Calibrated against the 20 real off-air captures in scratch_captures_600ack
+# and against synthetic frames from 20 dB SNR down to 0 dB:
+#
+#   genuine sync word present   0.93 - 0.99   (all profiles, all SNRs, and
+#                                              still 0.94 on the captures
+#                                              whose frames fail CRC)
+#   no sync word present        0.19 - 0.49   (off-air noise, and modulated
+#                                              data carrying no sync)
+#
+# 0.7 sits in the middle of that gap. The gap is what matters here: the
+# previous peak/median-noise-floor measure scored those same no-sync
+# captures at 7.8 to 214 against a threshold of 4.0, i.e. it false-synced
+# on every one of them.
+CONFIDENCE_THRESHOLD = 0.7
+
+# Windows quieter than this fraction of the buffer's own RMS window energy
+# are treated as having this much energy instead, so normalising by a
+# near-silent window cannot manufacture a large ratio out of a tiny
+# correlation. See _normalised_correlation.
+_ENERGY_FLOOR_FRACTION = 0.05
+
 CHUNK_SIZE = 40  # link-layer payload bytes per DATA frame, see whale/link.py
 
 MAX_FRAME_BITS = len(framing.SYNC_BITS) + 8 + 8 * framing.MAX_PAYLOAD_BYTES + 16
@@ -151,6 +182,19 @@ def _apply_ramp(signal, sample_rate, ramp_ms=5):
 
 
 def modulate(payload: bytes, profile: Profile = PROFILE_300, sample_rate=SAMPLE_RATE, amplitude=0.6):
+    """One keying's worth of audio: `payload` framed (sync word, length,
+    CRC, head/tail pads) and modulated as one continuous signal.
+
+    A multi-frame variant of this existed briefly, for putting a burst of
+    link-layer frames in a single keying. That was rolled back with the
+    rest of the burst work; if it returns, note what the first hardware run
+    established: the frames have to share one _cpfsk_tone call. Modulating
+    each separately and concatenating the audio puts a 10ms fade to silence
+    at every join, because _apply_ramp ramps each frame down and the next
+    back up -- inaudible on a clean channel, but with the receiver's
+    AGC/limiter pumping through the gap the frame after each join decoded
+    only about a third of the time.
+    """
     sps = round(sample_rate / profile.baud)
     bits = framing.build_frame_bits(payload, baud=profile.baud)
     tone = _cpfsk_tone(bits, sps, sample_rate, profile.freq0, profile.freq1)
@@ -181,26 +225,79 @@ def frame_seconds(payload_len=framing.MAX_PAYLOAD_BYTES, profile: Profile = PROF
     return n_bits / profile.baud
 
 
-def demodulate(audio, profile: Profile = PROFILE_300, sample_rate=SAMPLE_RATE):
-    """Tries to find and decode one frame in `audio`. Returns a dict with at
-    least 'synced' and 'payload' (None if nothing usable was found)."""
-    sps = round(sample_rate / profile.baud)
-    audio = np.asarray(audio, dtype=np.float64)
+# How many correlation peaks demodulate() will attempt to decode in one
+# call, and how close together two peaks may be before they're treated as
+# one. A frame's sync word is 63 symbols, so peaks closer than a few
+# symbols are the same lock seen twice; the cap keeps a noisy buffer full
+# of marginal peaks from turning one poll into hundreds of CRC attempts.
+_MIN_PEAK_SEPARATION_SYMBOLS = 8
+_MAX_SYNC_CANDIDATES = 16
 
-    diff = _tone_energy_diff(audio, sample_rate, sps, profile.freq0, profile.freq1)
-    template = _sync_template(sps, sample_rate, profile.freq0, profile.freq1)
-    if len(diff) < len(template):
-        return {"synced": False, "payload": None}
 
+def _normalised_correlation(diff, template):
+    """Sliding normalised cross-correlation of `template` over `diff`: one
+    value per offset, in [-1, 1], where 1 means that window has exactly the
+    template's shape.
+
+    This replaces a plain correlation scored against
+    `peak / median(abs(corr))`. That ratio measured the wrong thing. Its
+    denominator is the *typical* correlation across the buffer, which is
+    small when the buffer is mostly idle noise and large when the buffer is
+    mostly modulated audio -- so the same frame scored 255 sitting in six
+    seconds of silence and 12 when the buffer held little else, and a
+    buffer of pure noise could score 6 against a threshold of 4. Measured
+    over the real off-air captures in scratch_captures_600ack, that measure
+    reported a sync lock on all 30 recordings that contain no sync word at
+    all.
+
+    Whether a frame is present cannot depend on how much dead air happens
+    to surround it, and it does not here: dividing each window's
+    correlation by that window's own energy makes the score a property of
+    the window alone.
+    """
     corr = correlate(diff, template, mode="valid", method="fft")
-    i_star = int(np.argmax(corr))
-    peak = float(corr[i_star])
-    noise_floor = float(np.median(np.abs(corr)))
-    confidence = peak / noise_floor if noise_floor > 0 else 0.0
+    m = len(template)
+    cumulative = np.concatenate([[0.0], np.cumsum(diff.astype(np.float64) ** 2)])
+    window_energy = np.maximum(cumulative[m:] - cumulative[:-m], 0.0)
+    local = np.sqrt(window_energy)[:len(corr)]
+    # A window of digital silence has no energy at all, and dividing a
+    # ~zero correlation by ~zero yields NaN or a meaningless large ratio.
+    # Floor it relative to the buffer's own typical window energy, with an
+    # absolute epsilon for a buffer that is silent throughout.
+    rms_window = float(np.sqrt(np.mean(diff.astype(np.float64) ** 2))) * np.sqrt(m)
+    floor = max(_ENERGY_FLOOR_FRACTION * rms_window, 1e-12)
+    ncc = corr / (np.maximum(local, floor) * float(np.sqrt(np.sum(template ** 2))))
+    return np.nan_to_num(ncc, nan=0.0, posinf=0.0, neginf=0.0)
 
-    if confidence < profile.confidence_threshold:
-        return {"synced": False, "confidence": confidence, "payload": None}
 
+def _sync_peaks(score, threshold_value, min_separation):
+    """Indices of distinct peaks in `score` (a normalised correlation)
+    above `threshold_value`, in time order.
+
+    demodulate() used to take argmax and stop, which is right only if the
+    buffer holds at most one sync-like thing. It does not: the RX buffer
+    routinely holds a garbled self-echo of our own last transmission
+    alongside the peer's genuine reply, and the echo can easily be the
+    louder of the two. Consuming up to the strongest peak's end then throws
+    away everything before it, the real frame included. The earliest peak
+    that decodes -- not the loudest -- is the one to return.
+    """
+    above = np.flatnonzero(score > threshold_value)
+    if above.size == 0:
+        return []
+    splits = np.flatnonzero(np.diff(above) > min_separation)
+    peaks = [int(group[np.argmax(score[group])]) for group in np.split(above, splits + 1)]
+    if len(peaks) > _MAX_SYNC_CANDIDATES:
+        # Keep the strongest, but hand them back in time order regardless:
+        # the point of the search is "earliest that decodes", and strength
+        # is only used to decide which marginal peaks are worth the CRC.
+        peaks = sorted(sorted(peaks, key=lambda i: score[i], reverse=True)[:_MAX_SYNC_CANDIDATES])
+    return peaks
+
+
+def _try_sync(diff, i_star, sps, confidence):
+    """Attempts to read a frame at one correlation peak. Same return shape
+    as demodulate()."""
     n_sync = len(framing.SYNC_BITS)
     first_index = i_star + (sps - 1)
     max_symbols = (len(diff) - 1 - first_index) // sps + 1
@@ -221,6 +318,13 @@ def demodulate(audio, profile: Profile = PROFILE_300, sample_rate=SAMPLE_RATE):
         "synced": payload is not None,
         "confidence": confidence,
         "start_index": i_star,
+        # Where the sync word itself ends. A caller giving up on this
+        # position only has to step past the sync to guarantee the same
+        # peak cannot win again, and stepping past just that discards far
+        # less unexamined audio than skipping to the end of a frame whose
+        # declared length it has no reason to trust. See whale/link.py's
+        # _decode_one.
+        "sync_end_index": first_index + sps * n_sync,
         "payload": payload,
     }
     if payload is not None or max_symbols >= total_bits_needed:
@@ -231,3 +335,50 @@ def demodulate(audio, profile: Profile = PROFILE_300, sample_rate=SAMPLE_RATE):
         # same buffer instead of discarding a frame that hasn't finished.
         result["end_index"] = first_index + sps * min(total_bits_needed, num_symbols)
     return result
+
+
+def demodulate(audio, profile: Profile = PROFILE_300, sample_rate=SAMPLE_RATE):
+    """Finds and decodes the *earliest* frame in `audio`. Returns a dict
+    with at least 'synced' and 'payload' (None if nothing usable was found).
+
+    `audio` can hold more than one sync-like thing -- a garbled self-echo of
+    our own last transmission and the peer's genuine reply routinely sit in
+    the buffer together. Every correlation peak clearing the profile's
+    confidence threshold is tried in time order and the first one whose CRC
+    checks out wins, so the caller can consume up to its 'end_index' and
+    come straight back for whatever follows.
+
+    When nothing decodes, the reported near-miss ('end_index' without a
+    'payload') is likewise the earliest such peak, so a caller skipping past
+    it discards as little unexamined audio as possible.
+    """
+    sps = round(sample_rate / profile.baud)
+    audio = np.asarray(audio, dtype=np.float64)
+
+    diff = _tone_energy_diff(audio, sample_rate, sps, profile.freq0, profile.freq1)
+    template = _sync_template(sps, sample_rate, profile.freq0, profile.freq1)
+    if len(diff) < len(template):
+        return {"synced": False, "payload": None}
+
+    ncc = _normalised_correlation(diff, template)
+    peaks = _sync_peaks(ncc, profile.confidence_threshold,
+                        sps * _MIN_PEAK_SEPARATION_SYMBOLS)
+    if not peaks:
+        return {"synced": False, "payload": None, "confidence": float(np.max(ncc))}
+
+    # First peak that yields a valid frame wins. Otherwise prefer reporting
+    # "still arriving" (no end_index, so the caller waits for more audio)
+    # over the earliest dead end, since discarding a frame mid-flight costs
+    # a retransmit while waiting one more poll costs nothing.
+    near_miss = None
+    still_arriving = None
+    for i_star in peaks:
+        result = _try_sync(diff, i_star, sps, float(ncc[i_star]))
+        if result.get("payload") is not None:
+            return result
+        if "end_index" in result:
+            if near_miss is None:
+                near_miss = result
+        elif still_arriving is None:
+            still_arriving = result
+    return still_arriving or near_miss

@@ -54,6 +54,14 @@ def _ensure_com_initialized():
 # samples -- the IC-705's T/R switch is slow and, more awkwardly, variable.
 # Worst direction decides, so budget the full 310ms.
 #
+# One constant for every radio, deliberately. A per-radio lead was tried
+# (0.08 for the HT against 0.22 for the IC-705) and rolled back: this is a
+# modem meant to work with whatever is plugged into it, and a table of
+# measured values only helps the two radios on this bench while quietly
+# under-provisioning every radio not in it. The conservative figure costs
+# the HT ~0.14s of dead carrier per frame, which is the price of not
+# needing to know what the radio is.
+#
 # Opening the output stream and filling its first buffer already spends
 # ~130ms of that with the carrier up, so PTT_LEAD only has to find the
 # rest: 0.22 + 0.13 + framing.HEAD_PAD_SECONDS puts the sync word ~430ms
@@ -74,6 +82,12 @@ PTT_TAIL = 0.05
 # How much recent audio the receiver keeps around for the decoder to search.
 # Generous relative to one frame's ~7s worst case (255-byte payload at 300
 # baud) so a frame straddling two decode attempts is never lost.
+#
+# Note this is the *cap*, not the working size -- whale/link.py's decode
+# loop prunes audio it has already searched and found nothing in, so the
+# buffer only approaches this length while a frame is actually arriving.
+# That matters because demodulate() costs time proportional to buffer
+# length (~14ms per second of audio per profile).
 RX_BUFFER_SECONDS = 10.0
 
 

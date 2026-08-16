@@ -32,8 +32,91 @@ tests/
 scripts/
   hw_smoke_single_frame.py   one AFSK frame each direction, no ARQ/sockets
   hw_smoke_link.py           full connect/send/disconnect via Link, no sockets
+  sweep_ptt_timing.py        the four dead-time knobs inside one keying
+  sweep_turnaround.py        the dead time *between* two stations' keyings
 acceptance_test.py            drives the full acceptance scenario over TCP
 ```
+
+## Where the time goes
+
+Throughput on a half-duplex link is set by turnaround, not by baud. Timing
+the acceptance run frame by frame (both stations' logs, PTT-on recovered as
+`logged_time - keyed_seconds`) put a steady-state 100-byte exchange at 1200
+baud at 3.91s: 2.00s of it fixed turnaround sleeps, 0.85s of PTT lead and
+sound-card startup, and 0.67s -- 17% -- actually spent on payload bits.
+
+Two things address that, neither of which changes how many frames are in
+flight -- the link is still stop-and-wait, one chunk acked before the next
+goes out:
+
+  - The turnaround wait is anchored on when the peer stopped transmitting,
+    worked out from where in the RX buffer its last frame ended, rather
+    than started when the link layer gets round to replying -- so the
+    decode is absorbed by the wait instead of added to it
+    (`link.TX_TURNAROUND_DELAY`, `sweep_turnaround.py`). The constant is
+    reasoned, not measured; the sweep has not been run on the bench yet.
+  - The decode loop discards audio it has already searched, bounding what
+    a poll costs instead of letting it grow with the preceding idle. This
+    feeds back into the turnaround: the reply cannot go out until the poll
+    that decoded the frame returns.
+
+### The burst attempt, and why it was rolled back
+
+The largest item -- several DATA frames per keying under one cumulative
+ACK, making the link go-back-N -- was built and then reverted. It never
+worked on the bench. Two hardware runs each went backwards for a reason
+the loopback tests could not see:
+
+  - Bursts were built by concatenating separately-modulated frames, so
+    every join carried a 10ms fade to silence. Fixed by modulating a
+    keying as one continuous waveform.
+  - Sync confidence was `peak / median(|correlation|)`, which measures the
+    buffer's composition rather than the frame -- it false-synced on all
+    30 off-air captures containing no sync word.
+  - An ACK naming the sender's own base -- "none of that keying arrived"
+    -- was classified as a stale ACK and waited out in full: 11 stalls of
+    ~6.1s in a 423s transfer. That signal only exists when a keying carries
+    several frames, so it did not survive the rollback; with one frame per
+    keying, a chunk the peer never decoded draws no ACK at all and the
+    timeout is the only signal there is.
+  - Replies were keying up on top of the peer, 24 of 51 within 150ms of
+    its PTT going off, because the anchor stopped at the peer's last CRC
+    bit and ignored the pad and carrier still to come.
+
+What remained after all four was still not right: the ic705->ht leg
+recovered exactly one frame from 32 of its 34 two-frame bursts, the second
+frame syncing at 0.97 and then failing its CRC every time, while the
+reverse leg carried the same bursts fine. That is the same "sync locks,
+frame does not verify" signature as the per-frame size ceilings the
+payload sweeps hit on this hardware, and it is not understood. Bursting is
+parked until it is.
+
+Three pieces of that work were kept, because they are fixes in their own
+right rather than burst machinery:
+
+  - The normalised sync correlation (`afsk._normalised_correlation`) and
+    the earliest-frame-wins sync search, which stop a loud self-echo in
+    the RX buffer from masking the peer's real reply.
+  - The turnaround anchoring above, including
+    `link.PEER_TRAILING_TRANSMISSION`.
+  - Session-scoped sequence numbers. The alternating-bit toggle they
+    replaced restarted at each message boundary, so a retransmitted final
+    chunk was indistinguishable from the first chunk of the next message.
+
+A DATA_ACK now carries two sequence numbers -- the frame it answers, and
+the one the receiver wants next -- rather than either alone. Only the
+second was carried during the burst work, and it is ambiguous: "send me S
+next" is equally "your chunk S-1 landed" and "I still want S". Since the
+receiver acks every frame it decodes, duplicates included, a single lost
+ACK leaves a spare copy queued at the sender, which reads as "the frame you
+just sent did not arrive". The pointless retransmit that follows is itself
+a duplicate, draws another spare ACK, and the link settles into two keyings
+per chunk for the rest of the session. One extra byte -- ~27ms of airtime
+at 300 baud -- removes the ambiguity entirely.
+
+`WHALE_CAPTURE_DIR` is left in place: set it and the link saves the audio
+behind every near-miss decode, which is the input to whatever finally
+explains the ceiling.
 
 ## Why CPFSK, why these numbers
 
