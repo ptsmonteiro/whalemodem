@@ -66,10 +66,21 @@ def run_point(tx, rx, payload, profile, label):
         ok += int(good)
         diag = ""
         if not good and "end_index" in result:
-            n_head = len(framing.head_pad_bits(profile.baud))
+            # Measure the frame the decoder *found*, not where it ended in
+            # the buffer. end_index is an absolute offset into the capture,
+            # and the frame starts ~1s into it (PTT lead, stream fill, head
+            # pad), so comparing it against a bare frame duration overstates
+            # the span by that much. This printed "~1.2x expected" for
+            # perfectly well-read frames, and that number was taken as
+            # evidence of a false sync lock on garbage -- it was not. What
+            # the decoder believed is start_index..end_index, which is the
+            # length byte read back as a duration.
             n_sync = len(framing.SYNC_BITS)
-            expected_bits = n_head + n_sync + 8 + 8 * len(payload) + 16 + len(framing.tail_pad_bits(profile.baud))
-            diag = f" [near-miss: end_index={result['end_index']} vs expected ~{round(expected_bits/profile.baud*SAMPLE_RATE)} samples]"
+            expected_bits = n_sync + 8 + 8 * len(payload) + 16
+            expected = round(expected_bits / profile.baud * SAMPLE_RATE)
+            span = result["end_index"] - result.get("start_index", 0)
+            diag = (f" [near-miss: frame span={span} vs expected {expected} samples"
+                    f" ({span/expected:.2f}x)]")
         print(f"  [{label}] trial {i}/{TRIALS}: tx={tx_wall:.2f}s captured={len(captured)}samp "
               f"confidence={result.get('confidence', 0.0):.1f} decoded={good}{diag}")
         time.sleep(0.5)

@@ -457,17 +457,25 @@ class Link:
         """Saves the audio a near-miss gave up on, if WHALE_CAPTURE_DIR is
         set in the environment. Off by default.
 
-        This exists for one specific open question: frames that sync
-        strongly and then fail their CRC anyway, on the ic705->ht leg only.
-        It is the signature behind the per-frame size ceilings in
+        This was added for one open question -- frames that sync strongly
+        and then fail CRC anyway, on the ic705->ht leg only, which is the
+        signature behind the per-frame size ceilings in
         scripts/sweep_payload_1200_2200.py and behind the burst attempt
-        being rolled back (see the module docstring), and none of it
-        reproduces in software -- progressive arrival, truncation at every
+        being rolled back (see the module docstring). That question is
+        answered: priority scan was enabled on the HT, muting its receiver
+        for ~280ms every ~3s, so any keying still running at 3.0s lost a
+        chunk out of its middle. With the scan off the ceiling is gone
+        entirely -- 255-byte payloads pass 100% both directions. See
+        scripts/probe_tx_duration_dropout.py, which separated keying
+        duration from payload size by holding the payload constant.
+
+        Worth keeping anyway. It is the only way to see what the radio
+        actually received rather than what the decoder made of it, and the
+        reason the original question took so long was that nothing about it
+        reproduced in software -- progressive arrival, truncation at every
         offset from 0 to 800ms, AWGN down to 15 dB and real off-air noise
-        beds all decode fine. Since the decoder cannot be made to fail on
-        demand, the only way to settle what the radio is actually receiving
-        is to keep it. Run the acceptance test with this set and the
-        captures are the input to whichever analysis comes next.
+        beds all decode fine. If a near-miss shows up that the dropout does
+        not explain, these captures are again the input to the analysis.
         """
         directory = os.environ.get("WHALE_CAPTURE_DIR")
         if not directory:

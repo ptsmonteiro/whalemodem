@@ -49,6 +49,357 @@ def test_afsk_noisy_delayed_loopback():
     print("test_afsk_noisy_delayed_loopback OK")
 
 
+# -- independent receiver clock ---------------------------------------
+#
+# Everything above this point modulates and demodulates against one clock,
+# which is a thing that never happens on air. Two stations have two sound
+# cards with two crystals, and nothing disciplines them to each other. The
+# tests below put an offset between the two so the suite can express the
+# class of bug that a shared clock hides completely.
+
+# A robustness target, deliberately far beyond anything this bench shows.
+#
+# scripts/measure_clock_offset.py measured the real figure on the two
+# radios: -3.7 ppm ic705->ht and +3.1 ppm ht->ic705, summing to -0.6 ppm.
+# The two legs being reciprocal to within 0.6 ppm is what says that is a
+# genuine clock difference and not an artefact of the method. The two sound
+# cards are, for practical purposes, the same clock -- ~100x too close to
+# cost a single bit at any frame size the link sends. Clock offset was
+# never the cause of anything failing on this bench; that was priority scan
+# on the HT, see scripts/probe_tx_duration_dropout.py.
+#
+# The tests below are kept anyway, because "the clocks happen to agree
+# today" is not a property of the modem. A different radio, a different
+# interface, or a colder shack changes it, and a decoder that silently
+# depends on it should be known to. 500 ppm is the bar a modem ought to
+# clear; it is not a measurement of this bench.
+ASSUMED_WORST_CASE_PPM = 500
+
+# The production frame: link.py sends chunk_size=100 bytes of payload plus
+# its own type/seq header, so the AFSK payload is 102 bytes. The bench
+# sweeps put the ceiling just above this -- 120 bytes decoded 100% both
+# directions, 160 bytes failed 0/5 one way.
+PRODUCTION_PAYLOAD_BYTES = 102
+
+
+def resample_clock(audio, ppm):
+    """`audio` as heard by a receiver whose sample clock is `ppm` parts per
+    million away from the transmitter's.
+
+    A receiver clocking fast takes more samples of the same span of time, so
+    the signal arrives stretched: a symbol that was `sps` samples long
+    becomes sps*(1+ppm/1e6), and every tone lands at freq/(1+ppm/1e6). Both
+    effects come out of the one resampling, which is the point -- a crystal
+    offset moves timing and frequency together, and simulating the timing
+    alone would be simulating something that cannot physically happen.
+
+    Linear interpolation suffices: the highest tone in use (2200 Hz) is
+    oversampled ~22x at 48 kHz, so the interpolation error sits far below
+    the noise the other tests already decode through. Verified against a
+    known offset in test_clock_offset_simulation_is_faithful.
+    """
+    audio = np.asarray(audio, dtype=np.float64)
+    ratio = 1.0 + ppm * 1e-6
+    if ppm == 0:
+        return audio.copy()
+    n_out = int(len(audio) * ratio)
+    return np.interp(np.arange(n_out) / ratio, np.arange(len(audio)), audio)
+
+
+def _frame_bits(payload_len):
+    """Bits from the start of the sync word to the end of the CRC -- the
+    span over which a timing error has to stay inside half a symbol."""
+    return len(framing.SYNC_BITS) + 8 + 8 * payload_len + 16
+
+
+def expected_failure(reason):
+    """Marks a test that documents a known, unfixed defect.
+
+    The test asserts the behaviour we want, so it fails today. Rather than
+    leave the suite red -- which trains everyone to ignore it -- the failure
+    is caught and reported as XFAIL. If the test ever *passes*, that is
+    itself an error: the defect is fixed and the marker has to come off, so
+    the assertion moves from documentation to guarantee. Same contract as
+    pytest's strict xfail, without taking a pytest dependency in a suite
+    that otherwise runs as a plain script.
+    """
+    def decorate(fn):
+        def wrapper(*args, **kwargs):
+            try:
+                fn(*args, **kwargs)
+            except AssertionError as exc:
+                first = str(exc).strip().splitlines()[0] if str(exc).strip() else ""
+                print(f"{fn.__name__} XFAIL ({reason})" + (f": {first}" if first else ""))
+                return
+            raise AssertionError(
+                f"{fn.__name__} passed, but is marked as a known failure "
+                f"({reason}). If the decoder now handles this, remove the "
+                f"expected_failure marker so the test guards the fix."
+            )
+        wrapper.__name__ = fn.__name__
+        wrapper.__doc__ = fn.__doc__
+        return wrapper
+    return decorate
+
+
+def test_clock_offset_simulation_is_faithful():
+    """The offset helper is the instrument every test below reads through,
+    so check it against something with a known answer before trusting it: a
+    pure tone resampled by `ppm` must come back at freq/(1+ppm/1e6)."""
+    seconds, freq = 2.0, 1500.0
+    t = np.arange(int(seconds * afsk.SAMPLE_RATE)) / afsk.SAMPLE_RATE
+    tone = np.cos(2 * np.pi * freq * t)
+
+    assert np.array_equal(resample_clock(tone, 0), tone), "0 ppm must be identity"
+
+    for ppm in (-1000, -250, 250, 1000):
+        shifted = resample_clock(tone, ppm)
+        ratio = 1.0 + ppm * 1e-6
+        assert abs(len(shifted) - len(tone) * ratio) <= 1, ppm
+
+        # Frequency by phase slope, which resolves far below an FFT bin.
+        n = np.arange(len(shifted))
+        mixed = shifted * np.exp(-1j * 2 * np.pi * (freq / ratio) * n / afsk.SAMPLE_RATE)
+        win = int(afsk.SAMPLE_RATE * 0.002)
+        smooth = np.convolve(mixed, np.ones(win) / win, mode="valid")
+        phase = np.unwrap(np.angle(smooth))
+        tt = np.arange(len(phase)) / afsk.SAMPLE_RATE
+        residual_hz = np.polyfit(tt, phase, 1)[0] / (2 * np.pi)
+        # Expected tone is freq/ratio; anything left over is helper error.
+        assert abs(residual_hz) < 0.05, (ppm, residual_hz)
+    print("test_clock_offset_simulation_is_faithful OK")
+
+
+def test_decodes_through_a_small_clock_offset():
+    """Well-matched clocks must not be a problem at any frame size the link
+    actually sends. This is the regression guard for whatever fixes the
+    larger offsets -- a timing estimator that helps at 500 ppm and hurts at
+    50 would pass the tests below and still make the link worse."""
+    rng = np.random.default_rng(11)
+    for profile in afsk.PROFILES:
+        for n in (2, PRODUCTION_PAYLOAD_BYTES, 160):
+            payload = bytes(rng.integers(0, 256, size=n, dtype=np.uint8))
+            tx = afsk.modulate(payload, profile=profile)
+            for ppm in (-50, 0, 50):
+                rx = resample_clock(tx, ppm)
+                result = afsk.demodulate(rx, profile=profile)
+                assert result.get("payload") == payload, \
+                    (profile.name, n, ppm, result.get("confidence"))
+    print("test_decodes_through_a_small_clock_offset OK")
+
+
+def test_clock_offset_tolerance_is_half_a_symbol_over_the_frame():
+    """Characterises exactly where today's decoder gives up, because the
+    shape of that boundary is what identifies the cause.
+
+    afsk.demodulate lays symbol sample points on a rigid grid of integer
+    `sps` from the sync peak, with no timing recovery, so a clock offset
+    accumulates a sampling error that grows along the frame. The frame dies
+    when that error reaches half a symbol, which puts the tolerance at
+    0.5/n_bits -- inversely proportional to frame length, and independent of
+    baud, since a faster profile has proportionally shorter symbols.
+
+    Both of those are the signature the bench saw: a ceiling in *payload
+    bytes* that sat at the same byte count for all three profiles. Gradual
+    SNR falloff does not do that, and neither does anything in the RF path.
+
+    When timing recovery lands, this test fails -- that is the point of it.
+    Re-measure the boundary and update the bound; do not delete the test.
+    """
+    rng = np.random.default_rng(12)
+    for profile in afsk.PROFILES:
+        for n in (40, 120, 200):
+            payload = bytes(rng.integers(0, 256, size=n, dtype=np.uint8))
+            tx = afsk.modulate(payload, profile=profile)
+            predicted = 0.5e6 / _frame_bits(n)
+
+            # Comfortably inside the predicted boundary: must decode.
+            inside = resample_clock(tx, round(predicted * 0.6))
+            assert afsk.demodulate(inside, profile=profile).get("payload") == payload, \
+                ("expected decode inside the half-symbol bound", profile.name, n)
+
+            # Comfortably outside it: must not. If this half starts passing,
+            # the decoder has gained timing tolerance from somewhere.
+            outside = resample_clock(tx, round(predicted * 2.0))
+            assert afsk.demodulate(outside, profile=profile).get("payload") != payload, \
+                ("expected failure outside the half-symbol bound", profile.name, n)
+    print("test_clock_offset_tolerance_is_half_a_symbol_over_the_frame OK")
+
+
+@expected_failure("no symbol timing recovery in afsk.demodulate")
+def test_decodes_at_production_size_under_bench_clock_offset():
+    """The requirement, stated as the link needs it: a production-sized
+    frame survives the clock offset two independent sound cards can present,
+    in either direction, on every profile.
+
+    Fails today, at every profile, for the reason in
+    test_clock_offset_tolerance_is_half_a_symbol_over_the_frame: 102 bytes
+    is 903 bits, so the decoder's half-symbol budget runs out at ~550 ppm
+    and this asks for 500 in both directions with no margin for the sync
+    peak landing a fraction of a symbol off.
+    """
+    rng = np.random.default_rng(13)
+    failures = []
+    for profile in afsk.PROFILES:
+        payload = bytes(rng.integers(0, 256, size=PRODUCTION_PAYLOAD_BYTES, dtype=np.uint8))
+        tx = afsk.modulate(payload, profile=profile)
+        for ppm in (-ASSUMED_WORST_CASE_PPM, ASSUMED_WORST_CASE_PPM):
+            result = afsk.demodulate(resample_clock(tx, ppm), profile=profile)
+            if result.get("payload") != payload:
+                failures.append((profile.name, ppm, round(result.get("confidence") or 0, 3)))
+    assert not failures, f"no decode at (profile, ppm, confidence): {failures}"
+    print("test_decodes_at_production_size_under_bench_clock_offset OK")
+
+
+@expected_failure("no symbol timing recovery in afsk.demodulate")
+def test_long_frames_lose_to_clock_offset_before_short_ones():
+    """Long frames are the first thing a clock offset takes away.
+
+    Worth pinning down because it is a trap, not because it is currently
+    biting: a decoder with no timing recovery degrades in a way that looks
+    exactly like a frame-size ceiling, and the bench did have a frame-size
+    ceiling. It was not this -- the clocks measure 8 ppm apart and the real
+    cause is a receiver dropout, see
+    scripts/probe_tx_duration_dropout.py. But the two are indistinguishable
+    from the decoder's output alone, so if a size ceiling ever shows up
+    again, measure the clocks before assuming it is the same thing twice.
+    """
+    rng = np.random.default_rng(14)
+    profile = afsk.PROFILE_600
+    ppm = 400  # inside 120 bytes' budget (478 ppm), outside 160 bytes' (366)
+
+    small = bytes(rng.integers(0, 256, size=120, dtype=np.uint8))
+    large = bytes(rng.integers(0, 256, size=160, dtype=np.uint8))
+    small_rx = afsk.demodulate(resample_clock(afsk.modulate(small, profile=profile), ppm),
+                               profile=profile)
+    large_rx = afsk.demodulate(resample_clock(afsk.modulate(large, profile=profile), ppm),
+                               profile=profile)
+
+    # The 120-byte half is not the defect and must hold regardless.
+    assert small_rx.get("payload") == small, "120 bytes should survive 400 ppm"
+    assert large_rx.get("payload") == large, \
+        f"160 bytes failed at {ppm} ppm (confidence {large_rx.get('confidence')})"
+    print("test_long_frames_lose_to_clock_offset_before_short_ones OK")
+
+
+# -- mid-frame receiver dropout ---------------------------------------
+#
+# The failure the bench actually had, kept because the shape of it will
+# recur with any scanning receiver. Priority scan was enabled on the HT,
+# muting it for ~280ms about 3.0s after PTT key-down and again roughly
+# every 3.1s. Nothing to do with the modulation, the tones, or frame size.
+#
+# It was mistaken for a frame-size ceiling because a bigger payload is also
+# a longer keying, and every sweep varied both at once. A 40-byte frame -- a
+# size the sweeps recorded as 100% reliable -- failed 0/4 when the padding
+# in front of it put it on air across the 3.0s mark, and went back to 4/4
+# on both sides of that band. With the scan off the ceiling disappeared
+# entirely: 255-byte payloads pass 100% both directions at 600 and 1200
+# baud.
+
+DROPOUT_SECONDS = 0.28
+
+
+def punch_dropout(audio, at_seconds, duration=DROPOUT_SECONDS):
+    """Silences `duration` seconds of `audio` starting at `at_seconds`,
+    the way the HT's receiver silences a span of a transmission."""
+    audio = np.asarray(audio, dtype=np.float64).copy()
+    start = int(at_seconds * afsk.SAMPLE_RATE)
+    end = min(len(audio), start + int(duration * afsk.SAMPLE_RATE))
+    if start < len(audio):
+        audio[start:end] = 0.0
+    return audio
+
+
+def test_a_dropout_outside_the_frame_is_harmless():
+    """The requirement the link actually depends on. Retransmits have to
+    land in a clear window and decode there, even though the buffer they
+    arrive in still holds the hole that killed the previous attempt."""
+    rng = np.random.default_rng(16)
+    profile = afsk.PROFILE_600
+    payload = bytes(rng.integers(0, 256, size=40, dtype=np.uint8))
+    frame = afsk.modulate(payload, profile=profile)
+
+    lead = np.zeros(int(1.5 * afsk.SAMPLE_RATE), dtype=np.float32)
+    tail = np.zeros(int(1.5 * afsk.SAMPLE_RATE), dtype=np.float32)
+    buffer = np.concatenate([lead, frame, tail])
+    frame_end = (len(lead) + len(frame)) / afsk.SAMPLE_RATE
+
+    for at in (0.4, frame_end + 0.4):
+        holed = punch_dropout(buffer, at)
+        holed = holed + rng.normal(0, 0.01, size=len(holed))
+        result = afsk.demodulate(holed, profile=profile)
+        assert result.get("payload") == payload, \
+            (f"a dropout at {at:.2f}s, clear of the frame, broke the decode",
+             result.get("confidence"))
+    print("test_a_dropout_outside_the_frame_is_harmless OK")
+
+
+def test_a_dropout_inside_the_frame_fails_without_lying():
+    """A hole in the middle of a frame is unrecoverable and that is fine --
+    280ms is ~170 bits at 600 baud, and there is no FEC to rebuild them.
+    What must not happen is a *false* decode: the CRC has to catch it, so
+    the link retransmits rather than handing up corrupt data.
+
+    The sync word still scores high, because it is 63 symbols at the very
+    front and the hole is far behind it. That is why the bench saw
+    'confidence 0.99, CRC failed' and read it as a sync problem.
+    """
+    rng = np.random.default_rng(17)
+    profile = afsk.PROFILE_600
+    payload = bytes(rng.integers(0, 256, size=40, dtype=np.uint8))
+    frame = afsk.modulate(payload, profile=profile)
+    lead = np.zeros(int(0.5 * afsk.SAMPLE_RATE), dtype=np.float32)
+    buffer = np.concatenate([lead, frame, np.zeros(4000, dtype=np.float32)])
+
+    frame_seconds = len(frame) / afsk.SAMPLE_RATE
+    hit = 0
+    for offset in np.arange(0.15, frame_seconds - 0.3, 0.1):
+        holed = punch_dropout(buffer, 0.5 + offset)
+        holed = holed + rng.normal(0, 0.01, size=len(holed))
+        result = afsk.demodulate(holed, profile=profile)
+        assert result.get("payload") in (None, payload), "decoder invented a payload"
+        if result.get("payload") is None:
+            hit += 1
+    assert hit > 0, "expected at least one dropout position to break the frame"
+    print(f"test_a_dropout_inside_the_frame_fails_without_lying OK "
+          f"({hit} positions broke the frame, none decoded falsely)")
+
+
+def test_high_confidence_survives_the_offset_that_kills_the_payload():
+    """Why the ceiling looked mysterious rather than obvious.
+
+    The sync word is 63 symbols; a frame is twenty times that. An offset
+    that has barely moved the sampling point by the end of the sync word has
+    walked most of a symbol by the end of the payload, so the receiver
+    reports a near-perfect lock and then fails CRC. Any diagnostic that
+    reads confidence as "the frame arrived cleanly" is reading the first 5%
+    of the frame.
+    """
+    rng = np.random.default_rng(15)
+    profile = afsk.PROFILE_600
+    payload = bytes(rng.integers(0, 256, size=160, dtype=np.uint8))
+    tx = afsk.modulate(payload, profile=profile)
+
+    result = afsk.demodulate(resample_clock(tx, 800), profile=profile)
+    assert result.get("payload") is None, "expected the frame to fail at 800 ppm"
+    assert result.get("confidence", 0) > 0.9, \
+        f"expected a high-confidence near-miss, got {result.get('confidence')}"
+
+    # And the length byte still reads correctly, because it sits at bits
+    # 63-71 where the accumulated error is still negligible. This is worth
+    # pinning down: the sweep scripts reported a near-miss end_index ~1.2x
+    # the expected frame length and it was read as a false sync lock on
+    # garbage. It is not -- end_index is an absolute offset into the RX
+    # buffer, and the frame simply started ~1s into it.
+    assert "end_index" in result and "start_index" in result, result
+    span = result["end_index"] - result["start_index"]
+    sps = round(afsk.SAMPLE_RATE / profile.baud)
+    assert abs(span - sps * _frame_bits(len(payload))) < sps, \
+        ("length byte decoded wrong", span, sps * _frame_bits(len(payload)))
+    print("test_high_confidence_survives_the_offset_that_kills_the_payload OK")
+
+
 def test_link_packet_roundtrip():
     """Same shape as whale.link's packet encode: type byte + body, through
     modulate/demodulate."""
@@ -459,6 +810,14 @@ if __name__ == "__main__":
     test_framing_roundtrip()
     test_afsk_clean_loopback()
     test_afsk_noisy_delayed_loopback()
+    test_clock_offset_simulation_is_faithful()
+    test_decodes_through_a_small_clock_offset()
+    test_clock_offset_tolerance_is_half_a_symbol_over_the_frame()
+    test_high_confidence_survives_the_offset_that_kills_the_payload()
+    test_decodes_at_production_size_under_bench_clock_offset()
+    test_long_frames_lose_to_clock_offset_before_short_ones()
+    test_a_dropout_outside_the_frame_is_harmless()
+    test_a_dropout_inside_the_frame_fails_without_lying()
     test_link_packet_roundtrip()
     test_connect_body_roundtrip()
     test_connect_ack_body_roundtrip()

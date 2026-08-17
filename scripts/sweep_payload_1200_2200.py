@@ -63,10 +63,17 @@ def run_point(tx, rx, payload, label):
         ok += int(good)
         diag = ""
         if not good and "end_index" in result:
-            n_head = len(framing.head_pad_bits(BAUD))
+            # See the same block in scripts/sweep_baud_payload.py: end_index
+            # is absolute within the capture buffer, so it has to be taken
+            # against start_index rather than against a frame duration. The
+            # older form reported "~2x expected" for frames whose length
+            # byte had in fact been read correctly.
             n_sync = len(framing.SYNC_BITS)
-            expected_bits = n_head + n_sync + 8 + 8 * len(payload) + 16 + len(framing.tail_pad_bits(BAUD))
-            diag = f" [near-miss: end_index={result['end_index']} vs expected ~{round(expected_bits/BAUD*SAMPLE_RATE)} samples]"
+            expected_bits = n_sync + 8 + 8 * len(payload) + 16
+            expected = round(expected_bits / BAUD * SAMPLE_RATE)
+            span = result["end_index"] - result.get("start_index", 0)
+            diag = (f" [near-miss: frame span={span} vs expected {expected} samples"
+                    f" ({span/expected:.2f}x)]")
         print(f"  [{label}] trial {i}/{TRIALS}: tx={tx_wall:.2f}s captured={len(captured)}samp "
               f"confidence={result.get('confidence', 0.0):.1f} decoded={good}{diag}")
         time.sleep(0.5)

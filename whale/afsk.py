@@ -156,17 +156,16 @@ PROFILE_300 = Profile(name="300baud", mode_id=0, baud=BAUD, freq0=FREQ_0, freq1=
 # worked, now with 500 Hz of band either side instead of 100 Hz below and
 # 800 Hz above.
 #
-# scripts/sweep_baud_payload.py --skip-baud --baud 600 found the frame-size
-# ceiling at this baud: 2-120 byte AFSK payloads passed 100% both
-# directions; 160 bytes broke down 0/5 on the ic705->ht leg specifically
-# (ht->ic705 stayed 100%) via the same false/duplicate-sync-lock signature
-# PROFILE_1200 hit at its own ceiling (end_index ~1.2x the expected frame
-# length), not gradual SNR falloff -- and notably the leg that failed here
-# is the *stronger*-SNR one, so this ceiling is a framing effect, not
-# simply "whichever leg has less SNR." chunk_size=100 (-> 102-byte AFSK
-# payload for DATA, see whale/link.py's frame_airtime calc) mirrors
-# PROFILE_1200's margin choice, keeping clearance below both the 120-byte
-# clean point and the 160-byte failure mode.
+# scripts/sweep_baud_payload.py --skip-baud --baud 600 once recorded a
+# "frame-size ceiling" at this baud: 2-120 byte AFSK payloads passed 100%
+# both directions; 160 bytes broke down 0/5 on the ic705->ht leg. That was
+# priority scan on the HT muting its receiver every ~3s, not a property of
+# this profile or of frame size -- see the note above PROFILE_1200. With
+# the scan off the same sweep passes 100% both directions at every payload
+# up to 255 bytes. chunk_size=100 (-> 102-byte AFSK payload for DATA, see
+# whale/link.py's frame_airtime calc) is kept as a turnaround and
+# retransmit-cost choice: a lost frame costs a whole chunk to resend, and
+# smaller chunks interleave better with ACKs.
 # The separation was then narrowed again, from 800 Hz to 600, after the
 # re-centring: 1200/1800 A/B'd against 1100/1900 on the bench, interleaved
 # trial by trial so drift could not favour either. Both decoded 100% (32/32
@@ -212,13 +211,49 @@ PROFILE_600 = Profile(name="600baud", mode_id=1, baud=600, freq0=tones(600.0)[0]
 # separation -- don't have that problem. Re-running the baud sweep at
 # 1200/2200 Hz cleared 1200 baud cleanly (100% both directions) and broke
 # down at 1400 (0/5 ht->ic705, confidence flatlined -- a real passband
-# wall, not a marginal case). scripts/sweep_payload_1200_2200.py then found
-# the frame-size ceiling at that baud: 120-byte AFSK payloads passed 100%
-# both directions; 160 bytes broke down on the ic705->ht leg specifically
-# via false/duplicate sync lock (end_index ~2x the expected frame length),
-# not gradual SNR falloff. chunk_size=100 (-> 102-byte AFSK payload for
-# DATA, see whale/link.py's frame_airtime calc) keeps meaningful margin
-# below both the 120-byte clean point and the 160-byte failure mode.
+# wall, not a marginal case). chunk_size=100 (-> 102-byte AFSK payload for
+# DATA, see whale/link.py's frame_airtime calc).
+#
+# RESOLVED, and it was never about frame size or about this profile.
+#
+# scripts/sweep_payload_1200_2200.py and the 600-baud sweep both reported a
+# "frame-size ceiling" -- 120-byte payloads 100%, 160 bytes failing on the
+# ic705->ht leg. The cause was **priority scan enabled on the HT**, which
+# briefly mutes the receiver every ~3s to check the priority channel. It
+# cost ~280ms of audio starting ~3.0s after PTT key-down and roughly every
+# 3.1s after, so any keying still running at 3.0s lost a chunk out of its
+# middle. Turning priority scan off removed it completely.
+#
+# Payload size was a proxy for keying duration, and every sweep varied both
+# at once, so the limit appeared in whichever unit was being printed. The
+# arithmetic lined up across both sweeps despite completely different
+# airtime sums (this one pads 1s of noise either side of the frame, the
+# 600-baud one pads nothing): every payload that passed finished before
+# ~2.8s from PTT, every one that failed was still transmitting at 3.0s.
+# scripts/probe_tx_duration_dropout.py is the test that separated the two,
+# holding the payload at 40 bytes -- a size the sweeps called 100% reliable
+# -- and varying only the dead air in front of it. With the scan on it went
+# 4/4, 0/4, 4/4 as the frame moved across the 3.0s mark; with it off, 4/4
+# at every offset on both legs.
+#
+# After the fix, the 600-baud sweep runs 100% both directions at every
+# payload up to 255 bytes, the format's own maximum -- so there is no
+# frame-size ceiling on this bench at all, and chunk_size is now a
+# turnaround/retransmit-cost choice rather than a reliability one.
+#
+# Two explanations that were believed for a while and are both wrong. It
+# was not a false sync lock: the sync word scores ~0.99 and the length byte
+# reads back correctly, because both sit in the first 5% of the frame, far
+# ahead of the hole -- the "end_index ~2x expected" figure that suggested
+# otherwise was a bug in the sweep's own diagnostic, comparing an absolute
+# buffer index against a bare frame duration. And it was not sample-clock
+# drift between the two sound cards: scripts/measure_clock_offset.py puts
+# them 3.4 ppm apart (-3.7/+3.1 ppm on the two legs, summing to -0.6, i.e.
+# properly reciprocal), some 100x too little to cost a bit at any frame
+# size -- a frame dies when timing error reaches half a symbol, which needs
+# ~366 ppm at 160 bytes. tests/test_afsk_loopback.py keeps both failure
+# modes on file, because from the decoder's output alone they are
+# indistinguishable from this one.
 #
 # These tones are NOT centred on 1500 Hz the way the two slower profiles
 # are, and the exception is deliberate. Moving this profile down to the

@@ -88,8 +88,18 @@ recovered exactly one frame from 32 of its 34 two-frame bursts, the second
 frame syncing at 0.97 and then failing its CRC every time, while the
 reverse leg carried the same bursts fine. That is the same "sync locks,
 frame does not verify" signature as the per-frame size ceilings the
-payload sweeps hit on this hardware, and it is not understood. Bursting is
-parked until it is.
+payload sweeps hit on this hardware -- and that signature now has an
+explanation: **priority scan was enabled on the HT**, muting its receiver
+for ~280ms every ~3s. Any keying still transmitting at ~3.0s after PTT lost
+a chunk out of its middle, which is precisely where the second frame of a
+two-frame burst sits. See `whale/afsk.py`'s note above `PROFILE_1200` and
+`scripts/probe_tx_duration_dropout.py`.
+
+With the scan off, the payload sweeps run 100% both directions to 255
+bytes, the format's maximum. Bursting is therefore no longer blocked on an
+unexplained failure -- but it has not been retried, and the four bugs above
+are separate from the scan and were all real. Anyone picking it back up
+starts from the rollback, not from the burst branch.
 
 Three pieces of that work were kept, because they are fixes in their own
 right rather than burst machinery:
