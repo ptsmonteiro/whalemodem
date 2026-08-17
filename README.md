@@ -28,10 +28,14 @@ whale/
   vara_server.py  VARA-API-shaped TCP front end (StationServer, CLI)
   hw/             sound card lookup + PTT keying (audio_io, ptt, radios)
 tests/
+  link_harness.py         two Links against each other, in one process
   test_afsk_loopback.py   pure-software self-test, no hardware/radios
+  test_link_recovery.py   what a *lost control frame* does to a session
 scripts/
   hw_smoke_single_frame.py   one AFSK frame each direction, no ARQ/sockets
   hw_smoke_link.py           full connect/send/disconnect via Link, no sockets
+  hw_half_open_recovery.py   kill one station mid-session, time the other
+  measure_peer_gap.py        worst legitimate peer silence, from the logs
   sweep_ptt_timing.py        the four dead-time knobs inside one keying
   sweep_turnaround.py        the dead time *between* two stations' keyings
 acceptance_test.py            drives the full acceptance scenario over TCP
@@ -128,6 +132,84 @@ at 300 baud -- removes the ambiguity entirely.
 behind every near-miss decode, which is the input to whatever finally
 explains the ceiling.
 
+## Losing a control frame
+
+ARQ covers a lost DATA frame or a lost ACK, because both ends go on
+agreeing about what they are doing while the retransmits happen. Control
+frames are the ones that *change* what each end is doing, so losing one
+leaves the two ends disagreeing -- and a retransmit repeats a
+disagreement, it does not repair it. Two of those used to be
+unrecoverable, and neither could be reached by the test suite as it stood.
+
+**A lost MODE_ACK was session-fatal.** The responder moves its rx_profile
+when it sends the ack; the requester moves its tx_profile only when it
+receives one. Lose that frame and the peer transmits at a profile the
+responder has stopped listening for -- and the only way to notice is to
+decode a frame, which is exactly what has become impossible. Every DATA
+frame then failed and the session died. `rx_profile` is now a hint rather
+than an assertion: the pre-step profile stays a decode candidate until a
+data frame settles it, and a decoded DATA/DATA_ACK is treated as ground
+truth about what the peer is really sending. Recovery takes one frame,
+whichever end lost the ack. Note which cases were fatal -- 600<->1200 and
+any step down to the control profile. Stepping *up* from 300 always
+limped on, because 300 is the control profile and every station always
+tries it, and that is why the bug survived so long.
+
+**A lost CONNECT_ACK left the session half open.** The caller retried into
+a listener that had already returned from `listen_once`, where nothing
+handled a CONNECT at all. The caller gave up and went IDLE while the
+listener stayed CONNECTED with no keepalive, no timeout, and -- wedged in
+`accept()` on its data port -- no thread that could ever notice. The
+handshake is now idempotent: a retry of the session already in progress is
+re-answered with the same CONNECT_ACK, byte for byte. A caller that gives
+up anyway sends one DISC on its way out, so the two ends converge in
+seconds rather than waiting out the backstop.
+
+That idempotency needs to tell "a retry of the call you answered" from "I
+restarted, calling again", which are otherwise the same bytes; guessing the
+second resets the sequence state under a transfer with chunks in flight.
+So **CONNECT and CONNECT_ACK each gained one byte**, a session identifier
+the caller picks and the listener echoes. Both stations must run the same
+build across that change.
+
+`link.INACTIVITY_TIMEOUT` is the backstop for a peer that simply vanished.
+It is measured, not guessed: the worst silence a healthy session produces
+is a full MAX_RETRIES cycle, which timed at **44.4s** on the bench against
+the 34.8s the ACK-timeout arithmetic predicts -- the five retransmissions'
+own airtime and turnaround land inside the same silence. Plus an
+unanswered mode step (4.3s) that puts the worst legitimate quiet at ~49s,
+and the constant a little over 3x that. See `scripts/measure_peer_gap.py`.
+It deliberately does not keep an *idle* session alive; that would need a
+keepalive probe, and every keepalive is a keying.
+
+### Reproducing frame loss on the bench
+
+A real channel cannot be told to lose a chosen frame. But from the peer's
+side a MODE_ACK that was never sent is indistinguishable from one that was
+sent and lost, so loss is reproduced by suppressing the transmission.
+Three environment hooks in `whale/link.py` do this, all off by default and
+all invisible on air; the software tests drive the same code, so the bench
+and the suite exercise one mechanism rather than two:
+
+```
+WHALE_DROP_PTYPE=MODE_ACK,CONNECT_ACK   packet types not to transmit
+WHALE_DROP_NTH=1                        which occurrences (or "all")
+WHALE_FORCE_MODE=1                      start a session at a chosen profile
+WHALE_MODE_STEP_SCRIPT=1:up             step at a chosen chunk, not by luck
+```
+
+`scripts/run_acceptance_test.py` takes `--a-env`/`--b-env` to set them per
+station, which is what the scenarios need -- "the responder loses its
+MODE_ACK" is a different run from "both ends lose one":
+
+```
+python scripts/run_acceptance_test.py --log-dir logs/b1 --size 512 \
+    --a-env WHALE_FORCE_MODE=1 --a-env WHALE_MODE_STEP_SCRIPT=1:up \
+    --a-env WHALE_DROP_PTYPE=MODE_ACK \
+    --b-env WHALE_FORCE_MODE=1 --b-env WHALE_MODE_STEP_SCRIPT=1:up \
+    --b-env WHALE_DROP_PTYPE=MODE_ACK
+```
+
 ## Why CPFSK, why these numbers
 
 300 baud, continuous-phase binary FSK at 1200/1800 Hz: FSK carries
@@ -194,10 +276,11 @@ name matching, PTT wiring, COM ports) is configured in `whale/hw/radios.py`.
 
 ## Running
 
-Software-only self-test (no radios needed):
+Software-only self-tests (no radios needed):
 
 ```
 python tests/test_afsk_loopback.py
+python tests/test_link_recovery.py
 ```
 
 Hardware smoke tests (need both radios connected and on the same

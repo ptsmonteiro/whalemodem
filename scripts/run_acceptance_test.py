@@ -7,11 +7,29 @@ as when run by hand), waits for both command ports to accept a connection,
 runs acceptance_test.py against them, then tears both servers down --
 whether the test passed, failed, or raised.
 
+Each station's environment can be extended with --a-env/--b-env, which is
+how the frame-loss and profile hooks in whale/link.py (WHALE_DROP_PTYPE,
+WHALE_FORCE_MODE, WHALE_MODE_STEP_SCRIPT -- see the "test affordances" note
+there) are driven on the bench. They have to be per station rather than
+inherited from this process: the interesting scenarios are asymmetric, and
+"the responder loses its MODE_ACK" is not the same run as "both ends lose
+one".
+
 Run:
     python scripts/run_acceptance_test.py
     python scripts/run_acceptance_test.py --a-radio ic705 --b-radio ht --size 4096
+
+    # start both legs at 600 baud, have each station step up after its
+    # first ACKed chunk, and lose the first MODE_ACK at each end -- i.e.
+    # the 600->1200 transition failing in both directions at once
+    python scripts/run_acceptance_test.py \
+        --a-env WHALE_FORCE_MODE=1 --a-env WHALE_MODE_STEP_SCRIPT=1:up \
+        --a-env WHALE_DROP_PTYPE=MODE_ACK \
+        --b-env WHALE_FORCE_MODE=1 --b-env WHALE_MODE_STEP_SCRIPT=1:up \
+        --b-env WHALE_DROP_PTYPE=MODE_ACK
 """
 import argparse
+import os
 import socket
 import subprocess
 import sys
@@ -51,14 +69,32 @@ def _pump_output(name, proc, log_file):
         log_file.flush()
 
 
-def _start_server(radio, mycall, cmd_port, data_port, host, log_path, name):
+def _env_with(overrides):
+    """This process's environment plus `overrides` (a list of NAME=VALUE),
+    logged so a run's own log records what it was run with -- an injected
+    frame loss that is not written down beside the result is worse than no
+    result at all."""
+    env = dict(os.environ)
+    for item in overrides or ():
+        name, _, value = item.partition("=")
+        env[name.strip()] = value
+    return env
+
+
+def _start_server(radio, mycall, cmd_port, data_port, host, log_path, name, env_overrides=()):
     log_file = open(log_path, "w")
+    if env_overrides:
+        header = f"# station {name} environment: {' '.join(env_overrides)}\n"
+        print(f"[{name}] {header}", end="")
+        log_file.write(header)
+        log_file.flush()
     proc = subprocess.Popen(
         [sys.executable, "-m", "whale.vara_server",
          "--radio", radio, "--mycall", mycall,
          "--cmd-port", str(cmd_port), "--data-port", str(data_port),
          "--host", host, "--verbose"],
         cwd=ROOT, stdout=subprocess.PIPE, stderr=subprocess.STDOUT,
+        env=_env_with(env_overrides),
     )
     pump = threading.Thread(target=_pump_output, args=(name, proc, log_file), daemon=True)
     pump.start()
@@ -93,6 +129,10 @@ def main():
     ap.add_argument("--connect-timeout", type=float, default=180.0)
     ap.add_argument("--transfer-timeout", type=float, default=300.0)
     ap.add_argument("--log-dir", default=str(ROOT / "logs"))
+    ap.add_argument("--a-env", action="append", metavar="NAME=VALUE", default=[],
+                    help="extra environment for station A (repeatable)")
+    ap.add_argument("--b-env", action="append", metavar="NAME=VALUE", default=[],
+                    help="extra environment for station B (repeatable)")
     args = ap.parse_args()
 
     log_dir = Path(args.log_dir)
@@ -101,11 +141,11 @@ def main():
     print(f"starting station A ({args.a_radio}, {args.a_call}) on cmd={args.a_cmd} data={args.a_data}, "
           f"logging to {log_dir / 'sta1.log'}...")
     proc_a, log_a, pump_a = _start_server(args.a_radio, args.a_call, args.a_cmd, args.a_data, args.host,
-                                           log_dir / "sta1.log", "A")
+                                           log_dir / "sta1.log", "A", args.a_env)
     print(f"starting station B ({args.b_radio}, {args.b_call}) on cmd={args.b_cmd} data={args.b_data}, "
           f"logging to {log_dir / 'sta2.log'}...")
     proc_b, log_b, pump_b = _start_server(args.b_radio, args.b_call, args.b_cmd, args.b_data, args.host,
-                                           log_dir / "sta2.log", "B")
+                                           log_dir / "sta2.log", "B", args.b_env)
 
     exit_code = 1
     try:

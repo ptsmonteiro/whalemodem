@@ -14,6 +14,11 @@ import numpy as np
 
 from whale import afsk, framing, link, mode_history
 
+# The two-Link-in-one-process harness these tests share with
+# tests/test_link_recovery.py.
+from link_harness import (FakeTransport as _FakeTransport, connected_pair as _connected_pair,
+                          silence_once as _silence_once, transfer as _transfer)
+
 
 def test_framing_roundtrip():
     for payload in (b"", b"hello", bytes(range(256))[:255]):
@@ -414,17 +419,19 @@ def test_link_packet_roundtrip():
 
 
 def test_connect_body_roundtrip():
-    body = link._encode_call_and_modes("STA1", "STA2", [0, 1], 1)
-    a, b, supported, extra = link._decode_call_and_modes(body)
-    assert (a, b, supported, extra) == ("STA1", "STA2", [0, 1], 1), (a, b, supported, extra)
+    body = link._encode_call_and_modes("STA1", "STA2", [0, 1], 1, 0x5A)
+    a, b, supported, extra, session = link._decode_call_and_modes(body)
+    assert (a, b, supported, extra, session) == ("STA1", "STA2", [0, 1], 1, 0x5A), \
+        (a, b, supported, extra, session)
     print("test_connect_body_roundtrip OK")
 
 
 def test_connect_ack_body_roundtrip():
-    body = link._encode_connect_ack("STA2", "STA1", [0, 1, 2], 1, 0)
-    a, b, supported, accepted_id, own_id = link._decode_connect_ack(body)
-    assert (a, b, supported, accepted_id, own_id) == ("STA2", "STA1", [0, 1, 2], 1, 0), \
-        (a, b, supported, accepted_id, own_id)
+    body = link._encode_connect_ack("STA2", "STA1", [0, 1, 2], 1, 0, 0x5A)
+    a, b, supported, accepted_id, own_id, session = link._decode_connect_ack(body)
+    assert (a, b, supported, accepted_id, own_id, session) == \
+        ("STA2", "STA1", [0, 1, 2], 1, 0, 0x5A), \
+        (a, b, supported, accepted_id, own_id, session)
     print("test_connect_ack_body_roundtrip OK")
 
 
@@ -543,90 +550,6 @@ def test_await_turnaround_is_anchored_on_peer_audio():
     finally:
         link.TX_TURNAROUND_DELAY = saved
     print("test_await_turnaround_is_anchored_on_peer_audio OK")
-
-
-class _FakeTransport:
-    """In-memory stand-in for whale.transport.RadioTransport: send() writes
-    straight into the paired transport's buffer instead of playing audio."""
-
-    def __init__(self):
-        self._buf = np.zeros(0, dtype=np.float32)
-        self._lock = threading.Lock()
-        self.peer = None
-        # Optional f(audio) -> audio applied to one transmission, so a test
-        # can lose a DATA frame or an ACK outright.
-        self.corrupt = None
-        self.keyings = 0
-
-    def start_receiving(self):
-        pass
-
-    def stop_receiving(self):
-        pass
-
-    def is_transmitting(self):
-        # send() below writes straight into the peer's buffer synchronously,
-        # so there's no "mid-transmit" window for the decode loop to race.
-        return False
-
-    def snapshot_rx(self):
-        with self._lock:
-            return self._buf.copy()
-
-    def consume_rx(self, upto_sample):
-        with self._lock:
-            self._buf = self._buf[upto_sample:]
-
-    def send(self, tx_audio, **kwargs):
-        self.keyings += 1
-        if self.corrupt is not None:
-            tx_audio = self.corrupt(tx_audio)
-        with self.peer._lock:
-            self.peer._buf = np.concatenate([self.peer._buf, tx_audio])
-        return len(tx_audio) / afsk.SAMPLE_RATE
-
-
-def _silence_once(transport):
-    """Wipes the next transmission from this transport and then gets out of
-    the way -- one frame or ACK lost to the channel."""
-    def corrupt(audio):
-        transport.corrupt = None
-        return np.zeros(len(audio), dtype=np.float32)
-    return corrupt
-
-
-def _connected_pair():
-    """Two Links, connected over paired fake transports, with the timing
-    constants wound down -- the settling delays exist for real radios and
-    only slow this down."""
-    link.TX_TURNAROUND_DELAY = 0.02
-    link.DECODE_POLL_INTERVAL = 0.01
-    ta, tb = _FakeTransport(), _FakeTransport()
-    ta.peer, tb.peer = tb, ta
-    history = {}
-    a = link.Link(ta, "STA1", mode_history_store=history)
-    b = link.Link(tb, "STA2", mode_history_store=history)
-    a.start()
-    b.start()
-    result = {}
-    t = threading.Thread(target=lambda: result.update(peer=b.listen_once(timeout=20)))
-    t.start()
-    ok = a.connect("STA2", retries=3)
-    t.join(timeout=20)
-    assert ok, "connect() failed"
-    assert result.get("peer") == "STA1", result
-    return a, b, ta, tb
-
-
-def _transfer(a, b, data, timeout=90):
-    """a.send_message(data) with b receiving concurrently, as vara_server's
-    pump does. Returns what b reassembled."""
-    got = {}
-    t = threading.Thread(target=lambda: got.update(msg=b.recv_message(timeout=timeout)))
-    t.start()
-    a.send_message(data)
-    t.join(timeout=timeout)
-    return got.get("msg")
 
 
 def test_link_multi_chunk_message_roundtrip():

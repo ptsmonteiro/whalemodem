@@ -40,6 +40,12 @@ logger = logging.getLogger(__name__)
 
 PUMP_RECV_TIMEOUT = 0.5
 
+# How often the wait for the local client's data connection comes up for
+# air to service the link. Same figure as PUMP_RECV_TIMEOUT and for the
+# same reason: it is the granularity at which this station notices anything
+# that is not a socket. See _accept_data_connection.
+DATA_ACCEPT_POLL = 0.5
+
 
 class StationServer:
     def __init__(self, radio_name, mycall, cmd_port, data_port, host="127.0.0.1"):
@@ -140,13 +146,40 @@ class StationServer:
             if self.link.state != "CONNECTED":
                 return
 
+    def _accept_data_connection(self):
+        """Waits for the local client to open the data port, servicing the
+        radio link while it does. Returns the connection, or None if the
+        session ended before anyone turned up.
+
+        This used to be a bare blocking accept(), and that was where a
+        half-open session lodged. Between going CONNECTED and the client
+        connecting, nothing on this station read anything off the air: a
+        caller whose CONNECT_ACK was lost retried into that window, got no
+        answer, gave up and went IDLE -- while this station stayed
+        CONNECTED with accept() having no timeout and Link, at the time,
+        having none either. Polling instead lets Link.service_while_idle
+        re-answer the handshake, and failing that notice the peer has
+        gone."""
+        self._data_listener.settimeout(DATA_ACCEPT_POLL)
+        while True:
+            try:
+                conn, addr = self._data_listener.accept()
+            except socket.timeout:
+                if not self.link.service_while_idle():
+                    logger.info("session ended before the data port was opened")
+                    return None
+                continue
+            logger.info("data connection from %s", addr)
+            return conn
+
     def _run_session(self, start_fn):
         """start_fn() blocks until CONNECTED (True) or gives up (False)."""
         ok = start_fn()
         if not ok:
             return
-        data_conn, data_addr = self._data_listener.accept()
-        logger.info("data connection from %s", data_addr)
+        data_conn = self._accept_data_connection()
+        if data_conn is None:
+            return
         with self._data_lock:
             self._data_conn = data_conn
         reader = threading.Thread(target=self._data_reader_loop, args=(data_conn,), daemon=True)
@@ -154,6 +187,15 @@ class StationServer:
         try:
             self._pump_until_disconnected()
         finally:
+            # The pump can return with the link still CONNECTED -- that is
+            # what a LinkError from send_message looks like, a peer that
+            # stopped answering mid-transfer. Nothing would then be calling
+            # recv_message or service_while_idle, so the station would sit
+            # CONNECTED with no thread left that could ever notice, which
+            # is the same half-open state by a different route. One
+            # best-effort DISC ends it; disconnect() is a no-op if the
+            # session is already down.
+            self.link.disconnect(retries=1)
             with self._data_lock:
                 self._data_conn = None
             try:

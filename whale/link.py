@@ -38,11 +38,62 @@ scripts/sweep_payload_1200_2200.py and the 600 baud sweep. That is not
 understood, and bursting is parked until it is. What survives from the
 attempt is the sequence numbering (below) and the decoder fixes it forced
 in whale/afsk.py, which were real bugs in their own right.
+
+Losing a control frame
+----------------------
+
+ARQ covers a lost DATA frame and a lost DATA_ACK, because both ends keep
+agreeing about what they are doing while the retransmits happen. A lost
+*control* frame is different: control frames are the things that change
+what each end is doing, so losing one leaves the two ends disagreeing, and
+a disagreement is not something a retransmit repairs. Two of those used to
+be unrecoverable.
+
+  - A lost PT_MODE_ACK ended the session. _handle_mode_req moves rx_profile
+    when it *sends* the ack; _request_mode_step moves the requester's
+    tx_profile only when it *receives* one. Lose that frame and the peer
+    goes on transmitting at a profile this station has stopped listening
+    for -- and the only way to notice is to decode a frame, which is
+    exactly what has become impossible. Every DATA frame then failed, ARQ
+    exhausted its retries, and send_message raised.
+
+    rx_profile is now a hint rather than an assertion. The pre-step profile
+    stays a decode candidate until a data frame settles the question (see
+    _apply_rx_profile), and a decoded PT_DATA/PT_DATA_ACK is taken as
+    ground truth about what the peer is really transmitting (see
+    _confirm_rx_profile). That is self-healing whichever end lost the
+    frame, and it costs one extra candidate profile for one frame.
+
+  - A lost PT_CONNECT_ACK left the session half open. The caller retried
+    PT_CONNECT into a listener that had already returned from listen_once,
+    and nothing anywhere handled a PT_CONNECT afterwards -- _wait_packet
+    discarded them. The caller exhausted its retries and went IDLE while
+    the listener sat CONNECTED with no keepalive, no timeout, and nothing
+    left that could ever wake it.
+
+    The handshake is now idempotent: a retry of the session we are already
+    in is re-answered with the same CONNECT_ACK, byte for byte (see
+    _answer_duplicate_connect). A caller that gives up anyway sends one
+    PT_DISC on its way out, so the listener converges in seconds rather
+    than waiting out INACTIVITY_TIMEOUT -- which remains as the backstop
+    for everything idempotency cannot reach, including a peer that simply
+    vanished.
+
+ON-AIR FORMAT CHANGE, made deliberately for the second of those: PT_CONNECT
+and PT_CONNECT_ACK each carry one extra trailing byte, a session identifier
+the caller picks and the listener echoes. It is what makes "a retry of the
+session I am already in" distinguishable from "a genuinely new session";
+without it those are the same bytes, the listener has to guess, and
+guessing "new session" resets the sequence state of a transfer that may
+have chunks in flight. One byte of airtime buys an unambiguous answer.
+Stations running builds from either side of this change will not
+interoperate.
 """
 
 import logging
 import os
 import queue
+import random
 import threading
 import time
 
@@ -66,6 +117,14 @@ PT_MODE_ACK = 0x08         # body: [accepted_mode_id] (may differ from proposed 
 # afsk.CONTROL_PROFILE (see _tx_packet), never on self.tx_profile. Only bulk
 # data (PT_DATA/PT_DATA_ACK) ever rides the negotiated speed.
 _CONTROL_PLANE_TYPES = {PT_CONNECT, PT_CONNECT_ACK, PT_DISC, PT_DISC_ACK, PT_MODE_REQ, PT_MODE_ACK}
+
+# The complement: the only two types that ever ride self.tx_profile. A
+# decoded frame of one of these is therefore direct evidence of the profile
+# the peer is actually transmitting at, which is what makes rx_profile
+# self-correcting -- see _confirm_rx_profile. A decoded control-plane frame
+# says nothing of the sort, since it would have gone out at
+# afsk.CONTROL_PROFILE whatever either station had negotiated.
+_DATA_PLANE_TYPES = {PT_DATA, PT_DATA_ACK}
 
 # The seq byte of a DATA frame: one flag bit and a seven-bit sequence
 # number.
@@ -109,6 +168,71 @@ SEQ_MODULO = SEQ_MASK + 1
 # which compute them per instance instead of as module constants.
 MAX_RETRIES = 6
 DECODE_POLL_INTERVAL = 0.15
+
+# The one byte of session identity in PT_CONNECT/PT_CONNECT_ACK. See the
+# module docstring for why it is on air at all. 0 is reserved for "not
+# stated" so a body that decoded short reads as unknown rather than as
+# session zero; _new_session_id never returns it.
+SESSION_ID_NONE = 0
+
+
+def _new_session_id():
+    """A fresh session identifier for one connect() attempt sequence.
+
+    Random rather than a counter: a counter restarts at the same value
+    every time the process does, and the case this has to distinguish is
+    precisely "the peer restarted and is calling again" from "the peer is
+    retrying the call I already answered". 255 values is plenty -- the only
+    collision that matters is with the session this station is in *right
+    now*, and a 1-in-255 chance of a restarted caller having to wait out
+    INACTIVITY_TIMEOUT is a far smaller cost than the extra bytes of a
+    wider field.
+    """
+    return random.randint(1, 255)
+
+
+# How long a CONNECTED station will go without decoding anything at all
+# from its peer before tearing the session down.
+#
+# MEASURED on the bench, both stations logged, by
+# scripts/measure_peer_gap.py -- which reads the worst gap between frames
+# decoded off the air out of each station's log. Three runs, because the
+# silences that matter are not the ones a clean run produces:
+#
+#   clean acceptance run, 1 KB each way          5.2s  (ht->ic705 leg;
+#                                                       4.0s the other way)
+#   a full MAX_RETRIES cycle at 300 baud, forced
+#     by suppressing the first five DATA_ACKs
+#     (WHALE_DROP_PTYPE=DATA_ACK
+#      WHALE_DROP_NTH=1,2,3,4,5)                44.4s
+#   a mode step whose MODE_ACK never arrives:
+#     control_ack_timeout                         4.3s
+#
+# So ~48.7s is the worst silence a *healthy* session can legitimately
+# present, and this is a little over 3x that.
+#
+# Note the retry cycle measured 44.4s where the arithmetic says 34.8s (six
+# data_ack_timeouts). The formula counts only the waiting; the five
+# retransmissions in between are each a keying of their own, and their
+# airtime, PTT lead and turnaround land inside the same silence. That gap
+# between the computed and the measured figure is the reason this is
+# measured at all -- a reasoned constant here would have been ~20% short of
+# a case that occurs in normal operation.
+#
+# The margin on top is deliberately wide, because the cost of being wrong
+# is asymmetric: too long only delays a teardown that something else
+# usually beats to it (the peer's DISC, or the caller's parting DISC in
+# connect()), while too short kills a session that was about to recover.
+#
+# What this deliberately does NOT do is keep an idle session alive. A
+# station with a connection up and no user data to send transmits nothing,
+# so its peer decodes nothing, and after this long the session is torn
+# down. That is the accepted trade for not adding keepalive frames -- every
+# keepalive is a keying, on a link where a keying costs seconds of air time
+# and PTT wear. If sessions that idle longer than this ever need to
+# survive, the answer is a keepalive probe (send one, retry it, tear down
+# only when the probe itself goes unanswered), not a bigger number here.
+INACTIVITY_TIMEOUT = 150.0
 
 # Dead time between the end of the peer's transmission and our keying up.
 #
@@ -191,6 +315,103 @@ def _ptype_name(ptype):
     return _PTYPE_NAMES.get(ptype, f"0x{ptype:02x}")
 
 
+_PTYPES_BY_NAME = {name: ptype for ptype, name in _PTYPE_NAMES.items()}
+
+
+# -- test affordances --------------------------------------------------
+#
+# Three environment-gated hooks, all off by default, all no-ops unless the
+# variable is set. They exist because the failures this module now handles
+# cannot otherwise be produced on demand over a real radio link.
+#
+#   WHALE_DROP_PTYPE   comma-separated packet type names (MODE_ACK,
+#                      CONNECT_ACK, DATA_ACK, ...) or numeric ids, whose
+#                      transmission is suppressed.
+#   WHALE_DROP_NTH     which occurrences of each to suppress: comma-
+#                      separated 1-based ordinals, or "all". Default "1".
+#   WHALE_FORCE_MODE   mode_id this station proposes at connect time (as
+#                      caller) or picks for its own TX (as listener),
+#                      overriding whatever mode_history remembers.
+#   WHALE_MODE_STEP_SCRIPT
+#                      comma-separated "<n>:<up|down>": after the nth
+#                      ACKed chunk of a session, take that mode step
+#                      instead of whatever _maybe_adapt would have decided.
+#
+# Why suppression rather than a dropped frame. A real channel cannot be
+# told to lose a chosen frame, and waiting for it to lose the right one is
+# not a test. But from the peer's side a MODE_ACK that was never sent is
+# indistinguishable from one that was sent and lost -- the peer sees
+# silence either way -- so suppressing the transmission reproduces the
+# failure exactly. The software tests in tests/test_link_recovery.py drive
+# the same hook, so the bench and the suite exercise one mechanism rather
+# than two that have to be kept in agreement.
+#
+# Why the other two. The lost-MODE_ACK cases that used to be fatal are
+# specific transitions -- 600<->1200, and any step down to the control
+# profile -- and reaching them by waiting for _maybe_adapt to adapt its way
+# there over a real channel is slow and unreliable. WHALE_FORCE_MODE picks
+# the profile a session starts at; WHALE_MODE_STEP_SCRIPT picks which step
+# it then takes. Neither is visible on air: the first only changes which
+# mode_id a station proposes through the negotiation that already exists,
+# and the second only changes when an ordinary PT_MODE_REQ goes out.
+
+
+class _TxSuppressor:
+    """Drops selected frames on the way out of _tx_packet, as if the
+    channel had eaten them. See the note above."""
+
+    def __init__(self, ptypes=(), occurrences=None):
+        self.ptypes = set(ptypes)
+        self.occurrences = occurrences  # None means every occurrence
+        self._seen = {}
+
+    @classmethod
+    def from_env(cls, env=None):
+        env = os.environ if env is None else env
+        spec = (env.get("WHALE_DROP_PTYPE") or "").strip()
+        if not spec:
+            return cls()
+        ptypes = set()
+        for token in spec.split(","):
+            token = token.strip().upper()
+            if not token:
+                continue
+            ptypes.add(_PTYPES_BY_NAME[token] if token in _PTYPES_BY_NAME else int(token, 0))
+        nth = (env.get("WHALE_DROP_NTH") or "1").strip().lower()
+        occurrences = None if nth == "all" else {int(t) for t in nth.split(",") if t.strip()}
+        return cls(ptypes, occurrences)
+
+    def should_drop(self, ptype):
+        if ptype not in self.ptypes:
+            return False
+        seen = self._seen.get(ptype, 0) + 1
+        self._seen[ptype] = seen
+        return self.occurrences is None or seen in self.occurrences
+
+
+def _forced_mode_id(env=None):
+    """The mode_id WHALE_FORCE_MODE pins this station's own TX to, or None."""
+    env = os.environ if env is None else env
+    raw = (env.get("WHALE_FORCE_MODE") or "").strip()
+    if not raw:
+        return None
+    mode_id = int(raw, 0)
+    return mode_id if mode_id in afsk.PROFILES_BY_ID else None
+
+
+def _mode_step_script(env=None):
+    """WHALE_MODE_STEP_SCRIPT parsed to {chunk_number: +1 | -1}."""
+    env = os.environ if env is None else env
+    script = {}
+    for token in (env.get("WHALE_MODE_STEP_SCRIPT") or "").split(","):
+        token = token.strip()
+        if not token:
+            continue
+        nth, _, direction = token.partition(":")
+        script[int(nth)] = +1 if direction.strip().lower().startswith("u") else -1
+    return script
+
+
 def _encode_call_pair(src, dst):
     return src.encode("ascii") + b"\x00" + dst.encode("ascii")
 
@@ -200,11 +421,13 @@ def _decode_call_pair(payload):
     return src.decode("ascii", "replace"), dst.decode("ascii", "replace")
 
 
-def _encode_call_and_modes(a, b, supported_ids, extra_id):
-    """CONNECT body: "a\\x00b\\x00" + one byte per supported mode_id + one
-    trailing byte (the sender's proposed TX mode_id for the a->b direction)."""
+def _encode_call_and_modes(a, b, supported_ids, extra_id, session_id=SESSION_ID_NONE):
+    """CONNECT body: "a\\x00b\\x00" + one byte per supported mode_id + two
+    trailing bytes -- the sender's proposed TX mode_id for the a->b
+    direction, and the session identifier it has picked for this call (see
+    the module docstring; SESSION_ID_NONE if it has none)."""
     return (a.encode("ascii") + b"\x00" + b.encode("ascii") + b"\x00" +
-            bytes(sorted(supported_ids)) + bytes([extra_id]))
+            bytes(sorted(supported_ids)) + bytes([extra_id, session_id]))
 
 
 def _decode_call_and_modes(payload):
@@ -212,21 +435,24 @@ def _decode_call_and_modes(payload):
     b, _, mode_section = rest.partition(b"\x00")
     a = a.decode("ascii", "replace")
     b = b.decode("ascii", "replace")
-    if not mode_section:
-        return a, b, [], afsk.CONTROL_PROFILE.mode_id
-    return a, b, list(mode_section[:-1]), mode_section[-1]
+    if len(mode_section) < 2:
+        return a, b, [], afsk.CONTROL_PROFILE.mode_id, SESSION_ID_NONE
+    return a, b, list(mode_section[:-2]), mode_section[-2], mode_section[-1]
 
 
-def _encode_connect_ack(a, b, supported_ids, accepted_tx_id, own_tx_id):
-    """CONNECT_ACK body: same shape as CONNECT's, but with *two* trailing
-    bytes instead of one -- the two directions of the link are negotiated
+def _encode_connect_ack(a, b, supported_ids, accepted_tx_id, own_tx_id,
+                        session_id=SESSION_ID_NONE):
+    """CONNECT_ACK body: same shape as CONNECT's, but with *three* trailing
+    bytes instead of two -- the two directions of the link are negotiated
     independently (one station's TX quality to its peer is not the same as
     the reverse leg, see whale/afsk.py's measured per-direction SNR), so the
     listener must report back both: the mode_id it's accepting for the
     caller's proposed (a->b) direction, and the mode_id it has separately
-    chosen for its own (b->a) transmissions."""
+    chosen for its own (b->a) transmissions. The third is the caller's own
+    session identifier echoed back unchanged, which is what lets the caller
+    tell this ack from a leftover ack for some earlier session."""
     return (a.encode("ascii") + b"\x00" + b.encode("ascii") + b"\x00" +
-            bytes(sorted(supported_ids)) + bytes([accepted_tx_id, own_tx_id]))
+            bytes(sorted(supported_ids)) + bytes([accepted_tx_id, own_tx_id, session_id]))
 
 
 def _decode_connect_ack(payload):
@@ -234,9 +460,11 @@ def _decode_connect_ack(payload):
     b, _, mode_section = rest.partition(b"\x00")
     a = a.decode("ascii", "replace")
     b = b.decode("ascii", "replace")
-    if len(mode_section) < 2:
-        return a, b, [], afsk.CONTROL_PROFILE.mode_id, afsk.CONTROL_PROFILE.mode_id
-    return a, b, list(mode_section[:-2]), mode_section[-2], mode_section[-1]
+    if len(mode_section) < 3:
+        return (a, b, [], afsk.CONTROL_PROFILE.mode_id, afsk.CONTROL_PROFILE.mode_id,
+                SESSION_ID_NONE)
+    return (a, b, list(mode_section[:-3]), mode_section[-3], mode_section[-2],
+            mode_section[-1])
 
 
 def _negotiate_mode(own_supported_ids, proposed_id):
@@ -284,12 +512,30 @@ class Link:
         # profile. Both start at CONTROL_PROFILE as a harmless default.
         self.tx_profile = afsk.CONTROL_PROFILE
         self.rx_profile = afsk.CONTROL_PROFILE
+        # A second profile the decoder keeps trying while it is not yet
+        # settled which of the two the peer is transmitting at. Only ever
+        # set across a mode step -- see _apply_rx_profile.
+        self._rx_profile_fallback = None
         self._recompute_timings()
+
+        # Env-gated, off by default, and no-ops unless the corresponding
+        # variable is set -- see the "test affordances" note above.
+        self.tx_suppress = _TxSuppressor.from_env()
+        self._mode_step_script = _mode_step_script()
 
         self._rx_packets = queue.Queue()
         self._partial_rx_buf = None  # in-progress recv_message() reassembly, see recv_message()
         self._tx_seq = 0
         self._rx_expect_seq = 0
+        self._acked_chunks = 0
+        # Session identity, and the ack that established it. Both are what
+        # make a retried PT_CONNECT answerable after listen_once has
+        # returned -- see _answer_duplicate_connect.
+        self._session_id = SESSION_ID_NONE
+        self._connect_ack_body = None
+        # When we last decoded anything from the peer, in time.monotonic()
+        # terms. Written by the decode thread, read by _peer_is_stale.
+        self._last_peer_frame_at = None
         # Set by the decode thread to when the peer's audio ended, in
         # time.monotonic() terms; consumed by _await_turnaround.
         self._peer_unkeyed_at = None
@@ -317,6 +563,12 @@ class Link:
         self._partial_rx_buf = None
         self._tx_seq = 0
         self._rx_expect_seq = 0
+        self._acked_chunks = 0
+        # Arm the inactivity backstop from the handshake rather than from
+        # the first frame after it: a listener whose CONNECT_ACK was lost
+        # may never decode anything from its peer at all, and that is
+        # precisely the session that has to time out.
+        self._last_peer_frame_at = time.monotonic()
 
     # -- profile management -----------------------------------------------
 
@@ -328,12 +580,50 @@ class Link:
         self.tx_profile = profile
         self._recompute_timings()
 
-    def _apply_rx_profile(self, profile):
+    def _apply_rx_profile(self, profile, fallback=None):
         """Sets the profile this station expects the *peer's* transmissions
         at -- i.e. the peer's own tx_profile, as far as this station knows
-        it. Used by the decode loop and (indirectly) by the ACK timeout."""
+        it. Used by the decode loop and (indirectly) by the ACK timeout.
+
+        `fallback` is a second profile to go on trying until a data frame
+        settles which of the two the peer is really using. It exists for
+        one case, and the case is unrecoverable without it: we have just
+        accepted the peer's PT_MODE_REQ and sent a PT_MODE_ACK, but the
+        peer only moves its tx_profile on *receiving* that ack. If it never
+        arrives, the peer stays where it was and this station is the only
+        one that moved -- and with only the new profile as a candidate, its
+        frames stop decoding entirely. Nothing then recovers, because the
+        only evidence that could correct the mistake is a decoded frame.
+
+        Keeping the old profile as a candidate makes that frame decodable;
+        _confirm_rx_profile makes it authoritative. The cost is one extra
+        demodulate() pass per poll, for as long as it takes one data frame
+        to arrive."""
         self.rx_profile = profile
+        self._rx_profile_fallback = fallback if fallback is not profile else None
         self._recompute_timings()
+
+    def _confirm_rx_profile(self, profile):
+        """Takes a decoded data-plane frame as ground truth about what the
+        peer is transmitting at, correcting rx_profile if they disagree.
+
+        This is the other half of _apply_rx_profile's fallback, and it is
+        what makes the two ends converge again after a lost PT_MODE_ACK --
+        in one frame, and whichever end lost it. rx_profile is only ever a
+        belief about the peer's tx_profile; a frame that actually decoded
+        is not a belief.
+
+        Only PT_DATA/PT_DATA_ACK count (_DATA_PLANE_TYPES). Control-plane
+        frames always ride afsk.CONTROL_PROFILE regardless of what either
+        station negotiated, so treating a decoded MODE_REQ or DISC as
+        evidence would drag rx_profile back down to the control profile
+        every time the peer stepped up."""
+        if profile is self.rx_profile:
+            self._rx_profile_fallback = None
+            return
+        logger.info("[%s] peer is transmitting at %s, not %s -- adopting what decoded",
+                    self.mycall, profile.name, self.rx_profile.name)
+        self._apply_rx_profile(profile)
 
     def _recompute_timings(self):
         # Everything here is a function of the two negotiated profiles, and
@@ -359,10 +649,17 @@ class Link:
         now: control-plane traffic always uses CONTROL_PROFILE, and DATA
         traffic uses whatever self.rx_profile currently is (the peer's own
         tx_profile) -- try both since the decode loop can't otherwise tell
-        which is arriving next."""
-        if self.rx_profile is afsk.CONTROL_PROFILE:
-            return (afsk.CONTROL_PROFILE,)
-        return (afsk.CONTROL_PROFILE, self.rx_profile)
+        which is arriving next.
+
+        A third appears transiently, while a mode step is still unconfirmed
+        and the peer may not have taken it: see _apply_rx_profile. It is
+        dropped again as soon as one data frame says which of the two the
+        peer is really using."""
+        candidates = [afsk.CONTROL_PROFILE]
+        for profile in (self.rx_profile, self._rx_profile_fallback):
+            if profile is not None and profile not in candidates:
+                candidates.append(profile)
+        return tuple(candidates)
 
     # -- decode loop (background) ---------------------------------------
 
@@ -518,6 +815,11 @@ class Link:
             if src == self.mycall:
                 logger.info("[%s] dropping self-echoed %s", self.mycall, _ptype_name(ptype))
                 return
+        # Anything that got this far came off the air from the peer, so it
+        # is proof of life whether or not whatever is waiting wants it.
+        self._last_peer_frame_at = time.monotonic()
+        if ptype in _DATA_PLANE_TYPES:
+            self._confirm_rx_profile(profile)
         logger.info("[%s] RX %s at %s (%d body byte(s))", self.mycall, _ptype_name(ptype), profile.name, len(body))
         self._rx_packets.put((ptype, body))
 
@@ -555,6 +857,14 @@ class Link:
         """Waits out the turnaround, then keys up for one frame."""
         self._await_turnaround()
         profile = afsk.CONTROL_PROFILE if ptype in _CONTROL_PLANE_TYPES else self.tx_profile
+        if self.tx_suppress.should_drop(ptype):
+            # Test affordance only (WHALE_DROP_PTYPE) -- see _TxSuppressor.
+            # Everything up to this line has already happened, turnaround
+            # included, so the caller's own timing is exactly what it would
+            # have been; the frame simply never reaches the air.
+            logger.warning("[%s] SUPPRESSING TX %s at %s (%d body byte(s)) -- WHALE_DROP_PTYPE",
+                           self.mycall, _ptype_name(ptype), profile.name, len(body))
+            return
         audio = afsk.modulate(bytes([ptype]) + body, profile=profile)
         keyed = self.transport.send(audio)
         # Both numbers, because the gap between them is the PTT/settling
@@ -576,10 +886,107 @@ class Link:
                 return None
             if ptype in want_types:
                 return ptype, body
+            if ptype == PT_CONNECT and self._answer_duplicate_connect(body):
+                continue
             # Not what we're waiting for right now (e.g. a stray DISC from a
             # previous session) -- drop it and keep waiting.
             logger.info("[%s] dropping unexpected %s while waiting for %s", self.mycall,
                         _ptype_name(ptype), {_ptype_name(t) for t in want_types})
+
+    def _answer_duplicate_connect(self, body):
+        """Re-answers a PT_CONNECT that is a retry of the session we are
+        already in, and reports whether it did.
+
+        This is the one deliberate exception to _wait_packet discarding
+        whatever it was not waiting for, and it is the whole fix for a lost
+        PT_CONNECT_ACK. The handshake used to be answered exactly once, in
+        listen_once; afterwards nothing anywhere handled a PT_CONNECT, so a
+        caller retrying because it never heard the ack was retrying into
+        silence. It gave up and went IDLE while this station stayed
+        CONNECTED -- a half-open session with nothing left to end it.
+
+        Re-answering is the entire response, because the listener's state
+        already *is* what the ack describes. The stored body goes back out
+        byte for byte rather than being rebuilt, so a retry cannot
+        renegotiate anything: the caller ends up with exactly the profiles
+        it would have had if the first ack had arrived.
+
+        Narrow on purpose -- only while CONNECTED, only from our own peer,
+        and only for the session id we are actually in. A PT_CONNECT
+        carrying a *different* session id is a genuinely new call (the peer
+        restarted), and adopting it here would reset the sequence state
+        underneath a transfer that may have chunks in flight. So it is
+        dropped instead, and the caller gets in once INACTIVITY_TIMEOUT has
+        cleared this session -- slow, but it cannot corrupt a live one.
+        Telling those two cases apart is the entire reason the session id
+        is on air; see the module docstring."""
+        if self.state != "CONNECTED" or self._connect_ack_body is None:
+            return False
+        src, dst, _, _, session_id = _decode_call_and_modes(body)
+        if dst != self.mycall or src != self.peer_call:
+            return False
+        if session_id != self._session_id:
+            logger.warning("[%s] CONNECT from %s carries session 0x%02x but we are in "
+                           "0x%02x -- ignoring rather than resetting a live session",
+                           self.mycall, src, session_id, self._session_id)
+            return False
+        logger.info("[%s] re-answering a duplicate CONNECT from %s (session 0x%02x)",
+                    self.mycall, src, session_id)
+        self.on_event("PTT", on=True)
+        self._tx_packet(PT_CONNECT_ACK, self._connect_ack_body)
+        self.on_event("PTT", off=True)
+        return True
+
+    def _peer_is_stale(self):
+        """True when this station has been CONNECTED for longer than
+        INACTIVITY_TIMEOUT with nothing decoded from its peer at all."""
+        if self.state != "CONNECTED" or self._last_peer_frame_at is None:
+            return False
+        return time.monotonic() - self._last_peer_frame_at > INACTIVITY_TIMEOUT
+
+    def _abandon_stale_session(self):
+        """Tears down a session whose peer has stopped saying anything.
+
+        The backstop, not the primary mechanism: a lost CONNECT_ACK is
+        normally repaired by _answer_duplicate_connect, and a caller that
+        gives up anyway sends a PT_DISC on its way out. This covers what
+        neither reaches -- a peer that was switched off, moved out of
+        range, or crashed. The DISC that disconnect() sends is best effort
+        and quite likely lands on nobody; it costs one keying and, when
+        there *is* somebody, ends their side too."""
+        logger.warning("[%s] nothing decoded from %s in %.0fs -- abandoning the session",
+                       self.mycall, self.peer_call, INACTIVITY_TIMEOUT)
+        self.disconnect(retries=1)
+
+    def service_while_idle(self):
+        """Housekeeping for a station that is CONNECTED but is not, right
+        now, inside send_message or recv_message. Returns False once the
+        session is over.
+
+        There is one such window and it is exactly where the half-open
+        session used to lodge: between going CONNECTED and vara_server's
+        local client opening its data socket, nothing on this station reads
+        decoded packets at all. A caller's CONNECT retries pile up in the
+        queue unanswered, and a peer that has given up cannot be noticed.
+        Calling this from that wait closes it."""
+        if self.state != "CONNECTED":
+            return False
+        while True:
+            try:
+                ptype, body = self._rx_packets.get_nowait()
+            except queue.Empty:
+                break
+            if ptype == PT_CONNECT:
+                self._answer_duplicate_connect(body)
+            elif ptype == PT_DISC:
+                self._handle_peer_disc()
+                return False
+            else:
+                logger.info("[%s] dropping %s received while idle", self.mycall, _ptype_name(ptype))
+        if self._peer_is_stale():
+            self._abandon_stale_session()
+            return False
+        return True
 
     def _drain_packets(self):
         while True:
@@ -595,10 +1002,19 @@ class Link:
         self._drain_packets()
         self.state = "CONNECTING"
         own_supported = [p.mode_id for p in afsk.PROFILES]
-        proposed_id = mode_history.last_good_mode(self.mode_history, self.mycall, dst_call)
+        # Not `forced or history`: mode_id 0 is a real profile (300 baud)
+        # and a perfectly reasonable thing to pin a bench run to.
+        proposed_id = _forced_mode_id()
+        if proposed_id is None:
+            proposed_id = mode_history.last_good_mode(self.mode_history, self.mycall, dst_call)
         if proposed_id is None or proposed_id not in own_supported:
             proposed_id = afsk.CONTROL_PROFILE.mode_id  # no history with this peer -- start slow
-        body = _encode_call_and_modes(self.mycall, dst_call, own_supported, proposed_id)
+        # One id for the whole retry sequence, not one per attempt: every
+        # CONNECT below is the same call, and a listener that answered an
+        # earlier one has to recognise the later ones as such.
+        self._session_id = _new_session_id()
+        body = _encode_call_and_modes(self.mycall, dst_call, own_supported, proposed_id,
+                                      self._session_id)
         for attempt in range(1, retries + 1):
             logger.info("[%s] CONNECT attempt %d/%d to %s (proposing mode %d)",
                         self.mycall, attempt, retries, dst_call, proposed_id)
@@ -608,25 +1024,47 @@ class Link:
             got = self._wait_packet({PT_CONNECT_ACK}, timeout_per_try)
             if got is not None:
                 _, ack_body = got
-                src, dst, peer_supported, accepted_id, peer_tx_id = _decode_connect_ack(ack_body)
-                if dst == self.mycall:
-                    self.peer_call = src
-                    self.peer_supported_modes = set(peer_supported)
-                    # accepted_id: what the listener accepted of our proposal --
-                    # that's our TX rate for this (mycall->peer) direction.
-                    # peer_tx_id: the listener's own, independently chosen TX
-                    # rate for the reverse (peer->mycall) direction -- that's
-                    # what we should expect its frames at.
-                    self._apply_tx_profile(afsk.PROFILES_BY_ID.get(accepted_id, afsk.CONTROL_PROFILE))
-                    self._apply_rx_profile(afsk.PROFILES_BY_ID.get(peer_tx_id, afsk.CONTROL_PROFILE))
-                    self._clean_streak = 0
-                    self.state = "CONNECTED"
-                    self._reset_sequence_state()
-                    self.on_event("CONNECTED", mycall=self.mycall, peer=self.peer_call)
-                    logger.info("[%s] connected to %s: tx=%s rx=%s", self.mycall, self.peer_call,
-                                self.tx_profile.name, self.rx_profile.name)
-                    return True
+                (src, dst, peer_supported, accepted_id, peer_tx_id,
+                 ack_session) = _decode_connect_ack(ack_body)
+                if dst != self.mycall:
+                    continue
+                if ack_session != self._session_id:
+                    # An ack for some earlier call of ours, still in the
+                    # buffer or still in flight. It describes profiles that
+                    # were negotiated for a session that no longer exists.
+                    logger.info("[%s] ignoring CONNECT_ACK for session 0x%02x (calling as 0x%02x)",
+                                self.mycall, ack_session, self._session_id)
+                    continue
+                self.peer_call = src
+                self.peer_supported_modes = set(peer_supported)
+                # accepted_id: what the listener accepted of our proposal --
+                # that's our TX rate for this (mycall->peer) direction.
+                # peer_tx_id: the listener's own, independently chosen TX
+                # rate for the reverse (peer->mycall) direction -- that's
+                # what we should expect its frames at.
+                self._apply_tx_profile(afsk.PROFILES_BY_ID.get(accepted_id, afsk.CONTROL_PROFILE))
+                self._apply_rx_profile(afsk.PROFILES_BY_ID.get(peer_tx_id, afsk.CONTROL_PROFILE))
+                self._clean_streak = 0
+                self.state = "CONNECTED"
+                self._reset_sequence_state()
+                self.on_event("CONNECTED", mycall=self.mycall, peer=self.peer_call)
+                logger.info("[%s] connected to %s: tx=%s rx=%s", self.mycall, self.peer_call,
+                            self.tx_profile.name, self.rx_profile.name)
+                return True
+        # Giving up. Somebody may nonetheless have answered one of those
+        # CONNECTs and be sitting CONNECTED right now with an ack we never
+        # heard -- that is the half-open session, seen from the other side.
+        # One PT_DISC converges the two ends in seconds instead of leaving
+        # the listener to wait out INACTIVITY_TIMEOUT. Best effort: in the
+        # ordinary "nobody home" case it lands on nobody, which costs one
+        # keying on a call that has already spent `retries` of them.
+        logger.info("[%s] CONNECT to %s gave up after %d attempt(s) -- sending DISC in case "
+                    "the far end answered an ack we never heard", self.mycall, dst_call, retries)
+        self.on_event("PTT", on=True)
+        self._tx_packet(PT_DISC, b"")
+        self.on_event("PTT", off=True)
         self.state = "IDLE"
+        self._session_id = SESSION_ID_NONE
         self.on_event("CONNECT_FAILED")
         return False
 
@@ -640,7 +1078,7 @@ class Link:
         if got is None:
             return None
         _, body = got
-        src, dst, peer_supported, proposed_id = _decode_call_and_modes(body)
+        src, dst, peer_supported, proposed_id, session_id = _decode_call_and_modes(body)
         if dst != self.mycall:
             return None
         self.peer_call = src
@@ -654,11 +1092,21 @@ class Link:
         # to CONTROL_PROFILE if the caller hasn't told us it supports that
         # mode. The two legs need not match: this rig's two directions
         # measure different SNR (see whale/afsk.py's module docstring).
-        own_tx_id = mode_history.last_good_mode(self.mode_history, self.mycall, src)
+        own_tx_id = _forced_mode_id()   # mode_id 0 is falsy, so not `or`
+        if own_tx_id is None:
+            own_tx_id = mode_history.last_good_mode(self.mode_history, self.mycall, src)
         if (own_tx_id is None or own_tx_id not in own_supported
                 or own_tx_id not in peer_supported):
             own_tx_id = afsk.CONTROL_PROFILE.mode_id
-        ack_body = _encode_connect_ack(self.mycall, src, own_supported, negotiated_id, own_tx_id)
+        ack_body = _encode_connect_ack(self.mycall, src, own_supported, negotiated_id, own_tx_id,
+                                       session_id)
+        # Both remembered *before* the ack goes out, not after: this is the
+        # frame that may be lost, and if it is, the caller's retry can
+        # arrive while we are still inside _tx_packet. Everything needed to
+        # re-answer it has to be in place by then. See
+        # _answer_duplicate_connect.
+        self._session_id = session_id
+        self._connect_ack_body = ack_body
         self.on_event("PTT", on=True)
         self._tx_packet(PT_CONNECT_ACK, ack_body)
         self.on_event("PTT", off=True)
@@ -714,7 +1162,17 @@ class Link:
         the link was bursting, where a keying's later frames failing CRC
         left the receiver acking an earlier frame and thereby saying
         something useful about the current one. One frame per keying, and
-        that channel of information is gone with it.)"""
+        that channel of information is gone with it.)
+
+        PT_MODE_REQ is answered here as well as in recv_message. It should
+        not normally arrive while we are the sender -- the peer only steps
+        its own TX rate after a chunk *it* sent got acked, which means we
+        were receiving -- but the roles can swap between the ack and the
+        step, and until this was handled the request was simply discarded
+        and the peer spent a full control_ack_timeout waiting for an answer
+        that no longer had anywhere to come from. Accepting it mid-ARQ is
+        safe: it moves rx_profile, and _apply_rx_profile's fallback covers
+        the DATA_ACK that may already be in flight at the old one."""
         body = bytes([seq | (EOF_BIT if is_eof else 0)]) + chunk
         for attempt in range(1, MAX_RETRIES + 1):
             self.on_event("PTT", on=True)
@@ -725,13 +1183,16 @@ class Link:
                 remaining = deadline - time.monotonic()
                 if remaining <= 0:
                     break
-                got = self._wait_packet({PT_DATA_ACK, PT_DISC}, remaining)
+                got = self._wait_packet({PT_DATA_ACK, PT_DISC, PT_MODE_REQ}, remaining)
                 if got is None:
                     break
                 ptype, body_in = got
                 if ptype == PT_DISC:
                     self._handle_peer_disc()
                     raise LinkError("peer disconnected mid-transfer")
+                if ptype == PT_MODE_REQ:
+                    self._handle_mode_req(body_in)
+                    continue
                 if len(body_in) < 2:
                     continue
                 answered, expects = body_in[0] & SEQ_MASK, body_in[1] & SEQ_MASK
@@ -766,6 +1227,18 @@ class Link:
         """Called after each ACKed chunk with how many tries it took.
         Purely ARQ-outcome based: no SNR estimate, just react to trouble
         fast and only speed up after a solid run of clean chunks."""
+        self._acked_chunks += 1
+        scripted = self._mode_step_script.get(self._acked_chunks)
+        if scripted is not None:
+            # Test affordance only (WHALE_MODE_STEP_SCRIPT) -- see the note
+            # above _TxSuppressor for why a bench run needs to choose its
+            # own transitions rather than wait for the channel to produce
+            # them.
+            logger.warning("[%s] taking scripted mode step %+d after chunk %d -- "
+                           "WHALE_MODE_STEP_SCRIPT", self.mycall, scripted, self._acked_chunks)
+            self._clean_streak = 0
+            self._request_mode_step(scripted)
+            return
         if attempts >= STEP_DOWN_AFTER_ATTEMPTS:
             self._clean_streak = 0
             self._request_mode_step(-1)
@@ -806,15 +1279,27 @@ class Link:
         """The peer is telling us it's stepping *its own* TX rate -- i.e.
         our rx expectation. Accept/reject based on whether we can decode
         that rate, and update only self.rx_profile; our own tx_profile
-        (the reverse leg) is unrelated and stays put."""
+        (the reverse leg) is unrelated and stays put.
+
+        Note the asymmetry this has to live with, which is not fixable from
+        here: we move on *sending* the ack, the peer moves on *receiving*
+        it, and no acknowledgement scheme removes the last hop's
+        uncertainty. So the old profile is kept as a decode fallback rather
+        than assumed dead -- if the ack is lost, the peer goes on
+        transmitting at it, and that frame is the only thing that can tell
+        us so. See _apply_rx_profile and _confirm_rx_profile."""
         proposed_id = body[0] if body else afsk.CONTROL_PROFILE.mode_id
         own_supported = {p.mode_id for p in afsk.PROFILES}
         accepted_id = proposed_id if proposed_id in own_supported else afsk.CONTROL_PROFILE.mode_id
+        previous = self.rx_profile
         self.on_event("PTT", on=True)
         self._tx_packet(PT_MODE_ACK, bytes([accepted_id]))
         self.on_event("PTT", off=True)
-        self._apply_rx_profile(afsk.PROFILES_BY_ID.get(accepted_id, afsk.CONTROL_PROFILE))
-        logger.info("[%s] accepted peer mode step, now expecting rx at %s", self.mycall, self.rx_profile.name)
+        self._apply_rx_profile(afsk.PROFILES_BY_ID.get(accepted_id, afsk.CONTROL_PROFILE),
+                               fallback=previous)
+        logger.info("[%s] accepted peer mode step, now expecting rx at %s (still trying %s "
+                    "until a data frame settles it)", self.mycall, self.rx_profile.name,
+                    previous.name)
 
     def recv_message(self, timeout=None):
         """Blocks for the chunks of one message (as delimited by the EOF bit)
@@ -837,6 +1322,13 @@ class Link:
             self._partial_rx_buf = bytearray()
         deadline = None if timeout is None else time.time() + timeout
         while True:
+            if self._peer_is_stale():
+                # The pump calls this on a short timeout over and over, so
+                # this is where a station that is merely *waiting* spends
+                # its time -- and therefore where a peer that has gone away
+                # has to be noticed. See INACTIVITY_TIMEOUT.
+                self._abandon_stale_session()
+                return None
             remaining = None if deadline is None else max(0.0, deadline - time.time())
             if deadline is not None and remaining <= 0:
                 return None
@@ -883,6 +1375,14 @@ class Link:
 
     # -- teardown ------------------------------------------------------
 
+    def _forget_session(self):
+        """Drops the identity of the session that has just ended, so a
+        PT_CONNECT arriving afterwards is treated as a new call rather than
+        re-answered as a retry of a session that no longer exists."""
+        self._session_id = SESSION_ID_NONE
+        self._connect_ack_body = None
+        self._last_peer_frame_at = None
+
     def _handle_peer_disc(self):
         if self.peer_call is not None:
             mode_history.record_good_mode(self.mode_history, self.mycall, self.peer_call, self.tx_profile.mode_id)
@@ -891,6 +1391,7 @@ class Link:
         self.on_event("PTT", off=True)
         self.state = "IDLE"
         self.peer_call = None
+        self._forget_session()
         self.on_event("DISCONNECTED")
 
     def disconnect(self, timeout=None, retries=3):
@@ -909,16 +1410,5 @@ class Link:
                 break
         self.state = "IDLE"
         self.peer_call = None
+        self._forget_session()
         self.on_event("DISCONNECTED")
-
-    def poll_peer_disconnect(self):
-        """Non-blocking: if the peer has sent DISC, tear down and return
-        True. Used while idling in a connected state waiting on the user."""
-        try:
-            ptype, _ = self._rx_packets.get_nowait()
-        except queue.Empty:
-            return False
-        if ptype == PT_DISC:
-            self._handle_peer_disc()
-            return True
-        return False
