@@ -46,8 +46,8 @@ import numpy as np
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
-from whale import afsk, framing
-from whale.transport import RadioTransport, SAMPLE_RATE, PTT_LEAD
+from whale import afsk
+from whale.transport import RadioTransport, SAMPLE_RATE, PTT_LEAD, STREAM_FILL
 
 PROFILE = afsk.PROFILE_600
 LEAD_PADS = [0.0, 0.5, 1.0, 1.5, 2.0, 2.5, 3.0, 3.5, 4.0]
@@ -56,22 +56,21 @@ PAYLOAD_BYTES = 40
 PAD_AMPLITUDE = 0.05  # quiet noise, just to keep the carrier modulated
 CAPTURE_TAIL = 0.8
 
-# Time between PTT key-down and the first audio sample reaching the air:
-# PTT_LEAD plus the ~130ms the output stream spends opening and filling its
-# first buffer (see whale/transport.py's PTT_LEAD comment).
-STREAM_FILL = 0.13
-
 
 def _noise(seconds, rng):
     return (PAD_AMPLITUDE * rng.standard_normal(int(SAMPLE_RATE * seconds))).astype(np.float32)
 
 
 def frame_window(lead_pad, payload_len):
-    """When the frame's own audio starts and ends, relative to PTT key-down."""
-    bits = (len(framing.head_pad_bits(PROFILE.baud)) + len(framing.SYNC_BITS)
-            + 8 + 8 * payload_len + 16 + len(framing.tail_pad_bits(PROFILE.baud)))
+    """When the frame's own audio starts and ends, relative to PTT key-down.
+
+    PTT_LEAD + STREAM_FILL is the gap between key-down and the first sample
+    reaching the air; both live in whale/transport.py, which is also where
+    afsk.KEYING_OVERHEAD_SECONDS -- the budget that now sizes every profile's
+    chunk_size -- is checked against them.
+    """
     start = PTT_LEAD + STREAM_FILL + lead_pad
-    return start, start + bits / PROFILE.baud
+    return start, start + afsk.frame_bits(payload_len, PROFILE.baud) / PROFILE.baud
 
 
 def run_point(tx, rx, lead_pad, payload, trials, rng):

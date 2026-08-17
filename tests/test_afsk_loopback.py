@@ -29,6 +29,44 @@ def test_framing_roundtrip():
     print("test_framing_roundtrip OK")
 
 
+def test_every_keying_fits_the_budget_and_uses_it():
+    """No transmission this modem makes may outlast afsk.MAX_KEYING_SECONDS,
+    and every DATA frame should come as close to it as the format allows.
+
+    Both halves matter. The cap is what keeps a keying clear of a receiver
+    that mutes itself on a timer -- priority scan on the HT, ~280ms starting
+    ~3.0s after key-down, see scripts/probe_tx_duration_dropout.py -- and a
+    keying that overruns it loses a chunk out of its middle on a radio this
+    modem cannot see or configure. The tightness is the throughput: chunk
+    sizes are derived from the budget rather than chosen, so a profile
+    leaving room for another whole byte means the derivation has drifted
+    from the arithmetic, not that someone made a judgement call.
+
+    A DATA frame is the long one, but the control plane rides the same air,
+    so the smaller frame types are checked too rather than assumed."""
+    for profile in afsk.PROFILES:
+        payload = production_payload_bytes(profile)
+        keying = afsk.keying_seconds(payload, profile)
+        assert keying <= afsk.MAX_KEYING_SECONDS + 1e-9, \
+            (profile.name, payload, round(keying, 3))
+
+        # One more byte must not fit -- unless what stopped us was the 8-bit
+        # length field rather than the clock, which is the case at 1200 baud.
+        if payload < framing.MAX_PAYLOAD_BYTES:
+            assert afsk.keying_seconds(payload + 1, profile) > afsk.MAX_KEYING_SECONDS, \
+                f"{profile.name} leaves room for a bigger chunk than {profile.chunk_size}"
+
+        # DATA_ACK (2 seq bytes + type) and the control-plane estimate, both
+        # of which key the radio up like anything else.
+        for small in (3, link._CONTROL_FRAME_LEN_ESTIMATE):
+            assert afsk.keying_seconds(small, profile) <= afsk.MAX_KEYING_SECONDS, \
+                (profile.name, small)
+    print("test_every_keying_fits_the_budget_and_uses_it OK "
+          + ", ".join(f"{p.name} {p.chunk_size}B/"
+                      f"{afsk.keying_seconds(production_payload_bytes(p), p):.2f}s"
+                      for p in afsk.PROFILES))
+
+
 def test_afsk_clean_loopback():
     rng = np.random.default_rng(0)
     payload = bytes(rng.integers(0, 256, size=37, dtype=np.uint8))
@@ -80,11 +118,14 @@ def test_afsk_noisy_delayed_loopback():
 # clear; it is not a measurement of this bench.
 ASSUMED_WORST_CASE_PPM = 500
 
-# The production frame: link.py sends chunk_size=100 bytes of payload plus
-# its own type/seq header, so the AFSK payload is 102 bytes. The bench
-# sweeps put the ceiling just above this -- 120 bytes decoded 100% both
-# directions, 160 bytes failed 0/5 one way.
-PRODUCTION_PAYLOAD_BYTES = 102
+# The production frame: link.py sends chunk_size bytes of payload plus its
+# own type/seq header. This is per profile rather than one number now that
+# chunk_size is derived from the keying-length budget -- 73, 158 and 255
+# bytes of AFSK payload at 300, 600 and 1200 baud, all three landing on a
+# keying of at most afsk.MAX_KEYING_SECONDS. Derived rather than restated so
+# these tests keep measuring what the link actually sends.
+def production_payload_bytes(profile):
+    return profile.chunk_size + afsk.DATA_FRAME_HEADER_BYTES
 
 
 def resample_clock(audio, ppm):
@@ -182,7 +223,7 @@ def test_decodes_through_a_small_clock_offset():
     50 would pass the tests below and still make the link worse."""
     rng = np.random.default_rng(11)
     for profile in afsk.PROFILES:
-        for n in (2, PRODUCTION_PAYLOAD_BYTES, 160):
+        for n in (2, production_payload_bytes(profile), 160):
             payload = bytes(rng.integers(0, 256, size=n, dtype=np.uint8))
             tx = afsk.modulate(payload, profile=profile)
             for ppm in (-50, 0, 50):
@@ -237,16 +278,29 @@ def test_decodes_at_production_size_under_bench_clock_offset():
     frame survives the clock offset two independent sound cards can present,
     in either direction, on every profile.
 
-    Fails today, at every profile, for the reason in
-    test_clock_offset_tolerance_is_half_a_symbol_over_the_frame: 102 bytes
-    is 903 bits, so the decoder's half-symbol budget runs out at ~550 ppm
-    and this asks for 500 in both directions with no margin for the sync
-    peak landing a fraction of a symbol off.
+    Fails today, for the reason in
+    test_clock_offset_tolerance_is_half_a_symbol_over_the_frame: the
+    decoder's half-symbol budget is 0.5/n_bits, so each profile's production
+    frame has its own tolerance --
+
+        300 baud    73 bytes    671 bits    ~745 ppm
+        600 baud   158 bytes   1351 bits    ~370 ppm
+       1200 baud   255 bytes   2127 bits    ~235 ppm
+
+    -- and the two faster profiles are the ones that cannot hold 500. Note
+    the shape: the frames are sized by *airtime*, so a faster profile spends
+    its budget on more bits, and more bits is exactly what this decoder
+    cannot keep timing across. The tolerance therefore falls as the link
+    speeds up, which is the opposite of the reassuring direction. It costs
+    nothing on this bench (the two cards measure 3.4 ppm apart, ~70x inside
+    even the 1200 baud figure) and it is the first thing to check on
+    hardware whose clocks are not this close.
     """
     rng = np.random.default_rng(13)
     failures = []
     for profile in afsk.PROFILES:
-        payload = bytes(rng.integers(0, 256, size=PRODUCTION_PAYLOAD_BYTES, dtype=np.uint8))
+        payload = bytes(rng.integers(0, 256, size=production_payload_bytes(profile),
+                                     dtype=np.uint8))
         tx = afsk.modulate(payload, profile=profile)
         for ppm in (-ASSUMED_WORST_CASE_PPM, ASSUMED_WORST_CASE_PPM):
             result = afsk.demodulate(resample_clock(tx, ppm), profile=profile)
@@ -731,6 +785,7 @@ def test_link_negotiation_and_mode_step():
 
 if __name__ == "__main__":
     test_framing_roundtrip()
+    test_every_keying_fits_the_budget_and_uses_it()
     test_afsk_clean_loopback()
     test_afsk_noisy_delayed_loopback()
     test_clock_offset_simulation_is_faithful()

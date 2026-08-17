@@ -22,6 +22,7 @@ import time
 import numpy as np
 import sounddevice as sd
 
+from whale import afsk
 from whale.hw import audio_io
 from whale.hw import radios as radios_mod
 
@@ -78,6 +79,36 @@ def _ensure_com_initialized():
 # DATA and ACK frame sizes.
 PTT_LEAD = 0.22
 PTT_TAIL = 0.05
+
+# The rest of the dead air a keying carries: opening the output stream and
+# filling its first buffer, between PTT_LEAD elapsing and the first sample
+# actually leaving the card. Not a knob -- it is what the audio stack does,
+# recorded here so the keying-length arithmetic can account for it.
+#
+# MEASURED end to end rather than reasoned from audio_io's latency=0.1: an
+# acceptance run logs `Ns audio, Ms keyed` for every transmission, and
+# M - N - PTT_LEAD - PTT_TAIL is this figure. Across 44 keyings spanning
+# both radios, all three profiles and every frame type, that came out at
+# 0.15-0.16s -- not the 0.13 previously assumed from the requested stream
+# latency, which left the derived chunk sizes ~20ms over budget. Take the
+# worst; a keying budget wants the pessimistic end.
+STREAM_FILL = 0.16
+
+# whale/afsk.py sizes every profile's chunk_size so that a whole keying fits
+# inside afsk.MAX_KEYING_SECONDS, and the overhead it budgets for is exactly
+# the three constants above. It cannot import them -- that would drag the
+# sound-card stack into the DSP module, which the software-only tests run
+# without -- so the agreement is checked here instead, where both modules are
+# already loaded. If this fires, the sizing is stale: re-derive
+# afsk.KEYING_OVERHEAD_SECONDS from the new figures rather than silencing it,
+# because the chunk sizes it produced are now over budget.
+_KEYING_OVERHEAD = PTT_LEAD + STREAM_FILL + PTT_TAIL
+if abs(_KEYING_OVERHEAD - afsk.KEYING_OVERHEAD_SECONDS) > 0.005:
+    raise RuntimeError(
+        f"keying overhead drifted: transport says {_KEYING_OVERHEAD:.3f}s "
+        f"(PTT_LEAD {PTT_LEAD} + STREAM_FILL {STREAM_FILL} + PTT_TAIL {PTT_TAIL}) "
+        f"but afsk.KEYING_OVERHEAD_SECONDS is {afsk.KEYING_OVERHEAD_SECONDS:.3f}s; "
+        "the profiles' chunk_size was derived from the latter")
 
 # How much recent audio the receiver keeps around for the decoder to search.
 # Generous relative to one frame's ~7s worst case (255-byte payload at 300

@@ -86,7 +86,8 @@ def computed_worst_cases():
     same arithmetic _recompute_timings and control_ack_timeout use."""
     rows = []
     for profile in afsk.PROFILES:
-        tx_airtime = afsk.frame_seconds(profile.chunk_size + 2, profile)
+        tx_airtime = afsk.frame_seconds(
+            profile.chunk_size + afsk.DATA_FRAME_HEADER_BYTES, profile)
         ack_airtime = afsk.frame_seconds(3, profile)
         data_ack_timeout = (tx_airtime + ack_airtime
                             + 2 * link.TX_TURNAROUND_DELAY + 3.0)

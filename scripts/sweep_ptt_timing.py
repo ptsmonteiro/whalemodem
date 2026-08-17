@@ -93,7 +93,7 @@ audio_io.transmit = _timed_transmit
 
 def data_payload(profile):
     """A DATA frame's AFSK payload at this profile: ptype + seq + chunk."""
-    return bytes((i % 256 for i in range(profile.chunk_size + 2)))
+    return bytes((i % 256 for i in range(profile.chunk_size + afsk.DATA_FRAME_HEADER_BYTES)))
 
 
 def ack_payload():

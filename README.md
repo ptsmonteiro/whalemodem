@@ -49,9 +49,14 @@ the acceptance run frame by frame (both stations' logs, PTT-on recovered as
 baud at 3.91s: 2.00s of it fixed turnaround sleeps, 0.85s of PTT lead and
 sound-card startup, and 0.67s -- 17% -- actually spent on payload bits.
 
-Two things address that, neither of which changes how many frames are in
-flight -- the link is still stop-and-wait, one chunk acked before the next
-goes out:
+That was measured when the chunk was 100 bytes. Chunks are now sized by the
+keying budget instead ("How long one keying may be" below), which is the
+direct lever on that 17%: the fixed cost per keying does not change, so
+filling the keying is how it gets amortised.
+
+Two further things address it, neither of which changes how many frames are
+in flight -- the link is still stop-and-wait, one chunk acked before the
+next goes out:
 
   - The turnaround wait is anchored on when the peer stopped transmitting,
     worked out from where in the RX buffer its last frame ended, rather
@@ -262,6 +267,78 @@ Note that `link.TX_TURNAROUND_DELAY` -- a 1s pause *before* keying -- is
 not air time, but it is now the largest single delay per frame, and it has
 not had the same measurement treatment.
 
+### How long one keying may be
+
+Everything above is fixed cost per keying, so the way to spend less of it
+per byte is to put more bytes in a keying. What stops that from being
+unbounded is not the frame format or the channel -- it is that a receiver
+can go deaf on a timer. Priority scan on the HT muted its receiver for
+~280ms starting ~3.0s after PTT key-down and every ~3.1s after, which took
+a chunk out of the middle of any keying still running at 3.0s and cost
+several rounds of chasing a "frame-size ceiling" that was nothing of the
+kind (see `PROFILE_1200`'s note in `whale/afsk.py`).
+
+So a keying is capped in *duration* -- `afsk.MAX_KEYING_SECONDS`, 2.8s,
+measured PTT key-down to PTT release -- and every profile's `chunk_size` is
+whatever fits inside that cap at its baud rather than a number picked per
+profile (`afsk.max_chunk_for_keying`):
+
+| profile | chunk | AFSK payload | frame | keying | payload bits/s |
+|---------|-------|--------------|-------|--------|----------------|
+| 300 baud  |  71 |  73 | 2.35s | 2.78s | 205 |
+| 600 baud  | 156 | 158 | 2.36s | 2.79s | 447 |
+| 1200 baud | 253 | 255 | 1.88s | 2.31s | 875 |
+
+Three things worth knowing about that table:
+
+  - **2.8s, not 3.0.** The probe put every passing frame's end at or before
+    2.64s and every failure across the 3.0s mark, so this keeps ~200ms
+    between the end of a keying and the earliest hole. The cap is the knob;
+    widen the margin rather than the cap if a radio with a shorter scan
+    period turns up.
+  - **1200 baud is not limited by time.** 2.8s of air at 1200 baud would
+    carry 328 bytes; what caps it at 255 is the 8-bit length field in
+    `whale/framing.py`. Roughly 0.5s of its budget goes unspent, and
+    widening that field is the only way to claim it -- a format change both
+    stations would have to take together.
+  - **The scan is off on this bench**, so nothing here is working around a
+    live fault. It is kept as a design constraint because scan/save
+    features of this shape are ordinary on handhelds, they are set on the
+    *far* station where this modem can neither see nor change them, and the
+    symptom -- sync locks at 0.99, CRC fails every time -- is expensive to
+    diagnose.
+
+The budget is spent on `transport.PTT_LEAD` + the output stream's
+`STREAM_FILL` + `transport.PTT_TAIL` (0.43s in total) before any frame bits
+are paid for, and `whale/afsk.py` cannot import those without dragging the
+sound-card stack into the DSP module. `whale/transport.py` therefore
+asserts at import that its own constants still sum to
+`afsk.KEYING_OVERHEAD_SECONDS`; if that fires, the chunk sizes derived from
+it are over budget and need re-deriving, not silencing.
+
+That 0.43s is measured, and measuring it mattered: it was first reasoned at
+0.40 from `audio_io`'s requested stream latency, which made every derived
+chunk ~20ms too big for the cap. Every transmission logs `Ns audio, Ms
+keyed`, so an acceptance run reads the real figure straight off -- 0.42-0.43s
+over 88 keyings across two runs, both radios, all three profiles, every
+frame type, with no value outside that range. Re-read it after any change to
+the audio chain, the same as `sweep_ptt_timing.py`'s constants.
+
+Both runs passed 1 KB each way byte-for-byte with **no retransmit, no
+near-miss decode and no rx-profile correction** on either leg. The run at
+the corrected sizes put the longest keying at 2.79s, inside the 2.8s cap and
+~210ms clear of the dropout.
+
+One cost this buys rather than saves: the decoder lays symbol sample points
+on a rigid grid from the sync peak, with no timing recovery, so its clock
+tolerance is 0.5/n_bits -- and sizing frames by airtime means a faster
+profile spends its budget on more bits. Tolerance therefore *falls* as the
+link speeds up: ~745 ppm at 300 baud, ~370 at 600, ~235 at 1200. The two
+sound cards on this bench measure 3.4 ppm apart, ~70x inside even the
+1200-baud figure, so it costs nothing here -- but it is the first thing to
+check on hardware whose clocks are not this close, and
+`tests/test_afsk_loopback.py` keeps the arithmetic on file.
+
 ## Dependencies
 
 ```
@@ -320,6 +397,9 @@ bandwidth selection, WINLINK-specific extensions.
 ## Known limitations (by design, for v1)
 
 - One frame in flight at a time (stop-and-wait, not sliding-window).
-- Fixed small chunk size (40 bytes/frame) and fixed timeouts, not adaptive.
-- Throughput is low (300 baud); this was optimized for correctness on
-  noisy real hardware, not speed.
+- Chunk size is fixed per profile -- the largest that fits the keying
+  budget, see "How long one keying may be" -- and timeouts derive from it,
+  but neither adapts to how the channel is actually behaving. A lost frame
+  costs a whole chunk to resend, and at 1200 baud that is now 253 bytes.
+- Throughput is low; this was optimized for correctness on noisy real
+  hardware, not speed.

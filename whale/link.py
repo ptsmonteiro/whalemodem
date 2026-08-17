@@ -633,7 +633,8 @@ class Link:
         # Worst-case round trip for one DATA/DATA_ACK exchange: our DATA
         # frame out at tx_profile, then the peer's (tiny) ACK back at
         # rx_profile, with a turnaround at each end.
-        tx_airtime = afsk.frame_seconds(self.tx_profile.chunk_size + 2, self.tx_profile)
+        tx_airtime = afsk.frame_seconds(
+            self.tx_profile.chunk_size + afsk.DATA_FRAME_HEADER_BYTES, self.tx_profile)
         ack_airtime = afsk.frame_seconds(3, self.rx_profile)
         self.data_ack_timeout = (tx_airtime + ack_airtime
                                  + 2 * TX_TURNAROUND_DELAY + 3.0)
@@ -642,7 +643,8 @@ class Link:
         # (see _prune_stale) -- enough that the longest frame either
         # candidate profile could be part-way through is never cut in half.
         self._rx_keep_seconds = max(
-            afsk.frame_seconds(p.chunk_size + 2, p) for p in self._candidate_decode_profiles()) + 1.0
+            afsk.frame_seconds(p.chunk_size + afsk.DATA_FRAME_HEADER_BYTES, p)
+            for p in self._candidate_decode_profiles()) + 1.0
 
     def _candidate_decode_profiles(self):
         """Which afsk.Profile(s) an incoming frame might be using right
@@ -1128,8 +1130,9 @@ class Link:
 
         Chunks are cut one at a time, immediately before each is sent, rather
         than pre-split up front: _maybe_adapt() can step tx_profile mid-message
-        and the profiles have different chunk_size (40 at 300baud, 100 at
-        600/1200), so a message pre-split at the starting profile would keep
+        and the profiles have different chunk_size (73 at 300 baud, 158 at 600,
+        253 at 1200 -- each is whatever afsk.MAX_KEYING_SECONDS allows at that
+        baud), so a message pre-split at the starting profile would keep
         sending undersized frames for the rest of the transfer even after
         stepping up."""
         if self.state != "CONNECTED":

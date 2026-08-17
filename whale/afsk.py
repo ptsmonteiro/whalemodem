@@ -110,7 +110,17 @@ CONFIDENCE_THRESHOLD = 0.7
 # correlation. See _normalised_correlation.
 _ENERGY_FLOOR_FRACTION = 0.05
 
-CHUNK_SIZE = 40  # link-layer payload bytes per DATA frame, see whale/link.py
+# Fallback link-layer payload bytes per DATA frame, for an ad-hoc Profile
+# built by a sweep script that has no opinion about size. Every shipped
+# profile below sizes itself from the airtime budget instead -- see
+# max_chunk_for_keying.
+CHUNK_SIZE = 40
+
+# What whale/link.py puts in front of the chunk inside a DATA frame's AFSK
+# payload: the packet type byte and the flags/sequence byte. Stated here
+# because the profiles' chunk_size is derived from an airtime budget, and
+# that budget is spent on the whole AFSK payload rather than on the chunk.
+DATA_FRAME_HEADER_BYTES = 2
 
 MAX_FRAME_BITS = len(framing.SYNC_BITS) + 8 + 8 * framing.MAX_PAYLOAD_BYTES + 16
 
@@ -143,7 +153,73 @@ class Profile:
     chunk_size: int = CHUNK_SIZE
 
 
-PROFILE_300 = Profile(name="300baud", mode_id=0, baud=BAUD, freq0=FREQ_0, freq1=FREQ_1)
+# -- the keying-length budget, and the chunk sizes it produces -------------
+#
+# A keying is capped in *duration*, and every profile's chunk_size is
+# whatever fits inside that cap rather than a number chosen per profile.
+#
+# The cap exists because a receiver can go deaf on a timer. Priority scan on
+# the HT muted its receiver for ~280ms starting ~3.0s after PTT key-down and
+# roughly every 3.1s after -- long enough to take a chunk out of the middle
+# of any keying still running at 3.0s, and unrecoverable when it lands
+# mid-frame (see PROFILE_1200's note and
+# scripts/probe_tx_duration_dropout.py). That setting is off on this bench
+# now, so nothing here is currently working around a live fault. It is kept
+# as a design constraint because scan/save features of this shape are
+# ordinary on handhelds, they are set on the *far* station where this modem
+# cannot see or change them, and their symptom -- sync locks at 0.99, CRC
+# fails every time -- cost several rounds of chasing the wrong explanation.
+# A keying that ends before the first hole never meets one.
+#
+# 2.8s, not 3.0: the probe put every passing frame's end at or before 2.64s
+# and every failure across the 3.0s mark, so 2.8 keeps ~200ms between the
+# end of a keying and the earliest hole. Widen the margin, not the cap, if a
+# radio with a shorter scan period turns up.
+MAX_KEYING_SECONDS = 2.8
+
+# Dead air inside a keying that isn't frame bits, PTT key-down to PTT
+# release. Mirrors transport.PTT_LEAD (0.22) + transport.STREAM_FILL (0.16,
+# the output stream opening and filling its first buffer) +
+# transport.PTT_TAIL (0.05); whale/transport.py asserts at import that it
+# still agrees with those, which is where each is measured and documented.
+# Not imported from there directly, so this module stays free of the
+# sound-card dependencies -- tests/test_afsk_loopback.py runs with no audio
+# stack at all.
+#
+# This was 0.40 when the sizing was first derived, from a nominal 0.13 for
+# the stream fill. An acceptance run logs the real thing -- every
+# transmission reports its audio length and its keyed length -- and put the
+# overhead at 0.42-0.43s over 44 keyings, i.e. the profiles below were each
+# ~20ms past the cap they were supposed to sit under. Corrected here rather
+# than by widening the cap, because the cap is the part with a measurement
+# behind it.
+KEYING_OVERHEAD_SECONDS = 0.43
+
+
+def frame_bits(payload_len, baud):
+    """Total bits on air for one frame, pads included."""
+    return (len(framing.head_pad_bits(baud)) + len(framing.SYNC_BITS) + 8
+            + 8 * payload_len + 16 + len(framing.tail_pad_bits(baud)))
+
+
+def max_payload_for_keying(baud, budget=MAX_KEYING_SECONDS):
+    """Largest AFSK payload, in bytes, whose whole keying fits in `budget`.
+
+    The inverse of frame_bits + KEYING_OVERHEAD_SECONDS, clamped to what the
+    length byte can describe.
+    """
+    spare_bits = (budget - KEYING_OVERHEAD_SECONDS) * baud - frame_bits(0, baud)
+    return max(0, min(int(spare_bits // 8), framing.MAX_PAYLOAD_BYTES))
+
+
+def max_chunk_for_keying(baud, budget=MAX_KEYING_SECONDS):
+    """max_payload_for_keying less the DATA frame's own header bytes, i.e.
+    the largest link-layer chunk this baud can carry inside the budget."""
+    return max(0, max_payload_for_keying(baud, budget) - DATA_FRAME_HEADER_BYTES)
+
+
+PROFILE_300 = Profile(name="300baud", mode_id=0, baud=BAUD, freq0=FREQ_0, freq1=FREQ_1,
+                      chunk_size=max_chunk_for_keying(BAUD))
 
 # Second speed. 800 Hz of tone separation, which was arrived at the hard
 # way: 700/1900 Hz (a 1200 Hz spread, the same 2:1 separation-to-baud ratio
@@ -162,10 +238,12 @@ PROFILE_300 = Profile(name="300baud", mode_id=0, baud=BAUD, freq0=FREQ_0, freq1=
 # priority scan on the HT muting its receiver every ~3s, not a property of
 # this profile or of frame size -- see the note above PROFILE_1200. With
 # the scan off the same sweep passes 100% both directions at every payload
-# up to 255 bytes. chunk_size=100 (-> 102-byte AFSK payload for DATA, see
-# whale/link.py's frame_airtime calc) is kept as a turnaround and
-# retransmit-cost choice: a lost frame costs a whole chunk to resend, and
-# smaller chunks interleave better with ACKs.
+# up to 255 bytes, so frame size is not a reliability limit here and
+# chunk_size comes straight from the keying budget above: 156 bytes, a
+# 158-byte AFSK payload, a 2.79s keying. That is a size this profile has
+# actually been swept at (160 bytes, 12/12 both directions during the
+# 1200/1800 A/B) rather than an extrapolation, and an acceptance run has
+# since carried six such frames over the air with no retransmit.
 # The separation was then narrowed again, from 800 Hz to 600, after the
 # re-centring: 1200/1800 A/B'd against 1100/1900 on the bench, interleaved
 # trial by trial so drift could not favour either. Both decoded 100% (32/32
@@ -195,7 +273,7 @@ PROFILE_300 = Profile(name="300baud", mode_id=0, baud=BAUD, freq0=FREQ_0, freq1=
 # threshold, and unchanged from when the tones differed. A full acceptance
 # run with both profiles live on air produced no near-miss decodes.
 PROFILE_600 = Profile(name="600baud", mode_id=1, baud=600, freq0=tones(600.0)[0],
-                       freq1=tones(600.0)[1], chunk_size=100)
+                       freq1=tones(600.0)[1], chunk_size=max_chunk_for_keying(600))
 
 # Third speed. PROFILE_600's tone-widening approach (700/1500 -> pushing
 # further apart) hit a hard wall: scripts/measure_band_edges.py found the
@@ -211,8 +289,14 @@ PROFILE_600 = Profile(name="600baud", mode_id=1, baud=600, freq0=tones(600.0)[0]
 # separation -- don't have that problem. Re-running the baud sweep at
 # 1200/2200 Hz cleared 1200 baud cleanly (100% both directions) and broke
 # down at 1400 (0/5 ht->ic705, confidence flatlined -- a real passband
-# wall, not a marginal case). chunk_size=100 (-> 102-byte AFSK payload for
-# DATA, see whale/link.py's frame_airtime calc).
+# wall, not a marginal case).
+#
+# This is the one profile the keying budget does not bind: 2.8s of air at
+# 1200 baud would carry a 328-byte payload, so what caps it is
+# framing.MAX_PAYLOAD_BYTES, the 8-bit length field. chunk_size is 253, the
+# 255-byte maximum less the DATA header, and the keying runs 2.31s. Widening
+# the length field is the only way to spend the remaining ~0.5s here, and it
+# is a format change both stations would have to take together.
 #
 # RESOLVED, and it was never about frame size or about this profile.
 #
@@ -285,7 +369,7 @@ PROFILE_600 = Profile(name="600baud", mode_id=1, baud=600, freq0=tones(600.0)[0]
 # coherent one), not in the tone table, and this profile could join the
 # others at 1500 Hz afterwards.
 PROFILE_1200 = Profile(name="1200baud", mode_id=2, baud=1200, freq0=1200.0, freq1=2200.0,
-                        chunk_size=100)
+                        chunk_size=max_chunk_for_keying(1200))
 
 # Slowest -> fastest. Index order is also step order for mid-session
 # adaptation (whale/link.py steps to PROFILES[i-1] / PROFILES[i+1]).
@@ -358,9 +442,16 @@ def _sync_template(sps, sample_rate, freq0, freq1):
 
 
 def frame_seconds(payload_len=framing.MAX_PAYLOAD_BYTES, profile: Profile = PROFILE_300):
-    n_bits = (len(framing.head_pad_bits(profile.baud)) + len(framing.SYNC_BITS) + 8 + 8 * payload_len + 16
-              + len(framing.tail_pad_bits(profile.baud)))
-    return n_bits / profile.baud
+    """How long the frame's own audio lasts."""
+    return frame_bits(payload_len, profile.baud) / profile.baud
+
+
+def keying_seconds(payload_len=framing.MAX_PAYLOAD_BYTES, profile: Profile = PROFILE_300):
+    """How long the channel is occupied, PTT key-down to PTT release --
+    frame_seconds plus the dead air held around it. This is the quantity
+    MAX_KEYING_SECONDS caps, because a receiver muting itself on a timer
+    counts from key-down, not from the first bit of the sync word."""
+    return KEYING_OVERHEAD_SECONDS + frame_seconds(payload_len, profile)
 
 
 # How many correlation peaks demodulate() will attempt to decode in one
