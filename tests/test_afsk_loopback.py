@@ -21,11 +21,15 @@ from link_harness import (FakeTransport as _FakeTransport, connected_pair as _co
 
 
 def test_framing_roundtrip():
-    for payload in (b"", b"hello", bytes(range(256))[:255]):
+    # 255/256 is where the old 8-bit length field ended, so both sides of
+    # that boundary are checked explicitly; 1000 is past anything a keying
+    # can carry but well within what the 16-bit field must describe.
+    for payload in (b"", b"hello", bytes(range(256))[:255],
+                    bytes(range(256)), bytes(i % 256 for i in range(1000))):
         bits = framing.build_frame_bits(payload)
         after_sync = len(framing.head_pad_bits(300)) + len(framing.SYNC_BITS)
         decoded = framing.parse_frame_bits(bits[after_sync:])
-        assert decoded == payload, (payload, decoded)
+        assert decoded == payload, (len(payload), len(decoded or b""))
     print("test_framing_roundtrip OK")
 
 
@@ -33,14 +37,13 @@ def test_every_keying_fits_the_budget_and_uses_it():
     """No transmission this modem makes may outlast afsk.MAX_KEYING_SECONDS,
     and every DATA frame should come as close to it as the format allows.
 
-    Both halves matter. The cap is what keeps a keying clear of a receiver
-    that mutes itself on a timer -- priority scan on the HT, ~280ms starting
-    ~3.0s after key-down, see scripts/probe_tx_duration_dropout.py -- and a
-    keying that overruns it loses a chunk out of its middle on a radio this
-    modem cannot see or configure. The tightness is the throughput: chunk
-    sizes are derived from the budget rather than chosen, so a profile
-    leaving room for another whole byte means the derivation has drifted
-    from the arithmetic, not that someone made a judgement call.
+    Both halves matter. The cap bounds how long the transmitter holds the
+    channel, which sets the cost of a single retransmit and the floor under
+    turnaround -- see afsk.MAX_KEYING_SECONDS. The tightness is the
+    throughput: chunk sizes are derived from the budget rather than chosen,
+    so a profile leaving room for another whole byte means the derivation
+    has drifted from the arithmetic, not that someone made a judgement
+    call.
 
     A DATA frame is the long one, but the control plane rides the same air,
     so the smaller frame types are checked too rather than assumed."""
@@ -50,11 +53,14 @@ def test_every_keying_fits_the_budget_and_uses_it():
         assert keying <= afsk.MAX_KEYING_SECONDS + 1e-9, \
             (profile.name, payload, round(keying, 3))
 
-        # One more byte must not fit -- unless what stopped us was the 8-bit
-        # length field rather than the clock, which is the case at 1200 baud.
-        if payload < framing.MAX_PAYLOAD_BYTES:
-            assert afsk.keying_seconds(payload + 1, profile) > afsk.MAX_KEYING_SECONDS, \
-                f"{profile.name} leaves room for a bigger chunk than {profile.chunk_size}"
+        # One more byte must not fit. This used to be conditional, because
+        # at 1200 baud what stopped us was the 8-bit length field rather
+        # than the clock; with framing.LENGTH_FIELD_BITS at 16 the budget
+        # binds at every profile and the exemption is gone.
+        assert payload < framing.MAX_PAYLOAD_BYTES, \
+            f"{profile.name} is capped by the length field again, not the clock"
+        assert afsk.keying_seconds(payload + 1, profile) > afsk.MAX_KEYING_SECONDS, \
+            f"{profile.name} leaves room for a bigger chunk than {profile.chunk_size}"
 
         # DATA_ACK (2 seq bytes + type) and the control-plane estimate, both
         # of which key the radio up like anything else.
@@ -107,9 +113,8 @@ def test_afsk_noisy_delayed_loopback():
 # The two legs being reciprocal to within 0.6 ppm is what says that is a
 # genuine clock difference and not an artefact of the method. The two sound
 # cards are, for practical purposes, the same clock -- ~100x too close to
-# cost a single bit at any frame size the link sends. Clock offset was
-# never the cause of anything failing on this bench; that was priority scan
-# on the HT, see scripts/probe_tx_duration_dropout.py.
+# cost a single bit at any frame size the link sends, and never the cause of
+# anything failing on this bench.
 #
 # The tests below are kept anyway, because "the clocks happen to agree
 # today" is not a property of the modem. A different radio, a different
@@ -120,7 +125,7 @@ ASSUMED_WORST_CASE_PPM = 500
 
 # The production frame: link.py sends chunk_size bytes of payload plus its
 # own type/seq header. This is per profile rather than one number now that
-# chunk_size is derived from the keying-length budget -- 73, 158 and 255
+# chunk_size is derived from the keying-length budget -- 80, 172 and 357
 # bytes of AFSK payload at 300, 600 and 1200 baud, all three landing on a
 # keying of at most afsk.MAX_KEYING_SECONDS. Derived rather than restated so
 # these tests keep measuring what the link actually sends.
@@ -155,7 +160,7 @@ def resample_clock(audio, ppm):
 def _frame_bits(payload_len):
     """Bits from the start of the sync word to the end of the CRC -- the
     span over which a timing error has to stay inside half a symbol."""
-    return len(framing.SYNC_BITS) + 8 + 8 * payload_len + 16
+    return len(framing.SYNC_BITS) + framing.frame_bits_for_length(payload_len)
 
 
 def expected_failure(reason):
@@ -283,9 +288,9 @@ def test_decodes_at_production_size_under_bench_clock_offset():
     decoder's half-symbol budget is 0.5/n_bits, so each profile's production
     frame has its own tolerance --
 
-        300 baud    73 bytes    671 bits    ~745 ppm
-        600 baud   158 bytes   1351 bits    ~370 ppm
-       1200 baud   255 bytes   2127 bits    ~235 ppm
+        300 baud    80 bytes    735 bits    ~680 ppm
+        600 baud   172 bytes   1471 bits    ~340 ppm
+       1200 baud   357 bytes   2951 bits    ~169 ppm
 
     -- and the two faster profiles are the ones that cannot hold 500. Note
     the shape: the frames are sized by *airtime*, so a faster profile spends
@@ -316,12 +321,12 @@ def test_long_frames_lose_to_clock_offset_before_short_ones():
 
     Worth pinning down because it is a trap, not because it is currently
     biting: a decoder with no timing recovery degrades in a way that looks
-    exactly like a frame-size ceiling, and the bench did have a frame-size
-    ceiling. It was not this -- the clocks measure 8 ppm apart and the real
-    cause is a receiver dropout, see
-    scripts/probe_tx_duration_dropout.py. But the two are indistinguishable
-    from the decoder's output alone, so if a size ceiling ever shows up
-    again, measure the clocks before assuming it is the same thing twice.
+    exactly like a frame-size ceiling, and the bench has had frame-size
+    ceilings that were nothing of the kind. The clocks measure 3.4 ppm
+    apart, far too close to be the cause of any of them -- but from the
+    decoder's output alone a clock ceiling and any other kind are
+    indistinguishable, so if a size ceiling shows up, measure the clocks
+    before assuming it is the same thing twice.
     """
     rng = np.random.default_rng(14)
     profile = afsk.PROFILE_600
@@ -339,90 +344,6 @@ def test_long_frames_lose_to_clock_offset_before_short_ones():
     assert large_rx.get("payload") == large, \
         f"160 bytes failed at {ppm} ppm (confidence {large_rx.get('confidence')})"
     print("test_long_frames_lose_to_clock_offset_before_short_ones OK")
-
-
-# -- mid-frame receiver dropout ---------------------------------------
-#
-# The failure the bench actually had, kept because the shape of it will
-# recur with any scanning receiver. Priority scan was enabled on the HT,
-# muting it for ~280ms about 3.0s after PTT key-down and again roughly
-# every 3.1s. Nothing to do with the modulation, the tones, or frame size.
-#
-# It was mistaken for a frame-size ceiling because a bigger payload is also
-# a longer keying, and every sweep varied both at once. A 40-byte frame -- a
-# size the sweeps recorded as 100% reliable -- failed 0/4 when the padding
-# in front of it put it on air across the 3.0s mark, and went back to 4/4
-# on both sides of that band. With the scan off the ceiling disappeared
-# entirely: 255-byte payloads pass 100% both directions at 600 and 1200
-# baud.
-
-DROPOUT_SECONDS = 0.28
-
-
-def punch_dropout(audio, at_seconds, duration=DROPOUT_SECONDS):
-    """Silences `duration` seconds of `audio` starting at `at_seconds`,
-    the way the HT's receiver silences a span of a transmission."""
-    audio = np.asarray(audio, dtype=np.float64).copy()
-    start = int(at_seconds * afsk.SAMPLE_RATE)
-    end = min(len(audio), start + int(duration * afsk.SAMPLE_RATE))
-    if start < len(audio):
-        audio[start:end] = 0.0
-    return audio
-
-
-def test_a_dropout_outside_the_frame_is_harmless():
-    """The requirement the link actually depends on. Retransmits have to
-    land in a clear window and decode there, even though the buffer they
-    arrive in still holds the hole that killed the previous attempt."""
-    rng = np.random.default_rng(16)
-    profile = afsk.PROFILE_600
-    payload = bytes(rng.integers(0, 256, size=40, dtype=np.uint8))
-    frame = afsk.modulate(payload, profile=profile)
-
-    lead = np.zeros(int(1.5 * afsk.SAMPLE_RATE), dtype=np.float32)
-    tail = np.zeros(int(1.5 * afsk.SAMPLE_RATE), dtype=np.float32)
-    buffer = np.concatenate([lead, frame, tail])
-    frame_end = (len(lead) + len(frame)) / afsk.SAMPLE_RATE
-
-    for at in (0.4, frame_end + 0.4):
-        holed = punch_dropout(buffer, at)
-        holed = holed + rng.normal(0, 0.01, size=len(holed))
-        result = afsk.demodulate(holed, profile=profile)
-        assert result.get("payload") == payload, \
-            (f"a dropout at {at:.2f}s, clear of the frame, broke the decode",
-             result.get("confidence"))
-    print("test_a_dropout_outside_the_frame_is_harmless OK")
-
-
-def test_a_dropout_inside_the_frame_fails_without_lying():
-    """A hole in the middle of a frame is unrecoverable and that is fine --
-    280ms is ~170 bits at 600 baud, and there is no FEC to rebuild them.
-    What must not happen is a *false* decode: the CRC has to catch it, so
-    the link retransmits rather than handing up corrupt data.
-
-    The sync word still scores high, because it is 63 symbols at the very
-    front and the hole is far behind it. That is why the bench saw
-    'confidence 0.99, CRC failed' and read it as a sync problem.
-    """
-    rng = np.random.default_rng(17)
-    profile = afsk.PROFILE_600
-    payload = bytes(rng.integers(0, 256, size=40, dtype=np.uint8))
-    frame = afsk.modulate(payload, profile=profile)
-    lead = np.zeros(int(0.5 * afsk.SAMPLE_RATE), dtype=np.float32)
-    buffer = np.concatenate([lead, frame, np.zeros(4000, dtype=np.float32)])
-
-    frame_seconds = len(frame) / afsk.SAMPLE_RATE
-    hit = 0
-    for offset in np.arange(0.15, frame_seconds - 0.3, 0.1):
-        holed = punch_dropout(buffer, 0.5 + offset)
-        holed = holed + rng.normal(0, 0.01, size=len(holed))
-        result = afsk.demodulate(holed, profile=profile)
-        assert result.get("payload") in (None, payload), "decoder invented a payload"
-        if result.get("payload") is None:
-            hit += 1
-    assert hit > 0, "expected at least one dropout position to break the frame"
-    print(f"test_a_dropout_inside_the_frame_fails_without_lying OK "
-          f"({hit} positions broke the frame, none decoded falsely)")
 
 
 def test_high_confidence_survives_the_offset_that_kills_the_payload():
@@ -445,8 +366,8 @@ def test_high_confidence_survives_the_offset_that_kills_the_payload():
     assert result.get("confidence", 0) > 0.9, \
         f"expected a high-confidence near-miss, got {result.get('confidence')}"
 
-    # And the length byte still reads correctly, because it sits at bits
-    # 63-71 where the accumulated error is still negligible. This is worth
+    # And the length field still reads correctly, because it sits at bits
+    # 63-79 where the accumulated error is still negligible. This is worth
     # pinning down: the sweep scripts reported a near-miss end_index ~1.2x
     # the expected frame length and it was read as a false sync lock on
     # garbage. It is not -- end_index is an absolute offset into the RX
@@ -455,8 +376,76 @@ def test_high_confidence_survives_the_offset_that_kills_the_payload():
     span = result["end_index"] - result["start_index"]
     sps = round(afsk.SAMPLE_RATE / profile.baud)
     assert abs(span - sps * _frame_bits(len(payload))) < sps, \
-        ("length byte decoded wrong", span, sps * _frame_bits(len(payload)))
+        ("length field decoded wrong", span, sps * _frame_bits(len(payload)))
     print("test_high_confidence_survives_the_offset_that_kills_the_payload OK")
+
+
+def _hand_built_frame(profile, length_field, payload_bytes):
+    """Audio for a frame whose length field is written directly, so it can
+    disagree with the payload that follows. modulate() cannot express this
+    -- it derives the field from the payload, which is the whole point."""
+    bits = (framing.head_pad_bits(profile.baud) + framing.SYNC_BITS
+            + framing.bytes_to_bits(
+                length_field.to_bytes(framing.LENGTH_FIELD_BITS // 8, "big") + payload_bytes)
+            + framing.tail_pad_bits(profile.baud))
+    sps = round(afsk.SAMPLE_RATE / profile.baud)
+    return afsk._cpfsk_tone(bits, sps, afsk.SAMPLE_RATE, profile.freq0, profile.freq1)
+
+
+def test_an_implausible_declared_length_is_a_dead_sync_not_a_frame_in_flight():
+    """The hazard the 16-bit length field introduces, and the check that
+    answers it.
+
+    Nothing can validate a length field before buffering everything it
+    claims -- the CRC sits after the payload it describes -- so the decoder
+    has to judge the claim on its face. A false sync on noise yields a
+    uniformly random 16-bit value, and at 1200 baud ~98% of those describe a
+    frame longer than transport.RX_BUFFER_SECONDS can ever hold. Reporting
+    one of those as 'still arriving' tells whale/link.py's decode loop to
+    stop pruning and re-search the whole buffer every poll (see
+    _prune_stale), which lands straight on the turnaround.
+
+    Under the old 8-bit field this could not happen: 255 bytes at 300 baud
+    is 7.1s, inside the buffer, so every value a garbage length byte could
+    take was one the decoder would collect in full and reject on CRC. That
+    property is now explicit rather than incidental -- see
+    afsk.MAX_CREDIBLE_FRAME_SECONDS.
+    """
+    profile = afsk.PROFILE_600
+    audio = _hand_built_frame(profile, 60000, b"nowhere near 60000 bytes")
+
+    result = afsk.demodulate(audio, profile=profile)
+    assert result.get("payload") is None, "a frame this broken must not decode"
+    assert result.get("confidence", 0) >= profile.confidence_threshold, \
+        f"the sync word should still lock, got {result.get('confidence')}"
+    assert "end_index" in result, \
+        "an unwaitable declared length must read as a dead sync, not as still-arriving"
+    print("test_an_implausible_declared_length_is_a_dead_sync_not_a_frame_in_flight OK")
+
+
+def test_a_plausible_frame_still_reads_as_still_arriving_while_incomplete():
+    """The other half, and the reason the check is a bound rather than a
+    blanket refusal: a real frame that is genuinely half-way through must
+    still suppress end_index, or the decode loop discards frames mid-flight
+    and pays a retransmit for each one."""
+    profile = afsk.PROFILE_600
+    payload = bytes([link.PT_DATA, 0]) + b"x" * 120
+    full = afsk.modulate(payload, profile=profile)
+
+    # Cut just past the length field, so the declared length is readable and
+    # credible but most of the payload has yet to arrive.
+    head = len(framing.head_pad_bits(profile.baud)) + len(framing.SYNC_BITS) + 32
+    sps = round(afsk.SAMPLE_RATE / profile.baud)
+    partial = full[:head * sps]
+
+    result = afsk.demodulate(partial, profile=profile)
+    assert result.get("payload") is None, "the frame is not complete yet"
+    assert "end_index" not in result, \
+        "a credible length still arriving must not be reported as a dead end"
+
+    # And the whole thing decodes once it has all landed.
+    assert afsk.demodulate(full, profile=profile).get("payload") == payload
+    print("test_a_plausible_frame_still_reads_as_still_arriving_while_incomplete OK")
 
 
 def test_link_packet_roundtrip():
@@ -794,8 +783,8 @@ if __name__ == "__main__":
     test_high_confidence_survives_the_offset_that_kills_the_payload()
     test_decodes_at_production_size_under_bench_clock_offset()
     test_long_frames_lose_to_clock_offset_before_short_ones()
-    test_a_dropout_outside_the_frame_is_harmless()
-    test_a_dropout_inside_the_frame_fails_without_lying()
+    test_an_implausible_declared_length_is_a_dead_sync_not_a_frame_in_flight()
+    test_a_plausible_frame_still_reads_as_still_arriving_while_incomplete()
     test_link_packet_roundtrip()
     test_connect_body_roundtrip()
     test_connect_ack_body_roundtrip()

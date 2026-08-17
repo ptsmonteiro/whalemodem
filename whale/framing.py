@@ -2,9 +2,9 @@
 
 Frame layout (bits, MSB first):
     SYNC_BITS (63 bits, PN sequence -- good autocorrelation for sync search)
-    length    (8 bits, payload length in bytes, 0-255)
+    length    (16 bits, big endian, payload length in bytes, 0-65535)
     payload   (8 * length bits)
-    crc16     (16 bits, over length_byte + payload)
+    crc16     (16 bits, over the length field + payload)
 """
 
 CRC16_POLY = 0x1021
@@ -40,7 +40,27 @@ def _lfsr_bits(num_bits, order, taps, seed=1):
 # used purely as a correlation target for sync search.
 SYNC_BITS = _lfsr_bits(63, 6, (1, 6), seed=1)
 
-MAX_PAYLOAD_BYTES = 255
+# The length field, and everything it can express.
+#
+# This was 8 bits / 255 bytes, which was the binding constraint at 1200 baud:
+# afsk.MAX_KEYING_SECONDS leaves room for a 328-byte payload there, so ~0.5s
+# of every keying went unspent purely because the field could not describe
+# it. 16 bits spends that, and leaves headroom for whatever faster profile
+# turns up -- it covers a full keying up to roughly 230 kbaud, which is far
+# past anything a 3 kHz audio channel will ever carry.
+#
+# ON-AIR FORMAT CHANGE: stations built either side of this do not
+# interoperate, and unlike the mode negotiation there is no way to straddle
+# it -- the length field has to be read before the frame that would say who
+# is transmitting.
+#
+# What binds frame size now is afsk.MAX_KEYING_SECONDS, which is about how
+# long the transmitter holds the channel rather than anything about the
+# format. The field is deliberately far wider than that budget will ever
+# allow, which is exactly why a declared length must not be taken at face
+# value on receive -- see afsk.max_credible_frame_bits.
+LENGTH_FIELD_BITS = 16
+MAX_PAYLOAD_BYTES = (1 << LENGTH_FIELD_BITS) - 1
 
 # Extra dummy bits appended after the CRC, purely as on-air padding. Real
 # hardware corrupts the very end of a transmission -- our own 5ms amplitude
@@ -116,24 +136,50 @@ def bits_to_bytes(bits) -> bytes:
 def build_frame_bits(payload: bytes, baud=300):
     if len(payload) > MAX_PAYLOAD_BYTES:
         raise ValueError(f"payload too long ({len(payload)} > {MAX_PAYLOAD_BYTES})")
-    body = bytes([len(payload)]) + payload
+    body = len(payload).to_bytes(LENGTH_FIELD_BITS // 8, "big") + payload
     crc = crc16_ccitt_false(body)
     crc_bytes = bytes([(crc >> 8) & 0xFF, crc & 0xFF])
     return head_pad_bits(baud) + SYNC_BITS + bytes_to_bits(body + crc_bytes) + tail_pad_bits(baud)
 
 
+def declared_length(bits_after_sync):
+    """The payload length this frame *claims*, or None if the length field
+    hasn't fully arrived yet.
+
+    Untrusted by construction, and the reason that matters is the ordering:
+    the CRC that would validate this number sits *after* the payload it
+    describes, so nothing can check it until that many bits have been
+    buffered. A receiver therefore has to decide whether the claim is
+    credible before it can afford to wait for it -- a false sync on noise
+    yields a uniformly random 16-bit length, and honouring one of those
+    means waiting for a frame that will never complete. See
+    afsk.max_credible_frame_bits, which is where that judgement is made.
+    """
+    if len(bits_after_sync) < LENGTH_FIELD_BITS:
+        return None
+    field = bits_to_bytes(bits_after_sync[0:LENGTH_FIELD_BITS])
+    return int.from_bytes(field, "big")
+
+
+def frame_bits_for_length(length):
+    """Bits from the start of the length field to the end of the CRC, for a
+    frame declaring `length` bytes of payload."""
+    return LENGTH_FIELD_BITS + 8 * length + 16
+
+
 def parse_frame_bits(bits_after_sync):
     """bits_after_sync may be longer than one frame. Returns payload bytes if
     CRC checks out, else None."""
-    if len(bits_after_sync) < 8:
+    length = declared_length(bits_after_sync)
+    if length is None:
         return None
-    length = bits_to_bytes(bits_after_sync[0:8])[0]
-    total_bits = 8 + 8 * length + 16
+    total_bits = frame_bits_for_length(length)
     if len(bits_after_sync) < total_bits:
         return None
-    body = bits_to_bytes(bits_after_sync[0:8 + 8 * length])
-    crc_bytes = bits_to_bytes(bits_after_sync[8 + 8 * length:total_bits])
+    body_bits = LENGTH_FIELD_BITS + 8 * length
+    body = bits_to_bytes(bits_after_sync[0:body_bits])
+    crc_bytes = bits_to_bytes(bits_after_sync[body_bits:total_bits])
     crc_received = (crc_bytes[0] << 8) | crc_bytes[1]
     if crc16_ccitt_false(body) != crc_received:
         return None
-    return body[1:]
+    return body[LENGTH_FIELD_BITS // 8:]

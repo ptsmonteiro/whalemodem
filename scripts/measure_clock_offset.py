@@ -13,9 +13,8 @@ The two legs are reciprocal to within 0.6 ppm, which is what says the
 number is a real clock difference rather than an artefact of the method.
 3.4 ppm is ~100x too little to cost a single bit: a frame dies when its
 accumulated timing error reaches half a symbol, needing ~366 ppm at 160
-bytes and ~550 ppm at the 102-byte production frame. The ceiling was
-priority scan on the HT muting its receiver every ~3s -- see
-scripts/probe_tx_duration_dropout.py.
+bytes and ~550 ppm at the 102-byte production frame. So whatever a
+frame-size ceiling turns out to be, on this bench it is not this.
 
 Run it after any change of radio, interface, or cabling. The decoder has no
 timing recovery (it lays symbol sample points on a rigid integer-sample

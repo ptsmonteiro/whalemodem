@@ -692,7 +692,7 @@ class Link:
         profile), a lower-baud profile's correlator can pick up a spurious
         sync lock on audio that's actually a still-arriving higher-baud
         frame -- their tones can overlap enough for that -- and, once it
-        reads far enough to hit a garbage length byte, report a near-miss
+        reads far enough to hit a garbage length field, report a near-miss
         end_index of its own. Consuming on that would truncate the real
         frame before the other candidate ever gets the full thing to look
         at. So: if any candidate has a genuine sync lock (confidence over
@@ -731,11 +731,15 @@ class Link:
                 #
                 # Advance past the *sync word only*, not to the end of the
                 # frame this position claims. A frame that failed to decode
-                # is by definition one whose length byte we have no reason
-                # to trust: a garbage length of 255 at 300 baud would skip
-                # seven seconds of audio, stepping straight over a real
-                # frame arriving behind it. Stepping past the sync is all
-                # that is needed to guarantee forward progress.
+                # is by definition one whose length field we have no reason
+                # to trust, and that field is 16 bits: a garbage length at
+                # 300 baud can claim half an hour of audio, stepping way
+                # over a real frame arriving behind it. (afsk._try_sync
+                # refuses to wait for such a claim at all -- see
+                # MAX_CREDIBLE_FRAME_SECONDS -- but what it hands back is
+                # still a position derived from a length we disbelieve.)
+                # Stepping past the sync is all that is needed to guarantee
+                # forward progress.
                 #
                 # Earliest wins, for the same reason -- whatever else is in
                 # the buffer is behind this one.
@@ -756,25 +760,19 @@ class Link:
         """Saves the audio a near-miss gave up on, if WHALE_CAPTURE_DIR is
         set in the environment. Off by default.
 
-        This was added for one open question -- frames that sync strongly
-        and then fail CRC anyway, on the ic705->ht leg only, which is the
-        signature behind the per-frame size ceilings in
-        scripts/sweep_payload_1200_2200.py and behind the burst attempt
-        being rolled back (see the module docstring). That question is
-        answered: priority scan was enabled on the HT, muting its receiver
-        for ~280ms every ~3s, so any keying still running at 3.0s lost a
-        chunk out of its middle. With the scan off the ceiling is gone
-        entirely -- 255-byte payloads pass 100% both directions. See
-        scripts/probe_tx_duration_dropout.py, which separated keying
-        duration from payload size by holding the payload constant.
+        For the failure that is hardest to reason about from logs alone: a
+        frame that syncs strongly and then fails CRC anyway. This is the only
+        way to see what the radio actually received rather than what the
+        decoder made of it, and that distinction is what such a case turns
+        on -- a high confidence score reads the first 5% of the frame, so it
+        says nothing about the 95% that failed.
 
-        Worth keeping anyway. It is the only way to see what the radio
-        actually received rather than what the decoder made of it, and the
-        reason the original question took so long was that nothing about it
-        reproduced in software -- progressive arrival, truncation at every
-        offset from 0 to 800ms, AWGN down to 15 dB and real off-air noise
-        beds all decode fine. If a near-miss shows up that the dropout does
-        not explain, these captures are again the input to the analysis.
+        Kept on the strength of a past investigation that took a long time
+        precisely because nothing about it reproduced in software:
+        progressive arrival, truncation at every offset from 0 to 800ms,
+        AWGN down to 15 dB and real off-air noise beds all decode fine. If a
+        near-miss shows up that software cannot reproduce, these captures
+        are the input to the analysis.
         """
         directory = os.environ.get("WHALE_CAPTURE_DIR")
         if not directory:
@@ -1130,8 +1128,8 @@ class Link:
 
         Chunks are cut one at a time, immediately before each is sent, rather
         than pre-split up front: _maybe_adapt() can step tx_profile mid-message
-        and the profiles have different chunk_size (73 at 300 baud, 158 at 600,
-        253 at 1200 -- each is whatever afsk.MAX_KEYING_SECONDS allows at that
+        and the profiles have different chunk_size (78 at 300 baud, 170 at 600,
+        355 at 1200 -- each is whatever afsk.MAX_KEYING_SECONDS allows at that
         baud), so a message pre-split at the starting profile would keep
         sending undersized frames for the rest of the transfer even after
         stepping up."""

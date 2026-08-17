@@ -96,19 +96,14 @@ What remained after all four was still not right: the ic705->ht leg
 recovered exactly one frame from 32 of its 34 two-frame bursts, the second
 frame syncing at 0.97 and then failing its CRC every time, while the
 reverse leg carried the same bursts fine. That is the same "sync locks,
-frame does not verify" signature as the per-frame size ceilings the
-payload sweeps hit on this hardware -- and that signature now has an
-explanation: **priority scan was enabled on the HT**, muting its receiver
-for ~280ms every ~3s. Any keying still transmitting at ~3.0s after PTT lost
-a chunk out of its middle, which is precisely where the second frame of a
-two-frame burst sits. See `whale/afsk.py`'s note above `PROFILE_1200` and
-`scripts/probe_tx_duration_dropout.py`.
+frame does not verify" signature as the per-frame size ceilings the payload
+sweeps hit on this hardware, and it is not understood. Bursting is parked
+until it is.
 
-With the scan off, the payload sweeps run 100% both directions to 255
-bytes, the format's maximum. Bursting is therefore no longer blocked on an
-unexplained failure -- but it has not been retried, and the four bugs above
-are separate from the scan and were all real. Anyone picking it back up
-starts from the rollback, not from the burst branch.
+The payload sweeps now run 100% both directions to 255 bytes, so the
+per-frame ceiling is not currently reproducible -- but bursting has not been
+retried, and the four bugs above were all real and separate from it. Anyone
+picking it back up starts from the rollback, not from the burst branch.
 
 Three pieces of that work were kept, because they are fixes in their own
 right rather than burst machinery:
@@ -239,7 +234,7 @@ explanation (the detector integrates one symbol, so a tone below the baud
 rate gives it less than a full cycle) are in `PROFILE_1200`'s comment in
 `whale/afsk.py`.
 
-Frames carry a 63-bit PN sync word, an 8-bit length, the
+Frames carry a 63-bit PN sync word, a 16-bit length, the
 payload, a CRC16, and short blocks of on-air padding before the sync word
 and after the CRC, so that settling artifacts at either end of a
 transmission eat padding rather than real bits. See the docstrings in
@@ -270,43 +265,47 @@ not had the same measurement treatment.
 ### How long one keying may be
 
 Everything above is fixed cost per keying, so the way to spend less of it
-per byte is to put more bytes in a keying. What stops that from being
-unbounded is not the frame format or the channel -- it is that a receiver
-can go deaf on a timer. Priority scan on the HT muted its receiver for
-~280ms starting ~3.0s after PTT key-down and every ~3.1s after, which took
-a chunk out of the middle of any keying still running at 3.0s and cost
-several rounds of chasing a "frame-size ceiling" that was nothing of the
-kind (see `PROFILE_1200`'s note in `whale/afsk.py`).
+per byte is to put more bytes in a keying. Nothing on this bench stops that
+outright, but three things make an unbounded keying a bad trade: a frame is
+all or nothing under stop-and-wait ARQ, so a keying is the unit one bit
+error destroys; the link is half duplex, so the peer cannot interject while
+we hold the carrier; and the decoder has no timing recovery, so its
+tolerance to sample-clock offset falls as `0.5/n_bits` and long frames are
+the first thing a clock difference takes away.
 
-So a keying is capped in *duration* -- `afsk.MAX_KEYING_SECONDS`, 2.8s,
+So a keying is capped in *duration* -- `afsk.MAX_KEYING_SECONDS`, 3.0s,
 measured PTT key-down to PTT release -- and every profile's `chunk_size` is
 whatever fits inside that cap at its baud rather than a number picked per
 profile (`afsk.max_chunk_for_keying`):
 
 | profile | chunk | AFSK payload | frame | keying | payload bits/s |
 |---------|-------|--------------|-------|--------|----------------|
-| 300 baud  |  71 |  73 | 2.35s | 2.78s | 205 |
-| 600 baud  | 156 | 158 | 2.36s | 2.79s | 447 |
-| 1200 baud | 253 | 255 | 1.88s | 2.31s | 875 |
+| 300 baud  |  78 |  80 | 2.56s | 2.99s | 209 |
+| 600 baud  | 170 | 172 | 2.56s | 2.99s | 455 |
+| 1200 baud | 355 | 357 | 2.57s | 3.00s | 947 |
 
 Three things worth knowing about that table:
 
-  - **2.8s, not 3.0.** The probe put every passing frame's end at or before
-    2.64s and every failure across the 3.0s mark, so this keeps ~200ms
-    between the end of a keying and the earliest hole. The cap is the knob;
-    widen the margin rather than the cap if a radio with a shorter scan
-    period turns up.
-  - **1200 baud is not limited by time.** 2.8s of air at 1200 baud would
-    carry 328 bytes; what caps it at 255 is the 8-bit length field in
-    `whale/framing.py`. Roughly 0.5s of its budget goes unspent, and
-    widening that field is the only way to claim it -- a format change both
-    stations would have to take together.
-  - **The scan is off on this bench**, so nothing here is working around a
-    live fault. It is kept as a design constraint because scan/save
-    features of this shape are ordinary on handhelds, they are set on the
-    *far* station where this modem can neither see nor change them, and the
-    symptom -- sync locks at 0.99, CRC fails every time -- is expensive to
-    diagnose.
+  - **3.0s is chosen, not measured.** None of the three reasons above has a
+    cliff in it, so the figure is round rather than derived, and it is the
+    knob to turn if the trade changes. If a radio ever does impose a hard
+    limit -- some receivers mute themselves periodically to scan, on a timer
+    set at the *far* station where this modem can neither see nor change it
+    -- that would be a measurement, and it would replace this.
+  - **1200 baud used to be capped by the format, not the clock.** 3.0s of
+    air there carries 357 bytes, but the length field was 8 bits, so the
+    chunk stopped at 253 and most of a second of every keying went unspent.
+    The field is 16 bits now (`framing.LENGTH_FIELD_BITS`) and the budget
+    binds at all three profiles. That was an on-air format change: stations
+    built either side of it do not interoperate. It also means a declared
+    length can no longer be taken on trust -- see
+    `afsk.MAX_CREDIBLE_FRAME_SECONDS`.
+  - **The clock-offset budget shrinks as the cap grows.** Sizing by airtime
+    means a faster profile spends the budget on more bits, and more bits is
+    what the decoder cannot keep timing across: the production frames sit at
+    ~680 ppm at 300 baud, ~340 at 600 and ~169 at 1200. The two sound cards
+    measure 3.4 ppm apart, so this costs nothing here, but it is the first
+    thing to check on hardware whose clocks are not that close.
 
 The budget is spent on `transport.PTT_LEAD` + the output stream's
 `STREAM_FILL` + `transport.PTT_TAIL` (0.43s in total) before any frame bits
@@ -325,9 +324,10 @@ frame type, with no value outside that range. Re-read it after any change to
 the audio chain, the same as `sweep_ptt_timing.py`'s constants.
 
 Both runs passed 1 KB each way byte-for-byte with **no retransmit, no
-near-miss decode and no rx-profile correction** on either leg. The run at
-the corrected sizes put the longest keying at 2.79s, inside the 2.8s cap and
-~210ms clear of the dropout.
+near-miss decode and no rx-profile correction** on either leg. Those runs
+predate the move to a 3.0s cap and the 16-bit length field, so their chunk
+sizes were smaller than the table above; the acceptance run should be
+repeated at the current sizes.
 
 One cost this buys rather than saves: the decoder lays symbol sample points
 on a rigid grid from the sync peak, with no timing recovery, so its clock

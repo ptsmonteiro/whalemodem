@@ -63,23 +63,27 @@ def _demod_debug(audio, profile):
         "ok": True, "confidence": confidence, "peak": float(corr[i_star]),
         "raw_peak_over_median": float(np.max(corr)) / float(np.median(np.abs(corr)) or 1.0),
         "sync_locked": confidence >= profile.confidence_threshold,
-        "max_symbols": max_symbols, "symbols_needed_for_length_byte": n_sync + 8,
+        "max_symbols": max_symbols,
+        "symbols_needed_for_length_field": n_sync + framing.LENGTH_FIELD_BITS,
     }
-    if max_symbols < n_sync + 8:
-        info["verdict"] = "not enough symbols captured to even read the length byte"
+    if max_symbols < n_sync + framing.LENGTH_FIELD_BITS:
+        info["verdict"] = "not enough symbols captured to even read the length field"
         return info
 
-    num_symbols = min(max_symbols, afsk.MAX_FRAME_BITS)
+    credible_bits = afsk.max_credible_frame_bits(profile.baud)
+    num_symbols = min(max_symbols, credible_bits)
     sample_indices = first_index + sps * np.arange(num_symbols)
     decoded_bits = (diff[sample_indices] > 0).astype(int).tolist()
     payload = framing.parse_frame_bits(decoded_bits[n_sync:])
-    length = framing.bits_to_bytes(decoded_bits[n_sync:n_sync + 8])[0]
-    total_bits_needed = n_sync + 8 + 8 * length + 16
-    info["declared_length_byte"] = length
+    length = framing.declared_length(decoded_bits[n_sync:])
+    total_bits_needed = n_sync + framing.frame_bits_for_length(length)
+    info["declared_length"] = length
     info["total_bits_needed"] = total_bits_needed
     info["payload"] = payload
     info["verdict"] = "DECODED" if payload is not None else (
-        "frame complete but CRC/parse failed" if max_symbols >= total_bits_needed
+        "implausible declared length -- dead sync, not a frame"
+        if total_bits_needed > credible_bits
+        else "frame complete but CRC/parse failed" if max_symbols >= total_bits_needed
         else "still arriving (not enough symbols for declared length yet)")
     return info
 
@@ -116,9 +120,10 @@ def _analyze(captured, profile):
     print(f"  confidence={info['confidence']:.1f} (threshold={profile.confidence_threshold}) "
           f"peak={info['peak']:.3g} raw_peak_over_median={info['raw_peak_over_median']:.3g} "
           f"sync_locked={info['sync_locked']}")
-    print(f"  max_symbols={info['max_symbols']} (need {info['symbols_needed_for_length_byte']} for length byte)")
-    if "declared_length_byte" in info:
-        print(f"  declared_length={info['declared_length_byte']} "
+    print(f"  max_symbols={info['max_symbols']} "
+          f"(need {info['symbols_needed_for_length_field']} for length field)")
+    if "declared_length" in info:
+        print(f"  declared_length={info['declared_length']} "
               f"total_bits_needed={info['total_bits_needed']}")
     print(f"  verdict: {info['verdict']}")
 

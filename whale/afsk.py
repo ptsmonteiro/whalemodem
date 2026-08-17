@@ -122,7 +122,41 @@ CHUNK_SIZE = 40
 # that budget is spent on the whole AFSK payload rather than on the chunk.
 DATA_FRAME_HEADER_BYTES = 2
 
-MAX_FRAME_BITS = len(framing.SYNC_BITS) + 8 + 8 * framing.MAX_PAYLOAD_BYTES + 16
+# The longest frame the decoder will believe a declared length describes.
+#
+# A receiver cannot check a length field before buffering everything that
+# field claims, because the CRC validating it sits *after* the payload it
+# describes. So a declared length is a promise the decoder has to honour or
+# reject on its face, and honouring an implausible one is not free: _try_sync
+# reports it as "still arriving", which tells whale/link.py's decode loop to
+# stop pruning and re-search the whole RX buffer every poll (see
+# _prune_stale), turning a ~40ms poll into a ~300ms one that lands straight
+# on the turnaround.
+#
+# With the old 8-bit length field this could not arise. 255 bytes at 300 baud
+# is 7.1s, inside transport.RX_BUFFER_SECONDS, so *every* value a garbage
+# length byte could take was one the decoder would eventually collect in full
+# and reject on CRC. A 16-bit field breaks that by ~200x: at 1200 baud some
+# 98% of random length values describe a frame longer than the buffer can
+# ever hold, and a false sync peak on noise -- routine, the buffer regularly
+# holds a garbled self-echo of our own last transmission -- produces exactly
+# a random length value.
+#
+# The property is therefore restored explicitly rather than left to
+# arithmetic that happened to work out. 8s is comfortably longer than any
+# keying this modem makes (MAX_KEYING_SECONDS is 3.0), with room to spare for
+# the sweep scripts, which deliberately transmit past that budget; and
+# comfortably shorter than transport.RX_BUFFER_SECONDS, so anything the
+# decoder does agree to wait for is something it can still be holding whole
+# when the last bit of it lands.
+MAX_CREDIBLE_FRAME_SECONDS = 8.0
+
+
+def max_credible_frame_bits(baud):
+    """Sync word through CRC, for the longest frame `baud` could be part-way
+    through inside MAX_CREDIBLE_FRAME_SECONDS. A declared length implying
+    more than this is a dead sync, not a frame still arriving."""
+    return int(MAX_CREDIBLE_FRAME_SECONDS * baud)
 
 
 @dataclass(frozen=True)
@@ -158,24 +192,29 @@ class Profile:
 # A keying is capped in *duration*, and every profile's chunk_size is
 # whatever fits inside that cap rather than a number chosen per profile.
 #
-# The cap exists because a receiver can go deaf on a timer. Priority scan on
-# the HT muted its receiver for ~280ms starting ~3.0s after PTT key-down and
-# roughly every 3.1s after -- long enough to take a chunk out of the middle
-# of any keying still running at 3.0s, and unrecoverable when it lands
-# mid-frame (see PROFILE_1200's note and
-# scripts/probe_tx_duration_dropout.py). That setting is off on this bench
-# now, so nothing here is currently working around a live fault. It is kept
-# as a design constraint because scan/save features of this shape are
-# ordinary on handhelds, they are set on the *far* station where this modem
-# cannot see or change them, and their symptom -- sync locks at 0.99, CRC
-# fails every time -- cost several rounds of chasing the wrong explanation.
-# A keying that ends before the first hole never meets one.
+# This is a design choice, not a measurement -- worth saying plainly, because
+# the number looks like the kind that gets measured. Nothing on this bench
+# fails at 3.0s. Three things make a cap worth having anyway:
 #
-# 2.8s, not 3.0: the probe put every passing frame's end at or before 2.64s
-# and every failure across the 3.0s mark, so 2.8 keeps ~200ms between the
-# end of a keying and the earliest hole. Widen the margin, not the cap, if a
-# radio with a shorter scan period turns up.
-MAX_KEYING_SECONDS = 2.8
+#   - Retransmit granularity. ARQ is stop-and-wait and a frame is all or
+#     nothing, so a keying is the unit a single bit error destroys. Longer
+#     keyings mean fewer, more expensive retries.
+#   - Responsiveness. The link is half duplex and the peer cannot interject
+#     while we hold the carrier, so keying length is a floor under turnaround
+#     and under how quickly a DISC can be answered.
+#   - Clock tolerance. demodulate() lays symbol points on a rigid grid with no
+#     timing recovery, so a frame dies when accumulated timing error reaches
+#     half a symbol -- a budget of 0.5/n_bits. Longer frames are the first
+#     thing a sample-clock offset takes away, and the budget is spent on more
+#     bits at every step up in baud. See
+#     test_clock_offset_tolerance_is_half_a_symbol_over_the_frame.
+#
+# None of those has a cliff in it, so the figure is round rather than
+# derived. If a radio ever does impose a hard limit -- some receivers mute
+# themselves periodically to scan, on a timer set at the *far* station where
+# this modem can neither see nor change it -- that would be a measurement,
+# and it would belong here in place of this.
+MAX_KEYING_SECONDS = 3.0
 
 # Dead air inside a keying that isn't frame bits, PTT key-down to PTT
 # release. Mirrors transport.PTT_LEAD (0.22) + transport.STREAM_FILL (0.16,
@@ -198,15 +237,17 @@ KEYING_OVERHEAD_SECONDS = 0.43
 
 def frame_bits(payload_len, baud):
     """Total bits on air for one frame, pads included."""
-    return (len(framing.head_pad_bits(baud)) + len(framing.SYNC_BITS) + 8
-            + 8 * payload_len + 16 + len(framing.tail_pad_bits(baud)))
+    return (len(framing.head_pad_bits(baud)) + len(framing.SYNC_BITS)
+            + framing.frame_bits_for_length(payload_len)
+            + len(framing.tail_pad_bits(baud)))
 
 
 def max_payload_for_keying(baud, budget=MAX_KEYING_SECONDS):
     """Largest AFSK payload, in bytes, whose whole keying fits in `budget`.
 
     The inverse of frame_bits + KEYING_OVERHEAD_SECONDS, clamped to what the
-    length byte can describe.
+    length field can describe -- though since that field went to 16 bits the
+    clamp is nominal: the budget binds at every baud this modem runs.
     """
     spare_bits = (budget - KEYING_OVERHEAD_SECONDS) * baud - frame_bits(0, baud)
     return max(0, min(int(spare_bits // 8), framing.MAX_PAYLOAD_BYTES))
@@ -232,18 +273,13 @@ PROFILE_300 = Profile(name="300baud", mode_id=0, baud=BAUD, freq0=FREQ_0, freq1=
 # worked, now with 500 Hz of band either side instead of 100 Hz below and
 # 800 Hz above.
 #
-# scripts/sweep_baud_payload.py --skip-baud --baud 600 once recorded a
-# "frame-size ceiling" at this baud: 2-120 byte AFSK payloads passed 100%
-# both directions; 160 bytes broke down 0/5 on the ic705->ht leg. That was
-# priority scan on the HT muting its receiver every ~3s, not a property of
-# this profile or of frame size -- see the note above PROFILE_1200. With
-# the scan off the same sweep passes 100% both directions at every payload
-# up to 255 bytes, so frame size is not a reliability limit here and
-# chunk_size comes straight from the keying budget above: 156 bytes, a
-# 158-byte AFSK payload, a 2.79s keying. That is a size this profile has
-# actually been swept at (160 bytes, 12/12 both directions during the
-# 1200/1800 A/B) rather than an extrapolation, and an acceptance run has
-# since carried six such frames over the air with no retransmit.
+# Frame size is not a reliability limit at this baud: the payload sweep runs
+# 100% both directions at every payload up to 255 bytes, so chunk_size comes
+# straight from the keying budget above rather than from any measured
+# ceiling. The sizes it produces are ones this profile has actually been
+# swept at (160 bytes, 12/12 both directions during the 1200/1800 A/B)
+# rather than extrapolations, and acceptance runs have since carried such
+# frames over the air with no retransmit.
 # The separation was then narrowed again, from 800 Hz to 600, after the
 # re-centring: 1200/1800 A/B'd against 1100/1900 on the bench, interleaved
 # trial by trial so drift could not favour either. Both decoded 100% (32/32
@@ -291,53 +327,26 @@ PROFILE_600 = Profile(name="600baud", mode_id=1, baud=600, freq0=tones(600.0)[0]
 # down at 1400 (0/5 ht->ic705, confidence flatlined -- a real passband
 # wall, not a marginal case).
 #
-# This is the one profile the keying budget does not bind: 2.8s of air at
-# 1200 baud would carry a 328-byte payload, so what caps it is
-# framing.MAX_PAYLOAD_BYTES, the 8-bit length field. chunk_size is 253, the
-# 255-byte maximum less the DATA header, and the keying runs 2.31s. Widening
-# the length field is the only way to spend the remaining ~0.5s here, and it
-# is a format change both stations would have to take together.
+# This used to be the one profile the keying budget did not bind: a full
+# keying at 1200 baud carries far more than the 8-bit length field could
+# describe, so the chunk stopped at 255 bytes and most of a second of every
+# keying went unspent. framing.LENGTH_FIELD_BITS is 16 now and the budget
+# binds here like everywhere else -- see that comment for the on-air
+# compatibility break it cost.
 #
-# RESOLVED, and it was never about frame size or about this profile.
-#
-# scripts/sweep_payload_1200_2200.py and the 600-baud sweep both reported a
-# "frame-size ceiling" -- 120-byte payloads 100%, 160 bytes failing on the
-# ic705->ht leg. The cause was **priority scan enabled on the HT**, which
-# briefly mutes the receiver every ~3s to check the priority channel. It
-# cost ~280ms of audio starting ~3.0s after PTT key-down and roughly every
-# 3.1s after, so any keying still running at 3.0s lost a chunk out of its
-# middle. Turning priority scan off removed it completely.
-#
-# Payload size was a proxy for keying duration, and every sweep varied both
-# at once, so the limit appeared in whichever unit was being printed. The
-# arithmetic lined up across both sweeps despite completely different
-# airtime sums (this one pads 1s of noise either side of the frame, the
-# 600-baud one pads nothing): every payload that passed finished before
-# ~2.8s from PTT, every one that failed was still transmitting at 3.0s.
-# scripts/probe_tx_duration_dropout.py is the test that separated the two,
-# holding the payload at 40 bytes -- a size the sweeps called 100% reliable
-# -- and varying only the dead air in front of it. With the scan on it went
-# 4/4, 0/4, 4/4 as the frame moved across the 3.0s mark; with it off, 4/4
-# at every offset on both legs.
-#
-# After the fix, the 600-baud sweep runs 100% both directions at every
-# payload up to 255 bytes, the format's own maximum -- so there is no
-# frame-size ceiling on this bench at all, and chunk_size is now a
+# There is no frame-size ceiling at this baud: the payload sweeps run 100%
+# both directions at every payload up to 255 bytes, so chunk_size is a
 # turnaround/retransmit-cost choice rather than a reliability one.
 #
-# Two explanations that were believed for a while and are both wrong. It
-# was not a false sync lock: the sync word scores ~0.99 and the length byte
-# reads back correctly, because both sit in the first 5% of the frame, far
-# ahead of the hole -- the "end_index ~2x expected" figure that suggested
-# otherwise was a bug in the sweep's own diagnostic, comparing an absolute
-# buffer index against a bare frame duration. And it was not sample-clock
-# drift between the two sound cards: scripts/measure_clock_offset.py puts
-# them 3.4 ppm apart (-3.7/+3.1 ppm on the two legs, summing to -0.6, i.e.
-# properly reciprocal), some 100x too little to cost a bit at any frame
-# size -- a frame dies when timing error reaches half a symbol, which needs
-# ~366 ppm at 160 bytes. tests/test_afsk_loopback.py keeps both failure
-# modes on file, because from the decoder's output alone they are
-# indistinguishable from this one.
+# One measurement worth keeping from that work, because it rules out a cause
+# that would otherwise be re-suspected the next time a long frame fails:
+# sample-clock drift between the two sound cards is not a factor.
+# scripts/measure_clock_offset.py puts them 3.4 ppm apart (-3.7/+3.1 ppm on
+# the two legs, summing to -0.6, i.e. properly reciprocal), some 100x too
+# little to cost a bit at any frame size this modem sends -- a frame dies
+# when timing error reaches half a symbol, which needs ~366 ppm at 160
+# bytes. tests/test_afsk_loopback.py keeps that failure mode on file, since
+# from the decoder's output alone it looks like any other size ceiling.
 #
 # These tones are NOT centred on 1500 Hz the way the two slower profiles
 # are, and the exception is deliberate. Moving this profile down to the
@@ -448,9 +457,10 @@ def frame_seconds(payload_len=framing.MAX_PAYLOAD_BYTES, profile: Profile = PROF
 
 def keying_seconds(payload_len=framing.MAX_PAYLOAD_BYTES, profile: Profile = PROFILE_300):
     """How long the channel is occupied, PTT key-down to PTT release --
-    frame_seconds plus the dead air held around it. This is the quantity
-    MAX_KEYING_SECONDS caps, because a receiver muting itself on a timer
-    counts from key-down, not from the first bit of the sync word."""
+    frame_seconds plus the dead air held around it. This, rather than the
+    frame's own audio, is the quantity MAX_KEYING_SECONDS caps: what the cap
+    is about is how long the transmitter holds the channel, which starts at
+    key-down and not at the first bit of the sync word."""
     return KEYING_OVERHEAD_SECONDS + frame_seconds(payload_len, profile)
 
 
@@ -524,25 +534,25 @@ def _sync_peaks(score, threshold_value, min_separation):
     return peaks
 
 
-def _try_sync(diff, i_star, sps, confidence):
+def _try_sync(diff, i_star, sps, confidence, max_credible_bits):
     """Attempts to read a frame at one correlation peak. Same return shape
     as demodulate()."""
     n_sync = len(framing.SYNC_BITS)
     first_index = i_star + (sps - 1)
     max_symbols = (len(diff) - 1 - first_index) // sps + 1
-    if max_symbols < n_sync + 8:
-        # Not even the length byte has fully arrived yet -- this may well
+    if max_symbols < n_sync + framing.LENGTH_FIELD_BITS:
+        # Not even the length field has fully arrived yet -- this may well
         # be a real frame still streaming in; say nothing definitive rather
         # than reporting it as a dead end.
         return {"synced": False, "confidence": confidence, "payload": None}
 
-    num_symbols = min(max_symbols, MAX_FRAME_BITS)
+    num_symbols = min(max_symbols, max_credible_bits)
     sample_indices = first_index + sps * np.arange(num_symbols)
     decoded_bits = (diff[sample_indices] > 0).astype(int).tolist()
 
     payload = framing.parse_frame_bits(decoded_bits[n_sync:])
-    length = framing.bits_to_bytes(decoded_bits[n_sync:n_sync + 8])[0]
-    total_bits_needed = n_sync + 8 + 8 * length + 16
+    length = framing.declared_length(decoded_bits[n_sync:])
+    total_bits_needed = n_sync + framing.frame_bits_for_length(length)
     result = {
         "synced": payload is not None,
         "confidence": confidence,
@@ -556,7 +566,15 @@ def _try_sync(diff, i_star, sps, confidence):
         "sync_end_index": first_index + sps * n_sync,
         "payload": payload,
     }
-    if payload is not None or max_symbols >= total_bits_needed:
+    if total_bits_needed > max_credible_bits:
+        # The declared length describes a frame longer than this baud could
+        # credibly be sending, so no amount of waiting will ever produce the
+        # CRC that would settle it -- see MAX_CREDIBLE_FRAME_SECONDS. Report
+        # a dead sync rather than a frame in flight, and end it at the sync
+        # word: a length we have just called implausible is not a length to
+        # measure a skip with.
+        result["end_index"] = result["sync_end_index"]
+    elif payload is not None or max_symbols >= total_bits_needed:
         # Either it decoded, or we had every bit the claimed length says it
         # needed and it *still* didn't check out -- this one's done, safe
         # to skip past. If neither holds, the frame may just still be
@@ -601,8 +619,9 @@ def demodulate(audio, profile: Profile = PROFILE_300, sample_rate=SAMPLE_RATE):
     # a retransmit while waiting one more poll costs nothing.
     near_miss = None
     still_arriving = None
+    credible_bits = max_credible_frame_bits(profile.baud)
     for i_star in peaks:
-        result = _try_sync(diff, i_star, sps, float(ncc[i_star]))
+        result = _try_sync(diff, i_star, sps, float(ncc[i_star]), credible_bits)
         if result.get("payload") is not None:
             return result
         if "end_index" in result:
