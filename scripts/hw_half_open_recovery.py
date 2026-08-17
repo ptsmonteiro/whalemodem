@@ -80,17 +80,6 @@ def main():
         a = StationClient("A", args.host, args.a_cmd, args.a_data)
         b = StationClient("B", args.host, args.b_cmd, args.b_data)
         clients = {"a": a, "b": b}
-        # StationClient builds its command socket with
-        # socket.create_connection(timeout=10), which leaves the socket in
-        # timeout mode -- so its reader thread takes a socket.timeout, sees
-        # an OSError and quietly exits after ten seconds of silence. The
-        # acceptance test never notices because PTT status lines arrive
-        # every few seconds throughout. This scenario is nothing *but*
-        # silence, for INACTIVITY_TIMEOUT, so the reader has to be allowed
-        # to block indefinitely or the status line being waited for is
-        # never read at all.
-        for client in clients.values():
-            client.cmd.settimeout(None)
 
         print("== B: LISTEN ON ==")
         b.send_cmd(f"MYCALL {args.b_call}")

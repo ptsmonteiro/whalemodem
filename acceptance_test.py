@@ -37,7 +37,14 @@ class StationClient:
 
     def __init__(self, name, host, cmd_port, data_port):
         self.name = name
+        # The 10s bounds the *connect*, so that a station server which never
+        # came up fails the run in seconds instead of hanging it. It is
+        # dropped immediately afterwards: create_connection leaves the socket
+        # in timeout mode for the rest of its life, and a command socket with
+        # nothing to say is not a broken one. The reader below has to be free
+        # to sit in recv() for as long as the station stays quiet.
         self.cmd = socket.create_connection((host, cmd_port), timeout=10)
+        self.cmd.settimeout(None)
         self._lines = queue.Queue()
         self._reader = threading.Thread(target=self._read_loop, daemon=True)
         self._reader.start()
@@ -49,6 +56,22 @@ class StationClient:
         while True:
             try:
                 chunk = self.cmd.recv(4096)
+            except socket.timeout:
+                # Nothing arrived yet; that is not the connection closing.
+                # socket.timeout is a subclass of OSError, so before the
+                # socket was put back into blocking mode above this fell
+                # into the handler below and killed the reader for good
+                # after ten seconds of quiet -- every status line from then
+                # on went unqueued and wait_for() could only ever time out.
+                # Nothing pointed at it: an acceptance run has PTT ON/PTT
+                # OFF crossing the socket every few seconds, so recv was
+                # never idle that long. Only a scenario that waits through
+                # real silence saw it (scripts/hw_half_open_recovery.py,
+                # which sits out whale.link.INACTIVITY_TIMEOUT). The socket
+                # no longer has a timeout to take, so this cannot fire; it
+                # stays because the failure it guards against is silent and
+                # permanent, and one settimeout() elsewhere would restore it.
+                continue
             except OSError:
                 return
             if not chunk:
@@ -82,6 +105,13 @@ class StationClient:
                 return text
 
     def open_data(self):
+        # Deliberately not given the settimeout(None) the command socket
+        # gets. The leftover connect timeout never reaches a recv: recv_data
+        # sets its own before every single one. And a timeout on the data
+        # socket means the transfer under test did not arrive in its budget,
+        # which is a failure the caller should see -- it comes out of
+        # recv_data as an exception rather than being swallowed by a
+        # background thread.
         self.data = socket.create_connection(self.data_port_addr, timeout=10)
 
     def send_data(self, payload: bytes):
