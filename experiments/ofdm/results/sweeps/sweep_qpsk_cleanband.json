@@ -1,0 +1,49 @@
+{
+  "when": "2026-08-18T12:13:49.586600+00:00",
+  "reference_bitrate": 853.3333333333334,
+  "band": [
+    650.0,
+    1950.0
+  ],
+  "amplitude": 0.9,
+  "papr_db": 12.0,
+  "trials": 4,
+  "confirm_trials": 10,
+  "winner": null,
+  "results": [
+    {
+      "profile": "ofdm4_50hz_cp8",
+      "n_fft": 960,
+      "cp": 120,
+      "bits_per_carrier": 2,
+      "spacing_hz": 50.0,
+      "cp_ms": 2.5,
+      "band": [
+        650.0,
+        1950.0
+      ],
+      "n_carriers": 27,
+      "amplitude": 0.9,
+      "papr_db": 12.0,
+      "payload_bytes": 691,
+      "payload_bitrate": 1842.6666666666667,
+      "worst_rate": 0.25,
+      "ic705->ht": {
+        "ok": 2,
+        "trials": 4,
+        "rate": 0.5,
+        "mean_confidence": 0.9707131472417423,
+        "min_confidence": 0.9704827516330996,
+        "max_keyed_seconds": 2.9945483207702637
+      },
+      "ht->ic705": {
+        "ok": 1,
+        "trials": 4,
+        "rate": 0.25,
+        "mean_confidence": 0.9528090367633485,
+        "min_confidence": 0.9506502157099866,
+        "max_keyed_seconds": 2.9924728870391846
+      }
+    }
+  ]
+}

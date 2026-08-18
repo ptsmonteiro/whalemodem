@@ -1,0 +1,135 @@
+{
+  "when": "2026-08-18T12:58:06.065539+00:00",
+  "reference_bitrate": 853.3333333333334,
+  "band": [
+    650.0,
+    1950.0
+  ],
+  "amplitude": 0.6,
+  "papr_db": 9.0,
+  "trials": 4,
+  "confirm_trials": 10,
+  "winner": null,
+  "results": [
+    {
+      "profile": "ofdm4_30hz_cp120samp_dfts_x1700-1800",
+      "n_fft": 1600,
+      "cp": 120,
+      "bits_per_carrier": 2,
+      "spacing_hz": 30.0,
+      "cp_ms": 2.5,
+      "pilot_interval": 0,
+      "dft_spread": true,
+      "band": [
+        660.0,
+        1950.0
+      ],
+      "excluded_bands": [
+        [
+          1700.0,
+          1800.0
+        ]
+      ],
+      "n_carriers": 40,
+      "amplitude": 0.6,
+      "papr_db": 9.0,
+      "payload_bytes": 626,
+      "payload_bitrate": 1669.3333333333333,
+      "weak_rate": 0.25,
+      "ht->ic705": {
+        "ok": 1,
+        "trials": 4,
+        "rate": 0.25,
+        "mean_confidence": 0.936849762388836,
+        "min_confidence": 0.9325648796985179,
+        "max_keyed_seconds": 2.972149133682251,
+        "captures": [
+          {
+            "audio": "experiments/ofdm/results/captures/qpsk_dfts_spacing/ofdm4_30hz_cp120samp_dfts_x1700-1800_ht_to_ic705_a0p60_p9p0_t01.npy",
+            "payload": "experiments/ofdm/results/captures/qpsk_dfts_spacing/ofdm4_30hz_cp120samp_dfts_x1700-1800_ht_to_ic705_a0p60_p9p0_t01.bin",
+            "decoded": false,
+            "confidence": 0.9401361743748424
+          },
+          {
+            "audio": "experiments/ofdm/results/captures/qpsk_dfts_spacing/ofdm4_30hz_cp120samp_dfts_x1700-1800_ht_to_ic705_a0p60_p9p0_t02.npy",
+            "payload": "experiments/ofdm/results/captures/qpsk_dfts_spacing/ofdm4_30hz_cp120samp_dfts_x1700-1800_ht_to_ic705_a0p60_p9p0_t02.bin",
+            "decoded": false,
+            "confidence": 0.9325648796985179
+          },
+          {
+            "audio": "experiments/ofdm/results/captures/qpsk_dfts_spacing/ofdm4_30hz_cp120samp_dfts_x1700-1800_ht_to_ic705_a0p60_p9p0_t03.npy",
+            "payload": "experiments/ofdm/results/captures/qpsk_dfts_spacing/ofdm4_30hz_cp120samp_dfts_x1700-1800_ht_to_ic705_a0p60_p9p0_t03.bin",
+            "decoded": true,
+            "confidence": 0.939925593706171
+          },
+          {
+            "audio": "experiments/ofdm/results/captures/qpsk_dfts_spacing/ofdm4_30hz_cp120samp_dfts_x1700-1800_ht_to_ic705_a0p60_p9p0_t04.npy",
+            "payload": "experiments/ofdm/results/captures/qpsk_dfts_spacing/ofdm4_30hz_cp120samp_dfts_x1700-1800_ht_to_ic705_a0p60_p9p0_t04.bin",
+            "decoded": false,
+            "confidence": 0.9347724017758128
+          }
+        ]
+      }
+    },
+    {
+      "profile": "ofdm4_75hz_cp120samp_dfts_x1700-1800",
+      "n_fft": 640,
+      "cp": 120,
+      "bits_per_carrier": 2,
+      "spacing_hz": 75.0,
+      "cp_ms": 2.5,
+      "pilot_interval": 0,
+      "dft_spread": true,
+      "band": [
+        675.0,
+        1950.0
+      ],
+      "excluded_bands": [
+        [
+          1700.0,
+          1800.0
+        ]
+      ],
+      "n_carriers": 16,
+      "amplitude": 0.6,
+      "papr_db": 9.0,
+      "payload_bytes": 584,
+      "payload_bitrate": 1557.3333333333333,
+      "weak_rate": 0.0,
+      "ht->ic705": {
+        "ok": 0,
+        "trials": 4,
+        "rate": 0.0,
+        "mean_confidence": 0.9455819603640103,
+        "min_confidence": 0.9420671929983175,
+        "max_keyed_seconds": 2.9800631999969482,
+        "captures": [
+          {
+            "audio": "experiments/ofdm/results/captures/qpsk_dfts_spacing/ofdm4_75hz_cp120samp_dfts_x1700-1800_ht_to_ic705_a0p60_p9p0_t01.npy",
+            "payload": "experiments/ofdm/results/captures/qpsk_dfts_spacing/ofdm4_75hz_cp120samp_dfts_x1700-1800_ht_to_ic705_a0p60_p9p0_t01.bin",
+            "decoded": false,
+            "confidence": 0.946902671483123
+          },
+          {
+            "audio": "experiments/ofdm/results/captures/qpsk_dfts_spacing/ofdm4_75hz_cp120samp_dfts_x1700-1800_ht_to_ic705_a0p60_p9p0_t02.npy",
+            "payload": "experiments/ofdm/results/captures/qpsk_dfts_spacing/ofdm4_75hz_cp120samp_dfts_x1700-1800_ht_to_ic705_a0p60_p9p0_t02.bin",
+            "decoded": false,
+            "confidence": 0.9420671929983175
+          },
+          {
+            "audio": "experiments/ofdm/results/captures/qpsk_dfts_spacing/ofdm4_75hz_cp120samp_dfts_x1700-1800_ht_to_ic705_a0p60_p9p0_t03.npy",
+            "payload": "experiments/ofdm/results/captures/qpsk_dfts_spacing/ofdm4_75hz_cp120samp_dfts_x1700-1800_ht_to_ic705_a0p60_p9p0_t03.bin",
+            "decoded": false,
+            "confidence": 0.9462635050985679
+          },
+          {
+            "audio": "experiments/ofdm/results/captures/qpsk_dfts_spacing/ofdm4_75hz_cp120samp_dfts_x1700-1800_ht_to_ic705_a0p60_p9p0_t04.npy",
+            "payload": "experiments/ofdm/results/captures/qpsk_dfts_spacing/ofdm4_75hz_cp120samp_dfts_x1700-1800_ht_to_ic705_a0p60_p9p0_t04.bin",
+            "decoded": false,
+            "confidence": 0.9470944718760327
+          }
+        ]
+      }
+    }
+  ]
+}

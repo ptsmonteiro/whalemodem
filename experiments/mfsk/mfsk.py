@@ -259,7 +259,23 @@ class MfskProfile:
 
     @property
     def sps(self) -> int:
+        """Samples per symbol at the experiment's default 48 kHz rate."""
         return round(SAMPLE_RATE / self.symbol_rate)
+
+    def samples_per_symbol(self, sample_rate=SAMPLE_RATE) -> int:
+        """Samples per symbol at ``sample_rate``.
+
+        Keeping this calculation profile-local lets fixed profiles be
+        exercised at both common radio rates (notably 9.6 and 48 kHz) without
+        silently using the 48 kHz integration window in the receiver.  As in
+        the original candidate modem, non-integral ratios use the nearest
+        integer because the generated sweep includes rates such as 550 baud.
+        """
+        exact = float(sample_rate) / self.symbol_rate
+        rounded = round(exact)
+        if rounded < 1:
+            raise ValueError("sample rate must be at least the symbol rate")
+        return rounded
 
     @cached_property
     def max_payload(self) -> int:
@@ -371,7 +387,7 @@ def _cpfsk(symbols, profile: MfskProfile, sample_rate):
     same construction as afsk._cpfsk_tone, just indexing a tone table instead
     of choosing between two."""
     freqs = profile.tones[np.asarray(symbols, dtype=np.int64)]
-    inst = np.repeat(freqs, round(sample_rate / profile.symbol_rate))
+    inst = np.repeat(freqs, profile.samples_per_symbol(sample_rate))
     return np.cos(2 * np.pi * np.cumsum(inst) / sample_rate)
 
 
@@ -440,7 +456,7 @@ def tone_envelopes(audio, profile: MfskProfile, sample_rate=SAMPLE_RATE):
     """
     audio = np.asarray(audio, dtype=np.float64)
     n = np.arange(len(audio))
-    sps = profile.sps
+    sps = profile.samples_per_symbol(sample_rate)
     rows = []
     for f in profile.tones:
         mixed = audio * np.exp(-1j * 2 * np.pi * f * n / sample_rate)
@@ -457,7 +473,7 @@ def _sync_template(profile: MfskProfile, sample_rate=SAMPLE_RATE):
     first sample at t - lead."""
     audio = _cpfsk(preamble_symbols(profile), profile, sample_rate)
     env = tone_envelopes(audio, profile, sample_rate)
-    lead = profile.sps - 1
+    lead = profile.samples_per_symbol(sample_rate) - 1
     return env[:, lead:], lead
 
 
@@ -528,7 +544,8 @@ def _sync_peaks(score, threshold, min_separation):
     return peaks
 
 
-def _training_gains(env, preamble_start, profile: MfskProfile):
+def _training_gains(env, preamble_start, profile: MfskProfile,
+                    sample_rate=SAMPLE_RATE):
     """Per-tone gain measured off the preamble: for each tone, the mean
     envelope in the slots where that tone was actually transmitted.
 
@@ -538,7 +555,8 @@ def _training_gains(env, preamble_start, profile: MfskProfile):
     than dividing by a number it cannot trust.
     """
     syms = preamble_symbols(profile)
-    idx = preamble_start + profile.sps * np.arange(len(syms)) + profile.sps - 1
+    sps = profile.samples_per_symbol(sample_rate)
+    idx = preamble_start + sps * np.arange(len(syms)) + sps - 1
     if idx[-1] >= env.shape[1] or idx[0] < 0:
         return None
     gains = np.ones(profile.m)
@@ -552,10 +570,10 @@ def _training_gains(env, preamble_start, profile: MfskProfile):
     return gains / gains.mean()
 
 
-def _decode_at(env, peak, lead, profile: MfskProfile):
+def _decode_at(env, peak, lead, profile: MfskProfile, sample_rate=SAMPLE_RATE):
     """Attempts to read a frame at one correlation peak. Returns the same
     shape as demodulate()."""
-    sps = profile.sps
+    sps = profile.samples_per_symbol(sample_rate)
     preamble_start = peak - lead
     data_start = preamble_start + sps * PREAMBLE_SYMBOLS
     available = (env.shape[1] - data_start) // sps
@@ -570,7 +588,7 @@ def _decode_at(env, peak, lead, profile: MfskProfile):
         return result
 
     if profile.train_on_preamble:
-        gains = _training_gains(env, preamble_start, profile)
+        gains = _training_gains(env, preamble_start, profile, sample_rate)
         if gains is not None:
             env = env / gains[:, None]
 
@@ -614,13 +632,13 @@ def demodulate(audio, profile: MfskProfile, sample_rate=SAMPLE_RATE):
 
     ncc = _normalised_correlation(env, template)
     peaks = _sync_peaks(ncc, profile.confidence_threshold,
-                        profile.sps * _MIN_PEAK_SEPARATION_SYMBOLS)
+                        profile.samples_per_symbol(sample_rate) * _MIN_PEAK_SEPARATION_SYMBOLS)
     if not peaks:
         return {"synced": False, "payload": None, "confidence": float(np.max(ncc))}
 
     near_miss = still_arriving = None
     for peak in peaks:
-        result = _decode_at(env, peak, lead, profile)
+        result = _decode_at(env, peak, lead, profile, sample_rate)
         result["confidence"] = float(ncc[peak])
         if result["payload"] is not None:
             return result

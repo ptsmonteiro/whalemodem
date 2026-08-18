@@ -21,6 +21,7 @@ Run: python experiments/ofdm/test_ofdm.py
 
 import sys
 from pathlib import Path
+from unittest.mock import patch
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
 sys.path.insert(0, str(Path(__file__).resolve().parent))
@@ -28,6 +29,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parent))
 import numpy as np
 
 import ofdm
+import ldpc
 from whale import afsk, framing
 
 # The QPSK working point most tests use: 50 Hz spacing, an eighth of a symbol
@@ -39,7 +41,7 @@ QPSK = ofdm.OfdmProfile(name="test_qpsk", n_fft=960, cp=120, bits_per_carrier=2)
 # rather than about a particular setting.
 REPRESENTATIVE = [
     ofdm.OfdmProfile(name=f"test_{1 << b}", n_fft=960, cp=120, bits_per_carrier=b)
-    for b in (1, 2, 3, 4)
+    for b in (1, 2, 3, 4, 5)
 ]
 
 CAPTURE_DIR = Path(__file__).resolve().parents[2] / "scratch_captures_600ack"
@@ -93,6 +95,115 @@ def _symbol_varying_phase(audio, profile, radians_per_symbol):
     return out
 
 
+def test_soft_16qam_llrs_are_code_independent():
+    points = ofdm.constellation(4)
+    llrs = ofdm.qam_llrs(points, 4, noise_variance=0.05).reshape(16, 4)
+    labels = ((np.arange(16)[:, None] >> np.arange(3, -1, -1)) & 1)
+    assert np.array_equal(llrs < 0, labels)
+
+
+def test_standard_ldpc_corrects_errors_and_has_zero_syndrome():
+    rng = _rng(81)
+    information = rng.integers(0, 2, ldpc.K, dtype=np.uint8)
+    codeword = ldpc.encode(information)
+    assert not np.any(ldpc.syndrome(codeword))
+    damaged = codeword.copy()
+    damaged[rng.choice(ldpc.N, 18, replace=False)] ^= 1
+    decoded, _, ok = ldpc.decode((1.0 - 2.0 * damaged) * 3.0)
+    assert ok and np.array_equal(decoded, information)
+
+
+def test_standard_rate_two_thirds_ldpc_corrects_errors():
+    rng = _rng(83)
+    k = ldpc.INFORMATION_BITS["2/3"]
+    information = rng.integers(0, 2, k, dtype=np.uint8)
+    codeword = ldpc.encode(information, "2/3")
+    assert not np.any(ldpc.syndrome(codeword, "2/3"))
+    damaged = codeword.copy()
+    damaged[rng.choice(ldpc.N, 12, replace=False)] ^= 1
+    decoded, _, ok = ldpc.decode((1.0 - 2.0 * damaged) * 3.0, rate="2/3")
+    assert ok and np.array_equal(decoded, information)
+
+
+def test_ldpc_16qam_roundtrip_on_synthetic_channels():
+    profile = ofdm.OfdmProfile(name="test_16qam_ldpc12", n_fft=960, cp=120,
+                               bits_per_carrier=4, fec="802.11n-648-1/2")
+    rng = _rng(82)
+    payload = rng.integers(0, 256, min(180, profile.max_payload), dtype=np.uint8).tobytes()
+    audio = ofdm.modulate(payload, profile)
+    assert ofdm.demodulate(audio, profile).get("payload") == payload
+    channel = _dispersive(audio, [(0, 1.0), (48, 0.22), (91, -0.10)])
+    channel = _noisy(channel, 24.0, rng)
+    assert ofdm.demodulate(channel, profile).get("payload") == payload
+
+
+def test_rate_two_thirds_16qam_roundtrip():
+    profile = ofdm.OfdmProfile(name="test_16qam_ldpc23", n_fft=960, cp=120,
+                               bits_per_carrier=4, fec="802.11n-648-2/3")
+    rng = _rng(84)
+    payload = rng.integers(0, 256, min(240, profile.max_payload), dtype=np.uint8).tobytes()
+    audio = _noisy(ofdm.modulate(payload, profile), 27.0, rng)
+    assert ofdm.demodulate(audio, profile).get("payload") == payload
+
+
+def test_fec_length_search_does_not_treat_capture_tail_as_tracking_pilots():
+    profile = ofdm.OfdmProfile(name="test_16qam_ldpc23_p4", n_fft=960, cp=120,
+                               bits_per_carrier=4, pilot_interval=4,
+                               fec="802.11n-648-2/3")
+    rng = _rng(85)
+    payload = rng.integers(0, 256, min(698, profile.max_payload), dtype=np.uint8).tobytes()
+    audio = ofdm.modulate(payload, profile)
+    # More than one pilot interval of post-frame audio used to create a false
+    # channel anchor and corrupt the final two symbols during length search.
+    capture = np.concatenate((audio, rng.normal(0, 0.01, 8 * profile.symbol_samples)))
+    assert ofdm.demodulate(capture, profile).get("payload") == payload
+
+
+def test_fec_roundtrip_preserves_variable_payload_lengths():
+    """The search optimization must not turn the sweep's full-size payload
+    into an accidental fixed-size wire format. Exercise both sides of two
+    LDPC block boundaries: rate 2/3 carries 50 payload bytes in one block and
+    104 in two once the four framing bytes are included."""
+    profile = ofdm.OfdmProfile(name="test_16qam_ldpc23_variable", n_fft=960,
+                               cp=120, bits_per_carrier=4, papr_db=30.0,
+                               fec="802.11n-648-2/3")
+    rng = _rng(86)
+    for size in (0, 50, 51, 104, 105):
+        payload = rng.integers(0, 256, size, dtype=np.uint8).tobytes()
+        assert ofdm.demodulate(ofdm.modulate(payload, profile), profile).get(
+            "payload") == payload, size
+
+
+def test_fec_length_search_is_capped_at_the_profile_capacity():
+    profile = ofdm.OfdmProfile(name="test_16qam_ldpc23_bound", n_fft=960,
+                               cp=120, bits_per_carrier=4, pilot_interval=4,
+                               fec="802.11n-648-2/3")
+    k = ldpc.INFORMATION_BITS["2/3"]
+    expected_max = -(-framing.frame_bits_for_length(profile.max_payload) // k)
+    candidates = tuple(ofdm._fec_candidate_block_counts(
+        profile, ofdm.max_credible_data_symbols(profile)))
+    assert candidates == tuple(range(1, expected_max + 1))
+
+
+def test_fec_length_candidate_stops_at_the_first_failed_codeword():
+    profile = ofdm.OfdmProfile(name="test_16qam_ldpc23_fail_fast", n_fft=960,
+                               cp=120, bits_per_carrier=4,
+                               fec="802.11n-648-2/3")
+    calls = []
+
+    def reject(llr, rate):
+        calls.append((len(llr), rate))
+        return np.zeros(ldpc.INFORMATION_BITS[rate], dtype=np.uint8), 30, False
+
+    with patch.object(ldpc, "decode", side_effect=reject):
+        bits, iterations = ofdm._decode_fec_codewords(
+            np.zeros(3 * ldpc.N), profile)
+
+    assert bits is None
+    assert iterations == [30]
+    assert calls == [(ldpc.N, "2/3")]
+
+
 # -- the modem is self-consistent -----------------------------------------
 
 
@@ -103,7 +214,7 @@ def test_constellations_are_gray_coded_and_unit_power():
     what makes the symbol error rate the honest thing for diagnose_ofdm.py to
     report, and it makes adding FEC later a drop-in rather than a format
     change."""
-    for bits in (1, 2, 3, 4):
+    for bits in (1, 2, 3, 4, 5):
         points = ofdm.constellation(bits)
         assert len(points) == 1 << bits, bits
         assert len(set(np.round(points, 9))) == 1 << bits, f"{bits}: duplicate points"
@@ -114,7 +225,7 @@ def test_constellations_are_gray_coded_and_unit_power():
             for i in range(len(order)):
                 a, b = int(order[i]), int(order[(i + 1) % len(order)])
                 assert bin(a ^ b).count("1") == 1, (bits, a, b)
-        else:
+        elif bits == 4:
             # 16-QAM: neighbours along each axis independently.
             levels = np.round(points.real * np.sqrt(10)).astype(int)
             for value in range(16):
@@ -122,6 +233,24 @@ def test_constellations_are_gray_coded_and_unit_power():
                                        & (np.abs(points.imag - points[value].imag) < 1e-9))
                 for other in right:
                     assert bin(value ^ int(other)).count("1") == 1, (value, other)
+        else:
+            # Cross-32-QAM: the four high-energy corners of a 6x6 grid are
+            # absent. Perfect Gray coding is impossible; the optimal mapping
+            # has only two two-bit nearest-neighbour edges per quadrant.
+            scaled = np.round(points * np.sqrt(20)).astype(complex)
+            assert set(np.abs(scaled.real)) == {1, 3, 5}
+            assert set(np.abs(scaled.imag)) == {1, 3, 5}
+            assert not any(abs(p.real) == 5 and abs(p.imag) == 5 for p in scaled)
+            edges = []
+            for value, point in enumerate(scaled):
+                for other in range(value + 1, len(scaled)):
+                    distance = abs(point.real - scaled[other].real) \
+                        + abs(point.imag - scaled[other].imag)
+                    if distance == 2:
+                        edges.append(bin(value ^ other).count("1"))
+            assert len(edges) == 52
+            assert edges.count(1) == 44
+            assert edges.count(2) == 8
     print("test_constellations_are_gray_coded_and_unit_power OK")
 
 
@@ -182,6 +311,66 @@ def test_roundtrip_in_clean_audio():
             result = ofdm.demodulate(ofdm.modulate(payload, profile), profile)
             assert result.get("payload") == payload, (profile.name, size)
     print("test_roundtrip_in_clean_audio OK")
+
+
+def test_dft_spread_roundtrip_and_energy():
+    """DFT spreading is an invertible, unitary change of data waveform."""
+    from dataclasses import replace
+    rng = _rng(3)
+    for base in REPRESENTATIVE:
+        profile = replace(base, name=f"{base.name}_dfts", dft_spread=True)
+        for size in (0, 1, 17, profile.max_payload):
+            payload = rng.integers(0, 256, size, dtype=np.uint8).tobytes()
+            spread = ofdm.data_symbol_values(payload, profile)
+            decisions = ofdm._despread_data(spread, profile)
+            assert np.allclose(np.sum(np.abs(spread) ** 2, axis=1),
+                               np.sum(np.abs(decisions) ** 2, axis=1))
+            assert ofdm.demodulate(ofdm.modulate(payload, profile), profile).get(
+                "payload") == payload
+    print("test_dft_spread_roundtrip_and_energy OK")
+
+
+def test_dft_spreading_reduces_unclipped_data_symbol_papr():
+    """The new mode must change the peak statistics it was added to improve."""
+    from dataclasses import replace
+    rng = _rng(4)
+    plain = replace(QPSK, papr_db=30.0)
+    spread = replace(plain, name="test_qpsk_dfts", dft_spread=True)
+    payload = rng.integers(0, 256, 300, dtype=np.uint8).tobytes()
+
+    def symbol_paprs(profile):
+        out = []
+        for row in ofdm.data_symbol_values(payload, profile):
+            wave = ofdm._symbol_audio(profile, profile.carriers, row)
+            out.append(ofdm.measured_papr_db(wave))
+        return np.asarray(out)
+
+    ordinary = symbol_paprs(plain)
+    dfts = symbol_paprs(spread)
+    assert np.percentile(dfts, 95) < np.percentile(ordinary, 95) - 2.0, (
+        np.percentile(ordinary, 95), np.percentile(dfts, 95))
+
+    # Pads are part of the same globally normalised waveform and must not
+    # restore the peaks removed from the data section.
+    ordinary_frame = ofdm.modulate(payload, plain)
+    spread_frame = ofdm.modulate(payload, spread)
+    assert ofdm.measured_papr_db(spread_frame) < (
+        ofdm.measured_papr_db(ordinary_frame) - 2.0)
+    print("test_dft_spreading_reduces_unclipped_data_symbol_papr OK")
+
+
+def test_dft_spread_roundtrip_with_excluded_physical_carriers():
+    """A spectral hole changes capacity but not DFT spreading's invertibility."""
+    from dataclasses import replace
+    profile = replace(QPSK, name="test_qpsk_dfts_notch", dft_spread=True,
+                      excluded_bands=((1700.0, 1800.0),))
+    assert list(profile.carriers * profile.spacing) == [
+        f for f in QPSK.carriers * QPSK.spacing if not 1700 <= f <= 1800]
+    assert profile.n_carriers == QPSK.n_carriers - 3
+    assert profile.max_payload < QPSK.max_payload
+    payload = _rng(6).integers(0, 256, profile.max_payload, dtype=np.uint8).tobytes()
+    assert ofdm.demodulate(ofdm.modulate(payload, profile), profile).get("payload") == payload
+    print("test_dft_spread_roundtrip_with_excluded_physical_carriers OK")
 
 
 def test_tracking_pilots_refresh_a_moving_channel():
@@ -622,10 +811,22 @@ def test_clipping_reaches_its_target_and_the_default_is_the_optimum():
 
 
 if __name__ == "__main__":
+    test_soft_16qam_llrs_are_code_independent()
+    test_standard_ldpc_corrects_errors_and_has_zero_syndrome()
+    test_standard_rate_two_thirds_ldpc_corrects_errors()
+    test_ldpc_16qam_roundtrip_on_synthetic_channels()
+    test_rate_two_thirds_16qam_roundtrip()
+    test_fec_length_search_does_not_treat_capture_tail_as_tracking_pilots()
+    test_fec_roundtrip_preserves_variable_payload_lengths()
+    test_fec_length_search_is_capped_at_the_profile_capacity()
+    test_fec_length_candidate_stops_at_the_first_failed_codeword()
     test_constellations_are_gray_coded_and_unit_power()
     test_the_whitening_sequence_is_a_full_period_m_sequence()
     test_a_repetitive_payload_is_no_worse_than_a_random_one()
     test_roundtrip_in_clean_audio()
+    test_dft_spread_roundtrip_and_energy()
+    test_dft_spreading_reduces_unclipped_data_symbol_papr()
+    test_dft_spread_roundtrip_with_excluded_physical_carriers()
     test_tracking_pilots_refresh_a_moving_channel()
     test_tracking_pilot_layout_and_budget_are_exact()
     test_random_payloads_roundtrip_at_full_size()

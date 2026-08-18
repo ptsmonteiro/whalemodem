@@ -1,0 +1,337 @@
+{
+  "when": "2026-08-18T12:07:33.391170+00:00",
+  "reference_bitrate": 853.3333333333334,
+  "band": [
+    300.0,
+    3000.0
+  ],
+  "amplitude": 0.9,
+  "papr_db": 12.0,
+  "trials": 4,
+  "confirm_trials": 10,
+  "winner": null,
+  "results": [
+    {
+      "profile": "ofdm4_50hz_cp8",
+      "n_fft": 960,
+      "cp": 120,
+      "bits_per_carrier": 2,
+      "spacing_hz": 50.0,
+      "cp_ms": 2.5,
+      "band": [
+        300.0,
+        3000.0
+      ],
+      "n_carriers": 55,
+      "amplitude": 0.9,
+      "papr_db": 9.0,
+      "payload_bytes": 1412,
+      "payload_bitrate": 3765.3333333333335,
+      "worst_rate": 0.0,
+      "ic705->ht": {
+        "ok": 0,
+        "trials": 4,
+        "rate": 0.0,
+        "mean_confidence": 0.8322619956321271,
+        "min_confidence": 0.8311691101209366,
+        "max_keyed_seconds": 2.9958527088165283
+      },
+      "ht->ic705": {
+        "ok": 0,
+        "trials": 4,
+        "rate": 0.0,
+        "mean_confidence": 0.7416001247756685,
+        "min_confidence": 0.731307496633485,
+        "max_keyed_seconds": 2.990685224533081
+      },
+      "drive": [
+        0.9,
+        9.0
+      ]
+    },
+    {
+      "profile": "ofdm4_50hz_cp8",
+      "n_fft": 960,
+      "cp": 120,
+      "bits_per_carrier": 2,
+      "spacing_hz": 50.0,
+      "cp_ms": 2.5,
+      "band": [
+        300.0,
+        3000.0
+      ],
+      "n_carriers": 55,
+      "amplitude": 0.9,
+      "papr_db": 7.0,
+      "payload_bytes": 1412,
+      "payload_bitrate": 3765.3333333333335,
+      "worst_rate": 0.0,
+      "ic705->ht": {
+        "ok": 0,
+        "trials": 4,
+        "rate": 0.0,
+        "mean_confidence": 0.8379763431365304,
+        "min_confidence": 0.8371595921886809,
+        "max_keyed_seconds": 2.9925167560577393
+      },
+      "ht->ic705": {
+        "ok": 0,
+        "trials": 4,
+        "rate": 0.0,
+        "mean_confidence": 0.7165768207103943,
+        "min_confidence": 0.695338771866353,
+        "max_keyed_seconds": 2.991128921508789
+      },
+      "drive": [
+        0.9,
+        7.0
+      ]
+    },
+    {
+      "profile": "ofdm4_50hz_cp8",
+      "n_fft": 960,
+      "cp": 120,
+      "bits_per_carrier": 2,
+      "spacing_hz": 50.0,
+      "cp_ms": 2.5,
+      "band": [
+        300.0,
+        3000.0
+      ],
+      "n_carriers": 55,
+      "amplitude": 0.9,
+      "papr_db": 12.0,
+      "payload_bytes": 1412,
+      "payload_bitrate": 3765.3333333333335,
+      "worst_rate": 0.0,
+      "ic705->ht": {
+        "ok": 0,
+        "trials": 4,
+        "rate": 0.0,
+        "mean_confidence": 0.8318199547074772,
+        "min_confidence": 0.8312666668635863,
+        "max_keyed_seconds": 2.9970996379852295
+      },
+      "ht->ic705": {
+        "ok": 0,
+        "trials": 4,
+        "rate": 0.0,
+        "mean_confidence": 0.7553224389438897,
+        "min_confidence": 0.7380302615199767,
+        "max_keyed_seconds": 2.9976229667663574
+      },
+      "drive": [
+        0.9,
+        12.0
+      ]
+    },
+    {
+      "profile": "ofdm4_50hz_cp8",
+      "n_fft": 960,
+      "cp": 120,
+      "bits_per_carrier": 2,
+      "spacing_hz": 50.0,
+      "cp_ms": 2.5,
+      "band": [
+        300.0,
+        3000.0
+      ],
+      "n_carriers": 55,
+      "amplitude": 0.6,
+      "papr_db": 9.0,
+      "payload_bytes": 1412,
+      "payload_bitrate": 3765.3333333333335,
+      "worst_rate": 0.0,
+      "ic705->ht": {
+        "ok": 0,
+        "trials": 4,
+        "rate": 0.0,
+        "mean_confidence": 0.8332416023304359,
+        "min_confidence": 0.8323220493776281,
+        "max_keyed_seconds": 2.9971582889556885
+      },
+      "ht->ic705": {
+        "ok": 0,
+        "trials": 4,
+        "rate": 0.0,
+        "mean_confidence": 0.7524369638952839,
+        "min_confidence": 0.7309362739348175,
+        "max_keyed_seconds": 2.9967615604400635
+      },
+      "drive": [
+        0.6,
+        9.0
+      ]
+    },
+    {
+      "profile": "ofdm4_50hz_cp8",
+      "n_fft": 960,
+      "cp": 120,
+      "bits_per_carrier": 2,
+      "spacing_hz": 50.0,
+      "cp_ms": 2.5,
+      "band": [
+        300.0,
+        3000.0
+      ],
+      "n_carriers": 55,
+      "amplitude": 0.9,
+      "papr_db": 12.0,
+      "payload_bytes": 1412,
+      "payload_bitrate": 3765.3333333333335,
+      "worst_rate": 0.0,
+      "ic705->ht": {
+        "ok": 0,
+        "trials": 4,
+        "rate": 0.0,
+        "mean_confidence": 0.8327611574676111,
+        "min_confidence": 0.8316772390732843,
+        "max_keyed_seconds": 2.994941473007202
+      },
+      "ht->ic705": {
+        "ok": 0,
+        "trials": 4,
+        "rate": 0.0,
+        "mean_confidence": 0.7577751236608272,
+        "min_confidence": 0.7453007981876124,
+        "max_keyed_seconds": 2.9946401119232178
+      }
+    },
+    {
+      "profile": "ofdm4_40hz_cp8",
+      "n_fft": 1200,
+      "cp": 150,
+      "bits_per_carrier": 2,
+      "spacing_hz": 40.0,
+      "cp_ms": 3.125,
+      "band": [
+        320.0,
+        3000.0
+      ],
+      "n_carriers": 68,
+      "amplitude": 0.9,
+      "papr_db": 12.0,
+      "payload_bytes": 1373,
+      "payload_bitrate": 3661.3333333333335,
+      "worst_rate": 0.0,
+      "ic705->ht": {
+        "ok": 0,
+        "trials": 4,
+        "rate": 0.0,
+        "mean_confidence": 0.8729788882430529,
+        "min_confidence": 0.872045416444861,
+        "max_keyed_seconds": 2.974682092666626
+      },
+      "ht->ic705": {
+        "ok": 0,
+        "trials": 4,
+        "rate": 0.0,
+        "mean_confidence": 0.7806376109295426,
+        "min_confidence": 0.757589328862435,
+        "max_keyed_seconds": 2.976691484451294
+      }
+    },
+    {
+      "profile": "ofdm4_30hz_cp8",
+      "n_fft": 1600,
+      "cp": 200,
+      "bits_per_carrier": 2,
+      "spacing_hz": 30.0,
+      "cp_ms": 4.166666666666667,
+      "band": [
+        300.0,
+        3000.0
+      ],
+      "n_carriers": 91,
+      "amplitude": 0.9,
+      "papr_db": 12.0,
+      "payload_bytes": 1361,
+      "payload_bitrate": 3629.3333333333335,
+      "worst_rate": 0.0,
+      "ic705->ht": {
+        "ok": 0,
+        "trials": 4,
+        "rate": 0.0,
+        "mean_confidence": 0.8456503334090029,
+        "min_confidence": 0.8452442875510596,
+        "max_keyed_seconds": 2.9741933345794678
+      },
+      "ht->ic705": {
+        "ok": 0,
+        "trials": 4,
+        "rate": 0.0,
+        "mean_confidence": 0.750031690118107,
+        "min_confidence": 0.7344423174190658,
+        "max_keyed_seconds": 2.973684072494507
+      }
+    },
+    {
+      "profile": "ofdm4_75hz_cp4",
+      "n_fft": 640,
+      "cp": 160,
+      "bits_per_carrier": 2,
+      "spacing_hz": 75.0,
+      "cp_ms": 3.3333333333333335,
+      "band": [
+        300.0,
+        3000.0
+      ],
+      "n_carriers": 37,
+      "amplitude": 0.9,
+      "papr_db": 12.0,
+      "payload_bytes": 1291,
+      "payload_bitrate": 3442.6666666666665,
+      "worst_rate": 0.0,
+      "ic705->ht": {
+        "ok": 0,
+        "trials": 4,
+        "rate": 0.0,
+        "mean_confidence": 0.8318898691015248,
+        "min_confidence": 0.831675930897671,
+        "max_keyed_seconds": 2.993223190307617
+      },
+      "ht->ic705": {
+        "ok": 0,
+        "trials": 4,
+        "rate": 0.0,
+        "mean_confidence": 0.7382253473275857,
+        "min_confidence": 0.7188977859939711,
+        "max_keyed_seconds": 2.9955668449401855
+      }
+    },
+    {
+      "profile": "ofdm4_60hz_cp4",
+      "n_fft": 800,
+      "cp": 200,
+      "bits_per_carrier": 2,
+      "spacing_hz": 60.0,
+      "cp_ms": 4.166666666666667,
+      "band": [
+        300.0,
+        3000.0
+      ],
+      "n_carriers": 46,
+      "amplitude": 0.9,
+      "papr_db": 12.0,
+      "payload_bytes": 1272,
+      "payload_bitrate": 3392.0,
+      "worst_rate": 0.0,
+      "ic705->ht": {
+        "ok": 0,
+        "trials": 4,
+        "rate": 0.0,
+        "mean_confidence": 0.8703837762937592,
+        "min_confidence": 0.8692517490514947,
+        "max_keyed_seconds": 2.9840009212493896
+      },
+      "ht->ic705": {
+        "ok": 0,
+        "trials": 4,
+        "rate": 0.0,
+        "mean_confidence": 0.7366597520622407,
+        "min_confidence": 0.7281733377370239,
+        "max_keyed_seconds": 2.9876129627227783
+      }
+    }
+  ]
+}

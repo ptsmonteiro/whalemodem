@@ -33,6 +33,19 @@ at interval 16, and denser pilots were 0/4. A saved-frame comparison reduced
 five wrong decisions to four, leaving scattered errors that tracking cannot
 correct. The next meaningful experiment is FEC, not more pilot density.
 
+Experimental cross-32-QAM was also tested over 650–1950 Hz with 50 Hz spacing,
+a 2.5 ms prefix, peak 0.6, and a 12 dB PAPR target. Its 1734-byte frame failed
+all four trials in each direction. Sync remained strong, but even the best
+capture had 791 wrong decisions out of 2781 (28.4%) and -12.8 dB derotated
+EVM. This is not a near miss that shorter framing or a small parameter
+adjustment can fix.
+
+The same profile geometry at 16QAM was tested on the stronger IC-705→HT path
+with a full-band channel update every 90, 45, and 22.5 ms. All three pilot
+densities failed 0/4. Representative captures still had 7.0–9.9% wrong
+constellation decisions, so increasingly frequent channel estimates did not
+address the remaining noise/distortion.
+
 ## Why OFDM, given that MFSK already works
 
 The MFSK experiment found that the binding impairment on this bench is not
@@ -91,8 +104,10 @@ the squelch. `test_a_pure_tone_does_not_sync` exists because of that.
 
 ## Candidates
 
-The grid is `n_fft` in (1600, 1200, 960, 800, 640) × cyclic prefix in (1/4,
-1/8, 1/16) × 1–4 bits per carrier: 60 profiles. The single thing the candidates
+The default grid is `n_fft` in (1600, 1200, 960, 800, 640) × cyclic prefix in
+(1/4, 1/8, 1/16) × 1–4 bits per carrier: 60 profiles. Experimental cross-32-QAM
+is available explicitly with `--bits 5`; it is excluded from the default ladder
+because even QPSK has not been reliable on this bench. The single thing the candidates
 trade is prefix length, i.e. how much delay spread they survive versus how much
 airtime they spend surviving it.
 
@@ -204,6 +219,21 @@ worse than expected" rather than as a bug:
 4. **The clock-offset claim was backwards**, above.
 
 ## Running it
+
+Screen the independent soft 16-QAM, rate-1/2 LDPC path with:
+
+```powershell
+python experiments/ofdm/sweep_ofdm.py --fec --bits 4 --n-ffts 960 `
+  --cp-samples 120 --band 650 1950 --pilot-intervals 1 --min-gain 0 `
+  --direction ht-to-ic705 `
+  --capture-dir experiments/ofdm/results/captures/16qam_ldpc12 `
+  --out experiments/ofdm/results/sweeps/16qam_ldpc12.json
+```
+
+Bare `--fec` uses rate 1/2; `--fec 2/3` selects the corresponding fixed IEEE
+802.11n length-648 QC-LDPC matrix. Both use normalized min-sum decoding. The CRC remains inside the protected frame,
+whitening remains on the transmitted coded grid, and codewords are
+interleaved jointly over all data symbols and carriers.
 
 ```
 python experiments/ofdm/test_ofdm.py       # software only, no radios

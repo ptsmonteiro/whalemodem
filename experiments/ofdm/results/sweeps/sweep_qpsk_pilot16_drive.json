@@ -1,0 +1,166 @@
+{
+  "when": "2026-08-18T12:32:34.415207+00:00",
+  "reference_bitrate": 853.3333333333334,
+  "band": [
+    650.0,
+    1950.0
+  ],
+  "amplitude": 0.9,
+  "papr_db": 12.0,
+  "trials": 4,
+  "confirm_trials": 10,
+  "winner": null,
+  "results": [
+    {
+      "profile": "ofdm4_50hz_cp8_p16",
+      "n_fft": 960,
+      "cp": 120,
+      "bits_per_carrier": 2,
+      "spacing_hz": 50.0,
+      "cp_ms": 2.5,
+      "pilot_interval": 16,
+      "band": [
+        650.0,
+        1950.0
+      ],
+      "n_carriers": 27,
+      "amplitude": 0.9,
+      "papr_db": 9.0,
+      "payload_bytes": 650,
+      "payload_bitrate": 1733.3333333333333,
+      "weak_rate": 0.0,
+      "ht->ic705": {
+        "ok": 0,
+        "trials": 4,
+        "rate": 0.0,
+        "mean_confidence": 0.949877930381813,
+        "min_confidence": 0.9403127455006686,
+        "max_keyed_seconds": 2.9923458099365234
+      },
+      "drive": [
+        0.9,
+        9.0
+      ]
+    },
+    {
+      "profile": "ofdm4_50hz_cp8_p16",
+      "n_fft": 960,
+      "cp": 120,
+      "bits_per_carrier": 2,
+      "spacing_hz": 50.0,
+      "cp_ms": 2.5,
+      "pilot_interval": 16,
+      "band": [
+        650.0,
+        1950.0
+      ],
+      "n_carriers": 27,
+      "amplitude": 0.9,
+      "papr_db": 7.0,
+      "payload_bytes": 650,
+      "payload_bitrate": 1733.3333333333333,
+      "weak_rate": 0.0,
+      "ht->ic705": {
+        "ok": 0,
+        "trials": 4,
+        "rate": 0.0,
+        "mean_confidence": 0.9406185306860573,
+        "min_confidence": 0.9359345408066047,
+        "max_keyed_seconds": 2.9915525913238525
+      },
+      "drive": [
+        0.9,
+        7.0
+      ]
+    },
+    {
+      "profile": "ofdm4_50hz_cp8_p16",
+      "n_fft": 960,
+      "cp": 120,
+      "bits_per_carrier": 2,
+      "spacing_hz": 50.0,
+      "cp_ms": 2.5,
+      "pilot_interval": 16,
+      "band": [
+        650.0,
+        1950.0
+      ],
+      "n_carriers": 27,
+      "amplitude": 0.9,
+      "papr_db": 12.0,
+      "payload_bytes": 650,
+      "payload_bitrate": 1733.3333333333333,
+      "weak_rate": 0.75,
+      "ht->ic705": {
+        "ok": 3,
+        "trials": 4,
+        "rate": 0.75,
+        "mean_confidence": 0.9520171029190152,
+        "min_confidence": 0.9472770424810911,
+        "max_keyed_seconds": 2.9922220706939697
+      },
+      "drive": [
+        0.9,
+        12.0
+      ]
+    },
+    {
+      "profile": "ofdm4_50hz_cp8_p16",
+      "n_fft": 960,
+      "cp": 120,
+      "bits_per_carrier": 2,
+      "spacing_hz": 50.0,
+      "cp_ms": 2.5,
+      "pilot_interval": 16,
+      "band": [
+        650.0,
+        1950.0
+      ],
+      "n_carriers": 27,
+      "amplitude": 0.6,
+      "papr_db": 9.0,
+      "payload_bytes": 650,
+      "payload_bitrate": 1733.3333333333333,
+      "weak_rate": 0.0,
+      "ht->ic705": {
+        "ok": 0,
+        "trials": 4,
+        "rate": 0.0,
+        "mean_confidence": 0.9506476732939395,
+        "min_confidence": 0.9485436901387412,
+        "max_keyed_seconds": 2.994187593460083
+      },
+      "drive": [
+        0.6,
+        9.0
+      ]
+    },
+    {
+      "profile": "ofdm4_50hz_cp8_p16",
+      "n_fft": 960,
+      "cp": 120,
+      "bits_per_carrier": 2,
+      "spacing_hz": 50.0,
+      "cp_ms": 2.5,
+      "pilot_interval": 16,
+      "band": [
+        650.0,
+        1950.0
+      ],
+      "n_carriers": 27,
+      "amplitude": 0.9,
+      "papr_db": 12.0,
+      "payload_bytes": 650,
+      "payload_bitrate": 1733.3333333333333,
+      "weak_rate": 0.5,
+      "ht->ic705": {
+        "ok": 2,
+        "trials": 4,
+        "rate": 0.5,
+        "mean_confidence": 0.9535357328821472,
+        "min_confidence": 0.9529519097052197,
+        "max_keyed_seconds": 2.9910666942596436
+      }
+    }
+  ]
+}

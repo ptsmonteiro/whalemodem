@@ -1,0 +1,70 @@
+{
+  "when": "2026-08-18T13:49:59.034345+00:00",
+  "reference_bitrate": 853.3333333333334,
+  "band": [
+    650.0,
+    1950.0
+  ],
+  "amplitude": 0.6,
+  "papr_db": 12.0,
+  "trials": 4,
+  "confirm_trials": 10,
+  "winner": null,
+  "results": [
+    {
+      "profile": "ofdm32_50hz_cp120samp",
+      "n_fft": 960,
+      "cp": 120,
+      "bits_per_carrier": 5,
+      "spacing_hz": 50.0,
+      "cp_ms": 2.5,
+      "pilot_interval": 0,
+      "dft_spread": false,
+      "band": [
+        650.0,
+        1950.0
+      ],
+      "excluded_bands": [],
+      "n_carriers": 27,
+      "amplitude": 0.6,
+      "papr_db": 12.0,
+      "payload_bytes": 1734,
+      "payload_bitrate": 4624.0,
+      "weak_rate": 0.0,
+      "ht->ic705": {
+        "ok": 0,
+        "trials": 4,
+        "rate": 0.0,
+        "mean_confidence": 0.9531926679327365,
+        "min_confidence": 0.952573706594519,
+        "max_keyed_seconds": 2.996659278869629,
+        "captures": [
+          {
+            "audio": "experiments/ofdm/results/captures/32qam/ofdm32_50hz_cp120samp_ht_to_ic705_a0p60_p12p0_t01.npy",
+            "payload": "experiments/ofdm/results/captures/32qam/ofdm32_50hz_cp120samp_ht_to_ic705_a0p60_p12p0_t01.bin",
+            "decoded": false,
+            "confidence": 0.9539334156626477
+          },
+          {
+            "audio": "experiments/ofdm/results/captures/32qam/ofdm32_50hz_cp120samp_ht_to_ic705_a0p60_p12p0_t02.npy",
+            "payload": "experiments/ofdm/results/captures/32qam/ofdm32_50hz_cp120samp_ht_to_ic705_a0p60_p12p0_t02.bin",
+            "decoded": false,
+            "confidence": 0.952573706594519
+          },
+          {
+            "audio": "experiments/ofdm/results/captures/32qam/ofdm32_50hz_cp120samp_ht_to_ic705_a0p60_p12p0_t03.npy",
+            "payload": "experiments/ofdm/results/captures/32qam/ofdm32_50hz_cp120samp_ht_to_ic705_a0p60_p12p0_t03.bin",
+            "decoded": false,
+            "confidence": 0.9533664415017251
+          },
+          {
+            "audio": "experiments/ofdm/results/captures/32qam/ofdm32_50hz_cp120samp_ht_to_ic705_a0p60_p12p0_t04.npy",
+            "payload": "experiments/ofdm/results/captures/32qam/ofdm32_50hz_cp120samp_ht_to_ic705_a0p60_p12p0_t04.bin",
+            "decoded": false,
+            "confidence": 0.9528971079720546
+          }
+        ]
+      }
+    }
+  ]
+}

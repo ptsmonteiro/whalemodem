@@ -1,0 +1,84 @@
+{
+  "when": "2026-08-18T12:12:59.690756+00:00",
+  "reference_bitrate": 853.3333333333334,
+  "band": [
+    650.0,
+    1950.0
+  ],
+  "amplitude": 0.9,
+  "papr_db": 12.0,
+  "trials": 4,
+  "confirm_trials": 10,
+  "winner": "ofdm2_50hz_cp8",
+  "results": [
+    {
+      "profile": "ofdm2_50hz_cp8",
+      "n_fft": 960,
+      "cp": 120,
+      "bits_per_carrier": 1,
+      "spacing_hz": 50.0,
+      "cp_ms": 2.5,
+      "band": [
+        650.0,
+        1950.0
+      ],
+      "n_carriers": 27,
+      "amplitude": 0.9,
+      "papr_db": 12.0,
+      "payload_bytes": 343,
+      "payload_bitrate": 914.6666666666666,
+      "worst_rate": 1.0,
+      "ic705->ht": {
+        "ok": 4,
+        "trials": 4,
+        "rate": 1.0,
+        "mean_confidence": 0.9703943714061143,
+        "min_confidence": 0.9702050059221698,
+        "max_keyed_seconds": 2.9971892833709717
+      },
+      "ht->ic705": {
+        "ok": 4,
+        "trials": 4,
+        "rate": 1.0,
+        "mean_confidence": 0.9531649388833983,
+        "min_confidence": 0.9521163033054886,
+        "max_keyed_seconds": 3.0011963844299316
+      }
+    },
+    {
+      "profile": "ofdm2_50hz_cp8",
+      "n_fft": 960,
+      "cp": 120,
+      "bits_per_carrier": 1,
+      "spacing_hz": 50.0,
+      "cp_ms": 2.5,
+      "band": [
+        650.0,
+        1950.0
+      ],
+      "n_carriers": 27,
+      "amplitude": 0.9,
+      "papr_db": 12.0,
+      "payload_bytes": 343,
+      "payload_bitrate": 914.6666666666666,
+      "worst_rate": 1.0,
+      "ic705->ht": {
+        "ok": 10,
+        "trials": 10,
+        "rate": 1.0,
+        "mean_confidence": 0.9706361678982411,
+        "min_confidence": 0.9700575433376897,
+        "max_keyed_seconds": 2.9947142601013184
+      },
+      "ht->ic705": {
+        "ok": 10,
+        "trials": 10,
+        "rate": 1.0,
+        "mean_confidence": 0.953312615222084,
+        "min_confidence": 0.9498230639263768,
+        "max_keyed_seconds": 2.9954123497009277
+      },
+      "confirmation": true
+    }
+  ]
+}

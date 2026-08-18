@@ -1,0 +1,73 @@
+{
+  "when": "2026-08-18T14:27:02.113020+00:00",
+  "reference_bitrate": 853.3333333333334,
+  "band": [
+    650.0,
+    1950.0
+  ],
+  "amplitude": 0.6,
+  "papr_db": 12.0,
+  "trials": 4,
+  "confirm_trials": 10,
+  "direction": "ht-to-ic705",
+  "winner": null,
+  "results": [
+    {
+      "profile": "ofdm16_50hz_cp120samp_p4_ldpc23",
+      "n_fft": 960,
+      "cp": 120,
+      "bits_per_carrier": 4,
+      "fec": "802.11n-648-2/3",
+      "spacing_hz": 50.0,
+      "cp_ms": 2.5,
+      "pilot_interval": 4,
+      "dft_spread": false,
+      "band": [
+        650.0,
+        1950.0
+      ],
+      "excluded_bands": [],
+      "n_carriers": 27,
+      "amplitude": 0.6,
+      "papr_db": 12.0,
+      "payload_bytes": 698,
+      "payload_bitrate": 1861.3333333333333,
+      "one_way_direction": "ht-to-ic705",
+      "one_way_rate": 0.0,
+      "ht->ic705": {
+        "ok": 0,
+        "trials": 4,
+        "rate": 0.0,
+        "mean_confidence": 0.9539083838852151,
+        "min_confidence": 0.9536397599577507,
+        "max_keyed_seconds": 2.8516037464141846,
+        "captures": [
+          {
+            "audio": "experiments/ofdm/results/captures/16qam_ldpc23_p4/ofdm16_50hz_cp120samp_p4_ldpc23_ht_to_ic705_a0p60_p12p0_t01.npy",
+            "payload": "experiments/ofdm/results/captures/16qam_ldpc23_p4/ofdm16_50hz_cp120samp_p4_ldpc23_ht_to_ic705_a0p60_p12p0_t01.bin",
+            "decoded": false,
+            "confidence": 0.9543341008316127
+          },
+          {
+            "audio": "experiments/ofdm/results/captures/16qam_ldpc23_p4/ofdm16_50hz_cp120samp_p4_ldpc23_ht_to_ic705_a0p60_p12p0_t02.npy",
+            "payload": "experiments/ofdm/results/captures/16qam_ldpc23_p4/ofdm16_50hz_cp120samp_p4_ldpc23_ht_to_ic705_a0p60_p12p0_t02.bin",
+            "decoded": false,
+            "confidence": 0.9536397599577507
+          },
+          {
+            "audio": "experiments/ofdm/results/captures/16qam_ldpc23_p4/ofdm16_50hz_cp120samp_p4_ldpc23_ht_to_ic705_a0p60_p12p0_t03.npy",
+            "payload": "experiments/ofdm/results/captures/16qam_ldpc23_p4/ofdm16_50hz_cp120samp_p4_ldpc23_ht_to_ic705_a0p60_p12p0_t03.bin",
+            "decoded": false,
+            "confidence": 0.9538653306481775
+          },
+          {
+            "audio": "experiments/ofdm/results/captures/16qam_ldpc23_p4/ofdm16_50hz_cp120samp_p4_ldpc23_ht_to_ic705_a0p60_p12p0_t04.npy",
+            "payload": "experiments/ofdm/results/captures/16qam_ldpc23_p4/ofdm16_50hz_cp120samp_p4_ldpc23_ht_to_ic705_a0p60_p12p0_t04.bin",
+            "decoded": false,
+            "confidence": 0.9537943441033192
+          }
+        ]
+      }
+    }
+  ]
+}

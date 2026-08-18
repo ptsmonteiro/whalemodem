@@ -250,7 +250,12 @@ def decision_reference(equalised, profile):
     is still worth looking at, not because it is equivalent.
     """
     points = ofdm.constellation(profile.bits_per_carrier)
-    return points[ofdm._demap(equalised, profile.bits_per_carrier)].reshape(equalised.shape)
+    decisions = ofdm._despread_data(equalised, profile)
+    nearest = points[ofdm._demap(decisions, profile.bits_per_carrier)].reshape(
+        equalised.shape)
+    if profile.dft_spread:
+        return np.fft.fft(nearest, axis=1, norm="ortho")
+    return nearest
 
 
 def evm_db(err):
@@ -426,10 +431,13 @@ def analyse(audio, profile, payload=None, verbose=True):
     raw_residual = equalised - sent
     residual = drift["corrected"] - sent
 
-    got = ofdm._demap(equalised, profile.bits_per_carrier).reshape(n, -1)
-    want_values = ofdm._demap(sent, profile.bits_per_carrier).reshape(n, -1)
+    decision_grid = ofdm._despread_data(equalised, profile)
+    sent_decisions = ofdm._despread_data(sent, profile)
+    corrected_decisions = ofdm._despread_data(drift["corrected"], profile)
+    got = ofdm._demap(decision_grid, profile.bits_per_carrier).reshape(n, -1)
+    want_values = ofdm._demap(sent_decisions, profile.bits_per_carrier).reshape(n, -1)
     wrong = got != want_values
-    corrected_wrong = (ofdm._demap(drift["corrected"], profile.bits_per_carrier)
+    corrected_wrong = (ofdm._demap(corrected_decisions, profile.bits_per_carrier)
                        .reshape(n, -1) != want_values)
 
     ideal_peak_db, rx_peak_db = amplitude_axis(sent, profile, audio, first)
@@ -538,10 +546,13 @@ def verdict(a):
                      f"median, against {sigma_carrier:.2f} dB of expected scatter")
         lines.append(f"  |H| there is {mag[flagged].min():.1f} to {mag[flagged].max():.1f} dB "
                      "below the band peak")
-        if total:
+        if total and not profile.dft_spread:
             share = int(a["wrong"][:, flagged].sum()) / total
             lines.append(f"  those carriers hold {share * 100:.0f}% of the symbol errors "
                          f"on {len(flagged) / n_car * 100:.0f}% of the band")
+        elif total:
+            lines.append("  DFT spreading mixes every logical decision across the allocated "
+                         "carriers, so decision errors cannot be assigned to one frequency")
         lines.append("  with no FEC this fails every frame regardless of the other "
                      f"{n_car - len(flagged)} carriers. Re-measure the band "
                      "(probe_channel.py --out) and pass it to sweep_ofdm.py --band.")
@@ -617,12 +628,15 @@ def report(a, carrier_rows=64):
     phase = np.unwrap(np.angle(a["channel"]))
     evm = _carrier_evm(a)
     evm_raw = _carrier_evm(a, "raw_residual")
-    carrier_err = a["wrong"].sum(axis=0)
+    carrier_err = (a["wrong"].sum(axis=0) if not profile.dft_spread
+                   else np.zeros(n_car, dtype=int))
     flagged, level, sigma, _ = _carrier_flag(a)
     base = np.median(evm)
 
     print(f"\n  -- per subcarrier (expected EVM scatter on a flat channel +/-{sigma:.2f} dB; "
           f"flagged above {level:.1f} dB) --")
+    if profile.dft_spread:
+        print("      DFT-s decision errors are mixed across carriers; per-Hz counts omitted")
     print("        Hz    |H| dB   arg H    EVM  (raw)   errors")
     step = max(1, -(-n_car // carrier_rows))
     for i in range(0, n_car, step):
@@ -839,10 +853,14 @@ def resolve_profile(args):
                                 cp=args.cp or args.n_fft // 8,
                                 bits_per_carrier=args.bits,
                                 pilot_interval=args.pilot_interval,
+                                dft_spread=args.dft_spread,
+                                excluded_bands=tuple(tuple(b) for b in args.exclude_band),
                                 band_low=args.band[0] if args.band else ofdm.BAND_LOW_HZ,
                                 band_high=args.band[1] if args.band else ofdm.BAND_HIGH_HZ)
     band = tuple(args.band) if args.band else (ofdm.BAND_LOW_HZ, ofdm.BAND_HIGH_HZ)
-    pool = ofdm.candidates(band=band, pilot_interval=args.pilot_interval)
+    pool = ofdm.candidates(band=band, pilot_interval=args.pilot_interval,
+                           dft_spread=args.dft_spread,
+                           excluded_bands=tuple(tuple(b) for b in args.exclude_band))
     for p in pool:
         if p.name == args.profile:
             return p
@@ -880,6 +898,11 @@ def main():
     ap.add_argument("--band", nargs=2, type=float, metavar=("LOW", "HIGH"))
     ap.add_argument("--pilot-interval", type=int, default=0,
                     help="tracking-pilot interval used by the captured frame")
+    ap.add_argument("--dft-spread", action="store_true",
+                    help="captured data symbols use DFT spreading")
+    ap.add_argument("--exclude-band", nargs=2, type=float, action="append", default=[],
+                    metavar=("LOW", "HIGH"),
+                    help="physical carrier exclusion used by the captured frame")
 
     ap.add_argument("--capture", help=".npy capture to diagnose (see WHALE_CAPTURE_DIR)")
     ap.add_argument("--payload-file", help="the bytes that were sent")

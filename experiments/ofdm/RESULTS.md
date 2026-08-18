@@ -72,6 +72,47 @@ clock-tolerance, equalisation, and codec-negotiation complexity.
 The result could change with FEC or pilot-assisted tracking, but either is a
 new frame-format experiment rather than completion work on this CRC-only mode.
 
+## Experimental cross-32-QAM follow-up
+
+Cross-32-QAM was added as an explicit `--bits 5` experiment and tested in both
+directions. The profile used 650–1950 Hz, 50 Hz carrier spacing, a 2.5 ms
+cyclic prefix, peak amplitude 0.6, and a 12 dB software PAPR target. It carried
+1734 bytes, or 4624 payload bit/s arithmetically, in the 3-second keying budget.
+All eight frames failed payload decoding: 0/4 HT→IC-705 and 0/4 IC-705→HT.
+Sync confidence was 0.953–0.954 and 0.970–0.971 respectively.
+
+Saved-capture diagnostics found 791–1831 wrong decisions among 2781 points per
+frame (28.4–65.8%). Derotated EVM ranged from -12.8 to -9.3 dB. One capture
+contained a fitted +16 ppm clock excursion, far outside this profile's 3.4 ppm
+tolerance, but the other captures still contained hundreds of errors without
+that excursion. Some excess error remained around 1750–1800 Hz and mild
+limiting could not be separated from noise, but neither was the sole cause.
+
+This is not close enough for shorter CRC-only frames, pilot-density changes,
+or another small drive sweep to be meaningful. Any further high-order OFDM
+work should begin with FEC and interleaving, using these captures as its input,
+before spending more airtime.
+
+The nominally stronger IC-705→HT path was not materially better. Its captures
+had 1262–1476 wrong decisions (45.4–53.1%) and -11.5 to -10.5 dB derotated EVM.
+Five to seven edge carriers were consistently worse, and one frame showed a
+-18 ppm clock excursion, but derotation still left 1087 errors. This rules out
+path asymmetry as a way to make the uncoded mode useful.
+
+## 16QAM dense-pilot follow-up
+
+16QAM was tested on IC-705→HT with the same 650–1950 Hz band, 50 Hz spacing,
+2.5 ms prefix, peak 0.6, and 12 dB PAPR target. Full-band tracking pilots were
+inserted every 4, 2, and 1 data symbols, updating the channel estimate every
+90, 45, and 22.5 ms. The profiles carried 1116, 927, and 684 bytes per frame
+respectively. Each failed all four trials despite 0.970–0.971 sync confidence.
+
+Representative pilot/4, pilot/2, and pilot/1 captures contained 156/2241
+(7.0%), 149/1863 (8.0%), and 136/1377 (9.9%) wrong constellation decisions.
+Their EVM was approximately -13 dB. Denser tracking therefore did not improve
+the residual and in this sample increased the error fraction; channel-estimate
+age is not the binding impairment for uncoded 16QAM.
+
 ## Interleaved tracking-pilot follow-up
 
 Pilot-assisted tracking was implemented after the initial result. A known

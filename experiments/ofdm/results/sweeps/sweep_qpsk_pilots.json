@@ -1,0 +1,96 @@
+{
+  "when": "2026-08-18T12:28:26.969476+00:00",
+  "reference_bitrate": 853.3333333333334,
+  "band": [
+    650.0,
+    1950.0
+  ],
+  "amplitude": 0.9,
+  "papr_db": 12.0,
+  "trials": 4,
+  "confirm_trials": 10,
+  "winner": null,
+  "results": [
+    {
+      "profile": "ofdm4_50hz_cp8_p16",
+      "n_fft": 960,
+      "cp": 120,
+      "bits_per_carrier": 2,
+      "spacing_hz": 50.0,
+      "cp_ms": 2.5,
+      "pilot_interval": 16,
+      "band": [
+        650.0,
+        1950.0
+      ],
+      "n_carriers": 27,
+      "amplitude": 0.9,
+      "papr_db": 12.0,
+      "payload_bytes": 650,
+      "payload_bitrate": 1733.3333333333333,
+      "weak_rate": 0.25,
+      "ht->ic705": {
+        "ok": 1,
+        "trials": 4,
+        "rate": 0.25,
+        "mean_confidence": 0.9518657401414894,
+        "min_confidence": 0.9486345211829951,
+        "max_keyed_seconds": 2.9930999279022217
+      }
+    },
+    {
+      "profile": "ofdm4_50hz_cp8_p8",
+      "n_fft": 960,
+      "cp": 120,
+      "bits_per_carrier": 2,
+      "spacing_hz": 50.0,
+      "cp_ms": 2.5,
+      "pilot_interval": 8,
+      "band": [
+        650.0,
+        1950.0
+      ],
+      "n_carriers": 27,
+      "amplitude": 0.9,
+      "papr_db": 12.0,
+      "payload_bytes": 617,
+      "payload_bitrate": 1645.3333333333333,
+      "weak_rate": 0.0,
+      "ht->ic705": {
+        "ok": 0,
+        "trials": 4,
+        "rate": 0.0,
+        "mean_confidence": 0.9526872984046983,
+        "min_confidence": 0.9488985771402237,
+        "max_keyed_seconds": 2.9900271892547607
+      }
+    },
+    {
+      "profile": "ofdm4_50hz_cp8_p4",
+      "n_fft": 960,
+      "cp": 120,
+      "bits_per_carrier": 2,
+      "spacing_hz": 50.0,
+      "cp_ms": 2.5,
+      "pilot_interval": 4,
+      "band": [
+        650.0,
+        1950.0
+      ],
+      "n_carriers": 27,
+      "amplitude": 0.9,
+      "papr_db": 12.0,
+      "payload_bytes": 556,
+      "payload_bitrate": 1482.6666666666667,
+      "weak_rate": 0.0,
+      "ht->ic705": {
+        "ok": 0,
+        "trials": 4,
+        "rate": 0.0,
+        "mean_confidence": 0.9523101231267979,
+        "min_confidence": 0.9492388235542664,
+        "max_keyed_seconds": 2.9892542362213135
+      }
+    }
+  ]
+}

@@ -3,5 +3,7 @@ __pycache__/
 logs/
 *.wav
 scratch_captures*/
+experiments/ofdm/results/captures/
+experiments/ofdm/results/failures/
 .venv/
 *.egg-info/

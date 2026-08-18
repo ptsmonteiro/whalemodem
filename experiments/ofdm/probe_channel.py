@@ -40,7 +40,8 @@ is being transmitted outside what the radio will pass anyway -- the audio
 chain simply attenuates it, which is precisely the measurement.
 
 Run: python experiments/ofdm/probe_channel.py
-     python experiments/ofdm/probe_channel.py --trials 5 --out probe.json
+     python experiments/ofdm/probe_channel.py --trials 5 \
+         --out experiments/ofdm/results/measurements/probe.json
 """
 
 import argparse
@@ -277,7 +278,9 @@ def main():
               "one or both produced nothing.")
 
     if args.out:
-        Path(args.out).write_text(json.dumps({
+        out_path = Path(args.out)
+        out_path.parent.mkdir(parents=True, exist_ok=True)
+        out_path.write_text(json.dumps({
             "when": datetime.now(timezone.utc).isoformat(),
             "probe": {"n_fft": PROBE_N_FFT, "cp": PROBE_CP, "n_train": PROBE_TRAIN,
                       "band": list(PROBE_BAND)},

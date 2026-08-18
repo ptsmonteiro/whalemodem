@@ -132,6 +132,37 @@ def test_keying_budget_still_agrees_with_the_shipped_modem():
     print("test_keying_budget_still_agrees_with_the_shipped_modem OK")
 
 
+def test_pad_seconds_still_agree_with_the_shipped_modem():
+    """mfsk.py restates HEAD_PAD_SECONDS and TAIL_PAD_SECONDS from
+    framing.HEAD_PAD_SECONDS / framing.TAIL_PAD_SECONDS rather than importing
+    them, for the same "stands alone" reason as the keying budget above --
+    and until this test existed, that coupling was invisible the same way
+    the keying budget's used to be.
+
+    It already drifted, silently: framing.HEAD_PAD_SECONDS moved from 0.08 to
+    0.15 (an HT that blacks out ~110ms after its squelch opens -- see the
+    comment above that constant in whale/framing.py) and this copy was never
+    updated to match. Every payload size mfsk.py has derived since that
+    commit landed, including the bench-verified 4fsk_650bd_x0.833 winner's
+    379 bytes, was computed against a head pad 70ms narrower than the one
+    whale/ actually ships today. See RESULTS.md's "stale constants" note for
+    what that is worth in payload bits/s, and for why fixing the number here
+    would not even fully restore the comparisons that note is about.
+
+    This assertion is being added after the drift happened, not before it,
+    which is exactly why it currently FAILS -- that failure is the point: it
+    turns a silent mismatch into a loud one. Making it pass means updating
+    mfsk.py's copy of HEAD_PAD_SECONDS, which changes what modulate() emits
+    and what every candidate's max_payload computes to, so it belongs with
+    its own bench session rather than riding in on a documentation pass.
+    """
+    assert mfsk.HEAD_PAD_SECONDS == framing.HEAD_PAD_SECONDS, \
+        (mfsk.HEAD_PAD_SECONDS, framing.HEAD_PAD_SECONDS)
+    assert mfsk.TAIL_PAD_SECONDS == framing.TAIL_PAD_SECONDS, \
+        (mfsk.TAIL_PAD_SECONDS, framing.TAIL_PAD_SECONDS)
+    print("test_pad_seconds_still_agree_with_the_shipped_modem OK")
+
+
 def test_candidates_respect_the_measured_constraints():
     """The generator's whole job is to not propose things the bench has
     already ruled out. Each of these bounds is a measurement in whale/ or in

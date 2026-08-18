@@ -179,6 +179,7 @@ import numpy as np
 from scipy.signal import hilbert
 
 from whale import framing
+import ldpc
 
 SAMPLE_RATE = 48000
 
@@ -262,7 +263,8 @@ def _gray(i):
 @lru_cache(maxsize=None)
 def constellation(bits_per_carrier: int) -> np.ndarray:
     """Unit-average-power constellation, indexed by the integer the bits
-    spell out MSB first. 1/2/3 bits are PSK, 4 is 16-QAM.
+    spell out MSB first. 1/2/3 bits are PSK, 4 is square 16-QAM, and 5 is
+    cross-32-QAM.
 
     PSK up to 8 rather than QAM at every order, because PSK is
     constant-modulus: with no FEC and a limiter in the transmit path, an
@@ -285,6 +287,32 @@ def constellation(bits_per_carrier: int) -> np.ndarray:
             i_bits, q_bits = (value >> 2) & 0b11, value & 0b11
             points[value] = levels[i_bits] + 1j * levels[q_bits]
         return points / np.sqrt(10.0)
+    if bits_per_carrier == 5:
+        # Four copies of an eight-point quadrant make the usual 6x6 cross
+        # with the four (5, 5) corners removed.  Compared with rectangular
+        # 4x8 QAM this lowers peak energy from 58/26 to 34/20, useful on the
+        # peak-limited FM audio path this experiment targets.
+        #
+        # Cross-32-QAM has no perfect Gray labelling.  This assignment is
+        # optimal over each quadrant's nearest-neighbour graph: eight of its
+        # ten edges change one bit and two change two bits.  The two sign bits
+        # make every nearest-neighbour transition across an axis Gray.
+        coordinates_by_label = {
+            0b000: (1.0, 1.0),
+            0b001: (1.0, 3.0),
+            0b010: (1.0, 5.0),
+            0b100: (3.0, 1.0),
+            0b101: (3.0, 3.0),
+            0b011: (3.0, 5.0),
+            0b110: (5.0, 1.0),
+            0b111: (5.0, 3.0),
+        }
+        for value in range(m):
+            i_sign = 1.0 if value & 0b10000 else -1.0
+            q_sign = 1.0 if value & 0b01000 else -1.0
+            i_level, q_level = coordinates_by_label[value & 0b00111]
+            points[value] = i_sign * i_level + 1j * q_sign * q_level
+        return points / np.sqrt(20.0)
     raise ValueError(f"unsupported bits_per_carrier {bits_per_carrier}")
 
 
@@ -310,10 +338,13 @@ class OfdmProfile:
     bits_per_carrier: int
     band_low: float = BAND_LOW_HZ
     band_high: float = BAND_HIGH_HZ
+    excluded_bands: tuple[tuple[float, float], ...] = ()
     n_train: int = 2
     pilot_interval: int = 0
+    dft_spread: bool = False
     papr_db: float = 9.0
     confidence_threshold: float = CONFIDENCE_THRESHOLD
+    fec: str | None = None
 
     def __post_init__(self):
         if self.cp <= 0 or self.n_fft <= 0:
@@ -324,6 +355,11 @@ class OfdmProfile:
             raise ValueError("at least one training symbol is needed to estimate the channel")
         if self.pilot_interval < 0:
             raise ValueError("pilot_interval cannot be negative")
+        if self.fec not in (None, "802.11n-648-1/2", "802.11n-648-2/3"):
+            raise ValueError(f"unsupported FEC {self.fec!r}")
+        for low, high in self.excluded_bands:
+            if low > high:
+                raise ValueError("excluded band low edge cannot exceed high edge")
 
     # -- geometry ----------------------------------------------------------
 
@@ -353,7 +389,14 @@ class OfdmProfile:
         """FFT bin indices carrying data, low to high."""
         lo = int(np.ceil(self.band_low / self.spacing))
         hi = int(np.floor(self.band_high / self.spacing))
-        return np.arange(max(lo, 1), min(hi, self.n_fft // 2 - 1) + 1)
+        carriers = np.arange(max(lo, 1), min(hi, self.n_fft // 2 - 1) + 1)
+        if self.excluded_bands:
+            frequencies = carriers * self.spacing
+            keep = np.ones(len(carriers), dtype=bool)
+            for low, high in self.excluded_bands:
+                keep &= (frequencies < low) | (frequencies > high)
+            carriers = carriers[keep]
+        return carriers
 
     @cached_property
     def sync_carriers(self) -> np.ndarray:
@@ -407,6 +450,8 @@ class OfdmProfile:
     def max_payload(self) -> int:
         """Largest payload whose whole keying fits MAX_KEYING_SECONDS."""
         bits = self.max_data_symbols * self.bits_per_symbol
+        if self.fec:
+            bits = (bits // ldpc.N) * _fec_k(self)
         # The length field (2 bytes) and CRC (2 bytes) come out of the same
         # bits, so they are subtracted here rather than budgeted separately.
         return max(0, min(bits // 8 - 4, framing.MAX_PAYLOAD_BYTES))
@@ -432,6 +477,8 @@ def _pad_samples(seconds):
 
 def data_symbols_for_length(profile: OfdmProfile, payload_len) -> int:
     bits = framing.frame_bits_for_length(payload_len)
+    if profile.fec:
+        bits = -(-bits // _fec_k(profile)) * ldpc.N
     return -(-bits // profile.bits_per_symbol)
 
 
@@ -582,7 +629,15 @@ def _pad_audio(profile: OfdmProfile, seconds, seed):
     that; test_the_pads_do_not_sync keeps it honest.
     """
     rng = np.random.default_rng(seed)
-    values = np.exp(2j * np.pi * rng.random(profile.n_carriers))
+    if profile.dft_spread:
+        # The pads participate in the transmitter's one global peak
+        # normalisation. Leaving them as ordinary random-phase OFDM would let
+        # a pad peak set the level for the whole frame and throw away the
+        # data symbols' DFT-spreading gain before they reach the radio.
+        qpsk = constellation(2)[rng.integers(0, 4, profile.n_carriers)]
+        values = np.fft.fft(qpsk, norm="ortho")
+    else:
+        values = np.exp(2j * np.pi * rng.random(profile.n_carriers))
     tile = _symbol_audio(profile, profile.carriers, values)
     n = _pad_samples(seconds)
     if n <= 0:
@@ -659,6 +714,109 @@ def _bits_to_values(bits, bits_per_carrier):
 def _values_to_bits(values, bits_per_carrier):
     shifts = np.arange(bits_per_carrier - 1, -1, -1)
     return ((values[:, None] >> shifts) & 1).ravel().tolist()
+
+
+def qam_llrs(symbols, bits_per_carrier, noise_variance=None):
+    """Max-log constellation LLRs, independent of framing and FEC.
+
+    The output is symbol-major and MSB-first, matching ``_bits_to_values``;
+    positive values favour zero.  When no variance is supplied, the hard
+    decision residual supplies a conservative scale estimate.  This API is
+    intentionally useful without the OFDM modem (e.g. unit tests and saved
+    equalised-symbol captures).
+    """
+    received = np.asarray(symbols, dtype=complex).ravel()
+    points = constellation(bits_per_carrier)
+    distances = np.abs(received[:, None] - points[None, :]) ** 2
+    if noise_variance is None:
+        residual = np.min(distances, axis=1)
+        noise_variance = max(float(np.median(residual)) / np.log(2.0), 1e-4)
+    variance = np.asarray(noise_variance, dtype=float)
+    if variance.ndim:
+        variance = np.broadcast_to(variance, received.shape)[:, None]
+    else:
+        variance = max(float(variance), 1e-8)
+    labels = ((np.arange(len(points))[:, None]
+               >> np.arange(bits_per_carrier - 1, -1, -1)) & 1)
+    llrs = []
+    for bit in range(bits_per_carrier):
+        d0 = np.min(distances[:, labels[:, bit] == 0], axis=1)
+        d1 = np.min(distances[:, labels[:, bit] == 1], axis=1)
+        llrs.append((d1 - d0) / (variance[:, 0] if np.ndim(variance) == 2 else variance))
+    return np.stack(llrs, axis=1).ravel()
+
+
+def _interleave_codewords(coded, n_blocks, grid_bits):
+    """Spread every codeword over the complete transmitted time/frequency grid."""
+    coded = np.asarray(coded, dtype=np.uint8).reshape(n_blocks, ldpc.N)
+    spread = coded.T.ravel()  # adjacent grid bits come from different codewords
+    out = np.zeros(grid_bits, dtype=np.uint8)
+    out[:len(spread)] = spread
+    # A coprime affine stride breaks the residual carrier/time alignment.
+    stride = grid_bits - 1
+    permutation = (np.arange(grid_bits) * stride) % grid_bits
+    return out[permutation]
+
+
+def _deinterleave_llrs(llrs, n_blocks):
+    grid_bits = len(llrs)
+    stride = grid_bits - 1
+    permutation = (np.arange(grid_bits) * stride) % grid_bits
+    ordered = np.empty(grid_bits, dtype=float)
+    ordered[permutation] = llrs
+    return ordered[:n_blocks * ldpc.N].reshape(ldpc.N, n_blocks).T.reshape(-1)
+
+
+def _fec_rate(profile):
+    return profile.fec.rsplit("-", 1)[-1]
+
+
+def _fec_k(profile):
+    return ldpc.INFORMATION_BITS[_fec_rate(profile)]
+
+
+def _fec_encode(bits, profile):
+    bits = np.asarray(bits, dtype=np.uint8)
+    rate, k = _fec_rate(profile), _fec_k(profile)
+    n_blocks = -(-len(bits) // k)
+    padded = np.zeros(n_blocks * k, dtype=np.uint8)
+    padded[:len(bits)] = bits
+    return np.concatenate([ldpc.encode(row, rate) for row in padded.reshape(-1, k)])
+
+
+def _fec_candidate_block_counts(profile, available_data_symbols):
+    """Plausible encoded lengths that are complete in the capture.
+
+    The receive buffer can contain arbitrary audio after a frame, but an OFDM
+    profile cannot legally carry more than ``max_payload`` inside its keying
+    budget. Keeping that bound here prevents capture-tail audio from turning
+    into extra, expensive LDPC hypotheses while retaining every shorter frame.
+    """
+    available_blocks = (max(0, available_data_symbols) * profile.bits_per_symbol
+                        // ldpc.N)
+    capacity_blocks = profile.max_data_symbols * profile.bits_per_symbol // ldpc.N
+    payload_blocks = -(-framing.frame_bits_for_length(profile.max_payload)
+                       // _fec_k(profile))
+    return range(1, min(available_blocks, capacity_blocks, payload_blocks) + 1)
+
+
+def _decode_fec_codewords(llrs, profile):
+    """Decode one length hypothesis, failing on its first invalid codeword."""
+    blocks = np.asarray(llrs, dtype=float)
+    if blocks.size % ldpc.N:
+        raise ValueError("LDPC candidate does not contain whole codewords")
+    blocks = blocks.reshape(-1, ldpc.N)
+    information_bits, iterations = [], []
+    for block in blocks:
+        information, used, ok = ldpc.decode(block, rate=_fec_rate(profile))
+        iterations.append(used)
+        if not ok:
+            # No valid codeword means this length hypothesis cannot describe
+            # a valid frame. Do not spend another 30 iterations on each of its
+            # remaining blocks merely to reach the same conclusion by CRC.
+            return None, iterations
+        information_bits.extend(information.tolist())
+    return information_bits, iterations
 
 
 # -- modulate --------------------------------------------------------------
@@ -771,21 +929,41 @@ def _apply_ramp(signal, ramp_ms=5):
 
 
 def data_symbol_values(payload: bytes, profile: OfdmProfile):
-    """(n_symbols, n_carriers) of constellation points for `payload`.
+    """(n_symbols, n_carriers) of values mapped onto the OFDM carriers.
 
     The bracketed body -- length(16) | payload | crc16 -- is byte-identical to
     whale/framing.py's, CRC included, so an integrated version could share a
-    parser. Only the mapping from bits onto the channel differs.
+    parser. Only the mapping from bits onto the channel differs. With DFT
+    spreading enabled, each row of constellation points is transformed by a
+    unitary DFT before it is placed on the contiguous carrier allocation.
+    The unitary normalisation preserves the row's energy.
     """
     body = len(payload).to_bytes(framing.LENGTH_FIELD_BITS // 8, "big") + payload
     crc = framing.crc16_ccitt_false(body)
     bits = framing.bytes_to_bits(body + bytes([(crc >> 8) & 0xFF, crc & 0xFF]))
     per_symbol = profile.bits_per_symbol
-    n_symbols = -(-len(bits) // per_symbol)
+    channel_bits = (_fec_encode(bits, profile) if profile.fec
+                    else np.asarray(bits, dtype=np.uint8))
+    n_symbols = -(-len(channel_bits) // per_symbol)
     padded = np.zeros(n_symbols * per_symbol, dtype=np.int64)
-    padded[:len(bits)] = bits
+    if profile.fec:
+        n_blocks = len(channel_bits) // ldpc.N
+        padded = _interleave_codewords(channel_bits, n_blocks, len(padded))
+    else:
+        padded[:len(channel_bits)] = channel_bits
     values = _bits_to_values(_whiten(padded), profile.bits_per_carrier)
-    return constellation(profile.bits_per_carrier)[values].reshape(n_symbols, profile.n_carriers)
+    rows = constellation(profile.bits_per_carrier)[values].reshape(
+        n_symbols, profile.n_carriers)
+    if profile.dft_spread:
+        rows = np.fft.fft(rows, axis=1, norm="ortho")
+    return rows
+
+
+def _despread_data(symbols, profile: OfdmProfile):
+    """Return equalised data in the constellation decision domain."""
+    if profile.dft_spread:
+        return np.fft.ifft(symbols, axis=1, norm="ortho")
+    return symbols
 
 
 def modulate(payload: bytes, profile: OfdmProfile, amplitude=0.9) -> np.ndarray:
@@ -1051,13 +1229,43 @@ def _decode_at(audio, profile: OfdmProfile, preamble_start, confidence):
         # waiting one more poll costs nothing.
         return result
 
-    take = min(available, max_credible_data_symbols(profile))
-    equalised, _, _ = _equalise(profile, audio, first_symbol_start, take)
-    if equalised is None or not len(equalised):
-        return result
-
-    bits = _whiten(_values_to_bits(_demap(equalised, profile.bits_per_carrier),
-                                   profile.bits_per_carrier)).tolist()
+    if profile.fec:
+        # The length is protected by the code and the interleaver spans the
+        # whole grid, so it cannot be known before decoding. Try only valid
+        # grid sizes (one per possible block count), shortest first. The
+        # profile-cap keeps post-frame capture audio out of the search.
+        take = min(available, profile.max_data_symbols)
+        bits, iterations = [], []
+        equalised = None
+        for n_blocks in _fec_candidate_block_counts(profile, take):
+            n_symbols = -(-(n_blocks * ldpc.N) // profile.bits_per_symbol)
+            # Re-equalize at this candidate length. If the capture continues
+            # beyond the real frame, treating post-frame audio as a later
+            # tracking pilot would otherwise interpolate that false channel
+            # estimate backwards into the final data symbols.
+            candidate_equalised, _, _ = _equalise(
+                profile, audio, first_symbol_start, n_symbols)
+            if candidate_equalised is None or len(candidate_equalised) < n_symbols:
+                continue
+            candidate_decisions = _despread_data(candidate_equalised, profile)
+            llrs = qam_llrs(candidate_decisions, profile.bits_per_carrier)
+            llrs *= 1.0 - 2.0 * _whitening_bits(len(llrs))
+            llrs = _deinterleave_llrs(llrs, n_blocks)
+            trial, trial_iterations = _decode_fec_codewords(llrs, profile)
+            if trial is not None and framing.parse_frame_bits(trial) is not None:
+                bits, iterations = trial, trial_iterations
+                equalised = candidate_equalised
+                break
+        result["ldpc_blocks"] = len(bits) // _fec_k(profile)
+        result["ldpc_iterations"] = iterations
+    else:
+        take = min(available, max_credible_data_symbols(profile))
+        equalised, _, _ = _equalise(profile, audio, first_symbol_start, take)
+        if equalised is None or not len(equalised):
+            return result
+        decisions = _despread_data(equalised, profile)
+        bits = _whiten(_values_to_bits(_demap(decisions, profile.bits_per_carrier),
+                                       profile.bits_per_carrier)).tolist()
     payload = framing.parse_frame_bits(bits)
     length = framing.declared_length(bits)
     needed = data_symbols_for_length(profile, length) if length is not None else None
@@ -1169,9 +1377,13 @@ def candidates(bits=(1, 2, 3, 4), n_ffts=N_FFT_CHOICES, cp_fractions=CP_FRACTION
 
 def describe(profile: OfdmProfile) -> str:
     pilots = (f" pilot/{profile.pilot_interval}" if profile.pilot_interval else "")
+    spreading = " DFT-s" if profile.dft_spread else ""
+    fec = f" LDPC-R{_fec_rate(profile)}" if profile.fec else ""
+    excluded = (" exclude=" + ",".join(f"{lo:g}-{hi:g}" for lo, hi in profile.excluded_bands)
+                if profile.excluded_bands else "")
     return (f"{profile.name:<20} {profile.n_carriers:>3}x{1 << profile.bits_per_carrier:<3} "
             f"sp={profile.spacing:>5.1f}Hz cp={profile.cp_seconds * 1000:>5.2f}ms"
-            f"({profile.prefix_overhead * 100:>4.1f}%){pilots} "
+            f"({profile.prefix_overhead * 100:>4.1f}%){pilots}{spreading}{fec}{excluded} "
             f"band={profile.tone_low:>6.1f}-{profile.tone_high:<6.1f} "
             f"sym={profile.symbol_rate:>5.1f}/s raw={profile.raw_bitrate:>6.0f}bps "
             f"payload={profile.max_payload:>4d}B ={profile.payload_bitrate:>6.1f}bps "
