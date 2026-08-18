@@ -73,7 +73,35 @@ RADIOS = {
         ),
         Radio(
             name="ht",
-            description="HT via a Digirig-style interface, PTT on RTS",
+            # A Wouxun KG-UV9D Plus. Worth naming, because constants
+            # elsewhere are sized against whatever is plugged in here, and
+            # two different HTs have each broken this modem in a different
+            # way on a few-hundred-millisecond timescale:
+            #
+            #   Wouxun KG-UV9D Plus  priority scan muting its receiver
+            #                        ~280ms every ~3s (see the README).
+            #                        Fixed by turning the setting off.
+            #   Baofeng UV-B5        blacks out ~110ms after its squelch
+            #                        opens. On the bench for a few hours on
+            #                        2026-08-18; framing.HEAD_PAD_SECONDS
+            #                        and framing.SYNC_SECONDS are both sized
+            #                        from it, so those figures describe a
+            #                        radio this bench can no longer produce.
+            #
+            # The Baofeng was swapped back out because its battery was
+            # failing, which showed up as its transmit dropping ~20dB
+            # intermittently -- worth recognising, since a dying HT battery
+            # and a genuine modem regression look identical from the logs.
+            # scripts/probe_tx_duration_dropout.py in the git history and a
+            # tone-ladder sweep both separate them in a couple of minutes:
+            # a bad battery moves every frequency at once and shows up on
+            # raw tones, with no framing involved.
+            #
+            # Re-run scripts/sweep_ptt_timing.py, scripts/measure_snr.py and
+            # the acceptance test whenever this changes. Both failures above
+            # were found the hard way, after a swap, by a profile breaking
+            # rather than by anyone looking.
+            description="HT (Wouxun KG-UV9D Plus) via a Digirig-style interface, PTT on RTS",
             audio_name=HT_AUDIO,
             open_ptt=partial(ptt.LinePtt, HT_PTT_PORT, line="rts"),
         ),

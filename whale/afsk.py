@@ -24,7 +24,10 @@ runs.
 
 Measured channel: the hardware test bench is one IC-705 (STA1) and one HT via
 a Digirig-style interface (STA2), both squelched, on the bench per
-whale/hw/radios.py. scripts/measure_snr.py measures in-band SNR (signal RMS
+whale/hw/radios.py. The HT is a Wouxun KG-UV9D Plus, which is also what the
+SNR figures below were taken with, so they stand. (A Baofeng UV-B5 stood in
+for a few hours on 2026-08-18 and is what framing.HEAD_PAD_SECONDS is sized
+against; these numbers were never re-taken on it.) scripts/measure_snr.py measures in-band SNR (signal RMS
 across the profile's tone pair vs. a PSD-scaled noise estimate from the side
 bands just outside it, taken from a live squelch-open reception --
 squelch-closed audio is just the receiver muted, not a usable noise
@@ -237,7 +240,7 @@ KEYING_OVERHEAD_SECONDS = 0.43
 
 def frame_bits(payload_len, baud):
     """Total bits on air for one frame, pads included."""
-    return (len(framing.head_pad_bits(baud)) + len(framing.SYNC_BITS)
+    return (len(framing.head_pad_bits(baud)) + len(framing.sync_bits(baud))
             + framing.frame_bits_for_length(payload_len)
             + len(framing.tail_pad_bits(baud)))
 
@@ -304,10 +307,15 @@ PROFILE_300 = Profile(name="300baud", mode_id=0, baud=BAUD, freq0=FREQ_0, freq1=
 #
 # These are now the same two tones PROFILE_300 uses, which is safe and was
 # checked rather than assumed: the sync template discriminates on symbol
-# timing, not tone frequency, so a 300 baud frame scores 0.61 against the
-# 600 baud correlator and vice versa 0.38 -- both far below the 0.7 lock
-# threshold, and unchanged from when the tones differed. A full acceptance
-# run with both profiles live on air produced no near-miss decodes.
+# timing and on the sync word itself, not on tone frequency. A 300 baud
+# frame scores 0.34 against the 600 baud correlator and vice versa 0.37,
+# both far below the 0.7 lock threshold. Those figures were 0.61 and 0.38
+# when every profile shared one 63-bit sync word; they improved because
+# framing.sync_bits now gives each baud its own m-sequence, so the profiles
+# differ in what the correlator is looking for as well as in when. A full
+# acceptance run with both profiles live on air produced no near-miss
+# decodes, and test_a_frame_does_not_sync_another_profiles_correlator keeps
+# every pairing on file.
 PROFILE_600 = Profile(name="600baud", mode_id=1, baud=600, freq0=tones(600.0)[0],
                        freq1=tones(600.0)[1], chunk_size=max_chunk_for_keying(600))
 
@@ -445,8 +453,11 @@ def _tone_energy_diff(audio, sample_rate, sps, freq0, freq1):
     return e1 / norm1 - e0 / norm0
 
 
-def _sync_template(sps, sample_rate, freq0, freq1):
-    tone = _cpfsk_tone(framing.SYNC_BITS, sps, sample_rate, freq0, freq1)
+def _sync_template(baud, sps, sample_rate, freq0, freq1):
+    """The correlation target for `baud`. The sync word's length is a
+    function of baud (framing.sync_bits), so this is too -- a template built
+    at the wrong baud is a template for a different frame."""
+    tone = _cpfsk_tone(framing.sync_bits(baud), sps, sample_rate, freq0, freq1)
     return _tone_energy_diff(tone, sample_rate, sps, freq0, freq1)
 
 
@@ -466,9 +477,10 @@ def keying_seconds(payload_len=framing.MAX_PAYLOAD_BYTES, profile: Profile = PRO
 
 # How many correlation peaks demodulate() will attempt to decode in one
 # call, and how close together two peaks may be before they're treated as
-# one. A frame's sync word is 63 symbols, so peaks closer than a few
-# symbols are the same lock seen twice; the cap keeps a noisy buffer full
-# of marginal peaks from turning one poll into hundreds of CRC attempts.
+# one. A frame's sync word is 63 symbols at the slowest profile and longer
+# at every other (framing.sync_bits), so peaks closer than a few symbols are
+# the same lock seen twice; the cap keeps a noisy buffer full of marginal
+# peaks from turning one poll into hundreds of CRC attempts.
 _MIN_PEAK_SEPARATION_SYMBOLS = 8
 _MAX_SYNC_CANDIDATES = 16
 
@@ -534,10 +546,11 @@ def _sync_peaks(score, threshold_value, min_separation):
     return peaks
 
 
-def _try_sync(diff, i_star, sps, confidence, max_credible_bits):
+def _try_sync(diff, i_star, sps, confidence, max_credible_bits, n_sync):
     """Attempts to read a frame at one correlation peak. Same return shape
-    as demodulate()."""
-    n_sync = len(framing.SYNC_BITS)
+    as demodulate(). `n_sync` is the sync word's length in bits at this
+    profile's baud -- it sets where the length field starts, so it has to
+    come from the caller rather than a module constant."""
     first_index = i_star + (sps - 1)
     max_symbols = (len(diff) - 1 - first_index) // sps + 1
     if max_symbols < n_sync + framing.LENGTH_FIELD_BITS:
@@ -603,7 +616,7 @@ def demodulate(audio, profile: Profile = PROFILE_300, sample_rate=SAMPLE_RATE):
     audio = np.asarray(audio, dtype=np.float64)
 
     diff = _tone_energy_diff(audio, sample_rate, sps, profile.freq0, profile.freq1)
-    template = _sync_template(sps, sample_rate, profile.freq0, profile.freq1)
+    template = _sync_template(profile.baud, sps, sample_rate, profile.freq0, profile.freq1)
     if len(diff) < len(template):
         return {"synced": False, "payload": None}
 
@@ -620,8 +633,9 @@ def demodulate(audio, profile: Profile = PROFILE_300, sample_rate=SAMPLE_RATE):
     near_miss = None
     still_arriving = None
     credible_bits = max_credible_frame_bits(profile.baud)
+    n_sync = len(framing.sync_bits(profile.baud))
     for i_star in peaks:
-        result = _try_sync(diff, i_star, sps, float(ncc[i_star]), credible_bits)
+        result = _try_sync(diff, i_star, sps, float(ncc[i_star]), credible_bits, n_sync)
         if result.get("payload") is not None:
             return result
         if "end_index" in result:

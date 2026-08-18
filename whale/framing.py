@@ -1,11 +1,14 @@
 """Bit-level framing for the AFSK link: sync word, length+CRC16, bit packing.
 
 Frame layout (bits, MSB first):
-    SYNC_BITS (63 bits, PN sequence -- good autocorrelation for sync search)
+    sync word (PN sequence -- good autocorrelation for sync search; its
+              length depends on baud, see sync_bits)
     length    (16 bits, big endian, payload length in bytes, 0-65535)
     payload   (8 * length bits)
     crc16     (16 bits, over the length field + payload)
 """
+
+import functools
 
 CRC16_POLY = 0x1021
 CRC16_INIT = 0xFFFF
@@ -36,9 +39,62 @@ def _lfsr_bits(num_bits, order, taps, seed=1):
     return bits
 
 
-# x^6 + x + 1, primitive -> period 2^6-1 = 63. A fixed, known-good PN word
-# used purely as a correlation target for sync search.
-SYNC_BITS = _lfsr_bits(63, 6, (1, 6), seed=1)
+# The sync word, as a *duration* rather than a bit count -- for exactly the
+# reason head_pad_bits and tail_pad_bits are: what a radio corrupts is a
+# span of time, so a fixed bit count tuned at one baud silently shrinks at
+# the next. The sync word was the one thing between those two pads that did
+# not follow the rule, and it is what a receiver has to survive the start of
+# a transmission with.
+#
+# It was a fixed 63-bit PN word, i.e. 210ms at 300 baud but only 52ms at
+# 1200. So the profile with the least margin against a fixed-duration
+# impairment was always the fastest one -- the opposite of what you want,
+# since the fast profile is also the one carrying the most payload behind
+# that sync word. That is not a hypothetical: swapping the bench HT for one
+# that blacks out for ~110ms after its squelch opens killed PROFILE_1200
+# outright while 300 and 600 baud kept working, because at 1200 the whole
+# sync word fitted inside the blackout. See HEAD_PAD_SECONDS.
+#
+# Every profile now gets SYNC_SECONDS of sync word, so a blackout costs each
+# one the same *fraction* of its sync word rather than a fraction that
+# doubles with baud. An m-sequence has period 2^order - 1, which doubles per
+# order, and baud doubles per profile -- so one order per profile lands
+# within 1.2% of a constant duration the whole way up:
+#
+#     300 baud   order 6    63 bits   210.0ms
+#     600 baud   order 7   127 bits   211.7ms
+#    1200 baud   order 8   255 bits   212.5ms
+#    2400 baud   order 9   511 bits   212.9ms
+#
+# 0.21s is 300 baud's existing 63 bits, so the control profile's sync word
+# is bit-for-bit what it always was and only the faster ones lengthen.
+#
+# ON-AIR FORMAT CHANGE, on the same footing as LENGTH_FIELD_BITS: a station
+# built before this does not share a sync word with one built after at 600
+# or 1200 baud, and since the sync word is what a receiver locks on, the two
+# do not interoperate at those speeds at all. 300 baud is unchanged, and
+# because that is CONTROL_PROFILE, a mismatched pair still fails the way an
+# out-of-range station does -- no CONNECT_ACK -- rather than by half-opening
+# a session it cannot carry data on.
+SYNC_SECONDS = 0.21
+
+# Primitive over GF(2) under _lfsr_bits' tap convention, so each gives the
+# full 2^order - 1 period. Verified by construction rather than trusted from
+# a table: test_sync_words_are_full_period_m_sequences checks the period and
+# the autocorrelation that makes these usable as a correlation target.
+_SYNC_TAPS = {6: (1, 6), 7: (1, 7), 8: (1, 3, 4, 8), 9: (1, 3, 5, 9)}
+
+
+@functools.lru_cache(maxsize=None)
+def sync_bits(baud):
+    """The sync word for `baud`: the m-sequence whose period comes closest
+    to SYNC_SECONDS at this baud.
+
+    Cached because demodulate() rebuilds its correlation template on every
+    poll of the RX buffer, several times a second per profile."""
+    target = SYNC_SECONDS * baud
+    order = min(_SYNC_TAPS, key=lambda o: abs(((1 << o) - 1) - target))
+    return _lfsr_bits((1 << order) - 1, order, _SYNC_TAPS[order], seed=1)
 
 # The length field, and everything it can express.
 #
@@ -92,7 +148,7 @@ def tail_pad_bits(baud):
     return [i % 2 for i in range(n)]
 
 
-# Mirrors tail_pad_bits, but in front of SYNC_BITS. Content doesn't matter
+# Mirrors tail_pad_bits, but in front of the sync word. Content doesn't matter
 # (thrown away, never parsed); what it buys is settling time, scaled to
 # duration rather than bit count so it doesn't shrink as baud rises.
 #
@@ -107,58 +163,97 @@ def tail_pad_bits(baud):
 #
 # This was 80ms, on a sweep that decoded 100% at every value from 0 up --
 # i.e. no receiver on the bench at the time needed any of it, so the figure
-# was margin rather than a measured floor. Swapping the HT produced one
-# that does need it, and the failure is worth spelling out because nothing
-# about it points at this constant: PROFILE_1200 stopped working in one
+# was margin rather than a measured floor. Swapping the HT produced one that
+# does need it, and it is worth knowing what that failure looked like,
+# because nothing about it pointed here: PROFILE_1200 stopped working in one
 # direction while 300 and 600 kept running, which reads like a tone-placement
 # or frame-size problem at the fast profile and is neither.
 #
-# What the new HT does is take ~110-130ms to settle after its squelch opens
-# -- it slams into a clipping transient as the carrier arrives and its AGC
-# overshoots, leaving the audio ~2x its own steady-state level and still
-# moving. Aligning a real capture against the frame that was sent, by the
-# frame body, puts the damage entirely in front:
+# What that HT does is black out for ~110ms after its squelch opens. Not
+# attenuate -- black out.
+#
+# That HT is a Baofeng UV-B5, and it is no longer on the bench: it went back
+# to the Wouxun KG-UV9D Plus the same day, once a failing battery in the
+# Baofeng made it useless as a reference. So the figures below describe a
+# radio the bench can no longer reproduce, which is the main reason they are
+# written down in this much detail. Do not "re-measure" this constant on the
+# current bench and conclude it is oversized -- the Wouxun does not need it,
+# and did not need it before the swap either.
+#
+# A UV-B5 is about as minimal as an HT gets, which makes it a fair stand-in
+# for the worst radio likely to be plugged into this modem. That is the
+# spirit of the figure: not the worst case that exists, but a cheap radio
+# rather than a mid-range one. See whale/hw/radios.py. Measured on a real capture by comparing energy at
+# the profile's own tones against energy at 3000 Hz, where nothing is ever
+# transmitted: for the first 110ms the two are equal to within 3 dB, i.e.
+# what arrives is broadband transient with no tone in it at all, and at
+# +110ms the in-band figure jumps to +14 dB and stays there. The carrier
+# hitting the squelch produces a clipping transient (the capture pegs at
+# 1.000) and the receiver's AGC spends that long recovering from it.
+#
+# Two things follow, and the second is the one that took a wrong turn first.
+#
+# The signal is absent, not distorted, so no receiver-side cleverness
+# recovers it. An earlier version of this comment proposed normalising
+# afsk._tone_energy_diff per-window instead of over the whole buffer, on the
+# theory that the transient was an amplitude excursion warping the
+# correlation. It is not, and that would not have helped: there is nothing
+# under the transient to normalise. Anything that reaches the sync word
+# before the receiver has settled is simply lost, and the only defences are
+# to start the sync word later or to need less of it.
+#
+# The other is that the sync word is where the loss lands. Aligning a real
+# capture against the frame that was sent, by the frame body:
 #
 #            head pad     sync word      bit errors
 #   600      0-80ms       80-185ms       0 of 63 sync, 0 of 850 body
 #   1200     0-80ms       80-132ms      14 of 63 sync, 1 of 868 body
 #
-# So the *body* arrives essentially perfect at 1200 baud and the frame is
-# thrown away anyway, because 14-15 of the sync word's 63 symbols land
-# inside the transient every time and hold the normalised correlation at
-# 0.60-0.62 against afsk.CONFIDENCE_THRESHOLD's 0.7. A frame nobody can
-# sync on is indistinguishable from one that never arrived.
+# The 1200-baud *body* arrives essentially perfect and the frame is thrown
+# away anyway, because 14-15 of its 63 sync symbols land inside the blackout
+# every time and hold the correlation at 0.60-0.62 against
+# afsk.CONFIDENCE_THRESHOLD's 0.7. A frame nobody can sync on is
+# indistinguishable from one that never arrived. And 1200 baud was alone in
+# failing because its sync word was the shortest in *time* -- see SYNC_SECONDS
+# above, which is the structural half of this fix and the reason a blackout
+# now costs every profile the same fraction of its sync word rather than a
+# fraction that doubles with baud.
 #
-# 1200 baud fails alone because the sync word is a fixed 63 *bits*, so its
-# duration halves at every step up -- 210ms at 300 baud, 105 at 600, 52 at
-# 1200. At 600 the sync word outlasts the transient and the tail of it
-# still carries the correlation; at 1200 the whole thing fits inside. The
-# profile with the least settling margin is the fastest one, which is the
-# opposite of what a fixed pad in front of a fixed bit count implies.
+# So there are two allowances against a blackout, and they buy different
+# things per millisecond of air time:
 #
-# Measured on the weak leg (ic705->ht), 1200 baud, 100-byte payload:
+#   - this pad, 1:1 -- every ms of it is a ms of blackout the sync word
+#     never sees;
+#   - the sync word's length, at about 0.4:1 -- a lock survives losing
+#     roughly the first 40% of the sync word (identical at all three
+#     profiles, and holding to 40% while breaking at 50%; see
+#     test_a_lock_survives_losing_the_opening_of_the_sync_word).
 #
-#    80ms   1/5, 0/4, 0/8   confidence pinned at 0.6
-#   150ms   5/5
-#   200ms   7/8             one near-miss at 0.70
-#   280ms   8/8             confidence 1.0
-#   350ms   8/8             no better than 280
+# Total blackout tolerance is therefore about HEAD_PAD_SECONDS + 0.4 *
+# SYNC_SECONDS, or pad + ~85ms. Sizing this is picking how much margin to
+# hold over the worst receiver you expect; the sync word covers the rest and
+# costs the same at every profile.
 #
-# 280ms is the knee and is what this is now. It is a floor, not margin, and
-# it is the first value here derived from the worst radio rather than from
-# the bench agreeing it was unnecessary -- a receiver slower to settle than
-# this HT would push it up again. The same change takes 300 and 600 baud on
-# that leg from 75% to 100%: the new HT degrades every profile, 1200 is
-# just the one where it crosses the sync threshold.
+# Measured on the weak leg (ic705->ht), 1200 baud, 100-byte payload, with
+# the duration-scaled sync word in place:
 #
-# It costs 200ms of every keying, which under afsk.MAX_KEYING_SECONDS comes
-# out of the payload -- chunk sizes drop ~9% (78->70, 170->155, 355->325).
-# Buying it back belongs in the receiver, not here: the transient is an
-# amplitude excursion, and afsk._tone_energy_diff normalises each tone
-# branch over the whole buffer, so a gain that moves *within* the sync word
-# still warps its shape against a flat-amplitude template. A per-window
-# normalisation would let the pad shrink again.
-HEAD_PAD_SECONDS = 0.28
+#    20ms   1/8            blackout eats ~42% of the sync word
+#    50ms   8/8  conf 0.8
+#    80ms   8/8  conf 0.9
+#   150ms   8/8  conf 0.9
+#   280ms   8/8  conf 1.0
+#
+# 50ms is the knee on this radio and 150ms is what ships: ~235ms of total
+# tolerance against the 110ms this HT actually needs, so a receiver twice as
+# slow as the worst one seen still works. Before the sync word was scaled,
+# the same sweep needed 280ms to reach 8/8 and failed outright at 80 --
+# the 130ms saved is what the structural fix bought back, and it is spent
+# here on margin rather than returned to the payload.
+#
+# Note this pad is also the cheaper allowance to grow later: it is the one
+# that does not have to be paid at every profile equally, since a slow
+# receiver is a fixed number of ms regardless of what baud is running.
+HEAD_PAD_SECONDS = 0.15
 
 
 def head_pad_bits(baud):
@@ -191,7 +286,8 @@ def build_frame_bits(payload: bytes, baud=300):
     body = len(payload).to_bytes(LENGTH_FIELD_BITS // 8, "big") + payload
     crc = crc16_ccitt_false(body)
     crc_bytes = bytes([(crc >> 8) & 0xFF, crc & 0xFF])
-    return head_pad_bits(baud) + SYNC_BITS + bytes_to_bits(body + crc_bytes) + tail_pad_bits(baud)
+    return (head_pad_bits(baud) + sync_bits(baud)
+            + bytes_to_bits(body + crc_bytes) + tail_pad_bits(baud))
 
 
 def declared_length(bits_after_sync):

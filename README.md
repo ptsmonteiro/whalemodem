@@ -264,17 +264,37 @@ produced live in `whale/transport.py` (`PTT_LEAD`/`PTT_TAIL`) and
 measurement behind it in a comment. Re-run the sweep after any change to
 the radios, the audio chain, or the PTT wiring.
 
-Re-run it in earnest, too: swapping the bench HT broke `PROFILE_1200` in
-one direction while leaving 300 and 600 baud apparently working, and the
-cause was `HEAD_PAD_SECONDS` being 80ms when that receiver needs ~110-130ms
-to settle after squelch opens. The sync word is a fixed 63 *bits*, so it
-lasts 210ms at 300 baud and only 52ms at 1200 -- the fastest profile has
-the least settling margin, and it was the only one whose sync word landed
-entirely inside the transient. Its frame *bodies* were arriving with one
-bit error in 868 the whole time. See `HEAD_PAD_SECONDS` for the numbers;
-the lesson for a new radio is that a profile can fail with a clean channel
-underneath it, and that a timing allowance nothing on the bench needed is
-not thereby margin.
+Re-run it in earnest, too. Swapping the bench HT -- a Wouxun KG-UV9D Plus,
+briefly replaced by a Baofeng UV-B5 -- broke `PROFILE_1200` in one
+direction while leaving 300 and 600 baud apparently working, and the
+frame *bodies* were arriving with one bit error in 868 the whole time --
+what was being lost was the sync word, and a frame nobody can sync on is
+indistinguishable from one that never arrived. The new HT blacks out for
+~110ms after its squelch opens (not attenuates -- in-band and out-of-band
+energy are equal to within 3 dB for that whole stretch, so what arrives is
+transient with no tone in it), and the 80ms head pad no longer covered it.
+
+Only the fast profile died, and that asymmetry was the real defect. The
+sync word was a fixed 63 *bits*, so it lasted 210ms at 300 baud and 52ms at
+1200: a fixed-duration impairment cost the fastest profile the largest
+fraction of the one thing it cannot lose. Both pads had been scaled to a
+duration for exactly this reason, and the sync word between them had not.
+
+It is now scaled too (`framing.SYNC_SECONDS`, 0.21s at every profile, using
+one m-sequence order per baud), so a blackout costs every profile the same
+fraction of its sync word. A lock survives losing roughly the first 40% of
+it -- measured identical at all three profiles -- which gives a total
+tolerance of `HEAD_PAD_SECONDS + 0.4 * SYNC_SECONDS`. On the weak leg at
+1200 baud that took the head pad needed for a clean 8/8 from 280ms down to
+50ms; 150ms ships, for about twice the margin that HT needs. The Baofeng is
+no longer on the bench -- its battery was failing -- so these allowances are
+now sized against a radio the bench cannot reproduce, which is deliberate:
+the point of the exercise was to stop the fastest profile being the one with
+the least margin, not to tune for whatever is plugged in today.
+
+Two lessons for a new radio, both of which cost time here: a profile can
+fail with a clean channel underneath it, and a timing allowance that
+nothing on the bench needs is not thereby margin.
 
 The binding constraint is the transmitter: the IC-705 takes 129-310ms
 (variable, 28 samples) between the CI-V key command and being usably on
@@ -303,9 +323,9 @@ profile (`afsk.max_chunk_for_keying`):
 
 | profile | chunk | AFSK payload | frame | keying | payload bits/s |
 |---------|-------|--------------|-------|--------|----------------|
-| 300 baud  |  70 |  72 | 2.55s | 2.98s | 188 |
-| 600 baud  | 155 | 157 | 2.56s | 2.99s | 414 |
-| 1200 baud | 325 | 327 | 2.57s | 3.00s | 867 |
+| 300 baud  |  75 |  77 | 2.56s | 2.99s | 201 |
+| 600 baud  | 157 | 159 | 2.56s | 3.00s | 419 |
+| 1200 baud | 320 | 322 | 2.57s | 3.00s | 855 |
 
 Three things worth knowing about that table:
 
@@ -316,13 +336,18 @@ Three things worth knowing about that table:
     set at the *far* station where this modem can neither see nor change it
     -- that would be a measurement, and it would replace this.
   - **1200 baud used to be capped by the format, not the clock.** 3.0s of
-    air there carries 327 bytes, but the length field was 8 bits, so the
+    air there carries 322 bytes, but the length field was 8 bits, so the
     chunk stopped at 253 and most of a second of every keying went unspent.
     The field is 16 bits now (`framing.LENGTH_FIELD_BITS`) and the budget
     binds at all three profiles. That was an on-air format change: stations
     built either side of it do not interoperate. It also means a declared
     length can no longer be taken on trust -- see
-    `afsk.MAX_CREDIBLE_FRAME_SECONDS`.
+    `afsk.MAX_CREDIBLE_FRAME_SECONDS`. Scaling the sync word to a duration
+    (`framing.SYNC_SECONDS`) was a second such break, for the same reason:
+    the sync word is what a receiver locks on, so stations either side of it
+    do not interoperate at 600 or 1200 baud at all. 300 baud is unchanged,
+    and since that carries the control plane, a mismatched pair fails at
+    CONNECT rather than half-opening a session it cannot carry data on.
   - **The clock-offset budget shrinks as the cap grows.** Sizing by airtime
     means a faster profile spends the budget on more bits, and more bits is
     what the decoder cannot keep timing across: the production frames sit at

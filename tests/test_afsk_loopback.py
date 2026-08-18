@@ -23,10 +23,120 @@ def test_framing_roundtrip():
     for payload in (b"", b"hello", bytes(range(256))[:255],
                     bytes(range(256)), bytes(i % 256 for i in range(1000))):
         bits = framing.build_frame_bits(payload)
-        after_sync = len(framing.head_pad_bits(300)) + len(framing.SYNC_BITS)
+        after_sync = len(framing.head_pad_bits(300)) + len(framing.sync_bits(300))
         decoded = framing.parse_frame_bits(bits[after_sync:])
         assert decoded == payload, (len(payload), len(decoded or b""))
     print("test_framing_roundtrip OK")
+
+
+def test_sync_words_are_full_period_m_sequences():
+    """Each profile's sync word must really be an m-sequence, because that
+    is the whole reason it works as a correlation target: an m-sequence's
+    periodic autocorrelation is a single peak with a flat -1 floor, so the
+    correlator has one unambiguous lock point rather than a ridge of
+    near-peaks it can settle on a symbol or two off.
+
+    Checked by construction rather than trusted from a table of primitive
+    polynomials, since framing._SYNC_TAPS carries one tap set per PN order
+    and a wrong entry would still produce a plausible-looking bit string --
+    just a short-period one, with sidelobes to match.
+    """
+    for baud in (300, 600, 1200, 2400):
+        bits = framing.sync_bits(baud)
+        order = (len(bits) + 1).bit_length() - 1
+        assert len(bits) == (1 << order) - 1, (baud, len(bits))
+
+        # Balance: an m-sequence has exactly one more 1 than 0 per period.
+        assert sum(bits) == (1 << (order - 1)), (baud, sum(bits))
+
+        # Periodic autocorrelation: +len at zero shift, exactly -1 elsewhere.
+        pm = np.where(np.array(bits) == 1, 1, -1)
+        for shift in range(1, len(pm)):
+            assert int(np.dot(pm, np.roll(pm, shift))) == -1, (baud, shift)
+
+    # And each lasts about framing.SYNC_SECONDS on air -- the point of
+    # scaling it at all. See framing.sync_bits for why a fixed bit count
+    # left the fastest profile with the least margin.
+    for baud in (300, 600, 1200, 2400):
+        seconds = len(framing.sync_bits(baud)) / baud
+        assert abs(seconds - framing.SYNC_SECONDS) / framing.SYNC_SECONDS < 0.02, \
+            (baud, seconds)
+    print("test_sync_words_are_full_period_m_sequences OK")
+
+
+def test_a_frame_does_not_sync_another_profiles_correlator():
+    """Every profile has to reject the others' frames, since all three share
+    a radio and 300/600 now share a tone pair as well -- so symbol timing
+    and the sync word itself are the only things telling them apart.
+
+    This matters at exactly one moment in a session: a mode step. Both ends
+    keep decoding at the old profile until a data frame settles the new one
+    (see whale/link.py), so for one turnaround the receiver is running a
+    correlator at a baud the transmitter has already left.
+    """
+    payload = bytes(range(64))
+    for tx_profile in afsk.PROFILES:
+        audio = afsk.modulate(payload, profile=tx_profile)
+        for rx_profile in afsk.PROFILES:
+            if rx_profile.mode_id == tx_profile.mode_id:
+                continue
+            result = afsk.demodulate(audio, profile=rx_profile)
+            assert result.get("payload") is None, \
+                (tx_profile.name, rx_profile.name, "decoded another profile's frame")
+            assert result.get("confidence", 0.0) < rx_profile.confidence_threshold, \
+                (tx_profile.name, rx_profile.name, result.get("confidence"))
+    print("test_a_frame_does_not_sync_another_profiles_correlator OK")
+
+
+def test_a_lock_survives_losing_the_opening_of_the_sync_word():
+    """The structural property behind framing.SYNC_SECONDS.
+
+    A receiver that is still settling when a transmission starts destroys
+    the front of the frame -- on the bench HT, ~110ms of blackout after its
+    squelch opens, during which what arrives is broadband transient with no
+    tone in it. The frame body survives that easily; the sync word is what
+    the loss lands on, and a frame that cannot be synced on is lost however
+    clean the rest of it is.
+
+    What must hold is that the survivable loss is the same *fraction* of the
+    sync word at every profile. Since every profile's sync word is the same
+    duration, an equal fraction is an equal number of milliseconds -- so one
+    head-pad figure protects all three, instead of protecting the slow ones
+    while the fast one silently runs on a fraction of the margin.
+
+    With a fixed 63-bit sync word this failed badly: the same 110ms blackout
+    cost 300 baud a quarter of its sync word and 1200 baud all of it.
+    """
+    payload = bytes(range(100))
+    rng = np.random.default_rng(11)
+
+    def decode_rate(profile, fraction, trials=6):
+        sps = round(afsk.SAMPLE_RATE / profile.baud)
+        sync_start = len(framing.head_pad_bits(profile.baud)) * sps
+        n_sync = len(framing.sync_bits(profile.baud))
+        ok = 0
+        for _ in range(trials):
+            audio = afsk.modulate(payload, profile=profile).astype(np.float64)
+            end = sync_start + int(fraction * n_sync * sps)
+            # Loud broadband noise, not silence: that is what the radio
+            # actually delivers, and it is the harder case -- it adds energy
+            # to the correlation window without adding signal.
+            level = np.sqrt(np.mean(audio[sync_start:sync_start + 10 * sps] ** 2))
+            audio[:end] = rng.normal(0, level * 1.5, end)
+            ok += int(afsk.demodulate(audio, profile=profile).get("payload") == payload)
+        return ok / trials
+
+    for profile in afsk.PROFILES:
+        assert decode_rate(profile, 0.4) == 1.0, \
+            (profile.name, "should survive losing the first 40% of the sync word")
+
+    # And the cliff is in the same place for every profile -- that sameness
+    # is the property, more than the exact figure. If a decoder change moves
+    # it, move the 0.4 in framing.HEAD_PAD_SECONDS' sizing rule with it.
+    for profile in afsk.PROFILES:
+        assert decode_rate(profile, 0.6) == 0.0, \
+            (profile.name, "60% of the sync word destroyed should not decode")
+    print("test_a_lock_survives_losing_the_opening_of_the_sync_word OK")
 
 
 def test_every_keying_fits_the_budget_and_uses_it():
@@ -153,10 +263,12 @@ def resample_clock(audio, ppm):
     return np.interp(np.arange(n_out) / ratio, np.arange(len(audio)), audio)
 
 
-def _frame_bits(payload_len):
+def _frame_bits(payload_len, baud):
     """Bits from the start of the sync word to the end of the CRC -- the
-    span over which a timing error has to stay inside half a symbol."""
-    return len(framing.SYNC_BITS) + framing.frame_bits_for_length(payload_len)
+    span over which a timing error has to stay inside half a symbol.
+
+    Takes baud because the sync word's length does (framing.sync_bits)."""
+    return len(framing.sync_bits(baud)) + framing.frame_bits_for_length(payload_len)
 
 
 def expected_failure(reason):
@@ -243,8 +355,11 @@ def test_clock_offset_tolerance_is_half_a_symbol_over_the_frame():
     `sps` from the sync peak, with no timing recovery, so a clock offset
     accumulates a sampling error that grows along the frame. The frame dies
     when that error reaches half a symbol, which puts the tolerance at
-    0.5/n_bits -- inversely proportional to frame length, and independent of
-    baud, since a faster profile has proportionally shorter symbols.
+    0.5/n_bits -- inversely proportional to frame length. It is very nearly
+    independent of baud too, since a faster profile has proportionally
+    shorter symbols; the sync word's length now scales with baud
+    (framing.sync_bits), so n_bits differs a little per profile for the same
+    payload and the bound is computed per profile rather than once.
 
     Both of those are the signature the bench saw: a ceiling in *payload
     bytes* that sat at the same byte count for all three profiles. Gradual
@@ -258,7 +373,7 @@ def test_clock_offset_tolerance_is_half_a_symbol_over_the_frame():
         for n in (40, 120, 200):
             payload = bytes(rng.integers(0, 256, size=n, dtype=np.uint8))
             tx = afsk.modulate(payload, profile=profile)
-            predicted = 0.5e6 / _frame_bits(n)
+            predicted = 0.5e6 / _frame_bits(n, profile.baud)
 
             # Comfortably inside the predicted boundary: must decode.
             inside = resample_clock(tx, round(predicted * 0.6))
@@ -345,8 +460,8 @@ def test_long_frames_lose_to_clock_offset_before_short_ones():
 def test_high_confidence_survives_the_offset_that_kills_the_payload():
     """Why the ceiling looked mysterious rather than obvious.
 
-    The sync word is 63 symbols; a frame is twenty times that. An offset
-    that has barely moved the sampling point by the end of the sync word has
+    The sync word is 127 symbols at this profile; a frame is ten times that.
+    An offset that has barely moved the sampling point by the end of it has
     walked most of a symbol by the end of the payload, so the receiver
     reports a near-perfect lock and then fails CRC. Any diagnostic that
     reads confidence as "the frame arrived cleanly" is reading the first 5%
@@ -362,8 +477,9 @@ def test_high_confidence_survives_the_offset_that_kills_the_payload():
     assert result.get("confidence", 0) > 0.9, \
         f"expected a high-confidence near-miss, got {result.get('confidence')}"
 
-    # And the length field still reads correctly, because it sits at bits
-    # 63-79 where the accumulated error is still negligible. This is worth
+    # And the length field still reads correctly, because it sits in the
+    # bits immediately after the sync word, where the accumulated error is
+    # still negligible. This is worth
     # pinning down: the sweep scripts reported a near-miss end_index ~1.2x
     # the expected frame length and it was read as a false sync lock on
     # garbage. It is not -- end_index is an absolute offset into the RX
@@ -371,8 +487,9 @@ def test_high_confidence_survives_the_offset_that_kills_the_payload():
     assert "end_index" in result and "start_index" in result, result
     span = result["end_index"] - result["start_index"]
     sps = round(afsk.SAMPLE_RATE / profile.baud)
-    assert abs(span - sps * _frame_bits(len(payload))) < sps, \
-        ("length field decoded wrong", span, sps * _frame_bits(len(payload)))
+    expected_bits = _frame_bits(len(payload), profile.baud)
+    assert abs(span - sps * expected_bits) < sps, \
+        ("length field decoded wrong", span, sps * expected_bits)
     print("test_high_confidence_survives_the_offset_that_kills_the_payload OK")
 
 
@@ -380,7 +497,7 @@ def _hand_built_frame(profile, length_field, payload_bytes):
     """Audio for a frame whose length field is written directly, so it can
     disagree with the payload that follows. modulate() cannot express this
     -- it derives the field from the payload, which is the whole point."""
-    bits = (framing.head_pad_bits(profile.baud) + framing.SYNC_BITS
+    bits = (framing.head_pad_bits(profile.baud) + framing.sync_bits(profile.baud)
             + framing.bytes_to_bits(
                 length_field.to_bytes(framing.LENGTH_FIELD_BITS // 8, "big") + payload_bytes)
             + framing.tail_pad_bits(profile.baud))
@@ -430,7 +547,7 @@ def test_a_plausible_frame_still_reads_as_still_arriving_while_incomplete():
 
     # Cut just past the length field, so the declared length is readable and
     # credible but most of the payload has yet to arrive.
-    head = len(framing.head_pad_bits(profile.baud)) + len(framing.SYNC_BITS) + 32
+    head = len(framing.head_pad_bits(profile.baud)) + len(framing.sync_bits(profile.baud)) + 32
     sps = round(afsk.SAMPLE_RATE / profile.baud)
     partial = full[:head * sps]
 
@@ -770,6 +887,9 @@ def test_link_negotiation_and_mode_step():
 
 if __name__ == "__main__":
     test_framing_roundtrip()
+    test_sync_words_are_full_period_m_sequences()
+    test_a_frame_does_not_sync_another_profiles_correlator()
+    test_a_lock_survives_losing_the_opening_of_the_sync_word()
     test_every_keying_fits_the_budget_and_uses_it()
     test_afsk_clean_loopback()
     test_afsk_noisy_delayed_loopback()

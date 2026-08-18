@@ -137,7 +137,8 @@ def near_miss_diag(result, payload, profile):
     """
     if "end_index" not in result:
         return ""
-    expected_bits = len(framing.SYNC_BITS) + 8 + 8 * len(payload) + 16
+    expected_bits = (len(framing.sync_bits(profile.baud))
+                     + framing.LENGTH_FIELD_BITS + 8 * len(payload) + 16)
     expected = round(expected_bits / profile.baud * SAMPLE_RATE)
     span = result["end_index"] - result.get("start_index", 0)
     return (f" [near-miss: frame span={span} vs expected {expected} samples"

@@ -53,7 +53,7 @@ def _demod_debug(audio, profile):
     i_star = int(np.argmax(ncc))
     confidence = float(ncc[i_star])
 
-    n_sync = len(framing.SYNC_BITS)
+    n_sync = len(framing.sync_bits(profile.baud))
     first_index = i_star + (sps - 1)
     max_symbols = (len(diff) - 1 - first_index) // sps + 1
 

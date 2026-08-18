@@ -65,16 +65,16 @@ def _ensure_com_initialized():
 #
 # Opening the output stream and filling its first buffer already spends
 # ~130ms of that with the carrier up, so PTT_LEAD only has to find the
-# rest: 0.22 + 0.13 + framing.HEAD_PAD_SECONDS puts the sync word ~630ms
+# rest: 0.22 + 0.13 + framing.HEAD_PAD_SECONDS puts the sync word ~500ms
 # after keying, comfortably clear of the 310ms worst case. Note that
 # shrinking the stream latency would buy nothing -- it is dead air the
 # radio needs anyway, and PTT_LEAD would simply have to grow to replace it.
 #
-# Most of that clearance is now HEAD_PAD_SECONDS rather than this constant,
-# and the two are not interchangeable even though both are dead time before
-# the sync word: PTT_LEAD is silence, and what the head pad buys is in-band
-# tone for a receiver's AGC to settle *on*. See HEAD_PAD_SECONDS for the
-# receiver that made the difference matter.
+# This constant covers the *transmitter* coming up. A receiver that is slow
+# to settle is a separate allowance and is not bought here -- see
+# framing.HEAD_PAD_SECONDS, which is sized against a receiver that blacks
+# out for ~110ms after its squelch opens, and framing.SYNC_SECONDS, which is
+# what makes that allowance cost the same at every profile.
 #
 # PTT_TAIL is carrier held after the last sample is genuinely on air (see
 # audio_io.transmit, which now waits for playout rather than returning when
