@@ -103,10 +103,62 @@ def tail_pad_bits(baud):
 # already up. Their job is the last stretch before the sync word -- give
 # the receiver's audio AGC in-band tone to settle on, and keep modulate()'s
 # 5ms amplitude ramp-in off the front of the sync word, where it would eat
-# real correlation energy. 80ms is comfortably more than both need; the
-# bench sweep decoded 100% at every value tested from 0 up, so this is
-# margin rather than a measured floor.
-HEAD_PAD_SECONDS = 0.08
+# real correlation energy.
+#
+# This was 80ms, on a sweep that decoded 100% at every value from 0 up --
+# i.e. no receiver on the bench at the time needed any of it, so the figure
+# was margin rather than a measured floor. Swapping the HT produced one
+# that does need it, and the failure is worth spelling out because nothing
+# about it points at this constant: PROFILE_1200 stopped working in one
+# direction while 300 and 600 kept running, which reads like a tone-placement
+# or frame-size problem at the fast profile and is neither.
+#
+# What the new HT does is take ~110-130ms to settle after its squelch opens
+# -- it slams into a clipping transient as the carrier arrives and its AGC
+# overshoots, leaving the audio ~2x its own steady-state level and still
+# moving. Aligning a real capture against the frame that was sent, by the
+# frame body, puts the damage entirely in front:
+#
+#            head pad     sync word      bit errors
+#   600      0-80ms       80-185ms       0 of 63 sync, 0 of 850 body
+#   1200     0-80ms       80-132ms      14 of 63 sync, 1 of 868 body
+#
+# So the *body* arrives essentially perfect at 1200 baud and the frame is
+# thrown away anyway, because 14-15 of the sync word's 63 symbols land
+# inside the transient every time and hold the normalised correlation at
+# 0.60-0.62 against afsk.CONFIDENCE_THRESHOLD's 0.7. A frame nobody can
+# sync on is indistinguishable from one that never arrived.
+#
+# 1200 baud fails alone because the sync word is a fixed 63 *bits*, so its
+# duration halves at every step up -- 210ms at 300 baud, 105 at 600, 52 at
+# 1200. At 600 the sync word outlasts the transient and the tail of it
+# still carries the correlation; at 1200 the whole thing fits inside. The
+# profile with the least settling margin is the fastest one, which is the
+# opposite of what a fixed pad in front of a fixed bit count implies.
+#
+# Measured on the weak leg (ic705->ht), 1200 baud, 100-byte payload:
+#
+#    80ms   1/5, 0/4, 0/8   confidence pinned at 0.6
+#   150ms   5/5
+#   200ms   7/8             one near-miss at 0.70
+#   280ms   8/8             confidence 1.0
+#   350ms   8/8             no better than 280
+#
+# 280ms is the knee and is what this is now. It is a floor, not margin, and
+# it is the first value here derived from the worst radio rather than from
+# the bench agreeing it was unnecessary -- a receiver slower to settle than
+# this HT would push it up again. The same change takes 300 and 600 baud on
+# that leg from 75% to 100%: the new HT degrades every profile, 1200 is
+# just the one where it crosses the sync threshold.
+#
+# It costs 200ms of every keying, which under afsk.MAX_KEYING_SECONDS comes
+# out of the payload -- chunk sizes drop ~9% (78->70, 170->155, 355->325).
+# Buying it back belongs in the receiver, not here: the transient is an
+# amplitude excursion, and afsk._tone_energy_diff normalises each tone
+# branch over the whole buffer, so a gain that moves *within* the sync word
+# still warps its shape against a flat-amplitude template. A per-window
+# normalisation would let the pad shrink again.
+HEAD_PAD_SECONDS = 0.28
 
 
 def head_pad_bits(baud):

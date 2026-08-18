@@ -264,6 +264,18 @@ produced live in `whale/transport.py` (`PTT_LEAD`/`PTT_TAIL`) and
 measurement behind it in a comment. Re-run the sweep after any change to
 the radios, the audio chain, or the PTT wiring.
 
+Re-run it in earnest, too: swapping the bench HT broke `PROFILE_1200` in
+one direction while leaving 300 and 600 baud apparently working, and the
+cause was `HEAD_PAD_SECONDS` being 80ms when that receiver needs ~110-130ms
+to settle after squelch opens. The sync word is a fixed 63 *bits*, so it
+lasts 210ms at 300 baud and only 52ms at 1200 -- the fastest profile has
+the least settling margin, and it was the only one whose sync word landed
+entirely inside the transient. Its frame *bodies* were arriving with one
+bit error in 868 the whole time. See `HEAD_PAD_SECONDS` for the numbers;
+the lesson for a new radio is that a profile can fail with a clean channel
+underneath it, and that a timing allowance nothing on the bench needed is
+not thereby margin.
+
 The binding constraint is the transmitter: the IC-705 takes 129-310ms
 (variable, 28 samples) between the CI-V key command and being usably on
 air, which is most of the ~430ms of lead-in. The trailing side costs
@@ -291,9 +303,9 @@ profile (`afsk.max_chunk_for_keying`):
 
 | profile | chunk | AFSK payload | frame | keying | payload bits/s |
 |---------|-------|--------------|-------|--------|----------------|
-| 300 baud  |  78 |  80 | 2.56s | 2.99s | 209 |
-| 600 baud  | 170 | 172 | 2.56s | 2.99s | 455 |
-| 1200 baud | 355 | 357 | 2.57s | 3.00s | 947 |
+| 300 baud  |  70 |  72 | 2.55s | 2.98s | 188 |
+| 600 baud  | 155 | 157 | 2.56s | 2.99s | 414 |
+| 1200 baud | 325 | 327 | 2.57s | 3.00s | 867 |
 
 Three things worth knowing about that table:
 
@@ -304,7 +316,7 @@ Three things worth knowing about that table:
     set at the *far* station where this modem can neither see nor change it
     -- that would be a measurement, and it would replace this.
   - **1200 baud used to be capped by the format, not the clock.** 3.0s of
-    air there carries 357 bytes, but the length field was 8 bits, so the
+    air there carries 327 bytes, but the length field was 8 bits, so the
     chunk stopped at 253 and most of a second of every keying went unspent.
     The field is 16 bits now (`framing.LENGTH_FIELD_BITS`) and the budget
     binds at all three profiles. That was an on-air format change: stations
@@ -416,6 +428,6 @@ bandwidth selection, WINLINK-specific extensions.
 - Chunk size is fixed per profile -- the largest that fits the keying
   budget, see "How long one keying may be" -- and timeouts derive from it,
   but neither adapts to how the channel is actually behaving. A lost frame
-  costs a whole chunk to resend, and at 1200 baud that is now 253 bytes.
+  costs a whole chunk to resend, and at 1200 baud that is now 325 bytes.
 - Throughput is low; this was optimized for correctness on noisy real
   hardware, not speed.
