@@ -4,16 +4,25 @@ The radios' USB sound cards are used via WASAPI (lower latency / more
 predictable buffering than MME or DirectSound on Windows). Which card belongs
 to which radio lives in radios.py, not here.
 
-Copied from radiomodem's shark/hw/audio_io.py (unchanged).
+Copied from radiomodem's shark/hw/audio_io.py, since diverged: both keyed
+paths below now key *inside* their try block and un-key through ptt.unkey(),
+so that neither a failed key-on nor a failed key-off can leave the
+transmitter up. See the un-keying notes in ptt.py for the bench incident that
+forced it.
 """
 
+import logging
 import threading
 import time
 
 import numpy as np
 import sounddevice as sd
 
+from whale.hw import ptt as ptt_mod
+
 SAMPLE_RATE = 48000
+
+_log = logging.getLogger(__name__)
 
 
 def _wasapi_index():
@@ -66,6 +75,21 @@ def transmit(tx_signal, tx_device, ptt, samplerate=SAMPLE_RATE, ptt_lead=0.3, pt
 
     ptt_tail is therefore carrier held after the last sample is genuinely on
     air, not after the last sample was queued.
+
+    Everything between the key and the un-key is inside one try/finally whose
+    finally cannot raise. That is a hardware-safety property, not tidiness:
+
+      - ptt.key(True) is *inside* the try. It used to sit in front of it, so a
+        radio that did not acknowledge the key-on raised straight past the
+        finally and never got an un-key -- even though an unacknowledged
+        key-on is precisely the case where the transmitter may well be up.
+      - the finally calls ptt.unkey(), which never raises. It used to call
+        ptt.key(False) directly, and on the bench that raised TimeoutError out
+        of the finally: the exception that was already propagating (PaErrorCode
+        -9996, the USB bus dropping under our own RF) was replaced by a
+        TimeoutError, and the transmitter stayed keyed with nothing left to
+        turn it off. Both halves of that failed together, which is why both
+        halves are fixed here.
     """
     tx_signal = np.asarray(tx_signal, dtype=np.float32).reshape(-1, 1)
     tx_duration = len(tx_signal) / samplerate
@@ -90,14 +114,25 @@ def transmit(tx_signal, tx_device, ptt, samplerate=SAMPLE_RATE, ptt_lead=0.3, pt
         tx_pos = end
 
     started = time.time()
-    ptt.key(True)
     try:
+        ptt.key(True)
         time.sleep(ptt_lead)
         stream = sd.OutputStream(device=tx_device, samplerate=samplerate, channels=1,
                                  dtype="float32", latency=0.1, callback=out_callback)
         with stream:
             playing_since = time.time()
-            queued.wait(tx_duration + 5.0)
+            # A stream whose device disappears mid-transmission simply stops
+            # calling the callback, so this wait is what bounds a keying in
+            # that case -- and it bounds it at tx_duration + 5s of keyed
+            # transmitter, well past afsk.MAX_KEYING_SECONDS. The timeout is
+            # left as it is (shortening it would start cutting real
+            # transmissions off), but a wait that expires is now said out
+            # loud, because in the logs it is otherwise indistinguishable
+            # from a normal keying that merely took longer.
+            if not queued.wait(tx_duration + 5.0):
+                _log.warning("output stream stopped consuming audio before the end of "
+                             "the signal (%d/%d samples played); un-keying",
+                             tx_pos, len(tx_signal))
             # Sound starts leaving the card about `latency` after the stream
             # starts, so the last sample lands that much after the last one
             # was handed to the callback.
@@ -106,7 +141,7 @@ def transmit(tx_signal, tx_device, ptt, samplerate=SAMPLE_RATE, ptt_lead=0.3, pt
                 time.sleep(remaining)
         time.sleep(ptt_tail)
     finally:
-        ptt.key(False)
+        ptt_mod.unkey(ptt)
 
     if output_underflows:
         print(f"audio_io: {output_underflows} output underflow(s) during transmit")
@@ -196,8 +231,10 @@ def capture_while_transmitting(
     in_stream.start()
     try:
         time.sleep(pre_roll)
-        ptt.key(True)
+        # Keyed inside the try, un-keyed through a finally that cannot raise,
+        # for the reasons spelled out in transmit(). Same code, same hazard.
         try:
+            ptt.key(True)
             time.sleep(ptt_lead)
             out_stream = sd.OutputStream(
                 device=tx_device, samplerate=samplerate, channels=1, dtype="float32",
@@ -205,13 +242,16 @@ def capture_while_transmitting(
             )
             with out_stream:
                 playing_since = time.time()
-                tx_queued.wait(tx_duration + 5.0)
+                if not tx_queued.wait(tx_duration + 5.0):
+                    _log.warning("output stream stopped consuming audio before the end "
+                                 "of the signal (%d/%d samples played); un-keying",
+                                 tx_pos, len(tx_signal))
                 remaining = (playing_since + tx_duration + out_stream.latency) - time.time()
                 if remaining > 0:
                     time.sleep(remaining)
             time.sleep(ptt_tail)
         finally:
-            ptt.key(False)
+            ptt_mod.unkey(ptt)
         time.sleep(post_roll)
     finally:
         rec_done.wait(1.0)

@@ -228,6 +228,19 @@ class RadioTransport:
 
         A short retry loop remains as a fallback for ordinary WASAPI
         flakiness, on top of the COM-init fix in _ensure_com_initialized().
+        It has one hard limit: it will not go round again while the PTT
+        cannot account for the transmitter. audio_io.transmit() un-keys in a
+        finally that cannot raise, but "tried to un-key" is not "un-keyed" --
+        if the radio never acknowledged it (ptt.key_state_unknown), keying
+        again stacks a second transmission on top of a state nobody can read,
+        over the same bus that just failed. Giving up and raising is the
+        correct outcome there; the caller sees a failed send, which is what
+        happened, and the operator sees ptt.py's alarm about the radio.
+
+        This is the exact shape of the incident the un-keying work exists for:
+        RF from the transmission desensed the USB bus, the output stream
+        raised PaErrorCode -9996, and the retry loop's natural instinct was
+        to key again -- into a radio whose CI-V had stopped answering.
         """
         with self._tx_lock:
             _ensure_com_initialized()
@@ -236,6 +249,7 @@ class RadioTransport:
             try:
                 last_exc = None
                 keyed_seconds = None
+                log = logging.getLogger(__name__)
                 for attempt in range(1, retries + 1):
                     try:
                         keyed_seconds = audio_io.transmit(
@@ -245,9 +259,15 @@ class RadioTransport:
                         break
                     except sd.PortAudioError as exc:
                         last_exc = exc
-                        logging.getLogger(__name__).warning(
+                        log.warning(
                             "OutputStream start failed (attempt %d/%d): %s", attempt, retries, exc)
+                        if getattr(self.ptt, "key_state_unknown", False):
+                            log.error(
+                                "not retrying: the PTT could not confirm the un-key, so the "
+                                "transmitter's state is unknown. Check the radio.")
+                            break
                         time.sleep(min(1.0, 0.2 * attempt))
+                        self._reresolve_out_device()
                 if last_exc is not None:
                     raise last_exc
                 return keyed_seconds
@@ -262,9 +282,61 @@ class RadioTransport:
                 self._clear_buffer()
                 self._transmitting.clear()
 
+    def _reresolve_out_device(self):
+        """Looks the TX device up by name again, in case it re-enumerated.
+
+        A USB sound card that dropped off the bus and came back can return at
+        a different PortAudio index, and a retry aimed at the old one would
+        then fail forever for a reason that has nothing to do with the radio.
+        Re-resolving by name (the same lookup __init__ used, via radios.py) is
+        cheap and removes that whole class of stuck retry.
+
+        Deliberately *not* treated as the diagnosis, though. In the incident
+        that prompted this the indices did not move at all -- the bus was
+        desensed by our own RF and the devices came back where they were --
+        so a recovery path built around a stale index would have fixed
+        nothing. Both indices are logged when they differ so the next
+        occurrence can be told apart from that one, rather than a silent
+        rebind quietly hiding which failure happened.
+
+        Its real limit is worth knowing: sd.query_devices() reads the device
+        table PortAudio built when it initialised, so a card that moved while
+        this process was running may still read as its old index here.
+        Forcing a rescan means sd._terminate()/sd._initialize(), which would
+        destroy the input stream this transport keeps open for its whole life
+        -- and stop/start churn on this hardware is its own documented
+        failure (see the module docstring). So this is best-effort: if the
+        indices really did move under a live PortAudio, the process needs
+        restarting and no amount of retrying here will substitute.
+
+        Never raises. It runs on the recovery path, where the interesting
+        exception is the one already in flight.
+        """
+        try:
+            index = audio_io.find_device(self.radio.audio_name, "output")
+        except Exception as exc:
+            # LookupError (the card is genuinely gone or now ambiguous), or
+            # anything PortAudio throws while enumerating a sick bus.
+            logging.getLogger(__name__).warning(
+                "could not re-resolve the TX device for %s: %s", self.radio.name, exc)
+            return
+        if index != self.out_device:
+            logging.getLogger(__name__).warning(
+                "TX device for %s moved from index %d to %d; using the new one",
+                self.radio.name, self.out_device, index)
+            self.out_device = index
+
     def close(self):
         self.stop_receiving()
         try:
+            # ptt.close() un-keys first, and IcomCivPtt.key(False) no longer
+            # raises -- but this is the last un-key of the process, so a
+            # failure here is exactly the one that must not be swallowed
+            # silently. It stays non-fatal (close() is called from shutdown
+            # paths that have nothing better to do with an exception) and
+            # becomes loud instead.
             self.ptt.close()
-        except Exception:
-            pass
+        except Exception as exc:
+            logging.getLogger(__name__).error(
+                "closing PTT for %s failed (%s: %s). THE TRANSMITTER MAY STILL BE KEYED.",
+                self.radio.name, type(exc).__name__, exc)
