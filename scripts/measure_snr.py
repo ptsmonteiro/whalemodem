@@ -32,9 +32,8 @@ Run: python scripts/measure_snr.py
 import argparse
 import sys
 import time
-from pathlib import Path
 
-sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
+import bench
 
 import numpy as np
 from scipy.signal import butter, sosfiltfilt
@@ -138,16 +137,9 @@ def main():
     args = ap.parse_args()
     profile = PROFILES_BY_NAME[args.profile]
 
-    print(f"opening radios... (profile={profile.name}, tones={profile.freq0:.0f}/{profile.freq1:.0f} Hz, "
-          f"baud={profile.baud})")
-    t1 = RadioTransport("ic705")
-    t2 = RadioTransport("ht")
-    try:
-        t1.start_receiving()
-        t2.start_receiving()
-        print("warming up 2s...")
-        time.sleep(2)
-
+    print(f"profile={profile.name}, tones={profile.freq0:.0f}/{profile.freq1:.0f} Hz, "
+          f"baud={profile.baud}")
+    with bench.radio_pair() as (t1, t2):
         snr_ab = _measure_direction(t1, t2, "STA1", "STA2", profile)
         time.sleep(1.0)
         snr_ba = _measure_direction(t2, t1, "STA2", "STA1", profile)
@@ -155,9 +147,6 @@ def main():
         print("\n=== SUMMARY ===")
         print(f"STA1 -> STA2: {snr_ab:.1f} dB" if snr_ab is not None else "STA1 -> STA2: N/A")
         print(f"STA2 -> STA1: {snr_ba:.1f} dB" if snr_ba is not None else "STA2 -> STA1: N/A")
-    finally:
-        t1.close()
-        t2.close()
 
 
 if __name__ == "__main__":

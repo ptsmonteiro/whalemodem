@@ -59,13 +59,11 @@ with no --vary or --points it runs whatever the current constants are.
 import argparse
 import sys
 import time
-from pathlib import Path
 
-sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
-
+import bench
 from whale import afsk, framing, transport as transport_mod
 from whale.hw import audio_io
-from whale.transport import RadioTransport, SAMPLE_RATE
+from whale.transport import SAMPLE_RATE
 
 # Long enough to cover the RX stream's own 0.1s latency plus the receiver's
 # squelch tail, short enough not to dominate the sweep's runtime.
@@ -174,15 +172,8 @@ def main():
     if not profiles:
         ap.error(f"unknown profile {args.profile!r}")
 
-    print("opening radios...")
-    t_ic705 = RadioTransport("ic705")
-    t_ht = RadioTransport("ht")
     results = []
-    try:
-        t_ic705.start_receiving()
-        t_ht.start_receiving()
-        print("warming up 2s...")
-        time.sleep(2)
+    with bench.radio_pair() as (t_ic705, t_ht):
         for profile in profiles:
             frames = []
             if args.frame in ("data", "both"):
@@ -200,9 +191,6 @@ def main():
         print("\n===== SUMMARY =====")
         for profile_name, frame_name, label, worst, keyed in results:
             print(f"{profile_name:9s} {frame_name:4s} {label:24s} worst={worst*100:3.0f}%  keyed={keyed:.3f}s")
-    finally:
-        t_ic705.close()
-        t_ht.close()
     return 0
 
 

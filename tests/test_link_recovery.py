@@ -29,12 +29,8 @@ The survivable row is kept as a test in its own right so that a future
 change cannot quietly convert it into a fatal one.
 """
 
-import sys
 import threading
 import time
-from pathlib import Path
-
-sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
 from whale import afsk, link, mode_history
 

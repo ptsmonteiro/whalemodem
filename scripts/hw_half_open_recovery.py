@@ -30,12 +30,11 @@ import time
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent.parent
-sys.path.insert(0, str(ROOT))
 
-from acceptance_test import StationClient  # noqa: E402
-from whale import link  # noqa: E402
+from acceptance_test import StationClient
+from whale import link
 
-from run_acceptance_test import _start_server, _stop_server, _wait_for_port  # noqa: E402
+from run_acceptance_test import _start_server, _stop_server, _wait_for_port
 
 PORT_WAIT_TIMEOUT = 15.0
 

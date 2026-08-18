@@ -17,19 +17,17 @@ Run: python scripts/probe_600_ack.py
      python scripts/probe_600_ack.py --replay capture_dir  # re-analyze, no TX
 """
 import argparse
-import dataclasses
 import sys
 import time
 from pathlib import Path
 
-sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
-
 import numpy as np
 from scipy.signal import correlate
 
+import bench
 from whale import afsk, framing
 from whale.link import PT_DATA_ACK
-from whale.transport import RadioTransport, SAMPLE_RATE
+from whale.transport import SAMPLE_RATE
 
 SETTLE_AFTER_PTT = 0.3
 CAPTURE_TAIL = 1.0  # extra seconds captured after TX ends, in case the frame arrives late
@@ -164,24 +162,14 @@ def main():
         trial_dir = Path(args.save_dir)
         trial_dir.mkdir(parents=True, exist_ok=True)
 
-    print(f"opening radios... profile={profile.name} tones={profile.freq0:.0f}/{profile.freq1:.0f} Hz "
+    print(f"profile={profile.name} tones={profile.freq0:.0f}/{profile.freq1:.0f} Hz "
           f"confidence_threshold={profile.confidence_threshold}")
     print(f"payload under test: PT_DATA_ACK frame, {len(payload)} bytes "
           f"({afsk.frame_seconds(len(payload), profile):.2f}s nominal airtime)")
-    t_ht = RadioTransport("ht")
-    t_ic705 = RadioTransport("ic705")
-    try:
-        t_ht.start_receiving()
-        t_ic705.start_receiving()
-        print("warming up 2s...")
-        time.sleep(2)
-
+    with bench.radio_pair("ht", "ic705") as (t_ht, t_ic705):
         for i in range(1, args.trials + 1):
             _run_trial(t_ht, t_ic705, payload, profile, trial_dir, i)
             time.sleep(1.0)
-    finally:
-        t_ht.close()
-        t_ic705.close()
     return 0
 
 

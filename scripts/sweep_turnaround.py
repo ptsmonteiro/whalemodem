@@ -55,13 +55,11 @@ import argparse
 import sys
 import threading
 import time
-from pathlib import Path
-
-sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
 import numpy as np
 from scipy.signal import correlate
 
+import bench
 from whale import afsk, framing, link as link_mod, transport as transport_mod
 from whale.transport import RadioTransport, SAMPLE_RATE
 
@@ -273,16 +271,9 @@ def main():
         ap.error(f"unknown profile {args.profile!r}")
     turnarounds = [float(x) for x in args.turnarounds.split(",")]
 
-    print("opening radios...")
-    t_ic705 = ProbeTransport("ic705")
-    t_ht = ProbeTransport("ht")
-    t_ic705.keep_reply_audio = t_ht.keep_reply_audio = not args.keep_post_tx_clear
     results = []
-    try:
-        t_ic705.start_receiving()
-        t_ht.start_receiving()
-        print("warming up 2s...")
-        time.sleep(2)
+    with bench.radio_pair(transport_cls=ProbeTransport) as (t_ic705, t_ht):
+        t_ic705.keep_reply_audio = t_ht.keep_reply_audio = not args.keep_post_tx_clear
         for profile in profiles:
             frames = build_frames(profile, args.probe_pad)
             for turnaround in turnarounds:
@@ -298,9 +289,6 @@ def main():
         for name, turnaround, r in results:
             print(f"{name:9} {turnaround:10.2f} {r['rate']*100:7.0f}% {r['gap']*1000:+8.0f}ms "
                   f"{r['lost']:6.0f}ms {r['latency']*1000:6.0f}ms {r['clipped']:8d}")
-    finally:
-        t_ic705.close()
-        t_ht.close()
     return 0
 
 

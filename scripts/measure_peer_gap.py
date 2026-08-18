@@ -26,13 +26,10 @@ Run:
 
 import argparse
 import re
-import sys
 from datetime import datetime
 from pathlib import Path
 
-sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
-
-from whale import afsk, link  # noqa: E402  (needs sys.path set up first)
+from whale import afsk, link
 
 TIMESTAMP = re.compile(r"^(\d{4}-\d\d-\d\d \d\d:\d\d:\d\d,\d{3}) ")
 RX_FRAME = re.compile(r"\[(?P<call>\S+)\] RX (?P<ptype>\S+) at (?P<profile>\S+)")

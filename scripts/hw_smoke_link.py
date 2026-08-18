@@ -22,9 +22,7 @@ import logging
 import sys
 import threading
 import time
-from pathlib import Path
 
-sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(name)s: %(message)s")
 
 from whale import afsk, link as link_mod, mode_history, transport as transport_mod

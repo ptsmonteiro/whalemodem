@@ -32,6 +32,7 @@ tests/
   test_afsk_loopback.py   pure-software self-test, no hardware/radios
   test_link_recovery.py   what a *lost control frame* does to a session
 scripts/
+  bench.py                   the rig the sweeps share: radio pair, trial loop, walk
   hw_smoke_single_frame.py   one AFSK frame each direction, no ARQ/sockets
   hw_smoke_link.py           full connect/send/disconnect via Link, no sockets
   hw_half_open_recovery.py   kill one station mid-session, time the other
@@ -40,6 +41,16 @@ scripts/
   sweep_turnaround.py        the dead time *between* two stations' keyings
 acceptance_test.py            drives the full acceptance scenario over TCP
 ```
+
+Every characterisation script in `scripts/` answers the same shape of
+question -- "does a frame with these parameters survive the real link?" --
+the same way: bypass `whale.link`'s ARQ and do one direct modulate -> TX ->
+capture -> demodulate per trial, both directions, worst direction decides.
+`scripts/bench.py` is that method, written once. It also holds the
+frame-span diagnostic printed on a near miss, which was wrong in its first
+form (it compared an absolute `end_index` against a bare frame duration, so
+every cleanly-read frame reported as ~1.2x and looked like a false sync
+lock) and had to be fixed separately in each copy.
 
 ## Where the time goes
 
@@ -342,8 +353,13 @@ check on hardware whose clocks are not this close, and
 ## Dependencies
 
 ```
-pip install -r requirements.txt
+pip install -e .
 ```
+
+Dependencies are declared in `pyproject.toml`; `requirements.txt` is kept as
+a plain list of the same four. The editable install is what puts `whale` and
+`acceptance_test` on the import path, so nothing under `tests/` or
+`scripts/` has to reach back to the repo root by hand.
 
 Radio control (sound card lookup, PTT keying) lives in `whale/hw/`
 (`audio_io.py`, `ptt.py`, `radios.py`) -- copied in from a sibling

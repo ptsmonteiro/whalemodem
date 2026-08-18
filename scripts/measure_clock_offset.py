@@ -46,15 +46,12 @@ Run: python scripts/measure_clock_offset.py
      python scripts/measure_clock_offset.py --seconds 6 --trials 5
 """
 import argparse
-import sys
 import time
-from pathlib import Path
 
 import numpy as np
 
-sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
-
-from whale.transport import RadioTransport, SAMPLE_RATE
+import bench
+from whale.transport import SAMPLE_RATE
 
 TONE_HZ = 1500.0  # the centre the profiles share, comfortably mid-passband
 TONE_SECONDS = 4.0
@@ -163,19 +160,9 @@ def main():
     ap.add_argument("--trials", type=int, default=TRIALS)
     args = ap.parse_args()
 
-    print("opening radios...")
-    sta1 = RadioTransport("ic705")
-    sta2 = RadioTransport("ht")
-    sta1.start_receiving()
-    sta2.start_receiving()
-    print("warming up 2s...")
-    time.sleep(2.0)
-    try:
+    with bench.radio_pair() as (sta1, sta2):
         a = run_leg(sta1, sta2, "ic705->ht", args.seconds, args.trials)
         b = run_leg(sta2, sta1, "ht->ic705", args.seconds, args.trials)
-    finally:
-        sta1.stop_receiving()
-        sta2.stop_receiving()
 
     print("\n" + "=" * 66)
     if a is None or b is None:

@@ -12,14 +12,11 @@ Run: python scripts/hw_smoke_single_frame.py
 import logging
 import sys
 import time
-from pathlib import Path
-
-sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(name)s: %(message)s")
 
+import bench
 from whale import afsk
-from whale.transport import RadioTransport
 
 PAYLOAD = (b"hello whalemodem " * 4)
 
@@ -54,15 +51,7 @@ def try_one_way(tx_name, tx, rx_name, rx, settle_s=2.0, listen_s=6.0):
 
 
 def main():
-    print("opening radios...")
-    ic705 = RadioTransport("ic705")
-    ht = RadioTransport("ht")
-    try:
-        ic705.start_receiving()
-        ht.start_receiving()
-        print("warming up 3s...")
-        time.sleep(3)
-
+    with bench.radio_pair(warmup=3.0) as (ic705, ht):
         r1 = try_one_way("ic705", ic705, "ht", ht)
         time.sleep(1)
         r2 = try_one_way("ht", ht, "ic705", ic705)
@@ -70,10 +59,7 @@ def main():
         print("\n== RESULTS ==")
         print(f"ic705 -> ht: {'OK' if r1 else 'FAIL'}")
         print(f"ht -> ic705: {'OK' if r2 else 'FAIL'}")
-        sys.exit(0 if (r1 and r2) else 1)
-    finally:
-        ic705.close()
-        ht.close()
+    sys.exit(0 if (r1 and r2) else 1)
 
 
 if __name__ == "__main__":

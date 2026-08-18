@@ -4,3 +4,4 @@ logs/
 *.wav
 scratch_captures*/
 .venv/
+*.egg-info/

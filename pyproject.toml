@@ -1,0 +1,26 @@
+[build-system]
+requires = ["setuptools>=61"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "whalemodem"
+version = "0.1.0"
+description = "A VARA-API-shaped amateur radio data modem"
+requires-python = ">=3.11"
+dependencies = [
+    "numpy",
+    "scipy",
+    "sounddevice",
+    "pyserial",
+]
+
+[tool.setuptools]
+packages = ["whale", "whale.hw"]
+# acceptance_test.py lives at the repo root and is both run directly
+# (`python acceptance_test.py ...`) and imported by two scripts. Declaring it
+# here is what makes `from acceptance_test import StationClient` resolve from
+# scripts/, which is otherwise sys.path[0] and knows nothing about the root.
+py-modules = ["acceptance_test"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]

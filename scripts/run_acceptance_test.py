@@ -38,9 +38,8 @@ import time
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent.parent
-sys.path.insert(0, str(ROOT))
 
-import acceptance_test  # noqa: E402  (needs sys.path set up first)
+import acceptance_test
 
 PORT_WAIT_TIMEOUT = 15.0
 PORT_POLL_INTERVAL = 0.3
