@@ -109,3 +109,25 @@ updates. The remaining errors were isolated at 750, 800, 1000, and 1600 Hz,
 not concentrated late in the frame or at a band edge. Tracking is therefore
 real but not the binding impairment: the CRC-only frame now needs coding gain,
 not denser pilots.
+
+### Expanded interval sweep
+
+A follow-up filled in both sides of the original 4/8/16 grid, again screening
+only HT→IC-705 at `(0.9, 12 dB)` drive:
+
+| pilot interval | payload | payload bit/s | screen |
+|---|---:|---:|---:|
+| 32 | 671 B | 1789.3 | 1/4 |
+| 24 | 664 B | 1770.7 | 0/4 |
+| 12 | 637 B | 1698.7 | 0/4 |
+| 6 | 596 B | 1589.3 | 0/4 |
+| 3 | 515 B | 1373.3 | 0/4 |
+| 2 | 461 B | 1229.3 | 0/4 |
+| 1 | 340 B | 906.7 | 4/4, then 8/10 confirmation |
+
+Interval 1 found a genuine density threshold but not a usable mode. Spending
+every second OFDM symbol on a pilot reduced the payload rate slightly below
+the confirmed BPSK OFDM profile (914.7 bit/s), and two failures remained in
+ten confirmation frames. Since weak-path confirmation failed, IC-705→HT was
+not tested. This closes the pilot-density question from 1 through 32 symbols:
+tracking alone cannot meet the CRC-only reliability requirement.
