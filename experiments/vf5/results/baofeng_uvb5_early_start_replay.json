@@ -1,0 +1,46 @@
+{
+  "source": "baofeng_uvb5_both_3.json",
+  "purpose": "Diagnostic replay constrained to the plausible early frame window after the unchanged receiver selected a squelch-tail false candidate",
+  "direction": "ic705-to-ht",
+  "radio": "Baofeng UV-B5",
+  "passed": 3,
+  "total": 3,
+  "records": [
+    {
+      "trial": 1,
+      "start_index": 34074,
+      "decoded": true,
+      "total_bit_errors": 4476,
+      "ber": 0.10207991242474002,
+      "median_carrier_snr_db": 4.612117482341276,
+      "median_payload_evm_db": -4.9050463489066,
+      "rs_corrected_bytes": 18,
+      "rs_max_block_corrections": 3,
+      "clock_offset_ppm": -18.738114955220208
+    },
+    {
+      "trial": 2,
+      "start_index": 34156,
+      "decoded": true,
+      "total_bit_errors": 2166,
+      "ber": 0.04939792008757526,
+      "median_carrier_snr_db": 6.6758395044645376,
+      "median_payload_evm_db": -9.404882415756804,
+      "rs_corrected_bytes": 0,
+      "rs_max_block_corrections": 0,
+      "clock_offset_ppm": -11.915852787563214
+    },
+    {
+      "trial": 3,
+      "start_index": 34012,
+      "decoded": true,
+      "total_bit_errors": 2512,
+      "ber": 0.05728881590950557,
+      "median_carrier_snr_db": 6.28675257782446,
+      "median_payload_evm_db": -9.296433426505986,
+      "rs_corrected_bytes": 1,
+      "rs_max_block_corrections": 1,
+      "clock_offset_ppm": -29.953370825081358
+    }
+  ]
+}

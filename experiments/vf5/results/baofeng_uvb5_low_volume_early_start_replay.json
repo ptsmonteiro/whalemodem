@@ -1,0 +1,43 @@
+{
+  "source": "baofeng_uvb5_low_volume_both_3.json",
+  "purpose": "Diagnostic replay constrained to the plausible early frame window after the unchanged receiver selected an incorrect alignment in the damaged opening",
+  "direction": "ic705-to-ht",
+  "radio": "Baofeng UV-B5",
+  "passed": 3,
+  "total": 3,
+  "records": [
+    {
+      "trial": 1,
+      "start_index": 34092,
+      "decoded": true,
+      "total_bit_errors": 6260,
+      "ber": 0.1427659186279876,
+      "median_carrier_snr_db": 0.7889,
+      "median_payload_evm_db": 1.471,
+      "rs_corrected_bytes": 112,
+      "rs_max_block_corrections": 15
+    },
+    {
+      "trial": 2,
+      "start_index": 34047,
+      "decoded": true,
+      "total_bit_errors": 4276,
+      "ber": 0.0975187010,
+      "median_carrier_snr_db": 4.33898,
+      "median_payload_evm_db": -5.0822,
+      "rs_corrected_bytes": 19,
+      "rs_max_block_corrections": 3
+    },
+    {
+      "trial": 3,
+      "start_index": 34147,
+      "decoded": true,
+      "total_bit_errors": 4437,
+      "ber": 0.1011904762,
+      "median_carrier_snr_db": 4.42621,
+      "median_payload_evm_db": -5.43736,
+      "rs_corrected_bytes": 10,
+      "rs_max_block_corrections": 2
+    }
+  ]
+}
