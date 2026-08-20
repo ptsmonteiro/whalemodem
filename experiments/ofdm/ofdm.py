@@ -355,7 +355,8 @@ class OfdmProfile:
             raise ValueError("at least one training symbol is needed to estimate the channel")
         if self.pilot_interval < 0:
             raise ValueError("pilot_interval cannot be negative")
-        if self.fec not in (None, "802.11n-648-1/2", "802.11n-648-2/3"):
+        if self.fec not in (None, "802.11n-648-1/2", "802.11n-648-2/3",
+                            "802.11n-648-3/4"):
             raise ValueError(f"unsupported FEC {self.fec!r}")
         for low, high in self.excluded_bands:
             if low > high:
@@ -720,10 +721,12 @@ def qam_llrs(symbols, bits_per_carrier, noise_variance=None):
     """Max-log constellation LLRs, independent of framing and FEC.
 
     The output is symbol-major and MSB-first, matching ``_bits_to_values``;
-    positive values favour zero.  When no variance is supplied, the hard
-    decision residual supplies a conservative scale estimate.  This API is
-    intentionally useful without the OFDM modem (e.g. unit tests and saved
-    equalised-symbol captures).
+    positive values favour zero.  ``noise_variance`` is either a scalar for the
+    whole block or one value per symbol in ``symbols``, which is how a
+    per-carrier reliability is supplied -- see _carrier_noise_variance.  When
+    none is supplied, the hard decision residual supplies a conservative scale
+    estimate.  This API is intentionally useful without the OFDM modem (e.g.
+    unit tests and saved equalised-symbol captures).
     """
     received = np.asarray(symbols, dtype=complex).ravel()
     points = constellation(bits_per_carrier)
@@ -733,7 +736,12 @@ def qam_llrs(symbols, bits_per_carrier, noise_variance=None):
         noise_variance = max(float(np.median(residual)) / np.log(2.0), 1e-4)
     variance = np.asarray(noise_variance, dtype=float)
     if variance.ndim:
-        variance = np.broadcast_to(variance, received.shape)[:, None]
+        # A per-symbol vector, which is how the modem passes per-carrier
+        # reliabilities in. Floored for the same reason as the scalar below: a
+        # zero here is an infinite LLR, and an infinite LLR is a claim no
+        # measurement can support.
+        variance = np.broadcast_to(np.maximum(variance, 1e-8),
+                                   received.shape)[:, None]
     else:
         variance = max(float(variance), 1e-8)
     labels = ((np.arange(len(points))[:, None]
@@ -797,23 +805,42 @@ def _fec_candidate_block_counts(profile, available_data_symbols):
     capacity_blocks = profile.max_data_symbols * profile.bits_per_symbol // ldpc.N
     payload_blocks = -(-framing.frame_bits_for_length(profile.max_payload)
                        // _fec_k(profile))
-    return range(1, min(available_blocks, capacity_blocks, payload_blocks) + 1)
+    largest = min(available_blocks, capacity_blocks, payload_blocks)
+    # Radio sweeps and link frames normally fill the profile's payload
+    # budget. Trying that case first turns their protected-length search from
+    # N hypotheses into one, while shorter frames remain fully supported.
+    return range(largest, 0, -1)
 
 
 def _decode_fec_codewords(llrs, profile):
-    """Decode one length hypothesis, failing on its first invalid codeword."""
+    """Decode one length hypothesis, rejecting it as early as possible.
+
+    The code is systematic, so the first information block contains the
+    16-bit frame length. Decode that block first and require its declared
+    length to map back to this exact codeword count before spending CPU on
+    the remaining blocks.
+    """
     blocks = np.asarray(llrs, dtype=float)
     if blocks.size % ldpc.N:
         raise ValueError("LDPC candidate does not contain whole codewords")
     blocks = blocks.reshape(-1, ldpc.N)
-    information_bits, iterations = [], []
-    for block in blocks:
-        information, used, ok = ldpc.decode(block, rate=_fec_rate(profile))
+    rate = _fec_rate(profile)
+    first, used, ok = ldpc.decode(blocks[0], rate=rate)
+    iterations = [used]
+    if not ok:
+        return None, iterations
+    declared = framing.declared_length(first.tolist())
+    if declared is None or declared > profile.max_payload:
+        return None, iterations
+    expected_blocks = -(-framing.frame_bits_for_length(declared) // _fec_k(profile))
+    if expected_blocks != len(blocks):
+        return None, iterations
+
+    information_bits = first.tolist()
+    for block in blocks[1:]:
+        information, used, ok = ldpc.decode(block, rate=rate)
         iterations.append(used)
         if not ok:
-            # No valid codeword means this length hypothesis cannot describe
-            # a valid frame. Do not spend another 30 iterations on each of its
-            # remaining blocks merely to reach the same conclusion by CRC.
             return None, iterations
         information_bits.extend(information.tolist())
     return information_bits, iterations
@@ -1205,6 +1232,84 @@ def _equalise(profile: OfdmProfile, audio, first_symbol_start, n_symbols):
     return (np.vstack(rows) if rows else np.zeros((0, profile.n_carriers))), channel, noise
 
 
+# Per-carrier LLR weighting.
+#
+# The band is not flat and the receiver's noise is not white. Replaying the
+# saved bench captures shows the per-carrier post-equalisation noise power
+# spanning 4x within one frame on band600_2200 (the confirmed mode) and 51x on
+# band400_2300, always worst at the low edge. Handing a belief-propagation
+# decoder one flat scale for all of them makes the worst carriers assert
+# confident wrong LLRs, which is the input normalised min-sum handles least
+# gracefully.
+#
+# Which estimate to weight by was settled by measurement. Against the truth
+# (residual to the symbols actually sent) on 9 saved failures and 41 saved
+# passing captures, correlation of log estimate with log truth, and the RMS
+# log error left after removing a global scale:
+#
+#   estimator                                     log-corr    log-RMS error
+#   _equalise's training-symbol variance / |H|^2   0.02-0.82     1.28-1.59
+#   per-carrier hard-decision residual (this)      0.91-0.98     0.10-0.29
+#
+# The training estimate loses for a structural reason, not a tuning one. With
+# n_train == 2 it is a one-degree-of-freedom sample of the noise during two
+# adjacent symbols, whereas what the data sees is the channel drifting away
+# from that estimate over the following ~94 symbols. It measures the wrong
+# quantity, and no shrinkage recovers a correlation that is not there: driving
+# the weighting from it alone took the saved passing captures from 37/41 down
+# to 4/41 on replay, and blending it in at 0.05-0.5 moved the failures'
+# decoded-block count by at most one block either way. So it is not used.
+#
+# Note the LDPC decoder is normalised min-sum, which is homogeneous of degree
+# one: scaling every LLR by a positive constant cannot change a decode. Only
+# the *shape* of this vector across carriers can, so the absolute scale here is
+# documentation rather than a working number.
+
+# Clamp the weighting to this factor either side of the frame median. Two jobs:
+# a carrier whose residual happens to come out near zero must not be trusted
+# without bound, and the residual saturates near half the minimum constellation
+# distance once a carrier is mostly wrong, so "10x worse than the median" and
+# "1000x worse" mean the same thing and should not be scored differently.
+# Measured on the saved failures, decoded blocks against clamp: 146/205 at 2,
+# 148 at 3-4, 149 at 6 and above, against 133/205 unweighted. 8 is on the
+# plateau.
+_CARRIER_NOISE_CLAMP = 8.0
+
+
+def _carrier_noise_variance(decisions, profile):
+    """Per-carrier noise power for LLR weighting, or None if not estimable.
+
+    ``decisions`` is the equalised (symbols x carriers) grid in the
+    constellation decision domain, so this measures the noise where the
+    demapper sees it -- after equalisation, and after DFT despreading if the
+    profile uses it. The estimate is the mean squared distance from each
+    carrier's symbols to the nearest constellation point: the same quantity
+    qam_llrs' scalar fallback takes the median of, kept per carrier instead of
+    collapsed over the whole frame.
+
+    Clamping keeps every returned value strictly positive and finite, so no
+    carrier can produce an unbounded LLR however few symbols it was estimated
+    from. The shortest frame this modem sends is 5 data symbols; simulated
+    under an 18 dB spectral tilt, weighting still beat flat LLRs there -- 7/20
+    frames against 3/20 at 4 dB SNR and 18/20 against 13/20 at 5 dB -- so no
+    sample-count-dependent shrinkage is applied on top of the clamp.
+    """
+    decisions = np.asarray(decisions, dtype=complex)
+    if decisions.ndim != 2 or not decisions.shape[0]:
+        return None
+    points = constellation(profile.bits_per_carrier)
+    residual = np.min(np.abs(decisions[:, :, None] - points[None, None, :]) ** 2,
+                      axis=2)
+    variance = residual.mean(axis=0)
+    median = float(np.median(variance))
+    if not np.isfinite(median) or median <= 0.0:
+        # A noiseless frame, or one too short to say anything. Let qam_llrs
+        # fall back to its own scalar rather than invent a shape.
+        return None
+    return np.clip(variance, median / _CARRIER_NOISE_CLAMP,
+                   median * _CARRIER_NOISE_CLAMP)
+
+
 def _demap(symbols, bits_per_carrier):
     points = constellation(bits_per_carrier)
     flat = symbols.ravel()
@@ -1248,7 +1353,13 @@ def _decode_at(audio, profile: OfdmProfile, preamble_start, confidence):
             if candidate_equalised is None or len(candidate_equalised) < n_symbols:
                 continue
             candidate_decisions = _despread_data(candidate_equalised, profile)
-            llrs = qam_llrs(candidate_decisions, profile.bits_per_carrier)
+            # One reliability per subcarrier, tiled over the symbols: qam_llrs
+            # flattens the grid symbol-major, so the carrier index is the fast
+            # one and np.tile lines the vector up with it.
+            variance = _carrier_noise_variance(candidate_decisions, profile)
+            if variance is not None:
+                variance = np.tile(variance, len(candidate_decisions))
+            llrs = qam_llrs(candidate_decisions, profile.bits_per_carrier, variance)
             llrs *= 1.0 - 2.0 * _whitening_bits(len(llrs))
             llrs = _deinterleave_llrs(llrs, n_blocks)
             trial, trial_iterations = _decode_fec_codewords(llrs, profile)

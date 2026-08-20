@@ -286,7 +286,7 @@ def main():
     ap.add_argument("--bits", nargs="+", type=int,
                     help="constellations to consider (1=BPSK 2=QPSK 3=8PSK "
                          "4=16QAM 5=cross-32QAM)")
-    ap.add_argument("--fec", nargs="?", const="1/2", choices=("1/2", "2/3"),
+    ap.add_argument("--fec", nargs="?", const="1/2", choices=("1/2", "2/3", "3/4"),
                     help="use IEEE 802.11n length-648 LDPC; bare --fec selects 1/2")
     ap.add_argument("--n-ffts", nargs="+", type=int,
                     help="use these useful-symbol lengths (1600=30 Hz, 640=75 Hz)")

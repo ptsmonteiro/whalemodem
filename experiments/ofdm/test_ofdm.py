@@ -102,6 +102,93 @@ def test_soft_16qam_llrs_are_code_independent():
     assert np.array_equal(llrs < 0, labels)
 
 
+def test_per_carrier_llr_weighting_bounds_and_ranks_the_carriers():
+    """One noisy carrier must not be trusted like a clean one, and no carrier
+    may assert an unbounded LLR however its residual comes out.
+
+    The weighting is only useful if it survives the two degenerate cases: a
+    carrier whose sampled residual is zero (which would otherwise divide by
+    zero) and a frame short enough that there is barely anything to average.
+    """
+    profile = ofdm.OfdmProfile(name="weighting", n_fft=960, cp=120,
+                               bits_per_carrier=4, band_low=600.0,
+                               band_high=2200.0)
+    rng = _rng(4711)
+    points = ofdm.constellation(4)
+    n_symbols, n_carriers = 40, len(profile.carriers)
+    sent = points[rng.integers(0, 16, (n_symbols, n_carriers))]
+    # A 30 dB spread of noise across the band, worst at the low edge, which is
+    # the shape the saved bench captures actually show.
+    sigma = np.geomspace(0.30, 0.01, n_carriers)
+    noise = (rng.normal(size=sent.shape) + 1j * rng.normal(size=sent.shape))
+    decisions = sent + noise * sigma / np.sqrt(2.0)
+    decisions[:, -1] = points[rng.integers(0, 16, n_symbols)]  # exactly on grid
+
+    variance = ofdm._carrier_noise_variance(decisions, profile)
+    assert variance.shape == (n_carriers,)
+    assert np.all(np.isfinite(variance)) and np.all(variance > 0.0)
+    # The zero-residual carrier is floored, not infinite in reliability.
+    median = float(np.median(variance))
+    assert variance[-1] == median / ofdm._CARRIER_NOISE_CLAMP
+    assert variance.max() / variance.min() <= ofdm._CARRIER_NOISE_CLAMP ** 2 + 1e-9
+    # It still ranks the band the right way round: noisiest carrier weighted
+    # heaviest, cleanest lightest.
+    assert variance[0] > variance[n_carriers // 2] > variance[-2]
+
+    # And the LLRs that come out are finite and quieter on the bad carriers.
+    tiled = np.tile(variance, n_symbols)
+    llrs = ofdm.qam_llrs(decisions, 4, tiled)
+    assert np.all(np.isfinite(llrs))
+    magnitudes = np.abs(llrs).reshape(n_symbols, n_carriers, 4).mean(axis=(0, 2))
+    flat = np.abs(ofdm.qam_llrs(decisions, 4)).reshape(
+        n_symbols, n_carriers, 4).mean(axis=(0, 2))
+    assert magnitudes[0] / magnitudes[-2] < flat[0] / flat[-2]
+
+    # Degenerate inputs say "no opinion" rather than producing a shape.
+    assert ofdm._carrier_noise_variance(sent, profile) is None       # noiseless
+    assert ofdm._carrier_noise_variance(sent[:0], profile) is None   # empty
+
+
+def test_per_carrier_weighting_beats_flat_llrs_on_a_tilted_band():
+    """The reason the weighting exists: a band whose noise is not flat.
+
+    One deterministic point on a waterfall, chosen so the assertion is cheap.
+    The waterfall itself, 20 seeds per point under an 18 dB spectral tilt on
+    the band600_2200 geometry, is what the number is actually based on:
+
+        payload   SNR   flat   weighted
+          16 B   4 dB   3/20      7/20
+          16 B   5 dB  13/20     18/20
+         100 B   6 dB   9/20     14/20
+        1000 B   6 dB   0/20     15/20
+        1000 B   7 dB  17/20     20/20
+
+    This is a software invariant, not evidence about the radios. What the
+    change did to real off-air frames was measured by replaying the saved
+    captures, and is recorded in results/README.md.
+    """
+    profile = ofdm.OfdmProfile(name="tilted", n_fft=960, cp=120,
+                               bits_per_carrier=4, band_low=600.0,
+                               band_high=2200.0, pilot_interval=16,
+                               papr_db=12.0, fec="802.11n-648-2/3")
+    rng = _rng(9005)
+    payload = bytes(rng.integers(0, 256, 400).tolist())
+    audio = ofdm.modulate(payload, profile, amplitude=0.6)
+    # Noise sloping 18 dB down across the audio band, as the bench shows.
+    spectrum = (rng.normal(size=len(audio) // 2 + 1)
+                + 1j * rng.normal(size=len(audio) // 2 + 1))
+    freqs = np.fft.rfftfreq(len(audio), 1 / ofdm.SAMPLE_RATE)
+    spectrum *= 10 ** ((18.0 * (1 - np.clip(freqs, 300, 2800) / 2800)) / 20)
+    noise = np.fft.irfft(spectrum, n=len(audio))
+    noise *= (np.sqrt(np.mean(audio ** 2)) / np.sqrt(np.mean(noise ** 2))
+              * 10 ** (-6.0 / 20))
+    received = audio + noise
+
+    assert ofdm.demodulate(received, profile)["payload"] == payload
+    with patch.object(ofdm, "_carrier_noise_variance", lambda *a, **k: None):
+        assert ofdm.demodulate(received, profile)["payload"] != payload
+
+
 def test_standard_ldpc_corrects_errors_and_has_zero_syndrome():
     rng = _rng(81)
     information = rng.integers(0, 2, ldpc.K, dtype=np.uint8)
@@ -125,6 +212,18 @@ def test_standard_rate_two_thirds_ldpc_corrects_errors():
     assert ok and np.array_equal(decoded, information)
 
 
+def test_standard_rate_three_quarters_ldpc_corrects_errors():
+    rng = _rng(86)
+    k = ldpc.INFORMATION_BITS["3/4"]
+    information = rng.integers(0, 2, k, dtype=np.uint8)
+    codeword = ldpc.encode(information, "3/4")
+    assert not np.any(ldpc.syndrome(codeword, "3/4"))
+    damaged = codeword.copy()
+    damaged[rng.choice(ldpc.N, 8, replace=False)] ^= 1
+    decoded, _, ok = ldpc.decode((1.0 - 2.0 * damaged) * 3.0, rate="3/4")
+    assert ok and np.array_equal(decoded, information)
+
+
 def test_ldpc_16qam_roundtrip_on_synthetic_channels():
     profile = ofdm.OfdmProfile(name="test_16qam_ldpc12", n_fft=960, cp=120,
                                bits_per_carrier=4, fec="802.11n-648-1/2")
@@ -143,6 +242,15 @@ def test_rate_two_thirds_16qam_roundtrip():
     rng = _rng(84)
     payload = rng.integers(0, 256, min(240, profile.max_payload), dtype=np.uint8).tobytes()
     audio = _noisy(ofdm.modulate(payload, profile), 27.0, rng)
+    assert ofdm.demodulate(audio, profile).get("payload") == payload
+
+
+def test_rate_three_quarters_16qam_roundtrip():
+    profile = ofdm.OfdmProfile(name="test_16qam_ldpc34", n_fft=960, cp=120,
+                               bits_per_carrier=4, fec="802.11n-648-3/4")
+    rng = _rng(87)
+    payload = rng.integers(0, 256, min(260, profile.max_payload), dtype=np.uint8).tobytes()
+    audio = _noisy(ofdm.modulate(payload, profile), 28.0, rng)
     assert ofdm.demodulate(audio, profile).get("payload") == payload
 
 
@@ -182,7 +290,7 @@ def test_fec_length_search_is_capped_at_the_profile_capacity():
     expected_max = -(-framing.frame_bits_for_length(profile.max_payload) // k)
     candidates = tuple(ofdm._fec_candidate_block_counts(
         profile, ofdm.max_credible_data_symbols(profile)))
-    assert candidates == tuple(range(1, expected_max + 1))
+    assert candidates == tuple(range(expected_max, 0, -1))
 
 
 def test_fec_length_candidate_stops_at_the_first_failed_codeword():
@@ -812,6 +920,8 @@ def test_clipping_reaches_its_target_and_the_default_is_the_optimum():
 
 if __name__ == "__main__":
     test_soft_16qam_llrs_are_code_independent()
+    test_per_carrier_llr_weighting_bounds_and_ranks_the_carriers()
+    test_per_carrier_weighting_beats_flat_llrs_on_a_tilted_band()
     test_standard_ldpc_corrects_errors_and_has_zero_syndrome()
     test_standard_rate_two_thirds_ldpc_corrects_errors()
     test_ldpc_16qam_roundtrip_on_synthetic_channels()

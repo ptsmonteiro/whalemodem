@@ -1,0 +1,55 @@
+{
+  "when": "2026-08-18T15:40:16.982899+00:00",
+  "reference_bitrate": 853.3333333333334,
+  "band": [
+    600.0,
+    2200.0
+  ],
+  "amplitude": 0.6,
+  "papr_db": 12.0,
+  "trials": 1,
+  "confirm_trials": 10,
+  "direction": "ht-to-ic705",
+  "winner": null,
+  "results": [
+    {
+      "profile": "ofdm16_50hz_cp120samp_p16_ldpc34",
+      "n_fft": 960,
+      "cp": 120,
+      "bits_per_carrier": 4,
+      "fec": "802.11n-648-3/4",
+      "spacing_hz": 50.0,
+      "cp_ms": 2.5,
+      "pilot_interval": 16,
+      "dft_spread": false,
+      "band": [
+        600.0,
+        2200.0
+      ],
+      "excluded_bands": [],
+      "n_carriers": 33,
+      "amplitude": 0.6,
+      "papr_db": 12.0,
+      "payload_bytes": 1150,
+      "payload_bitrate": 3066.6666666666665,
+      "one_way_direction": "ht-to-ic705",
+      "one_way_rate": 0.0,
+      "ht->ic705": {
+        "ok": 0,
+        "trials": 1,
+        "rate": 0.0,
+        "mean_confidence": 0.890459850378581,
+        "min_confidence": 0.890459850378581,
+        "max_keyed_seconds": 2.90378737449646,
+        "captures": [
+          {
+            "audio": "captures_16qam_ldpc34_p16_band600_2200\\ofdm16_50hz_cp120samp_p16_ldpc34_ht_to_ic705_a0p60_p12p0_t01.npy",
+            "payload": "captures_16qam_ldpc34_p16_band600_2200\\ofdm16_50hz_cp120samp_p16_ldpc34_ht_to_ic705_a0p60_p12p0_t01.bin",
+            "decoded": false,
+            "confidence": 0.890459850378581
+          }
+        ]
+      }
+    }
+  ]
+}
