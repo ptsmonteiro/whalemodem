@@ -52,6 +52,15 @@ form (it compared an absolute `end_index` against a bare frame duration, so
 every cleanly-read frame reported as ~1.2x and looked like a false sync
 lock) and had to be fixed separately in each copy.
 
+## Documentation
+
+- [`LINK.md`](LINK.md) describes the link protocol, ARQ, negotiation,
+  and local TCP interface.
+- [`FRAMING.md`](FRAMING.md) describes modulation profiles, coding,
+  framing, synchronization, error detection, and on-air timing.
+- [`GOALS.md`](GOALS.md) describes the project's goals and architectural
+  direction.
+
 ## Where the time goes
 
 Throughput on a half-duplex link is set by turnaround, not by baud. Timing
