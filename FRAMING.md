@@ -25,6 +25,22 @@ link packet
   -> keyed, half-duplex radio (`whale.transport`)
 ```
 
+## Physical-layer interface
+
+The link protocol depends on the `WaveformMode` contract in
+`whale.waveform`, not on CPFSK functions directly. A mode supplies its own
+packet encoder, streaming-buffer decoder, airtime calculation, sample rate,
+payload limit, synchronization confidence threshold, and stable on-air mode
+ID. `ModeRegistry` provides the ordered set used for negotiation/adaptation
+and identifies the robust control-plane mode.
+
+The modes below are `whale.afsk.Profile` instances backed by `CpfskCodec`.
+`Profile` retains the CPFSK-specific tone and baud settings, while satisfying
+the generic link-facing contract through `encode()`, `decode()`, and
+`airtime()`. A waveform with different modulation, synchronization, framing,
+or FEC can implement the same contract and be installed in a registry without
+changing connection management or ARQ.
+
 ## Modulation profiles
 
 Audio is mono, 48 kHz, continuous-phase binary FSK. A zero or one selects the

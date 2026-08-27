@@ -64,7 +64,8 @@ these numbers drift with the physical setup, not with anything in this
 module.
 """
 
-from dataclasses import dataclass
+from dataclasses import dataclass, field
+from typing import Protocol
 
 import numpy as np
 from scipy.signal import correlate
@@ -162,6 +163,34 @@ def max_credible_frame_bits(baud):
     return int(MAX_CREDIBLE_FRAME_SECONDS * baud)
 
 
+class Codec(Protocol):
+    """Codec strategy used by a negotiable Profile."""
+
+    sample_rate: int
+
+    def encode(self, payload: bytes, profile: "Profile"): ...
+    def decode(self, audio, profile: "Profile"): ...
+    def airtime(self, payload_len: int, profile: "Profile") -> float: ...
+
+
+class CpfskCodec:
+    """Current CPFSK + PN-sync + length/CRC framing implementation."""
+
+    sample_rate = SAMPLE_RATE
+
+    def encode(self, payload: bytes, profile: "Profile"):
+        return modulate(payload, profile=profile, sample_rate=self.sample_rate)
+
+    def decode(self, audio, profile: "Profile"):
+        return demodulate(audio, profile=profile, sample_rate=self.sample_rate)
+
+    def airtime(self, payload_len: int, profile: "Profile") -> float:
+        return frame_seconds(payload_len, profile=profile)
+
+
+CPFSK_CODEC = CpfskCodec()
+
+
 @dataclass(frozen=True)
 class Profile:
     """One speed/tone setting for the modem. Everything that depends on
@@ -188,6 +217,20 @@ class Profile:
     freq1: float
     confidence_threshold: float = CONFIDENCE_THRESHOLD
     chunk_size: int = CHUNK_SIZE
+    codec: Codec = field(default=CPFSK_CODEC, compare=False, repr=False)
+
+    @property
+    def sample_rate(self):
+        return self.codec.sample_rate
+
+    def encode(self, payload: bytes):
+        return self.codec.encode(payload, self)
+
+    def decode(self, audio):
+        return self.codec.decode(audio, self)
+
+    def airtime(self, payload_len: int):
+        return self.codec.airtime(payload_len, self)
 
 
 # -- the keying-length budget, and the chunk sizes it produces -------------
@@ -400,6 +443,12 @@ PROFILES_BY_ID = {p.mode_id: p for p in PROFILES}
 # working even when the data channel is struggling. Only PT_DATA/PT_DATA_ACK
 # ever use the negotiated profile.
 CONTROL_PROFILE = PROFILE_300
+
+
+def default_registry():
+    """Returns the built-in modes through the link-facing registry API."""
+    from whale.waveform import ModeRegistry
+    return ModeRegistry(PROFILES, CONTROL_PROFILE)
 
 
 def _cpfsk_tone(bits, sps, sample_rate, freq0, freq1):

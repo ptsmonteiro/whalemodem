@@ -489,13 +489,13 @@ def _decode_connect_ack(payload):
             mode_section[-1])
 
 
-def _negotiate_mode(own_supported_ids, proposed_id):
+def _negotiate_mode(own_supported_ids, proposed_id, fallback_id=None):
     """Listener's rule for picking a starting data profile: accept the
     caller's proposal if we can decode it, else fall back to the always-
     supported control profile."""
     if proposed_id in own_supported_ids:
         return proposed_id
-    return afsk.CONTROL_PROFILE.mode_id
+    return afsk.CONTROL_PROFILE.mode_id if fallback_id is None else fallback_id
 
 
 class LinkError(Exception):
@@ -511,8 +511,10 @@ class Link:
     flight and nothing here needs to be reentrant.
     """
 
-    def __init__(self, transport, mycall, on_event=None, mode_history_store=None):
+    def __init__(self, transport, mycall, on_event=None, mode_history_store=None,
+                 mode_registry=None):
         self.transport = transport
+        self.modes = mode_registry or afsk.default_registry()
         self.mycall = mycall
         self.peer_call = None
         self.peer_supported_modes = set()
@@ -524,7 +526,7 @@ class Link:
 
         # Control-plane frames always use afsk.CONTROL_PROFILE (see
         # _tx_packet), so this timeout is fixed for the life of the Link.
-        self.control_ack_timeout = afsk.frame_seconds(_CONTROL_FRAME_LEN_ESTIMATE, afsk.CONTROL_PROFILE) + 3.0
+        self.control_ack_timeout = self.modes.control.airtime(_CONTROL_FRAME_LEN_ESTIMATE) + 3.0
 
         # self.tx_profile / self.rx_profile are the *negotiated data*
         # profiles for each direction -- only meaningful once CONNECTED.
@@ -533,8 +535,8 @@ class Link:
         # whale/afsk.py's measured per-direction SNR numbers), so each side
         # is negotiated and adapted separately instead of sharing one
         # profile. Both start at CONTROL_PROFILE as a harmless default.
-        self.tx_profile = afsk.CONTROL_PROFILE
-        self.rx_profile = afsk.CONTROL_PROFILE
+        self.tx_profile = self.modes.control
+        self.rx_profile = self.modes.control
         # A second profile the decoder keeps trying while it is not yet
         # settled which of the two the peer is transmitting at. Only ever
         # set across a mode step -- see _apply_rx_profile.
@@ -666,9 +668,8 @@ class Link:
         # Worst-case round trip for one DATA/DATA_ACK exchange: our DATA
         # frame out at tx_profile, then the peer's (tiny) ACK back at
         # rx_profile, with a turnaround at each end.
-        tx_airtime = afsk.frame_seconds(
-            self.tx_profile.chunk_size + afsk.DATA_FRAME_HEADER_BYTES, self.tx_profile)
-        ack_airtime = afsk.frame_seconds(3, self.rx_profile)
+        tx_airtime = self.tx_profile.airtime(self.tx_profile.chunk_size + 2)
+        ack_airtime = self.rx_profile.airtime(3)
         self.data_ack_timeout = (tx_airtime + ack_airtime
                                  + 2 * TX_TURNAROUND_DELAY + 3.0)
 
@@ -676,8 +677,7 @@ class Link:
         # (see _prune_stale) -- enough that the longest frame either
         # candidate profile could be part-way through is never cut in half.
         self._rx_keep_seconds = max(
-            afsk.frame_seconds(p.chunk_size + afsk.DATA_FRAME_HEADER_BYTES, p)
-            for p in self._candidate_decode_profiles()) + 1.0
+            p.airtime(p.chunk_size + 2) for p in self._candidate_decode_profiles()) + 1.0
 
     def _candidate_decode_profiles(self):
         """Which afsk.Profile(s) an incoming frame might be using right
@@ -690,7 +690,7 @@ class Link:
         and the peer may not have taken it: see _apply_rx_profile. It is
         dropped again as soon as one data frame says which of the two the
         peer is really using."""
-        candidates = [afsk.CONTROL_PROFILE]
+        candidates = [self.modes.control]
         for profile in (self.rx_profile, self._rx_profile_fallback):
             if profile is not None and profile not in candidates:
                 candidates.append(profile)
@@ -735,7 +735,7 @@ class Link:
         near_miss = None  # (end_index, confidence) of the earliest non-decoding sync, if any
         still_arriving = False
         for profile in self._candidate_decode_profiles():
-            result = afsk.demodulate(snap, profile=profile)
+            result = profile.decode(snap)
             if result.get("payload") is not None:
                 end = result.get("end_index", len(snap))
                 # Anchor the turnaround on when the peer's audio actually
@@ -744,7 +744,7 @@ class Link:
                 # peer's own PTT tail -- is settling time already spent.
                 # See _await_turnaround.
                 trailing = max(0, len(snap) - end)
-                self._peer_unkeyed_at = (time.monotonic() - trailing / afsk.SAMPLE_RATE
+                self._peer_unkeyed_at = (time.monotonic() - trailing / profile.sample_rate
                                              + PEER_TRAILING_TRANSMISSION)
                 self.transport.consume_rx(end)
                 logger.info("[%s] decoded frame at profile %s (confidence=%.2f)",
@@ -829,7 +829,7 @@ class Link:
         be sent until the poll that decodes the frame finishes. Keeping the
         most recent _rx_keep_seconds bounds the cost at about one frame's
         worth while leaving any part-arrived frame intact."""
-        keep = int(self._rx_keep_seconds * afsk.SAMPLE_RATE)
+        keep = int(self._rx_keep_seconds * max(p.sample_rate for p in self._candidate_decode_profiles()))
         if snap_len > keep:
             self.transport.consume_rx(snap_len - keep)
 
@@ -889,7 +889,7 @@ class Link:
     def _tx_packet(self, ptype: int, body: bytes):
         """Waits out the turnaround, then keys up for one frame."""
         self._await_turnaround()
-        profile = afsk.CONTROL_PROFILE if ptype in _CONTROL_PLANE_TYPES else self.tx_profile
+        profile = self.modes.control if ptype in _CONTROL_PLANE_TYPES else self.tx_profile
         if self.tx_suppress.should_drop(ptype):
             # Test affordance only (WHALE_DROP_PTYPE) -- see _TxSuppressor.
             # Everything up to this line has already happened, turnaround
@@ -898,14 +898,14 @@ class Link:
             logger.warning("[%s] SUPPRESSING TX %s at %s (%d body byte(s)) -- WHALE_DROP_PTYPE",
                            self.mycall, _ptype_name(ptype), profile.name, len(body))
             return
-        audio = afsk.modulate(bytes([ptype]) + body, profile=profile)
+        audio = profile.encode(bytes([ptype]) + body)
         keyed = self.transport.send(audio)
         # Both numbers, because the gap between them is the PTT/settling
         # overhead this frame actually paid -- the thing to watch if air
         # time regresses. See scripts/sweep_ptt_timing.py.
         logger.info("[%s] TX %s at %s (%d body byte(s), %.2fs audio, %.2fs keyed)",
                     self.mycall, _ptype_name(ptype), profile.name, len(body),
-                    len(audio) / afsk.SAMPLE_RATE, keyed)
+                    len(audio) / profile.sample_rate, keyed)
 
     def _wait_packet(self, want_types, timeout):
         deadline = time.time() + timeout
@@ -1034,14 +1034,14 @@ class Link:
         timeout_per_try = self.control_ack_timeout if timeout_per_try is None else timeout_per_try
         self._drain_packets()
         self.state = "CONNECTING"
-        own_supported = [p.mode_id for p in afsk.PROFILES]
+        own_supported = list(self.modes.supported_ids)
         # Not `forced or history`: mode_id 0 is a real profile (300 baud)
         # and a perfectly reasonable thing to pin a bench run to.
         proposed_id = _forced_mode_id()
         if proposed_id is None:
             proposed_id = mode_history.last_good_mode(self.mode_history, self.mycall, dst_call)
         if proposed_id is None or proposed_id not in own_supported:
-            proposed_id = afsk.CONTROL_PROFILE.mode_id  # no history with this peer -- start slow
+            proposed_id = self.modes.control.mode_id  # no history with this peer -- start slow
         # One id for the whole retry sequence, not one per attempt: every
         # CONNECT below is the same call, and a listener that answered an
         # earlier one has to recognise the later ones as such.
@@ -1075,8 +1075,8 @@ class Link:
                 # peer_tx_id: the listener's own, independently chosen TX
                 # rate for the reverse (peer->mycall) direction -- that's
                 # what we should expect its frames at.
-                self._apply_tx_profile(afsk.PROFILES_BY_ID.get(accepted_id, afsk.CONTROL_PROFILE))
-                self._apply_rx_profile(afsk.PROFILES_BY_ID.get(peer_tx_id, afsk.CONTROL_PROFILE))
+                self._apply_tx_profile(self.modes.resolve(accepted_id))
+                self._apply_rx_profile(self.modes.resolve(peer_tx_id))
                 self._clean_streak = 0
                 self.state = "CONNECTED"
                 self.role = "ISS"  # the caller starts holding the floor -- see PT_FLOOR_REQ above
@@ -1117,10 +1117,11 @@ class Link:
             return None
         self.peer_call = src
         self.peer_supported_modes = set(peer_supported)
-        own_supported = [p.mode_id for p in afsk.PROFILES]
+        own_supported = list(self.modes.supported_ids)
         # negotiated_id: whether we accept the caller's proposed rate for
         # its (src->mycall) direction -- becomes our rx expectation.
-        negotiated_id = _negotiate_mode(own_supported, proposed_id)
+        negotiated_id = _negotiate_mode(
+            own_supported, proposed_id, fallback_id=self.modes.control.mode_id)
         # own_tx_id: independently, what rate *we* should use transmitting
         # back (mycall->src) -- our own history for this peer, downgraded
         # to CONTROL_PROFILE if the caller hasn't told us it supports that
@@ -1131,7 +1132,7 @@ class Link:
             own_tx_id = mode_history.last_good_mode(self.mode_history, self.mycall, src)
         if (own_tx_id is None or own_tx_id not in own_supported
                 or own_tx_id not in peer_supported):
-            own_tx_id = afsk.CONTROL_PROFILE.mode_id
+            own_tx_id = self.modes.control.mode_id
         ack_body = _encode_connect_ack(self.mycall, src, own_supported, negotiated_id, own_tx_id,
                                        session_id)
         # Both remembered *before* the ack goes out, not after: this is the
@@ -1144,8 +1145,8 @@ class Link:
         self.on_event("PTT", on=True)
         self._tx_packet(PT_CONNECT_ACK, ack_body)
         self.on_event("PTT", off=True)
-        self._apply_rx_profile(afsk.PROFILES_BY_ID.get(negotiated_id, afsk.CONTROL_PROFILE))
-        self._apply_tx_profile(afsk.PROFILES_BY_ID.get(own_tx_id, afsk.CONTROL_PROFILE))
+        self._apply_rx_profile(self.modes.resolve(negotiated_id))
+        self._apply_tx_profile(self.modes.resolve(own_tx_id))
         self._clean_streak = 0
         self.state = "CONNECTED"
         self.role = "IRS"  # the listener starts waiting for the floor -- see PT_FLOOR_REQ above
@@ -1355,11 +1356,9 @@ class Link:
         touches the reverse leg -- that's the peer's own tx_profile, and
         gets adapted independently by the peer's own _maybe_adapt calls
         when it's the one sending."""
-        idx = afsk.PROFILES.index(self.tx_profile)
-        new_idx = idx + direction
-        if not (0 <= new_idx < len(afsk.PROFILES)):
+        candidate = self.modes.step(self.tx_profile, direction)
+        if candidate is None:
             return
-        candidate = afsk.PROFILES[new_idx]
         if candidate.mode_id not in self.peer_supported_modes:
             return
         logger.info("[%s] requesting mode step to %s", self.mycall, candidate.name)
@@ -1372,8 +1371,8 @@ class Link:
                             self.tx_profile.name)
             return
         _, body = got
-        accepted_id = body[0] if body else afsk.CONTROL_PROFILE.mode_id
-        self._apply_tx_profile(afsk.PROFILES_BY_ID.get(accepted_id, afsk.CONTROL_PROFILE))
+        accepted_id = body[0] if body else self.modes.control.mode_id
+        self._apply_tx_profile(self.modes.resolve(accepted_id))
         logger.info("[%s] switched tx profile to %s", self.mycall, self.tx_profile.name)
 
     def _handle_mode_req(self, body):
@@ -1389,15 +1388,14 @@ class Link:
         than assumed dead -- if the ack is lost, the peer goes on
         transmitting at it, and that frame is the only thing that can tell
         us so. See _apply_rx_profile and _confirm_rx_profile."""
-        proposed_id = body[0] if body else afsk.CONTROL_PROFILE.mode_id
-        own_supported = {p.mode_id for p in afsk.PROFILES}
-        accepted_id = proposed_id if proposed_id in own_supported else afsk.CONTROL_PROFILE.mode_id
+        proposed_id = body[0] if body else self.modes.control.mode_id
+        own_supported = set(self.modes.supported_ids)
+        accepted_id = proposed_id if proposed_id in own_supported else self.modes.control.mode_id
         previous = self.rx_profile
         self.on_event("PTT", on=True)
         self._tx_packet(PT_MODE_ACK, bytes([accepted_id]))
         self.on_event("PTT", off=True)
-        self._apply_rx_profile(afsk.PROFILES_BY_ID.get(accepted_id, afsk.CONTROL_PROFILE),
-                               fallback=previous)
+        self._apply_rx_profile(self.modes.resolve(accepted_id), fallback=previous)
         logger.info("[%s] accepted peer mode step, now expecting rx at %s (still trying %s "
                     "until a data frame settles it)", self.mycall, self.rx_profile.name,
                     previous.name)

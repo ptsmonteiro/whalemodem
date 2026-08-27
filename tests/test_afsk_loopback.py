@@ -9,6 +9,7 @@ import time
 import numpy as np
 
 from whale import afsk, framing, link, mode_history
+from whale.waveform import ModeRegistry
 
 # The two-Link-in-one-process harness these tests share with
 # tests/test_link_recovery.py.
@@ -598,6 +599,49 @@ def test_negotiate_mode():
     print("test_negotiate_mode OK")
 
 
+def test_link_uses_waveform_mode_contract():
+    """Link dispatches through a mode's codec rather than CPFSK directly."""
+    class SpyCodec:
+        sample_rate = afsk.SAMPLE_RATE
+
+        def __init__(self):
+            self.encoded = 0
+            self.decoded = 0
+
+        def encode(self, payload, profile):
+            self.encoded += 1
+            return afsk.modulate(payload, profile=profile)
+
+        def decode(self, audio, profile):
+            self.decoded += 1
+            return afsk.demodulate(audio, profile=profile)
+
+        def airtime(self, payload_len, profile):
+            return afsk.frame_seconds(payload_len, profile)
+
+    codec = SpyCodec()
+    custom = afsk.Profile(
+        name="custom-waveform", mode_id=42, baud=600, freq0=700, freq1=1500,
+        chunk_size=80, codec=codec)
+    registry = ModeRegistry((afsk.PROFILE_300, custom), afsk.PROFILE_300)
+    ta, tb = _FakeTransport(), _FakeTransport()
+    ta.peer, tb.peer = tb, ta
+    a = link.Link(ta, "STA1", mode_registry=registry)
+    b = link.Link(tb, "STA2", mode_registry=registry)
+    a._apply_tx_profile(custom)
+    b._apply_rx_profile(custom)
+    a._await_turnaround = lambda: None
+
+    a._tx_packet(link.PT_DATA, bytes([link.EOF_BIT]) + b"contract")
+    assert codec.encoded == 1
+    assert b._decode_one(tb.snapshot_rx())
+    assert codec.decoded >= 1
+    ptype, body = b._rx_packets.get_nowait()
+    assert ptype == link.PT_DATA
+    assert body[1:] == b"contract"
+    print("test_link_uses_waveform_mode_contract OK")
+
+
 def test_mode_change_packet_roundtrip():
     """PT_MODE_REQ/PT_MODE_ACK bodies through modulate/demodulate at
     PROFILE_600 -- confirms the existing framing/codec machinery, already
@@ -996,6 +1040,7 @@ if __name__ == "__main__":
     test_connect_body_roundtrip()
     test_connect_ack_body_roundtrip()
     test_negotiate_mode()
+    test_link_uses_waveform_mode_contract()
     test_mode_change_packet_roundtrip()
     test_demodulate_returns_the_earliest_frame_not_the_loudest()
     test_sync_confidence_does_not_depend_on_surrounding_silence()

@@ -23,6 +23,7 @@ station's request. Verified byte-for-byte on real hardware (see
 whale/
   framing.py     bit-level framing: sync word, length+CRC16, bit packing
   afsk.py         CPFSK modulate/demodulate (300 baud, 1200/1800 Hz tones)
+  waveform.py     physical-layer mode contract and negotiable mode registry
   transport.py    one radio: continuous RX capture + keyed TX
   link.py         stop-and-wait ARQ: connect / send / recv / disconnect
   vara_server.py  VARA-API-shaped TCP front end (StationServer, CLI)
