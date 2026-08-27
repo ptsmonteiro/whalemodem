@@ -419,6 +419,7 @@ name matching, PTT wiring, COM ports) is configured in `whale/hw/radios.py`.
 Software-only self-tests (no radios needed):
 
 ```
+pytest tests/test_audio_e2e.py -q       # full TCP stack over paired audio samples
 python tests/test_afsk_loopback.py
 python tests/test_link_recovery.py
 ```

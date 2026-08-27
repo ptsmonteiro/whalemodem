@@ -61,6 +61,10 @@ class StationServer:
         self._data_lock = threading.Lock()
 
         self._data_accepting = False
+        self._stopping = threading.Event()
+        self.ready = threading.Event()
+        self._cmd_listener = None
+        self._data_listener = None
 
     # -- command-port notifications --------------------------------------
 
@@ -191,24 +195,70 @@ class StationServer:
 
     # -- server bootstrap ---------------------------------------------------
 
+    def stop(self):
+        """Stop accepting clients and release the service and TCP sockets.
+
+        Production normally ends this server by terminating its process, but
+        an explicit lifecycle makes the exact same server usable by an
+        in-process end-to-end test (and by embedders) without leaking daemon
+        threads or listening sockets.
+        """
+        self._stopping.set()
+        self._close_data_connection()
+        with self._cmd_lock:
+            cmd_conn, self._cmd_conn = self._cmd_conn, None
+        if cmd_conn is not None:
+            try:
+                cmd_conn.shutdown(socket.SHUT_RDWR)
+            except OSError:
+                pass
+            try:
+                cmd_conn.close()
+            except OSError:
+                pass
+        for listener in (self._cmd_listener, self._data_listener):
+            if listener is not None:
+                try:
+                    listener.close()
+                except OSError:
+                    pass
+        self.service.stop()
+
     def serve_forever(self):
         self.service.start()
-        cmd_listener = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-        cmd_listener.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
-        cmd_listener.bind((self.host, self.cmd_port))
-        cmd_listener.listen(1)
+        self._stopping.clear()
+        self.ready.clear()
+        self._cmd_listener = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+        self._cmd_listener.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
+        self._cmd_listener.bind((self.host, self.cmd_port))
+        self._cmd_listener.listen(1)
+        self._cmd_listener.settimeout(DATA_ACCEPT_POLL)
+        self.cmd_port = self._cmd_listener.getsockname()[1]
 
         self._data_listener = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
         self._data_listener.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
         self._data_listener.bind((self.host, self.data_port))
         self._data_listener.listen(1)
+        self.data_port = self._data_listener.getsockname()[1]
 
         logger.info("whale VARA-API server: mycall=%s cmd=%d data=%d",
                     self.mycall, self.cmd_port, self.data_port)
-        while True:
-            conn, addr = cmd_listener.accept()
-            logger.info("command connection from %s", addr)
-            self._cmd_conn_loop(conn)
+        self.ready.set()
+        try:
+            while not self._stopping.is_set():
+                try:
+                    conn, addr = self._cmd_listener.accept()
+                except socket.timeout:
+                    continue
+                except OSError:
+                    if self._stopping.is_set():
+                        break
+                    raise
+                logger.info("command connection from %s", addr)
+                self._cmd_conn_loop(conn)
+        finally:
+            self.ready.clear()
+            self.service.stop()
 
 
 def main():
