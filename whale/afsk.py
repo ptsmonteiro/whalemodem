@@ -120,11 +120,9 @@ _ENERGY_FLOOR_FRACTION = 0.05
 # max_chunk_for_keying.
 CHUNK_SIZE = 40
 
-# What whale/link.py puts in front of the chunk inside a DATA frame's AFSK
-# payload: the packet type byte and the flags/sequence byte. Stated here
-# because the profiles' chunk_size is derived from an airtime budget, and
-# that budget is spent on the whole AFSK payload rather than on the chunk.
-DATA_FRAME_HEADER_BYTES = 2
+# DATA type and flags/sequence now live in the robust bootstrap header; the
+# negotiated body contains chunk bytes only.
+DATA_FRAME_HEADER_BYTES = 0
 
 # The longest frame the decoder will believe a declared length describes.
 #
@@ -300,9 +298,13 @@ def max_payload_for_keying(baud, budget=MAX_KEYING_SECONDS):
 
 
 def max_chunk_for_keying(baud, budget=MAX_KEYING_SECONDS):
-    """max_payload_for_keying less the DATA frame's own header bytes, i.e.
-    the largest link-layer chunk this baud can carry inside the budget."""
-    return max(0, max_payload_for_keying(baud, budget) - DATA_FRAME_HEADER_BYTES)
+    """Largest DATA body after paying for the robust bootstrap header."""
+    bootstrap_seconds = (frame_bits(framing.BOOTSTRAP_HEADER_BYTES,
+                                    framing.BOOTSTRAP_BAUD)
+                         / framing.BOOTSTRAP_BAUD)
+    body_budget = budget - KEYING_OVERHEAD_SECONDS - bootstrap_seconds
+    spare_bits = body_budget * baud - frame_bits(0, baud)
+    return max(0, min(int(spare_bits // 8), framing.MAX_PAYLOAD_BYTES))
 
 
 PROFILE_300 = Profile(name="300baud", mode_id=0, baud=BAUD, freq0=FREQ_0, freq1=FREQ_1,
@@ -522,6 +524,13 @@ def keying_seconds(payload_len=framing.MAX_PAYLOAD_BYTES, profile: Profile = PRO
     is about is how long the transmitter holds the channel, which starts at
     key-down and not at the first bit of the sync word."""
     return KEYING_OVERHEAD_SECONDS + frame_seconds(payload_len, profile)
+
+
+def data_keying_seconds(chunk_len, profile: Profile = PROFILE_300):
+    """Complete DATA keying: robust bootstrap plus negotiated body."""
+    return (KEYING_OVERHEAD_SECONDS
+            + frame_seconds(framing.BOOTSTRAP_HEADER_BYTES, PROFILE_300)
+            + frame_seconds(chunk_len, profile))
 
 
 # How many correlation peaks demodulate() will attempt to decode in one

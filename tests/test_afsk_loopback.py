@@ -156,7 +156,7 @@ def test_every_keying_fits_the_budget_and_uses_it():
     so the smaller frame types are checked too rather than assumed."""
     for profile in afsk.PROFILES:
         payload = production_payload_bytes(profile)
-        keying = afsk.keying_seconds(payload, profile)
+        keying = afsk.data_keying_seconds(payload, profile)
         assert keying <= afsk.MAX_KEYING_SECONDS + 1e-9, \
             (profile.name, payload, round(keying, 3))
 
@@ -166,7 +166,7 @@ def test_every_keying_fits_the_budget_and_uses_it():
         # binds at every profile and the exemption is gone.
         assert payload < framing.MAX_PAYLOAD_BYTES, \
             f"{profile.name} is capped by the length field again, not the clock"
-        assert afsk.keying_seconds(payload + 1, profile) > afsk.MAX_KEYING_SECONDS, \
+        assert afsk.data_keying_seconds(payload + 1, profile) > afsk.MAX_KEYING_SECONDS, \
             f"{profile.name} leaves room for a bigger chunk than {profile.chunk_size}"
 
         # DATA_ACK (2 seq bytes + type) and the control-plane estimate, both
@@ -176,7 +176,7 @@ def test_every_keying_fits_the_budget_and_uses_it():
                 (profile.name, small)
     print("test_every_keying_fits_the_budget_and_uses_it OK "
           + ", ".join(f"{p.name} {p.chunk_size}B/"
-                      f"{afsk.keying_seconds(production_payload_bytes(p), p):.2f}s"
+                      f"{afsk.data_keying_seconds(production_payload_bytes(p), p):.2f}s"
                       for p in afsk.PROFILES))
 
 

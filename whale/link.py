@@ -57,12 +57,10 @@ be unrecoverable.
     exactly what has become impossible. Every DATA frame then failed, ARQ
     exhausted its retries, and send_message raised.
 
-    rx_profile is now a hint rather than an assertion. The pre-step profile
-    stays a decode candidate until a data frame settles the question (see
-    _apply_rx_profile), and a decoded PT_DATA/PT_DATA_ACK is taken as
-    ground truth about what the peer is really transmitting (see
-    _confirm_rx_profile). That is self-healing whichever end lost the
-    frame, and it costs one extra candidate profile for one frame.
+    The robust header now names and CRC-protects the DATA body mode before
+    that decoder runs. A decoded PT_DATA is ground truth about what the peer
+    is really transmitting (see _confirm_rx_profile), so the receiver can
+    converge even if MODE_ACK was lost.
 
   - A lost PT_CONNECT_ACK left the session half open. The caller retried
     PT_CONNECT into a listener that had already returned from listen_once,
@@ -99,7 +97,7 @@ import time
 
 import numpy as np
 
-from whale import afsk, mode_history
+from whale import afsk, framing, mode_history
 
 logger = logging.getLogger(__name__)
 
@@ -117,8 +115,9 @@ PT_FLOOR_GRANT = 0x0A      # ISS handing the floor to the peer -- see _handle_fl
 # Packet types whose bodies are small and must survive even when the
 # negotiated data profile is struggling -- these always go out on
 # afsk.CONTROL_PROFILE (see _tx_packet), never on self.tx_profile. Only bulk
-# data (PT_DATA/PT_DATA_ACK) ever rides the negotiated speed.
-_CONTROL_PLANE_TYPES = {PT_CONNECT, PT_CONNECT_ACK, PT_DISC, PT_DISC_ACK, PT_MODE_REQ, PT_MODE_ACK,
+# only the DATA body ever rides the negotiated speed.
+_CONTROL_PLANE_TYPES = {PT_CONNECT, PT_CONNECT_ACK, PT_DISC, PT_DISC_ACK, PT_DATA_ACK,
+                         PT_MODE_REQ, PT_MODE_ACK,
                          PT_FLOOR_REQ, PT_FLOOR_GRANT}
 
 # Which end may originate PT_DATA right now. Real half-duplex ARQ modems
@@ -145,7 +144,71 @@ _CONTROL_PLANE_TYPES = {PT_CONNECT, PT_CONNECT_ACK, PT_DISC, PT_DISC_ACK, PT_MOD
 # self-correcting -- see _confirm_rx_profile. A decoded control-plane frame
 # says nothing of the sort, since it would have gone out at
 # afsk.CONTROL_PROFILE whatever either station had negotiated.
-_DATA_PLANE_TYPES = {PT_DATA, PT_DATA_ACK}
+_DATA_PLANE_TYPES = {PT_DATA}
+
+# Every keying starts with this fixed-size packet in the registry's robust
+# control mode.  Its ordinary frame CRC is therefore a CRC over every field
+# below, including the length and mode used to configure the following body
+# decoder.  Up to two bytes live inline, making the common ACK and one-byte
+# control packets header-only transmissions.
+_AIR_HEADER_MAGIC = b"WH"
+_AIR_HEADER_VERSION = 1
+_AIR_HEADER_INLINE_BYTES = 2
+_AIR_HEADER_LEN = framing.BOOTSTRAP_HEADER_BYTES
+
+
+def _air_inline_length(ptype):
+    if ptype == PT_DATA:
+        return 1
+    if ptype in (PT_CONNECT, PT_CONNECT_ACK, PT_DATA_ACK):
+        return 2
+    if ptype in (PT_MODE_REQ, PT_MODE_ACK):
+        return 1
+    return 0
+
+
+def _encode_air_header(ptype: int, body_mode_id: int, body: bytes):
+    inline_count = _air_inline_length(ptype)
+    inline = body[:inline_count]
+    remainder = body[len(inline):]
+    if len(remainder) > framing.MAX_PAYLOAD_BYTES:
+        raise ValueError("packet body is too long")
+    header = (_AIR_HEADER_MAGIC + bytes([_AIR_HEADER_VERSION, ptype, body_mode_id,
+                                         len(inline)])
+              + len(remainder).to_bytes(2, "big")
+              + inline.ljust(_AIR_HEADER_INLINE_BYTES, b"\x00"))
+    assert len(header) == _AIR_HEADER_LEN
+    return header, remainder
+
+
+def _decode_air_header(raw: bytes):
+    if len(raw) != _AIR_HEADER_LEN or raw[:2] != _AIR_HEADER_MAGIC:
+        return None
+    if raw[2] != _AIR_HEADER_VERSION:
+        return None
+    inline_len = raw[5]
+    if inline_len > _AIR_HEADER_INLINE_BYTES:
+        return None
+    if any(raw[8 + inline_len:10]):
+        return None
+    return raw[3], raw[4], int.from_bytes(raw[6:8], "big"), raw[8:8 + inline_len]
+
+
+def _valid_air_shape(ptype, profile, body_len, inline, control_mode_id):
+    """Semantic checks applied only after the bootstrap CRC has passed."""
+    if ptype == PT_DATA:
+        return len(inline) == 1 and body_len <= profile.chunk_size
+    if profile.mode_id != control_mode_id:
+        return False
+    if ptype in (PT_CONNECT, PT_CONNECT_ACK):
+        return len(inline) == 2 and 0 < body_len <= 128
+    if ptype == PT_DATA_ACK:
+        return len(inline) == 2 and body_len == 0
+    if ptype in (PT_MODE_REQ, PT_MODE_ACK):
+        return len(inline) == 1 and body_len == 0
+    if ptype in (PT_DISC, PT_DISC_ACK, PT_FLOOR_REQ, PT_FLOOR_GRANT):
+        return len(inline) == 0 and body_len == 0
+    return False
 
 # The seq byte of a DATA frame: one flag bit and a seven-bit sequence
 # number.
@@ -541,6 +604,9 @@ class Link:
         # settled which of the two the peer is transmitting at. Only ever
         # set across a mode step -- see _apply_rx_profile.
         self._rx_profile_fallback = None
+        # None, or (ptype, profile, announced_remainder_length, inline).
+        # A valid robust header is consumed before its optional body arrives.
+        self._pending_air_body = None
         self._recompute_timings()
 
         # Env-gated, off by default, and no-ops unless the corresponding
@@ -620,20 +686,9 @@ class Link:
         at -- i.e. the peer's own tx_profile, as far as this station knows
         it. Used by the decode loop and (indirectly) by the ACK timeout.
 
-        `fallback` is a second profile to go on trying until a data frame
-        settles which of the two the peer is really using. It exists for
-        one case, and the case is unrecoverable without it: we have just
-        accepted the peer's PT_MODE_REQ and sent a PT_MODE_ACK, but the
-        peer only moves its tx_profile on *receiving* that ack. If it never
-        arrives, the peer stays where it was and this station is the only
-        one that moved -- and with only the new profile as a candidate, its
-        frames stop decoding entirely. Nothing then recovers, because the
-        only evidence that could correct the mistake is a decoded frame.
-
-        Keeping the old profile as a candidate makes that frame decodable;
-        _confirm_rx_profile makes it authoritative. The cost is one extra
-        demodulate() pass per poll, for as long as it takes one data frame
-        to arrive."""
+        `fallback` is retained as negotiation history, but the robust air
+        header now names the actual body mode. The decoder therefore does
+        not need to guess between the old and new modes after a lost ACK."""
         self.rx_profile = profile
         self._rx_profile_fallback = fallback if fallback is not profile else None
         self._recompute_timings()
@@ -648,11 +703,9 @@ class Link:
         belief about the peer's tx_profile; a frame that actually decoded
         is not a belief.
 
-        Only PT_DATA/PT_DATA_ACK count (_DATA_PLANE_TYPES). Control-plane
-        frames always ride afsk.CONTROL_PROFILE regardless of what either
-        station negotiated, so treating a decoded MODE_REQ or DISC as
-        evidence would drag rx_profile back down to the control profile
-        every time the peer stepped up."""
+        Only PT_DATA counts (_DATA_PLANE_TYPES). DATA_ACK and all other
+        controls are robust-header transmissions, so they say nothing about
+        the peer's negotiated DATA body mode."""
         if profile is self.rx_profile:
             self._rx_profile_fallback = None
             return
@@ -668,16 +721,19 @@ class Link:
         # Worst-case round trip for one DATA/DATA_ACK exchange: our DATA
         # frame out at tx_profile, then the peer's (tiny) ACK back at
         # rx_profile, with a turnaround at each end.
-        tx_airtime = self.tx_profile.airtime(self.tx_profile.chunk_size + 2)
-        ack_airtime = self.rx_profile.airtime(3)
+        header_airtime = self.modes.control.airtime(_AIR_HEADER_LEN)
+        # DATA's flags/sequence byte is inline; only the chunk is in the
+        # negotiated body. DATA_ACK is entirely inline and header-only.
+        tx_airtime = header_airtime + self.tx_profile.airtime(self.tx_profile.chunk_size)
+        ack_airtime = header_airtime
         self.data_ack_timeout = (tx_airtime + ack_airtime
                                  + 2 * TX_TURNAROUND_DELAY + 3.0)
 
         # How much recent audio a poll that found nothing must leave alone
         # (see _prune_stale) -- enough that the longest frame either
         # candidate profile could be part-way through is never cut in half.
-        self._rx_keep_seconds = max(
-            p.airtime(p.chunk_size + 2) for p in self._candidate_decode_profiles()) + 1.0
+        self._rx_keep_seconds = (header_airtime + max(
+            p.airtime(p.chunk_size) for p in self.modes.modes) + 1.0)
 
     def _candidate_decode_profiles(self):
         """Which afsk.Profile(s) an incoming frame might be using right
@@ -732,62 +788,81 @@ class Link:
         its own threshold) but hasn't seen enough samples yet for a verdict,
         this poll holds off consuming anything and just waits for more
         audio, rather than letting a different candidate's near-miss win."""
-        near_miss = None  # (end_index, confidence) of the earliest non-decoding sync, if any
-        still_arriving = False
-        for profile in self._candidate_decode_profiles():
-            result = profile.decode(snap)
-            if result.get("payload") is not None:
-                end = result.get("end_index", len(snap))
-                # Anchor the turnaround on when the peer's audio actually
-                # ended rather than on now: everything captured after this
-                # frame -- the rest of the poll interval, this decode, the
-                # peer's own PTT tail -- is settling time already spent.
-                # See _await_turnaround.
-                trailing = max(0, len(snap) - end)
-                self._peer_unkeyed_at = (time.monotonic() - trailing / profile.sample_rate
-                                             + PEER_TRAILING_TRANSMISSION)
+        pending = self._pending_air_body
+        profile = pending[1] if pending is not None else self.modes.control
+        result = profile.decode(snap)
+        # If an announced body was lost, the next keying still begins with a
+        # robust header. Search for it in parallel so a missing body cannot
+        # strand the receiver in the previously announced decoder.
+        if pending is not None and profile is not self.modes.control:
+            bootstrap_result = self.modes.control.decode(snap)
+            bootstrap_payload = bootstrap_result.get("payload")
+            if (bootstrap_payload is not None
+                    and _decode_air_header(bootstrap_payload) is not None):
+                self._pending_air_body = None
+                end = bootstrap_result.get("end_index", len(snap))
                 self.transport.consume_rx(end)
-                logger.info("[%s] decoded frame at profile %s (confidence=%.2f)",
-                            self.mycall, profile.name, result.get("confidence", 0.0))
-                self._handle_raw(result["payload"], profile)
+                self._accept_air_header(bootstrap_payload, snap, end)
                 return True
-            if "end_index" not in result and result.get("confidence", 0) >= profile.confidence_threshold:
-                still_arriving = True
-            if "end_index" in result:
-                # Sync was found (confidence cleared the threshold) but the
-                # frame itself didn't check out -- most often a genuine
-                # frame at the *other* candidate profile, or a garbled
-                # self-echo of our own last TX. If we don't advance past
-                # it, this same match stays the strongest peak on every
-                # future poll and a later, weaker, genuine frame elsewhere
-                # in the buffer never gets a look in.
-                #
-                # Advance past the *sync word only*, not to the end of the
-                # frame this position claims. A frame that failed to decode
-                # is by definition one whose length field we have no reason
-                # to trust, and that field is 16 bits: a garbage length at
-                # 300 baud can claim half an hour of audio, stepping way
-                # over a real frame arriving behind it. (afsk._try_sync
-                # refuses to wait for such a claim at all -- see
-                # MAX_CREDIBLE_FRAME_SECONDS -- but what it hands back is
-                # still a position derived from a length we disbelieve.)
-                # Stepping past the sync is all that is needed to guarantee
-                # forward progress.
-                #
-                # Earliest wins, for the same reason -- whatever else is in
-                # the buffer is behind this one.
-                skip = result.get("sync_end_index", result["end_index"])
-                if near_miss is None or skip < near_miss[0]:
-                    near_miss = (skip, result.get("confidence", 0))
-        if near_miss is not None and not still_arriving:
-            logger.info("[%s] near-miss decode: sync found but frame invalid (confidence=%.2f len(snap)=%d)",
-                        self.mycall, near_miss[1], len(snap))
-            self._capture_near_miss(snap, near_miss[1])
-            self.transport.consume_rx(near_miss[0])
+        payload = result.get("payload")
+        if payload is not None:
+            end = result.get("end_index", len(snap))
+            self.transport.consume_rx(end)
+            if pending is None:
+                self._accept_air_header(payload, snap, end)
+                return True
+
+            ptype, body_profile, body_len, inline = pending
+            self._pending_air_body = None
+            if len(payload) != body_len:
+                # A missing robust-mode body followed by the next robust
+                # header is distinguishable by its magic and valid CRC.
+                if _decode_air_header(payload) is not None:
+                    self._accept_air_header(payload, snap, end)
+                    return True
+                logger.info("[%s] rejecting %s body: announced %d bytes, decoded %d",
+                            self.mycall, _ptype_name(ptype), body_len, len(payload))
+                return True
+            self._finish_air_packet(ptype, inline + payload, body_profile, snap, end)
             return True
-        if not still_arriving:
+
+        if "end_index" in result:
+            skip = result.get("sync_end_index", result["end_index"])
+            self._capture_near_miss(snap, result.get("confidence", 0))
+            self.transport.consume_rx(skip)
+            if pending is not None:
+                self._pending_air_body = None
+            return True
+        if result.get("confidence", 0) < profile.confidence_threshold:
             self._prune_stale(len(snap))
         return False
+
+    def _accept_air_header(self, payload, snap, end):
+        decoded = _decode_air_header(payload)
+        if decoded is None:
+            logger.info("[%s] rejecting invalid robust air header", self.mycall)
+            return
+        ptype, mode_id, body_len, inline = decoded
+        body_profile = self.modes.by_id.get(mode_id)
+        if body_profile is None or not _valid_air_shape(
+                ptype, body_profile, body_len, inline, self.modes.control.mode_id):
+            logger.info("[%s] rejecting impossible air header", self.mycall)
+            return
+        if body_len == 0:
+            self._finish_air_packet(ptype, inline, body_profile, snap, end)
+            return
+        self._pending_air_body = (ptype, body_profile, body_len, inline)
+        remainder_snap = self.transport.snapshot_rx()
+        if len(remainder_snap):
+            self._decode_one(remainder_snap)
+
+    def _finish_air_packet(self, ptype, body, profile, snap, end):
+        trailing = max(0, len(snap) - end)
+        self._peer_unkeyed_at = (time.monotonic() - trailing / profile.sample_rate
+                                 + PEER_TRAILING_TRANSMISSION)
+        logger.info("[%s] decoded %s body at profile %s", self.mycall,
+                    _ptype_name(ptype), profile.name)
+        self._handle_raw(bytes([ptype]) + body, profile)
 
     def _capture_near_miss(self, snap, confidence):
         """Saves the audio a near-miss gave up on, if WHALE_CAPTURE_DIR is
@@ -887,7 +962,7 @@ class Link:
             time.sleep(remaining)
 
     def _tx_packet(self, ptype: int, body: bytes):
-        """Waits out the turnaround, then keys up for one frame."""
+        """Keys one robust bootstrap and, when needed, one announced body."""
         self._await_turnaround()
         profile = self.modes.control if ptype in _CONTROL_PLANE_TYPES else self.tx_profile
         if self.tx_suppress.should_drop(ptype):
@@ -898,7 +973,15 @@ class Link:
             logger.warning("[%s] SUPPRESSING TX %s at %s (%d body byte(s)) -- WHALE_DROP_PTYPE",
                            self.mycall, _ptype_name(ptype), profile.name, len(body))
             return
-        audio = profile.encode(bytes([ptype]) + body)
+        header, remainder = _encode_air_header(ptype, profile.mode_id, body)
+        if not _valid_air_shape(ptype, profile, len(remainder),
+                                body[:_air_inline_length(ptype)],
+                                self.modes.control.mode_id):
+            raise ValueError(f"invalid {_ptype_name(ptype)} body/mode for air header")
+        parts = [self.modes.control.encode(header)]
+        if remainder:
+            parts.append(profile.encode(remainder))
+        audio = np.concatenate(parts)
         keyed = self.transport.send(audio)
         # Both numbers, because the gap between them is the PTT/settling
         # overhead this frame actually paid -- the thing to watch if air

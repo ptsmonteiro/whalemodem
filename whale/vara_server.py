@@ -179,7 +179,16 @@ class StationServer:
             self._cmd_conn = conn
         try:
             while True:
-                chunk = conn.recv(4096)
+                try:
+                    chunk = conn.recv(4096)
+                except OSError:
+                    # stop() deliberately shuts down and closes this socket
+                    # to wake a thread blocked in recv(). EBADF/ENOTCONN from
+                    # that close is normal shutdown, but an I/O failure while
+                    # the server is live must still be reported.
+                    if self._stopping.is_set():
+                        return
+                    raise
                 if not chunk:
                     return
                 buf += chunk

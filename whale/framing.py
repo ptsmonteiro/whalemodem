@@ -118,6 +118,13 @@ def sync_bits(baud):
 LENGTH_FIELD_BITS = 16
 MAX_PAYLOAD_BYTES = (1 << LENGTH_FIELD_BITS) - 1
 
+# Fixed decoded size of the robust bootstrap header carried at the start of
+# every link-layer keying. Its fields are specified in FRAMING.md and encoded
+# by whale.link. Keeping the size here lets airtime budgeting remain in the
+# physical layer without importing the link protocol.
+BOOTSTRAP_HEADER_BYTES = 10
+BOOTSTRAP_BAUD = 300
+
 # Extra dummy bits appended after the CRC, purely as on-air padding. Real
 # hardware corrupts the very end of a transmission -- our own 5ms amplitude
 # ramp-down, plus a symbol or so of radio audio tail -- and since

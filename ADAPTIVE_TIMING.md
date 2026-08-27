@@ -22,7 +22,7 @@ DATA retransmissions.
 The feature adapts the complete keyed transmission surrounding a frame:
 
 ```text
-calibration preamble | sync | length | payload | CRC | calibration postamble
+calibration preamble | robust bootstrap | optional body | calibration postamble
 ```
 
 For ordinary frames, the calibrated values replace the combined protection
@@ -85,10 +85,11 @@ The sync word provides the alignment for the head measurement. Once sync is
 located, the receiver walks backward through the expected head sequence and
 counts the correctly recovered, aligned symbols adjacent to sync.
 
-The decoded frame length provides the alignment for the tail measurement. Once
-the CRC position is known, the receiver walks forward through the expected tail
-sequence and counts the correctly recovered, aligned symbols adjacent to the
-CRC.
+The checked bootstrap announces whether a body follows and its exact decoded
+length and mode. That determines the complete keying extent. Once the final CRC
+position (bootstrap CRC for a header-only packet, body CRC otherwise) is known,
+the receiver walks forward through the expected tail sequence and counts the
+correctly recovered, aligned symbols adjacent to it.
 
 The receiver reports the two direct observations:
 
