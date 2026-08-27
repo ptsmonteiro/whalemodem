@@ -21,16 +21,6 @@ class PttCapabilities:
     requires_explicit_keying: bool = True
 
 
-@dataclass(frozen=True)
-class PttTiming:
-    lead: float = 0.22
-    tail: float = 0.05
-
-    def __post_init__(self):
-        if self.lead < 0 or self.tail < 0:
-            raise ValueError("PTT timing values cannot be negative")
-
-
 @runtime_checkable
 class PttController(Protocol):
     key_state_unknown: bool

@@ -9,6 +9,7 @@ Frame layout (bits, MSB first):
 """
 
 import functools
+import math
 
 CRC16_POLY = 0x1021
 CRC16_INIT = 0xFFFF
@@ -99,7 +100,7 @@ def sync_bits(baud):
 # The length field, and everything it can express.
 #
 # This was 8 bits / 255 bytes, which was the binding constraint at 1200 baud:
-# afsk.MAX_KEYING_SECONDS leaves room for a 328-byte payload there, so ~0.5s
+# the useful-frame duration budget leaves room for a larger payload there, so
 # of every keying went unspent purely because the field could not describe
 # it. 16 bits spends that, and leaves headroom for whatever faster profile
 # turns up -- it covers a full keying up to roughly 230 kbaud, which is far
@@ -110,9 +111,8 @@ def sync_bits(baud):
 # it -- the length field has to be read before the frame that would say who
 # is transmitting.
 #
-# What binds frame size now is afsk.MAX_KEYING_SECONDS, which is about how
-# long the transmitter holds the channel rather than anything about the
-# format. The field is deliberately far wider than that budget will ever
+# What binds frame size now is afsk.MAX_USEFUL_FRAME_SECONDS. The field is
+# deliberately far wider than that budget will ever
 # allow, which is exactly why a declared length must not be taken at face
 # value on receive -- see afsk.max_credible_frame_bits.
 LENGTH_FIELD_BITS = 16
@@ -125,7 +125,8 @@ MAX_PAYLOAD_BYTES = (1 << LENGTH_FIELD_BITS) - 1
 BOOTSTRAP_HEADER_BYTES = 10
 BOOTSTRAP_BAUD = 300
 
-# Extra dummy bits appended after the CRC, purely as on-air padding. Real
+# Extra dummy bits appended after the final CRC of a keying, purely as on-air
+# padding. A bootstrap omits them when a body follows. Real
 # hardware corrupts the very end of a transmission -- our own 5ms amplitude
 # ramp-down, plus a symbol or so of radio audio tail -- and since
 # parse_frame_bits only reads the exact prefix it needs and ignores anything
@@ -147,23 +148,24 @@ BOOTSTRAP_BAUD = 300
 # Still expressed as a duration rather than a bit count: what the radio
 # corrupts is a span of time, so a fixed bit count tuned at one baud
 # silently shrinks at the next. See scripts/sweep_ptt_timing.py.
-TAIL_PAD_SECONDS = 0.03
+TAIL_PAD_SECONDS = 1.0
 
 
 def tail_pad_bits(baud):
-    n = round(TAIL_PAD_SECONDS * baud)
+    n = math.ceil(TAIL_PAD_SECONDS * baud)
     return [i % 2 for i in range(n)]
 
 
-# Mirrors tail_pad_bits, but in front of the sync word. Content doesn't matter
+# Mirrors tail_pad_bits, but at the front of the complete keying. A body frame
+# omits it because the bootstrap has already supplied it. Content doesn't matter
 # (thrown away, never parsed); what it buys is settling time, scaled to
 # duration rather than bit count so it doesn't shrink as baud rises.
 #
 # Note this is *not* the whole leading allowance, and not the expensive
 # part of it: the transmitter needs a few hundred ms between PTT keying and
-# being usably on air, and that is bought by transport.PTT_LEAD (see its
-# comment for the measurement). By the time these bits go out the radio is
-# already up. Their job is the last stretch before the sync word -- give
+# being usably on air. These symbols now buy that entire interval: audio-stream
+# setup begins immediately after PTT assertion, with no separate lead sleep.
+# Their job before the sync word is also to give
 # the receiver's audio AGC in-band tone to settle on, and keep modulate()'s
 # 5ms amplitude ramp-in off the front of the sync word, where it would eat
 # real correlation energy.
@@ -260,11 +262,11 @@ def tail_pad_bits(baud):
 # Note this pad is also the cheaper allowance to grow later: it is the one
 # that does not have to be paid at every profile equally, since a slow
 # receiver is a fixed number of ms regardless of what baud is running.
-HEAD_PAD_SECONDS = 0.15
+HEAD_PAD_SECONDS = 1.0
 
 
 def head_pad_bits(baud):
-    n = round(HEAD_PAD_SECONDS * baud)
+    n = math.ceil(HEAD_PAD_SECONDS * baud)
     return [i % 2 for i in range(n)]
 
 
@@ -287,14 +289,15 @@ def bits_to_bytes(bits) -> bytes:
     return bytes(out)
 
 
-def build_frame_bits(payload: bytes, baud=300):
+def build_frame_bits(payload: bytes, baud=300, *, include_head=True, include_tail=True):
     if len(payload) > MAX_PAYLOAD_BYTES:
         raise ValueError(f"payload too long ({len(payload)} > {MAX_PAYLOAD_BYTES})")
     body = len(payload).to_bytes(LENGTH_FIELD_BITS // 8, "big") + payload
     crc = crc16_ccitt_false(body)
     crc_bytes = bytes([(crc >> 8) & 0xFF, crc & 0xFF])
-    return (head_pad_bits(baud) + sync_bits(baud)
-            + bytes_to_bits(body + crc_bytes) + tail_pad_bits(baud))
+    return ((head_pad_bits(baud) if include_head else []) + sync_bits(baud)
+            + bytes_to_bits(body + crc_bytes)
+            + (tail_pad_bits(baud) if include_tail else []))
 
 
 def declared_length(bits_after_sync):

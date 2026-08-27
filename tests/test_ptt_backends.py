@@ -16,12 +16,9 @@ def test_toml_radio_inventory(tmp_path: Path):
 [radios.field]
 audio_name = "Codec"
 ptt.backend = "vox"
-timing.lead = 0.7
-timing.tail = 0.1
 ''')
     radio = radios.get_radio("field", path)
     assert radio.ptt_backend == "vox"
-    assert radio.timing == ptt_backends.PttTiming(0.7, 0.1)
     assert radio.ptt().key(True)
 
 

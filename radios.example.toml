@@ -8,8 +8,6 @@ ptt.backend = "icom-civ"
 ptt.usb_id = "0C26:0036"
 ptt.radio_name = "IC-705"
 ptt.address = 0xA4
-timing.lead = 0.22
-timing.tail = 0.05
 
 [radios.digirig]
 audio_name = "USB Audio Device"
@@ -27,5 +25,3 @@ ptt.baud = 115200
 [radios.audio-vox]
 audio_name = "Built-in Audio"
 ptt.backend = "vox"
-timing.lead = 0.5
-timing.tail = 0.5

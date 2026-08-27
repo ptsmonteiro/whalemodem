@@ -330,8 +330,7 @@ INACTIVITY_TIMEOUT = 150.0
 #
 # What is left for this to cover, from the peer's last CRC bit:
 #
-#   framing.TAIL_PAD_SECONDS   0.03   peer still transmitting pad
-#   transport.PTT_TAIL         0.05   peer still keyed, carrier only
+#   framing.TAIL_PAD_SECONDS   1.00   peer still transmitting pad
 #   peer's T/R switch back to receive, and ours to transmit
 #
 # Getting this wrong is not a correctness problem -- too short and our
@@ -353,12 +352,10 @@ INACTIVITY_TIMEOUT = 150.0
 TX_TURNAROUND_DELAY = 0.4
 
 # What the peer is still transmitting after the last bit we decoded:
-# framing.TAIL_PAD_SECONDS of pad, then its own transport.PTT_TAIL of bare
-# carrier. Both are the *peer's* settings and nothing on air tells us what
-# they are, so this is a nominal figure for a bench where both stations run
-# the same build -- which is exactly why it is stated here as an assumption
-# rather than read out of our own transport module.
-PEER_TRAILING_TRANSMISSION = 0.08
+# framing.TAIL_PAD_SECONDS of pad. This is the peer's setting and nothing on
+# air tells us what it is, so this is a nominal figure for peers running the
+# same build.
+PEER_TRAILING_TRANSMISSION = framing.TAIL_PAD_SECONDS
 
 # How much older than the turnaround itself an anchor may be and still be
 # believed. Beyond that it is not evidence about when the peer stopped
@@ -978,9 +975,9 @@ class Link:
                                 body[:_air_inline_length(ptype)],
                                 self.modes.control.mode_id):
             raise ValueError(f"invalid {_ptype_name(ptype)} body/mode for air header")
-        parts = [self.modes.control.encode(header)]
+        parts = [self.modes.control.encode(header, include_tail=not remainder)]
         if remainder:
-            parts.append(profile.encode(remainder))
+            parts.append(profile.encode(remainder, include_head=False))
         audio = np.concatenate(parts)
         keyed = self.transport.send(audio)
         # Both numbers, because the gap between them is the PTT/settling
@@ -1311,7 +1308,7 @@ class Link:
         Chunks are cut one at a time, immediately before each is sent, rather
         than pre-split up front: _maybe_adapt() can step tx_profile mid-message
         and the profiles have different chunk_size (78 at 300 baud, 170 at 600,
-        355 at 1200 -- each is whatever afsk.MAX_KEYING_SECONDS allows at that
+        each is whatever afsk.MAX_USEFUL_FRAME_SECONDS allows at that
         baud), so a message pre-split at the starting profile would keep
         sending undersized frames for the rest of the transfer even after
         stepping up."""

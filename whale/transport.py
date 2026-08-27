@@ -45,74 +45,28 @@ def _ensure_com_initialized():
     ctypes.windll.ole32.CoInitializeEx(None, _COINIT_APARTMENTTHREADED)
     _com_ready.done = True
 
-# Dead time held around each transmission, and the reason for each.
-#
-# PTT_LEAD covers the gap between keying and actually being usably on air.
-# Measured on the bench (scripts/sweep_ptt_timing.py, plus the head-pad bit
-# probe it documents): send a frame with a long alternating head pad and
-# ptt_lead=0, then count how many of those pad bits decode at the far end.
-# ht->ic705 loses only 22-72ms, but ic705->ht loses 129-310ms across 28
-# samples -- the IC-705's T/R switch is slow and, more awkwardly, variable.
-# Worst direction decides, so budget the full 310ms.
-#
-# One constant for every radio, deliberately. A per-radio lead was tried
-# (0.08 for the HT against 0.22 for the IC-705) and rolled back: this is a
-# modem meant to work with whatever is plugged into it, and a table of
-# measured values only helps the two radios on this bench while quietly
-# under-provisioning every radio not in it. The conservative figure costs
-# the HT ~0.14s of dead carrier per frame, which is the price of not
-# needing to know what the radio is.
-#
-# Opening the output stream and filling its first buffer already spends
-# ~130ms of that with the carrier up, so PTT_LEAD only has to find the
-# rest: 0.22 + 0.13 + framing.HEAD_PAD_SECONDS puts the sync word ~500ms
-# after keying, comfortably clear of the 310ms worst case. Note that
-# shrinking the stream latency would buy nothing -- it is dead air the
-# radio needs anyway, and PTT_LEAD would simply have to grow to replace it.
-#
-# This constant covers the *transmitter* coming up. A receiver that is slow
-# to settle is a separate allowance and is not bought here -- see
-# framing.HEAD_PAD_SECONDS, which is sized against a receiver that blacks
-# out for ~110ms after its squelch opens, and framing.SYNC_SECONDS, which is
-# what makes that allowance cost the same at every profile.
-#
-# PTT_TAIL is carrier held after the last sample is genuinely on air (see
-# audio_io.transmit, which now waits for playout rather than returning when
-# the last block was merely queued). The measured on-air tail costs 1-2
-# bits even when PTT drops immediately, so this is nearly all margin.
-#
-# Validated at 100% over 120 trials -- both directions, all three profiles,
-# DATA and ACK frame sizes.
-PTT_LEAD = 0.22
-PTT_TAIL = 0.05
-
-# The rest of the dead air a keying carries: opening the output stream and
-# filling its first buffer, between PTT_LEAD elapsing and the first sample
+# The dead air a keying still carries: opening the output stream and
+# filling its first buffer, between PTT assertion and the first sample
 # actually leaving the card. Not a knob -- it is what the audio stack does,
 # recorded here so the keying-length arithmetic can account for it.
 #
 # MEASURED end to end rather than reasoned from audio_io's latency=0.1: an
 # acceptance run logs `Ns audio, Ms keyed` for every transmission, and
-# M - N - PTT_LEAD - PTT_TAIL is this figure. Across 44 keyings spanning
+# M - N was measured after subtracting the then-configured PTT sleeps. Across
+# 44 keyings spanning
 # both radios, all three profiles and every frame type, that came out at
 # 0.15-0.16s -- not the 0.13 previously assumed from the requested stream
 # latency, which left the derived chunk sizes ~20ms over budget. Take the
 # worst; a keying budget wants the pessimistic end.
 STREAM_FILL = 0.16
 
-# whale/afsk.py sizes every profile's chunk_size so that a whole keying fits
-# inside afsk.MAX_KEYING_SECONDS, and the overhead it budgets for is exactly
-# the three constants above. It cannot import them -- that would drag the
-# sound-card stack into the DSP module, which the software-only tests run
-# without -- so the agreement is checked here instead, where both modules are
-# already loaded. If this fires, the sizing is stale: re-derive
-# afsk.KEYING_OVERHEAD_SECONDS from the new figures rather than silencing it,
-# because the chunk sizes it produced are now over budget.
-_KEYING_OVERHEAD = PTT_LEAD + STREAM_FILL + PTT_TAIL
+# KEYING_OVERHEAD_SECONDS records the transport contribution to total PTT
+# occupancy. It does not participate in the useful-frame size restriction.
+_KEYING_OVERHEAD = STREAM_FILL
 if abs(_KEYING_OVERHEAD - afsk.KEYING_OVERHEAD_SECONDS) > 0.005:
     raise RuntimeError(
         f"keying overhead drifted: transport says {_KEYING_OVERHEAD:.3f}s "
-        f"(PTT_LEAD {PTT_LEAD} + STREAM_FILL {STREAM_FILL} + PTT_TAIL {PTT_TAIL}) "
+        f"(STREAM_FILL {STREAM_FILL}) "
         f"but afsk.KEYING_OVERHEAD_SECONDS is {afsk.KEYING_OVERHEAD_SECONDS:.3f}s; "
         "the profiles' chunk_size was derived from the latter")
 
@@ -240,9 +194,8 @@ class RadioTransport:
         raised PaErrorCode -9996, and the retry loop's natural instinct was
         to key again -- into a radio whose CI-V had stopped answering.
         """
-        timing = getattr(self.radio, "timing", None)
-        ptt_lead = getattr(timing, "lead", PTT_LEAD) if ptt_lead is None else ptt_lead
-        ptt_tail = getattr(timing, "tail", PTT_TAIL) if ptt_tail is None else ptt_tail
+        ptt_lead = 0.0 if ptt_lead is None else ptt_lead
+        ptt_tail = 0.0 if ptt_tail is None else ptt_tail
         with self._tx_lock:
             _ensure_com_initialized()
             self._transmitting.set()

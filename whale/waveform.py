@@ -21,7 +21,8 @@ class WaveformMode(Protocol):
     confidence_threshold: float
     sample_rate: int
 
-    def encode(self, payload: bytes) -> np.ndarray: ...
+    def encode(self, payload: bytes, *, include_head: bool = True,
+               include_tail: bool = True) -> np.ndarray: ...
 
     def decode(self, audio: np.ndarray) -> dict: ...
 

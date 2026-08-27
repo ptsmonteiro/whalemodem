@@ -49,9 +49,9 @@ amplitude ramp at each end and a nominal amplitude of 0.6.
 
 | Mode ID | Name | Baud | 0 tone | 1 tone | DATA chunk size |
 | ---: | --- | ---: | ---: | ---: | ---: |
-| `0` | `300baud` | 300 | 1200 Hz | 1800 Hz | 49 bytes |
-| `1` | `600baud` | 600 | 1200 Hz | 1800 Hz | 102 bytes |
-| `2` | `1200baud` | 1200 | 1200 Hz | 2200 Hz | 208 bytes |
+| `0` | `300baud` | 300 | 1200 Hz | 1800 Hz | 78 bytes |
+| `1` | `600baud` | 600 | 1200 Hz | 1800 Hz | 161 bytes |
+| `2` | `1200baud` | 1200 | 1200 Hz | 2200 Hz | 326 bytes |
 
 Mode 0 is the mandatory bootstrap and robust-body profile. Every keying begins
 in mode 0. CONNECT and CONNECT_ACK bodies also use it. DATA bodies use the
@@ -106,16 +106,19 @@ short mode-specific training whose exact extent is derived from the header.
 
 ## Generic mode frame
 
-The bootstrap and, currently, every non-empty body use this frame:
+The bootstrap and, currently, every non-empty body use this frame. The head
+and tail pads are outer-keying fields: a header-only keying has both; when a
+body follows, the bootstrap omits its tail and the body omits its head. Thus
+there is exactly one head pad and one tail pad per PTT keying:
 
 | Field | Size | Description |
 | --- | ---: | --- |
-| Head pad | `round(0.15 * baud)` bits | Alternating `0,1,...`; discarded |
+| Head pad | `ceil(1.0 * baud)` bits | Alternating `0,1,...`; discarded |
 | Sync | Baud-dependent | One full PN sequence, approximately 0.21 seconds |
 | Length | 16 bits | Number of payload bytes, `0..65535`, big-endian |
 | Payload | `Length * 8` bits | Bootstrap header or body bytes |
 | CRC | 16 bits | CRC-16/CCITT-FALSE over `Length || Payload` |
-| Tail pad | `round(0.03 * baud)` bits | Alternating `0,1,...`; discarded |
+| Tail pad | `ceil(1.0 * baud)` bits | Alternating `0,1,...`; discarded |
 
 The sync word is an m-sequence selected to last approximately 0.21 seconds at
 the mode's baud. This keeps the acquisition interval, and therefore tolerance
@@ -141,12 +144,12 @@ The control profile's order-6 sequence is:
 ```
 
 The length field can represent a 65,535-byte payload, but the built-in profiles
-do not send frames remotely that large. A complete keying is capped at 3.0
-seconds, including framing audio and transport overhead. Each profile's DATA
-chunk size is the largest value that fits this budget after the 10-byte robust
-bootstrap and body framing, as listed above. At current settings production
-DATA keyings occupy 2.566-2.569 seconds of audio and 2.997-2.999 seconds of
-total keying time.
+do not send frames remotely that large. Useful framed audio is capped at 3.0
+seconds across the robust bootstrap and optional body. Here, useful audio is
+sync, length, payload, and CRC; it excludes the outer head/tail throwaway
+symbols and transport startup. Each profile's DATA chunk size is the largest
+value that fits this budget. Total keying time is calculated separately and
+will vary with the selected timing protection.
 
 The generic length is untrusted until the trailing CRC arrives. A bootstrap
 must decode to exactly 10 bytes. A body must equal the length announced by its
@@ -161,18 +164,17 @@ the longest currently expected frame.
 
 Before every keying, the sender waits for radio turnaround. The nominal delay
 is 0.4 seconds after the estimated end of the peer transmission. When a frame
-decodes, its end position anchors that estimate; 0.08 seconds is added for the
-peer's nominal 30 ms tail pad and 50 ms keyed carrier hold. Time already spent
+decodes, its end position anchors that estimate; 1.0 second is added for the
+peer's nominal tail pad. Time already spent
 capturing and decoding after that point counts toward the delay. Without a
 fresh receive-time anchor, the full 0.4 seconds is waited.
 
-The transport keys PTT 0.22 seconds before opening and filling the output
-stream. Stream startup contributes a measured worst-case 0.16 seconds before
-the first sample leaves the audio device. PTT is held for 0.05 seconds after
-playout. Together these add 0.43 seconds to frame audio when calculating total
-keying time. Receive capture remains open during transmission, but captured
-self-audio is cleared around each local keying. These values are implementation
-timing assumptions, not fields negotiated on air.
+The transport asserts PTT and immediately opens and fills the output stream;
+there is no configured carrier-only lead or tail sleep. Stream startup still
+contributes a measured worst-case 0.16 seconds before the first sample leaves
+the audio device. Leading and trailing protection is carried entirely by the
+one-second throwaway symbol pads. Receive capture remains open during
+transmission, but captured self-audio is cleared around each local keying.
 
 Control acknowledgement timeouts include the robust bootstrap and any robust
 management body. DATA acknowledgement timeouts include the outbound bootstrap

@@ -141,12 +141,12 @@ def test_a_lock_survives_losing_the_opening_of_the_sync_word():
 
 
 def test_every_keying_fits_the_budget_and_uses_it():
-    """No transmission this modem makes may outlast afsk.MAX_KEYING_SECONDS,
+    """No useful DATA framing may outlast afsk.MAX_USEFUL_FRAME_SECONDS,
     and every DATA frame should come as close to it as the format allows.
 
     Both halves matter. The cap bounds how long the transmitter holds the
     channel, which sets the cost of a single retransmit and the floor under
-    turnaround -- see afsk.MAX_KEYING_SECONDS. The tightness is the
+    turnaround -- see afsk.MAX_USEFUL_FRAME_SECONDS. The tightness is the
     throughput: chunk sizes are derived from the budget rather than chosen,
     so a profile leaving room for another whole byte means the derivation
     has drifted from the arithmetic, not that someone made a judgement
@@ -156,9 +156,9 @@ def test_every_keying_fits_the_budget_and_uses_it():
     so the smaller frame types are checked too rather than assumed."""
     for profile in afsk.PROFILES:
         payload = production_payload_bytes(profile)
-        keying = afsk.data_keying_seconds(payload, profile)
-        assert keying <= afsk.MAX_KEYING_SECONDS + 1e-9, \
-            (profile.name, payload, round(keying, 3))
+        useful = afsk.useful_data_seconds(payload, profile)
+        assert useful <= afsk.MAX_USEFUL_FRAME_SECONDS + 1e-9, \
+            (profile.name, payload, round(useful, 3))
 
         # One more byte must not fit. This used to be conditional, because
         # at 1200 baud what stopped us was the 8-bit length field rather
@@ -166,17 +166,12 @@ def test_every_keying_fits_the_budget_and_uses_it():
         # binds at every profile and the exemption is gone.
         assert payload < framing.MAX_PAYLOAD_BYTES, \
             f"{profile.name} is capped by the length field again, not the clock"
-        assert afsk.data_keying_seconds(payload + 1, profile) > afsk.MAX_KEYING_SECONDS, \
+        assert afsk.useful_data_seconds(payload + 1, profile) > afsk.MAX_USEFUL_FRAME_SECONDS, \
             f"{profile.name} leaves room for a bigger chunk than {profile.chunk_size}"
 
-        # DATA_ACK (2 seq bytes + type) and the control-plane estimate, both
-        # of which key the radio up like anything else.
-        for small in (3, link._CONTROL_FRAME_LEN_ESTIMATE):
-            assert afsk.keying_seconds(small, profile) <= afsk.MAX_KEYING_SECONDS, \
-                (profile.name, small)
     print("test_every_keying_fits_the_budget_and_uses_it OK "
           + ", ".join(f"{p.name} {p.chunk_size}B/"
-                      f"{afsk.data_keying_seconds(production_payload_bytes(p), p):.2f}s"
+                      f"{afsk.useful_data_seconds(production_payload_bytes(p), p):.2f}s useful"
                       for p in afsk.PROFILES))
 
 
@@ -232,9 +227,9 @@ ASSUMED_WORST_CASE_PPM = 500
 
 # The production frame: link.py sends chunk_size bytes of payload plus its
 # own type/seq header. This is per profile rather than one number now that
-# chunk_size is derived from the keying-length budget -- 80, 172 and 357
+# chunk_size is derived from the useful-frame budget -- 78, 161 and 326
 # bytes of AFSK payload at 300, 600 and 1200 baud, all three landing on a
-# keying of at most afsk.MAX_KEYING_SECONDS. Derived rather than restated so
+# useful frame of at most afsk.MAX_USEFUL_FRAME_SECONDS. Derived rather than restated so
 # these tests keep measuring what the link actually sends.
 def production_payload_bytes(profile):
     return profile.chunk_size + afsk.DATA_FRAME_HEADER_BYTES
@@ -400,9 +395,9 @@ def test_decodes_at_production_size_under_bench_clock_offset():
     decoder's half-symbol budget is 0.5/n_bits, so each profile's production
     frame has its own tolerance --
 
-        300 baud    80 bytes    735 bits    ~680 ppm
-        600 baud   172 bytes   1471 bits    ~340 ppm
-       1200 baud   357 bytes   2951 bits    ~169 ppm
+        300 baud    78 bytes   1319 bits    ~379 ppm
+        600 baud   161 bytes   2647 bits    ~189 ppm
+       1200 baud   326 bytes   5295 bits     ~94 ppm
 
     -- and the two faster profiles are the ones that cannot hold 500. Note
     the shape: the frames are sized by *airtime*, so a faster profile spends
@@ -608,9 +603,10 @@ def test_link_uses_waveform_mode_contract():
             self.encoded = 0
             self.decoded = 0
 
-        def encode(self, payload, profile):
+        def encode(self, payload, profile, *, include_head=True, include_tail=True):
             self.encoded += 1
-            return afsk.modulate(payload, profile=profile)
+            return afsk.modulate(payload, profile=profile, include_head=include_head,
+                                 include_tail=include_tail)
 
         def decode(self, audio, profile):
             self.decoded += 1

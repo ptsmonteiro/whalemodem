@@ -265,14 +265,13 @@ WASAPI quirks this radio pair required working around.
 
 ## Air time
 
-Everything held around a frame -- PTT lead-in, the two padding blocks, PTT
-tail -- is dead air, and all of it is measured rather than guessed:
-`scripts/sweep_ptt_timing.py` sweeps each allowance over the real radios in
-both directions and lets the worst direction decide. The constants it
-produced live in `whale/transport.py` (`PTT_LEAD`/`PTT_TAIL`) and
-`whale/framing.py` (`HEAD_PAD_SECONDS`/`TAIL_PAD_SECONDS`), each with the
-measurement behind it in a comment. Re-run the sweep after any change to
-the radios, the audio chain, or the PTT wiring.
+Leading and trailing clipping protection is entirely in-band: every PTT keying
+carries one second of alternating throwaway symbols before its first sync and
+one second after its final CRC, rounded upward to a whole symbol. PTT is asserted immediately
+before output-stream setup and released immediately after confirmed playout;
+there is no configured carrier-only lead or tail sleep. This deliberately
+conservative baseline is intended to be replaced by connection-time adaptive
+timing.
 
 Re-run it in earnest, too. Swapping the bench HT -- a Wouxun KG-UV9D Plus,
 briefly replaced by a Baofeng UV-B5 -- broke `PROFILE_1200` in one
@@ -306,12 +305,10 @@ Two lessons for a new radio, both of which cost time here: a profile can
 fail with a clean channel underneath it, and a timing allowance that
 nothing on the bench needs is not thereby margin.
 
-The binding constraint is the transmitter: the IC-705 takes 129-310ms
-(variable, 28 samples) between the CI-V key command and being usably on
-air, which is most of the ~430ms of lead-in. The trailing side costs
-almost nothing by comparison.
+The measured IC-705 startup variation is now absorbed by the transmitted head
+symbols rather than a carrier-only PTT lead.
 
-Note that `link.TX_TURNAROUND_DELAY` -- a 1s pause *before* keying -- is
+Note that `link.TX_TURNAROUND_DELAY` -- a nominal 0.4s pause before keying -- is
 not air time, but it is now the largest single delay per frame, and it has
 not had the same measurement treatment.
 
@@ -326,26 +323,28 @@ we hold the carrier; and the decoder has no timing recovery, so its
 tolerance to sample-clock offset falls as `0.5/n_bits` and long frames are
 the first thing a clock difference takes away.
 
-So a keying is capped in *duration* -- `afsk.MAX_KEYING_SECONDS`, 3.0s,
-measured PTT key-down to PTT release -- and every profile's `chunk_size` is
-whatever fits inside that cap at its baud rather than a number picked per
-profile (`afsk.max_chunk_for_keying`):
+Useful framed audio is capped at three seconds by
+`afsk.MAX_USEFUL_FRAME_SECONDS`. This includes sync, length, payload, and CRC
+across the bootstrap and optional body, but excludes the outer timing pads and
+transport startup. Every profile's `chunk_size` is whatever fits that useful
+budget (`afsk.max_chunk_for_useful_frame`). Total PTT occupancy is separate
+because adaptive head/tail timing will make it radio-pair dependent:
 
-| profile | chunk | AFSK payload | frame | keying | payload bits/s |
+| profile | chunk | AFSK payload | useful | current keying | payload bits/s |
 |---------|-------|--------------|-------|--------|----------------|
-| 300 baud  |  75 |  77 | 2.56s | 2.99s | 201 |
-| 600 baud  | 157 | 159 | 2.56s | 3.00s | 419 |
-| 1200 baud | 320 | 322 | 2.57s | 3.00s | 855 |
+| 300 baud  |  78 |  78 | 2.98s | 5.14s | 121 |
+| 600 baud  | 161 | 161 | 3.00s | 5.16s | 250 |
+| 1200 baud | 326 | 326 | 3.00s | 5.16s | 506 |
 
 Three things worth knowing about that table:
 
-  - **3.0s is chosen, not measured.** None of the three reasons above has a
+  - **3.0s of useful audio is chosen, not measured.** None of the three reasons above has a
     cliff in it, so the figure is round rather than derived, and it is the
     knob to turn if the trade changes. If a radio ever does impose a hard
     limit -- some receivers mute themselves periodically to scan, on a timer
     set at the *far* station where this modem can neither see nor change it
     -- that would be a measurement, and it would replace this.
-  - **1200 baud used to be capped by the format, not the clock.** 3.0s of
+  - **1200 baud used to be capped by the format, not the clock.** The former 3.0s of
     air there carries 322 bytes, but the length field was 8 bits, so the
     chunk stopped at 253 and most of a second of every keying went unspent.
     The field is 16 bits now (`framing.LENGTH_FIELD_BITS`) and the budget
@@ -365,25 +364,16 @@ Three things worth knowing about that table:
     measure 3.4 ppm apart, so this costs nothing here, but it is the first
     thing to check on hardware whose clocks are not that close.
 
-The budget is spent on `transport.PTT_LEAD` + the output stream's
-`STREAM_FILL` + `transport.PTT_TAIL` (0.43s in total) before any frame bits
-are paid for, and `whale/afsk.py` cannot import those without dragging the
-sound-card stack into the DSP module. `whale/transport.py` therefore
-asserts at import that its own constants still sum to
-`afsk.KEYING_OVERHEAD_SECONDS`; if that fires, the chunk sizes derived from
-it are over budget and need re-deriving, not silencing.
-
-That 0.43s is measured, and measuring it mattered: it was first reasoned at
-0.40 from `audio_io`'s requested stream latency, which made every derived
-chunk ~20ms too big for the cap. Every transmission logs `Ns audio, Ms
-keyed`, so an acceptance run reads the real figure straight off -- 0.42-0.43s
-over 88 keyings across two runs, both radios, all three profiles, every
-frame type, with no value outside that range. Re-read it after any change to
-the audio chain, the same as `sweep_ptt_timing.py`'s constants.
+The output stream contributes about 0.16s of startup/fill time to total
+occupancy, but not to the useful-frame restriction. A body-bearing packet
+still contains two independently synchronized waveforms, but only the bootstrap carries the
+one-second outer head and only the body carries the one-second outer tail.
+There is no padding or amplitude ramp at their internal join. The conservative
+one-second outer pads increase total occupancy without reducing useful payload.
 
 Both runs passed 1 KB each way byte-for-byte with **no retransmit, no
 near-miss decode and no rx-profile correction** on either leg. Those runs
-predate the move to a 3.0s cap and the 16-bit length field, so their chunk
+predate the move to the duration-derived cap and the 16-bit length field, so their chunk
 sizes were smaller than the table above; the acceptance run should be
 repeated at the current sizes.
 
@@ -446,7 +436,7 @@ Radio hardware is selected from a TOML inventory rather than requiring a
 source edit. See `radios.example.toml`, then run the server with
 `--radio-config PATH --radio NAME` (or set `WHALE_RADIO_CONFIG`). Each entry
 selects an audio-device substring, a PTT backend, backend-specific settings,
-and optional measured `timing.lead`/`timing.tail` values.
+and backend-specific settings.
 
 Built-in backends are `icom-civ`, `serial-line` (RTS or DTR), `hamlib`, and
 `vox`. External packages can provide GPIO, USB-interface, CAT, or other

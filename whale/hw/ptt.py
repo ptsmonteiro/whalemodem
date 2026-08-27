@@ -96,8 +96,8 @@ WRITE_TIMEOUT = 0.25
 # Not a measured figure, and it should not pretend to be: the bus whose
 # recovery time would set it is the one that stopped answering, and
 # reproducing the failure means deliberately transmitting high power into a
-# desensed USB bus. Three is chosen against afsk.MAX_KEYING_SECONDS (3s) --
-# the retries should not outlast the transmission they are ending.
+# desensed USB bus. Three attempts bound the recovery effort without tying it
+# to the separately defined useful-frame or adaptive timing durations.
 UNKEY_ATTEMPTS = 3
 
 # Blind transmit-off frames written once the acked attempts are exhausted:
