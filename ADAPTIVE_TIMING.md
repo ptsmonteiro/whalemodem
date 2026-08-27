@@ -224,6 +224,12 @@ values.
 
 ## Packet fields
 
+Adaptive timing is required by connection format version 1, using the
+versioned CONNECT and CONNECT_ACK bodies specified in
+[`LINK.md`](LINK.md#versioned-connection-bodies-format-version-1). Support is
+deduced solely from that version. The fields below must not be appended to the
+legacy connection bodies.
+
 `CONNECT_ACK` gains these fields:
 
 ```text
@@ -252,8 +258,10 @@ Field widths depend on the final calibration sequence length. They must express
 every value from zero through the full sequence length, inclusive. Multi-byte
 counts use the framing convention: unsigned, most-significant byte first.
 
-This is an on-air protocol change. There is currently no protocol version or
-capability bit with which an old implementation can negotiate it.
+The exact placement and widths of the measurement fields remain to be fixed
+after the calibration sequence lengths are selected. They will be defined as
+fields of the version-1 packet bodies, not as ambiguous suffixes inferred from
+the ends of legacy CONNECT or CONNECT_ACK bodies.
 
 ## Retries and duplicate frames
 
@@ -313,22 +321,25 @@ long-running connection, but neither is part of this design.
 
 ## Implementation outline
 
-1. Change the transport so calibration/operational head audio starts with the
+1. Implement and test the versioned, length-delimited CONNECT and CONNECT_ACK
+   bodies from `LINK.md`, while retaining an explicitly selected legacy mode
+   during migration.
+2. Change the transport so calibration/operational head audio starts with the
    PTT operation and PTT is released without a fixed carrier-only tail delay.
-2. Allow the framing encoder to accept per-frame head and tail sequences.
-3. Add fixed calibration sequences and their protocol constants.
-4. Extend the decoder result for calibration frames with the two received-
+3. Allow the framing encoder to accept per-frame head and tail sequences.
+4. Add fixed calibration sequences and their protocol constants.
+5. Extend the decoder result for calibration frames with the two received-
    symbol counts while leaving ordinary decode behavior unchanged.
-5. Preserve sufficient leading audio and defer calibration-frame completion
+6. Preserve sufficient leading audio and defer calibration-frame completion
    until the tail can be measured.
-6. Add the `TIMING_ACK` and `TIMING_CONFIRM` packet types and encode/decode
+7. Add the `TIMING_ACK` and `TIMING_CONFIRM` packet types and encode/decode
    helpers for their fields.
-7. Add per-connection transmit head and tail durations to `Link`.
-8. Implement the calibration state transitions, conservative aggregation, and
+8. Add per-connection transmit head and tail durations to `Link`.
+9. Implement the calibration state transitions, conservative aggregation, and
    idempotent retry behavior.
-9. Make frame airtime, keying-budget, and timeout calculations accept the
+10. Make frame airtime, keying-budget, and timeout calculations accept the
    active timing, including the separate bounded calibration budget.
-10. Add unit tests with controlled leading and trailing truncation, followed by
+11. Add unit tests with controlled leading and trailing truncation, followed by
    bidirectional hardware tests using `scripts/sweep_ptt_timing.py`.
 
 ## Acceptance criteria

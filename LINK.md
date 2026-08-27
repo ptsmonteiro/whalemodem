@@ -3,9 +3,8 @@
 This document describes the link protocol and VARA-shaped local TCP interface
 implemented by the current `whale` package. Modulation, coding, framing, and
 on-air timing are specified separately in [`FRAMING.md`](FRAMING.md).
-This is a description of the present implementation, not a compatibility
-promise: there is no on-air version field or formal interoperability guarantee
-yet.
+Except where a section is explicitly marked as a proposed format, this is a
+description of the present implementation and not a compatibility promise.
 
 ## Conventions
 
@@ -51,6 +50,10 @@ are its body.
 
 ### Connection bodies
 
+The bodies below are the legacy, unversioned format implemented today. New
+on-air features must not add another inferred suffix to these bodies. They use
+the versioned connection-body format in the next section instead.
+
 CONNECT has this body:
 
 ```text
@@ -92,6 +95,85 @@ CONNECTED but every CONNECT_ACK was lost.
 After a valid exchange both endpoints enter CONNECTED, reset transmit and
 receive sequence numbers to zero, and clear partial message reassembly. The
 caller starts as ISS; the listener starts as IRS.
+
+### Versioned connection bodies (format version 1)
+
+This section specifies the connection-body envelope that must be implemented
+before adding adaptive timing. It replaces, rather than extends, the legacy
+CONNECT and CONNECT_ACK bodies above. All sizes are unsigned byte counts and
+all multi-byte integers are big-endian.
+
+Both packet types begin with this envelope:
+
+| Field | Size | Value or meaning |
+| --- | ---: | --- |
+| Magic | 4 bytes | `ff 57 48 4c` (`0xff` followed by ASCII `WHL`) |
+| Format version | 1 byte | `0x01` |
+| Content length | 2 bytes | Bytes after this field |
+| Content | `content_length` bytes | The version-specific fields below |
+
+The frame payload must end immediately after Content. A decoder rejects a
+body with the wrong magic, an unsupported format version, a content length
+that does not equal the remaining body size, a truncated field, or extra
+bytes. The `0xff` prefix cannot be emitted by the legacy ASCII callsign
+encoder, so format detection is deterministic for valid encoded bodies.
+
+CONNECT v1 Content is:
+
+| Field | Size | Meaning |
+| --- | ---: | --- |
+| Source length | 1 byte | `1..15` |
+| Source call | `source_length` bytes | Uppercase ASCII `A..Z`, `0..9`, or `-` |
+| Destination length | 1 byte | `1..15` |
+| Destination call | `destination_length` bytes | Same encoding as Source call |
+| Session ID | 1 byte | Random value `1..255` for this attempt |
+| Mode count | 1 byte | Number of following supported mode IDs |
+| Supported mode IDs | `mode_count` bytes | Unique one-byte IDs in preference order |
+| Proposed transmit mode | 1 byte | One of the advertised IDs |
+
+CONNECT_ACK v1 Content is:
+
+| Field | Size | Meaning |
+| --- | ---: | --- |
+| Source length | 1 byte | `1..15` |
+| Source call | `source_length` bytes | Listener callsign |
+| Destination length | 1 byte | `1..15` |
+| Destination call | `destination_length` bytes | Caller callsign |
+| Session ID | 1 byte | CONNECT session ID, echoed unchanged |
+| Mode count | 1 byte | Number of following supported mode IDs |
+| Supported mode IDs | `mode_count` bytes | Unique one-byte IDs in preference order |
+| Accepted caller transmit mode | 1 byte | Mode accepted for caller-to-listener traffic |
+| Listener transmit mode | 1 byte | Mode selected for listener-to-caller traffic |
+| CONNECT head symbols received | TBD | Adaptive-timing measurement defined in `ADAPTIVE_TIMING.md` |
+| CONNECT tail symbols received | TBD | Adaptive-timing measurement defined in `ADAPTIVE_TIMING.md` |
+
+Mode count may be zero only if both selected/proposed mode fields are mode 0;
+mode 0 is always a valid fallback. Callsigns are compared according to the
+existing link addressing policy after their v1 encoding has been validated.
+The limits above bound all variable fields before allocation.
+
+The format version defines the complete handshake feature set. Version 1
+includes adaptive timing and therefore requires the calibration handshake
+described in `ADAPTIVE_TIMING.md`. Its CONNECT carries the version-1
+calibration sequences around the frame. A v1
+decoder retains enough leading audio to measure them and, after decoding the
+body, waits a bounded time for the tail. Its CONNECT_ACK carries the two
+measurements above and is also surrounded by calibration sequences. An
+endpoint that does not implement every required version-1 behavior rejects
+version 1 rather than accepting a reduced feature set.
+
+The session ID and the complete encoded CONNECT body identify an attempt. A
+listener answers an identical duplicate CONNECT using the same format version
+and mode choices. Adaptive-timing measurements may change only according to
+the conservative aggregation rule in `ADAPTIVE_TIMING.md`. A CONNECT with the
+same session ID but different bytes is invalid. This prevents the handshake
+feature set from changing across retries.
+
+Legacy interoperation is explicit, not an in-band downgrade: a listener may
+accept either legacy bodies or v1 bodies, but a caller sends one format for the
+whole attempt. Failure of a v1 attempt must not trigger an automatic legacy
+retry with the same session ID. An implementation may expose a configured
+legacy-only mode; adaptive timing is unavailable in that mode.
 
 ### DATA and DATA_ACK
 
@@ -225,8 +307,10 @@ is an implementation detail and must not be used for application framing.
 
 ## Current limitations and compatibility notes
 
-- There is no protocol magic, version, capability namespace, authentication,
-  encryption, or forward-compatible length around link packet bodies.
+- The implemented legacy connection body has no protocol magic, version,
+  authentication, encryption, or forward-compatible length. The proposed v1
+  connection-body format above adds magic, versioning, and lengths, but does
+  not add authentication or encryption and is not implemented yet.
 - There is one outstanding DATA frame at a time; no windowing or cumulative
   multi-frame ACK is implemented.
 - The link is point-to-point and has no channel addressing outside callsigns
