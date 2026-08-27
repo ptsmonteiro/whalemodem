@@ -54,25 +54,40 @@ are its body.
 CONNECT has this body:
 
 ```text
-source_call NUL destination_call NUL supported_mode_ids... proposed_tx_mode_id
+source_call NUL destination_call NUL supported_mode_ids... proposed_tx_mode_id session_id
 ```
 
-The supported-mode list is zero or more one-byte mode IDs. The final byte is
-the caller's proposed transmit mode for the caller-to-listener direction. A
-new peer currently proposes mode 0; otherwise it may propose the last mode
-recorded as good for that callsign pair. Mode history is in memory only.
+The supported-mode list is zero or more one-byte mode IDs. The final two bytes
+are the caller's proposed transmit mode for the caller-to-listener direction
+and a session identifier. A new peer currently proposes mode 0; otherwise it
+may propose the last mode recorded as good for that callsign pair. Mode history
+is in memory only.
+
+The caller randomly chooses one session identifier in the range `1..255` for
+the complete CONNECT retry sequence; zero means unspecified. The identifier
+distinguishes a retry of the current connection from a delayed frame belonging
+to another attempt.
 
 CONNECT_ACK has this body:
 
 ```text
 source_call NUL destination_call NUL supported_mode_ids...
-accepted_caller_tx_mode_id listener_tx_mode_id
+accepted_caller_tx_mode_id listener_tx_mode_id session_id
 ```
 
-Its last two bytes negotiate the directions independently. The listener first
-states the mode accepted for traffic from the caller, then the mode it will
-use for its own transmissions. An unsupported proposal falls back to mode 0.
-For backward/short malformed bodies, the decoder also falls back to mode 0.
+Its last three bytes contain the two independently negotiated modes followed by
+the caller's session identifier echoed unchanged. The listener first states
+the mode accepted for traffic from the caller, then the mode it will use for
+its own transmissions. An unsupported proposal falls back to mode 0. For a
+short body, the decoder falls back to mode 0 and session ID zero.
+
+The caller ignores CONNECT_ACK packets whose destination or session identifier
+does not match the active attempt. The listener stores the accepted
+CONNECT_ACK body and retransmits it byte-for-byte when it receives a duplicate
+CONNECT from the same peer with the same session identifier. A CONNECT carrying
+a different identifier does not replace a live session. If the caller exhausts
+its CONNECT attempts, it sends one best-effort DISC in case the listener entered
+CONNECTED but every CONNECT_ACK was lost.
 
 After a valid exchange both endpoints enter CONNECTED, reset transmit and
 receive sequence numbers to zero, and clear partial message reassembly. The
@@ -137,8 +152,14 @@ Each endpoint adapts only its own transmit direction from ARQ outcomes:
 MODE_REQ carries the proposed one-byte mode ID. The receiver replies with the
 accepted ID in MODE_ACK, using mode 0 for an absent or unsupported value, and
 then changes the profile at which it expects that peer's DATA and DATA_ACK.
-The requester changes its transmit profile only after receiving MODE_ACK. A
-lost MODE_ACK leaves it at the old profile.
+The requester changes its transmit profile only after receiving MODE_ACK.
+
+Because MODE_ACK can be lost, the receiver temporarily retains the previous
+profile as a decode fallback. A decoded DATA or DATA_ACK is authoritative: it
+confirms whichever profile actually decoded and removes or corrects the
+fallback. Thus a lost MODE_ACK leaves the requester at its old profile and the
+next data-plane frame makes the receiver converge back to that profile. Control
+frames do not confirm a data profile because they always use the control mode.
 
 ### Disconnect
 
@@ -147,6 +168,11 @@ current transmit mode as good in its in-memory history, enters IDLE, and emits
 a disconnected event. A locally initiated disconnect tries DISC up to three
 times, accepts either DISC_ACK or a simultaneous DISC as completion, and then
 enters IDLE even if no response arrived.
+
+A connected endpoint also abandons the session after 150 seconds without
+decoding any frame from its peer. This is a crash/out-of-range backstop, not a
+keepalive protocol: a completely idle connection therefore expires after that
+interval. Teardown sends one best-effort DISC before returning to IDLE.
 
 ## Local TCP interface
 
