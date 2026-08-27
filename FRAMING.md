@@ -179,21 +179,19 @@ the longest currently expected frame.
 
 ## On-air timing
 
-Before every keying, the sender waits for radio turnaround. The nominal delay
-is 0.4 seconds after the estimated end of the peer transmission. When a frame
-decodes, its end position anchors that estimate; 1.0 second is added for the
-peer's nominal tail pad. Time already spent
-capturing and decoding after that point counts toward the delay. Without a
-fresh receive-time anchor, the full 0.4 seconds is waited.
+There is no fixed radio-turnaround sleep. A reply may key as soon as the peer's
+complete expected tail has been observed. The calibrated head sequence absorbs
+effective clipping caused by peer unkeying, both radios changing direction,
+transmitter startup, receiver recovery, and audio buffering.
 
 The transport asserts PTT and immediately opens and fills the output stream;
 there is no configured carrier-only lead or tail sleep. Stream startup still
 contributes a measured worst-case 0.16 seconds before the first sample leaves
-the audio device. Leading and trailing protection is carried entirely by the
-one-second throwaway symbol pads. Receive capture remains open during
+the audio device. Leading and trailing protection is carried entirely by
+throwaway symbol pads: one second during calibration and the derived
+per-session durations afterward. Receive capture remains open during
 transmission, but captured self-audio is cleared around each local keying.
 
 Control acknowledgement timeouts include the complete robust management
 packet. DATA acknowledgement timeouts include the negotiated DATA packet, the
-robust header-only DATA_ACK, two 0.4-second
-turnaround allowances, and a three-second margin.
+robust header-only DATA_ACK, and a three-second margin.

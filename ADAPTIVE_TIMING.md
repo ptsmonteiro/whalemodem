@@ -30,9 +30,10 @@ For ordinary frames, the calibrated values replace the conservative one-second
 starts audio-stream setup concurrently with keying and has no fixed lead or
 tail sleep, so clipping is observable as lost pad symbols.
 
-The first version does not change turnaround timing, the sync word, or the
-negotiated data mode. Audio API behavior that cannot be removed remains part of
-the measured chain rather than an independently tuned timing allowance.
+The fixed turnaround delay is zero. Its former protection is folded into the
+adaptive head sequence, which measures the total clipping between one
+station's transmission and the peer's reply. The first version does not change
+the sync word or negotiated data mode.
 
 ## Terminology
 
@@ -117,21 +118,23 @@ decoding must not acquire this extra delay.
 
 ## Deriving operational padding
 
-Because the number of calibration symbols transmitted is known, the sender can
-infer the loss:
+The receiver first converts its raw symbol count to the one-byte reported
+duration, rounding upward:
 
 ```text
-head_symbols_lost = calibration_head_symbols - head_symbols_received
-tail_symbols_lost = calibration_tail_symbols - tail_symbols_received
+head_time_byte = ceil(head_symbols_received * 255 / calibration_head_symbols)
+tail_time_byte = ceil(tail_symbols_received * 255 / calibration_tail_symbols)
 ```
 
-Radio impairments are durations, not symbol counts. The inferred losses are
-therefore converted to seconds using the control-mode baud:
+The sender infers loss in seconds from that protocol value:
 
 ```text
-head_loss_seconds = head_symbols_lost / control_baud
-tail_loss_seconds = tail_symbols_lost / control_baud
+head_loss_seconds = calibration_seconds * (255 - head_time_byte) / 255
+tail_loss_seconds = calibration_seconds * (255 - tail_time_byte) / 255
 ```
+
+Rounding received duration upward can understate loss by less than one unit
+(currently 3.92 ms); the mandatory minimum guard covers that quantization.
 
 The operational protection durations are:
 
@@ -177,20 +180,20 @@ connection-complete event:
 ```text
 ISS                                                   IRS
 
-CONNECT with large calibration sequences
+CONNECT with large calibration sequences (opening frame only)
 ----------------------------------------------------->
-                                      measures ISS -> IRS
 
-                       CONNECT_ACK carrying that measurement,
-                       with large calibration sequences
+                       CONNECT_ACK with large calibration sequences
 <-----------------------------------------------------
-measures IRS -> ISS
+measures IRS -> ISS after a real TX-to-RX transition
 
 TIMING_ACK carrying that measurement,
 with large calibration sequences
 ----------------------------------------------------->
+                                      measures ISS -> IRS after a real
+                                      TX-to-RX transition
 
-                                      TIMING_CONFIRM
+                    TIMING_CONFIRM carrying the TIMING_ACK measurement
 <-----------------------------------------------------
 
 both sides activate their connection-specific transmit padding
@@ -199,84 +202,74 @@ both sides activate their connection-specific transmit padding
 More precisely:
 
 1. The ISS sends `CONNECT` with the full calibration preamble and postamble.
-2. The IRS validates `CONNECT`, measures its head and tail sequences, and sends
-   those two received-symbol counts in `CONNECT_ACK`.
-3. The ISS validates `CONNECT_ACK`. The counts in its body describe the ISS's
-   own transmissions, so the ISS derives and stores its operational transmit
-   padding. The ISS also measures the calibration sequences around
-   `CONNECT_ACK`.
-4. The ISS sends those two received-symbol counts in `TIMING_ACK`. This frame
+2. The IRS validates `CONNECT` and immediately sends `CONNECT_ACK` with full
+   calibration sequences. `CONNECT` is not a timing probe because the IRS was
+   not transmitting immediately beforehand.
+3. The ISS measures the calibration sequences around `CONNECT_ACK`; this
+   observation includes its transition from transmitting to receiving.
+4. The ISS sends those observations as received-duration bytes in `TIMING_ACK`. This frame
    also uses the full calibration sequences; optimized timing is not used yet.
-5. The IRS validates `TIMING_ACK`. Its body describes the IRS's transmissions,
-   so the IRS derives and stores its operational transmit padding.
-6. The IRS sends `TIMING_CONFIRM`, using its newly derived operational padding,
-   and accepts the connection as calibrated.
-7. The ISS validates `TIMING_CONFIRM` and accepts the connection as calibrated.
-   Receipt of this frame also exercises the IRS's derived padding once before
-   application data is sent.
+5. The IRS validates `TIMING_ACK`. Its body describes the IRS transmission, so
+   the IRS derives its transmit padding. The IRS also measures `TIMING_ACK`,
+   including its own transition from transmitting to receiving.
+6. The IRS sends that observation in `TIMING_CONFIRM`, using its newly derived
+   operational padding, and accepts the connection as calibrated.
+7. The ISS validates `TIMING_CONFIRM`, derives its transmit padding from the
+   reported measurement, and accepts the connection as calibrated.
 
 Thus each measurement controls only the transmitter whose frame was measured:
 
 | Measured frame | Receiver | Measurement configures |
 | --- | --- | --- |
-| `CONNECT` | IRS | ISS transmit padding |
 | `CONNECT_ACK` | ISS | IRS transmit padding |
+| `TIMING_ACK` | IRS | ISS transmit padding |
 
-The calibration sequences around `TIMING_ACK` make the final handshake frame
-as robust as the first two. They are not used to calculate a third set of
-values.
+Both probes occur immediately after the receiving station transmitted, so the
+head loss includes peer unkeying, both radios' direction changes, transmitter
+startup, receiver recovery, and audio buffering as one effective duration.
 
 ## Packet fields
 
-Adaptive timing is required by connection format version 1, using the
-versioned CONNECT and CONNECT_ACK bodies specified in
-[`LINK.md`](LINK.md#versioned-connection-bodies-format-version-1). Support is
-deduced solely from that version. The fields below must not be appended to the
-legacy connection bodies.
-
-`CONNECT_ACK` gains these fields:
-
-```text
-connect_head_symbols_received
-connect_tail_symbols_received
-```
+Adaptive timing is required by connection format version 1, using the sole
+CONNECT and CONNECT_ACK body format specified in
+[`LINK.md`](LINK.md#connection-bodies). There is no legacy connection mode or
+downgrade path.
 
 `TIMING_ACK` contains:
 
 ```text
 session_id
-connect_ack_head_symbols_received
-connect_ack_tail_symbols_received
+connect_ack_head_time_received
+connect_ack_tail_time_received
 ```
 
 `TIMING_CONFIRM` contains:
 
 ```text
 session_id
+timing_ack_head_time_received
+timing_ack_tail_time_received
 ```
 
 The session identifier binds `TIMING_ACK` to the connection attempt and makes a
 delayed packet from an earlier connection harmless.
 
-Field widths depend on the final calibration sequence length. They must express
-every value from zero through the full sequence length, inclusive. Multi-byte
-counts use the framing convention: unsigned, most-significant byte first.
-
-The exact placement and widths of the measurement fields remain to be fixed
-after the calibration sequence lengths are selected. They will be defined as
-fields of the version-1 packet bodies, not as ambiguous suffixes inferred from
-the ends of legacy CONNECT or CONNECT_ACK bodies.
+Each measurement is one unsigned byte proportional to successfully decoded
+calibration-symbol time. `0` represents zero received duration and `255`
+represents the complete protocol-fixed calibration duration (currently one
+second). The encoder converts the received symbol count to this scale and
+rounds upward. Thus one unit currently represents approximately 3.92 ms. Zero
+is invalid for timing derivation because the actual loss may exceed the
+calibration interval.
 
 ## Retries and duplicate frames
 
 Calibration packets use the existing control-plane retry policy and control
 mode. Retransmissions always carry the full calibration sequences.
 
-A duplicate `CONNECT` for the active session is answered with the same logical
-`CONNECT_ACK`. Its measurement fields contain the most conservative valid
-observations accumulated for that session: the smallest received head and tail
-counts. The same rule applies when the ISS receives duplicate `CONNECT_ACK`
-frames before completing calibration.
+A duplicate `CONNECT` for the active attempt is answered with the same
+`CONNECT_ACK`. If retries produce multiple valid probe observations, the
+receiver retains the smallest head and tail counts before reporting them.
 
 A duplicate `TIMING_ACK` for the active session is idempotent: the IRS reapplies
 the same derived padding and sends `TIMING_CONFIRM` again. The ISS retries
@@ -307,10 +300,9 @@ Calibration must fail safe:
 - Derived values are clamped and can never become negative or exceed the full
   calibration duration plus the configured guard.
 
-The current fixed PTT and framing allowances remain the implementation fallback
-during development and for tests that construct a `Link` without completing a
-radio handshake. They are not silently substituted for a failed over-the-air
-calibration unless the protocol explicitly chooses a compatibility mode.
+The current fixed PTT and framing allowances remain an internal development
+default for tests that construct a `Link` without completing a radio
+handshake. They are never substituted for a failed over-the-air calibration.
 
 ## Connection lifetime
 
@@ -334,9 +326,9 @@ window before returning a frame so an in-progress tail is not misreported as
 clipping. These observations are not yet exchanged with the peer or used to
 change transmit padding.
 
-1. Implement and test the versioned, length-delimited CONNECT and CONNECT_ACK
-   bodies from `LINK.md`, while retaining an explicitly selected legacy mode
-   during migration.
+1. Replace the current NUL-delimited CONNECT and CONNECT_ACK encoding with the
+   length-delimited bodies from `LINK.md`; do not retain a legacy decoder or
+   downgrade path.
 2. Allow the framing encoder to accept per-frame head and tail sequences.
 3. Add fixed calibration sequences and their protocol constants. **Done:**
    distinct order-15 PN sequences now replace the alternating head/tail pads.

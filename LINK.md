@@ -47,61 +47,15 @@ bytes are inline; any remainder follows in the same waveform.
 | `0x08` | MODE_ACK | Accepted mode ID | control |
 | `0x09` | FLOOR_REQ | Empty | control |
 | `0x0a` | FLOOR_GRANT | Empty | control |
+| `0x0b` | TIMING_ACK | Reverse-direction timing measurement | control |
+| `0x0c` | TIMING_CONFIRM | Timing-handshake confirmation | control |
 
 ### Connection bodies
 
-The bodies below are the legacy, unversioned format implemented today. New
-on-air features must not add another inferred suffix to these bodies. They use
-the versioned connection-body format in the next section instead.
-
-CONNECT has this body:
-
-```text
-source_call NUL destination_call NUL supported_mode_ids... proposed_tx_mode_id session_id
-```
-
-The supported-mode list is zero or more one-byte mode IDs. The final two bytes
-are the caller's proposed transmit mode for the caller-to-listener direction
-and a session identifier. A new peer currently proposes mode 0; otherwise it
-may propose the last mode recorded as good for that callsign pair. Mode history
-is in memory only.
-
-The caller randomly chooses one session identifier in the range `1..255` for
-the complete CONNECT retry sequence; zero means unspecified. The identifier
-distinguishes a retry of the current connection from a delayed frame belonging
-to another attempt.
-
-CONNECT_ACK has this body:
-
-```text
-source_call NUL destination_call NUL supported_mode_ids...
-accepted_caller_tx_mode_id listener_tx_mode_id session_id
-```
-
-Its last three bytes contain the two independently negotiated modes followed by
-the caller's session identifier echoed unchanged. The listener first states
-the mode accepted for traffic from the caller, then the mode it will use for
-its own transmissions. An unsupported proposal falls back to mode 0. For a
-short body, the decoder falls back to mode 0 and session ID zero.
-
-The caller ignores CONNECT_ACK packets whose destination or session identifier
-does not match the active attempt. The listener stores the accepted
-CONNECT_ACK body and retransmits it byte-for-byte when it receives a duplicate
-CONNECT from the same peer with the same session identifier. A CONNECT carrying
-a different identifier does not replace a live session. If the caller exhausts
-its CONNECT attempts, it sends one best-effort DISC in case the listener entered
-CONNECTED but every CONNECT_ACK was lost.
-
-After a valid exchange both endpoints enter CONNECTED, reset transmit and
-receive sequence numbers to zero, and clear partial message reassembly. The
-caller starts as ISS; the listener starts as IRS.
-
-### Versioned connection bodies (format version 1)
-
-This section specifies the connection-body envelope that must be implemented
-before adding adaptive timing. It replaces, rather than extends, the legacy
-CONNECT and CONNECT_ACK bodies above. All sizes are unsigned byte counts and
-all multi-byte integers are big-endian.
+CONNECT and CONNECT_ACK use the following length-delimited format. This is the
+only connection-body format; the current NUL-delimited implementation is to be
+replaced outright rather than retained as a compatibility mode. All sizes are
+unsigned byte counts and all multi-byte integers are big-endian.
 
 Both packet types begin with this envelope:
 
@@ -115,8 +69,7 @@ Both packet types begin with this envelope:
 The frame payload must end immediately after Content. A decoder rejects a
 body with the wrong magic, an unsupported format version, a content length
 that does not equal the remaining body size, a truncated field, or extra
-bytes. The `0xff` prefix cannot be emitted by the legacy ASCII callsign
-encoder, so format detection is deterministic for valid encoded bodies.
+bytes.
 
 CONNECT v1 Content is:
 
@@ -144,21 +97,19 @@ CONNECT_ACK v1 Content is:
 | Supported mode IDs | `mode_count` bytes | Unique one-byte IDs in preference order |
 | Accepted caller transmit mode | 1 byte | Mode accepted for caller-to-listener traffic |
 | Listener transmit mode | 1 byte | Mode selected for listener-to-caller traffic |
-| CONNECT head symbols received | TBD | Adaptive-timing measurement defined in `ADAPTIVE_TIMING.md` |
-| CONNECT tail symbols received | TBD | Adaptive-timing measurement defined in `ADAPTIVE_TIMING.md` |
 
 Mode count may be zero only if both selected/proposed mode fields are mode 0;
 mode 0 is always a valid fallback. Callsigns are compared according to the
-existing link addressing policy after their v1 encoding has been validated.
+existing link addressing policy after their encoding has been validated.
 The limits above bound all variable fields before allocation.
 
 The format version defines the complete handshake feature set. Version 1
 includes adaptive timing and therefore requires the calibration handshake
-described in `ADAPTIVE_TIMING.md`. Its CONNECT carries the version-1
-calibration sequences around the frame. A v1
+described in `ADAPTIVE_TIMING.md`. Its CONNECT carries the protocol-fixed
+calibration sequences around the frame. The
 decoder retains enough leading audio to measure them and, after decoding the
-body, waits a bounded time for the tail. Its CONNECT_ACK carries the two
-measurements above and is also surrounded by calibration sequences. An
+body, waits a bounded time for the tail. CONNECT_ACK is surrounded by
+calibration sequences and begins the two-probe exchange. An
 endpoint that does not implement every required version-1 behavior rejects
 version 1 rather than accepting a reduced feature set.
 
@@ -169,11 +120,12 @@ the conservative aggregation rule in `ADAPTIVE_TIMING.md`. A CONNECT with the
 same session ID but different bytes is invalid. This prevents the handshake
 feature set from changing across retries.
 
-Legacy interoperation is explicit, not an in-band downgrade: a listener may
-accept either legacy bodies or v1 bodies, but a caller sends one format for the
-whole attempt. Failure of a v1 attempt must not trigger an automatic legacy
-retry with the same session ID. An implementation may expose a configured
-legacy-only mode; adaptive timing is unavailable in that mode.
+The caller randomly chooses one session identifier in the range `1..255` for
+the complete retry sequence. The caller ignores acknowledgements with a
+different destination or session identifier. A different CONNECT must not
+replace a live session. If establishment fails after the retry limit, the
+caller sends one best-effort DISC in case the peer reached a later handshake
+state.
 
 ### DATA and DATA_ACK
 
@@ -307,10 +259,11 @@ is an implementation detail and must not be used for application framing.
 
 ## Current limitations and compatibility notes
 
-- The implemented legacy connection body has no protocol magic, version,
-  authentication, encryption, or forward-compatible length. The proposed v1
-  connection-body format above adds magic, versioning, and lengths, but does
-  not add authentication or encryption and is not implemented yet.
+- The length-delimited connection body and adaptive-timing handshake specified
+  above are not implemented yet. The current code still uses the older
+  NUL-delimited body and must replace it; no interoperability with that
+  development format will be retained. The new format adds magic, versioning,
+  and lengths, but not authentication or encryption.
 - There is one outstanding DATA frame at a time; no windowing or cumulative
   multi-frame ACK is implemented.
 - The link is point-to-point and has no channel addressing outside callsigns

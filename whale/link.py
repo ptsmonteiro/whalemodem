@@ -18,11 +18,9 @@ exchange at 1200 baud at 3.91s, of which:
 So 17% of the link was moving user data. Two things are done about it here,
 neither of which changes how many frames are in flight:
 
-  - The turnaround wait is anchored on *when the peer stopped
-    transmitting*, worked out from where in the RX buffer its last frame
-    ended, rather than started when we get round to replying -- so decode
-    latency is absorbed by the wait instead of added to it. See
-    _await_turnaround and TX_TURNAROUND_DELAY.
+  - The fixed turnaround sleep is removed. The calibration handshake measures
+    effective clipping on replies after a real direction change, and the
+    resulting per-session head pad absorbs that loss.
   - The decode loop prunes audio it has already searched, so a poll costs
     a bounded amount of time rather than growing with the idle stretch
     before it. See _prune_stale. This matters to turnaround specifically:
@@ -112,6 +110,8 @@ PT_MODE_REQ = 0x07         # body: [proposed_mode_id] -- mid-session speed step,
 PT_MODE_ACK = 0x08         # body: [accepted_mode_id] (may differ from proposed if rejected)
 PT_FLOOR_REQ = 0x09        # IRS asking to become ISS -- see _acquire_floor
 PT_FLOOR_GRANT = 0x0A      # ISS handing the floor to the peer -- see _handle_floor_req
+PT_TIMING_ACK = 0x0B
+PT_TIMING_CONFIRM = 0x0C
 
 # Packet types whose bodies are small and must survive even when the
 # negotiated data profile is struggling -- these always go out on
@@ -119,7 +119,15 @@ PT_FLOOR_GRANT = 0x0A      # ISS handing the floor to the peer -- see _handle_fl
 # only the DATA body ever rides the negotiated speed.
 _CONTROL_PLANE_TYPES = {PT_CONNECT, PT_CONNECT_ACK, PT_DISC, PT_DISC_ACK, PT_DATA_ACK,
                          PT_MODE_REQ, PT_MODE_ACK,
-                         PT_FLOOR_REQ, PT_FLOOR_GRANT}
+                         PT_FLOOR_REQ, PT_FLOOR_GRANT, PT_TIMING_ACK,
+                         PT_TIMING_CONFIRM}
+
+CONNECT_FORMAT_MAGIC = b"\xffWHL"
+CONNECT_FORMAT_VERSION = 1
+CALIBRATION_SECONDS = 1.0
+HEAD_MIN_GUARD_SECONDS = 0.05
+TAIL_MIN_GUARD_SECONDS = 0.03
+TIMING_MARGIN = 0.20
 
 # Which end may originate PT_DATA right now. Real half-duplex ARQ modems
 # (PACTOR, VARA, WINMOR/Ardop) call these roles ISS (Information Sending
@@ -161,7 +169,8 @@ _AIR_HEADER_LEN = framing.BOOTSTRAP_HEADER_BYTES
 def _air_inline_length(ptype):
     if ptype == PT_DATA:
         return 1
-    if ptype in (PT_CONNECT, PT_CONNECT_ACK, PT_DATA_ACK):
+    if ptype in (PT_CONNECT, PT_CONNECT_ACK, PT_DATA_ACK, PT_TIMING_ACK,
+                 PT_TIMING_CONFIRM):
         return 2
     if ptype in (PT_MODE_REQ, PT_MODE_ACK):
         return 1
@@ -207,6 +216,10 @@ def _valid_air_shape(ptype, profile, body_len, inline, control_mode_id):
         return len(inline) == 2 and body_len == 0
     if ptype in (PT_MODE_REQ, PT_MODE_ACK):
         return len(inline) == 1 and body_len == 0
+    if ptype == PT_TIMING_ACK:
+        return len(inline) == 2 and body_len == 1
+    if ptype == PT_TIMING_CONFIRM:
+        return len(inline) == 2 and body_len == 1
     if ptype in (PT_DISC, PT_DISC_ACK, PT_FLOOR_REQ, PT_FLOOR_GRANT):
         return len(inline) == 0 and body_len == 0
     return False
@@ -319,38 +332,10 @@ def _new_session_id():
 # only when the probe itself goes unanswered), not a bigger number here.
 INACTIVITY_TIMEOUT = 150.0
 
-# Dead time between the end of the peer's transmission and our keying up.
-#
-# This was 1.0s and started when the link layer got round to replying. It
-# is now anchored on the end of the peer's audio, which the receiver can
-# measure -- demodulate() reports where in the RX buffer the frame ended,
-# and everything captured after that is time already spent. See
-# _await_turnaround. The old constant was therefore paying for the poll
-# interval, the decode, and the peer's PTT tail all over again on top of
-# whatever the radios actually needed.
-#
-# What is left for this to cover, from the peer's last CRC bit:
-#
-#   framing.TAIL_PAD_SECONDS   1.00   peer still transmitting pad
-#   peer's T/R switch back to receive, and ours to transmit
-#
-# Getting this wrong is not a correctness problem -- too short and our
-# frame lands on the tail of the peer's transmission, the ACK does not
-# come, and ARQ retransmits -- but it is a throughput problem in both
-# directions. scripts/sweep_turnaround.py measures the floor; it has not
-# been run on the bench yet, so this is still a reasoned figure rather
-# than a measured one.
-#
-# 0.25 was the first such figure and it was too small. The bench
-# acceptance run keyed 24 of its 51 replies within 150ms of the peer's own
-# PTT OFF -- 2ms in the worst case, i.e. on top of a radio that had not
-# begun to swap T/R -- and lost 21 ACKs to it. Two things were wrong:
-# the anchor stopped at the peer's last CRC bit and ignored the pad and
-# carrier the peer still had to send after it (now PEER_TRAILING_TRANSMISSION,
-# added at the anchor), and what remained was under-provisioned for the
-# switch itself. 0.4s of T/R allowance on top of the peer's own tail is
-# ~2.5x the largest turnaround loss seen; the sweep should replace it.
-TX_TURNAROUND_DELAY = 0.4
+# Kept as a compatibility name for diagnostics/tests. No fixed dead-air delay
+# is applied: replies begin after the decoder has observed the expected tail,
+# and calibrated head audio absorbs the effective direction-change loss.
+TX_TURNAROUND_DELAY = 0.0
 
 # What the peer is still transmitting after the last bit we decoded:
 # framing.TAIL_PAD_SECONDS of pad. This is the peer's setting and nothing on
@@ -391,6 +376,7 @@ _PTYPE_NAMES = {
     PT_DATA: "DATA", PT_DATA_ACK: "DATA_ACK",
     PT_MODE_REQ: "MODE_REQ", PT_MODE_ACK: "MODE_ACK",
     PT_FLOOR_REQ: "FLOOR_REQ", PT_FLOOR_GRANT: "FLOOR_GRANT",
+    PT_TIMING_ACK: "TIMING_ACK", PT_TIMING_CONFIRM: "TIMING_CONFIRM",
 }
 
 
@@ -495,13 +481,45 @@ def _mode_step_script(env=None):
     return script
 
 
-def _encode_call_pair(src, dst):
-    return src.encode("ascii") + b"\x00" + dst.encode("ascii")
+def _connection_envelope(content):
+    return CONNECT_FORMAT_MAGIC + bytes([CONNECT_FORMAT_VERSION]) + len(content).to_bytes(2, "big") + content
+
+
+def _decode_connection_envelope(payload):
+    if (len(payload) < 7 or payload[:4] != CONNECT_FORMAT_MAGIC
+            or payload[4] != CONNECT_FORMAT_VERSION
+            or int.from_bytes(payload[5:7], "big") != len(payload) - 7):
+        raise ValueError("invalid connection body envelope")
+    return memoryview(payload)[7:]
+
+
+def _call_bytes(call):
+    raw = call.encode("ascii")
+    if not 1 <= len(raw) <= 15 or any(chr(c) not in "ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789-" for c in raw):
+        raise ValueError("invalid callsign")
+    return bytes([len(raw)]) + raw
+
+
+def _take_call(content, offset):
+    if offset >= len(content):
+        raise ValueError("missing callsign")
+    size = content[offset]
+    end = offset + 1 + size
+    if not 1 <= size <= 15 or end > len(content):
+        raise ValueError("invalid callsign length")
+    call = bytes(content[offset + 1:end]).decode("ascii")
+    _call_bytes(call)
+    return call, end
 
 
 def _decode_call_pair(payload):
-    src, _, dst = payload.partition(b"\x00")
-    return src.decode("ascii", "replace"), dst.decode("ascii", "replace")
+    try:
+        content = _decode_connection_envelope(payload)
+        src, offset = _take_call(content, 0)
+        dst, _ = _take_call(content, offset)
+        return src, dst
+    except (ValueError, UnicodeError):
+        return "", ""
 
 
 def _encode_call_and_modes(a, b, supported_ids, extra_id, session_id=SESSION_ID_NONE):
@@ -509,18 +527,24 @@ def _encode_call_and_modes(a, b, supported_ids, extra_id, session_id=SESSION_ID_
     trailing bytes -- the sender's proposed TX mode_id for the a->b
     direction, and the session identifier it has picked for this call (see
     the module docstring; SESSION_ID_NONE if it has none)."""
-    return (a.encode("ascii") + b"\x00" + b.encode("ascii") + b"\x00" +
-            bytes(sorted(supported_ids)) + bytes([extra_id, session_id]))
+    modes = bytes(sorted(set(supported_ids)))
+    content = (_call_bytes(a) + _call_bytes(b) + bytes([session_id, len(modes)])
+               + modes + bytes([extra_id]))
+    return _connection_envelope(content)
 
 
 def _decode_call_and_modes(payload):
-    a, _, rest = payload.partition(b"\x00")
-    b, _, mode_section = rest.partition(b"\x00")
-    a = a.decode("ascii", "replace")
-    b = b.decode("ascii", "replace")
-    if len(mode_section) < 2:
-        return a, b, [], afsk.CONTROL_PROFILE.mode_id, SESSION_ID_NONE
-    return a, b, list(mode_section[:-2]), mode_section[-2], mode_section[-1]
+    content = _decode_connection_envelope(payload)
+    a, offset = _take_call(content, 0)
+    b, offset = _take_call(content, offset)
+    if offset + 3 > len(content):
+        raise ValueError("truncated CONNECT")
+    session_id, count = content[offset], content[offset + 1]
+    offset += 2
+    if offset + count + 1 != len(content):
+        raise ValueError("invalid CONNECT mode count")
+    modes = list(content[offset:offset + count])
+    return a, b, modes, content[-1], session_id
 
 
 def _encode_connect_ack(a, b, supported_ids, accepted_tx_id, own_tx_id,
@@ -534,20 +558,51 @@ def _encode_connect_ack(a, b, supported_ids, accepted_tx_id, own_tx_id,
     chosen for its own (b->a) transmissions. The third is the caller's own
     session identifier echoed back unchanged, which is what lets the caller
     tell this ack from a leftover ack for some earlier session."""
-    return (a.encode("ascii") + b"\x00" + b.encode("ascii") + b"\x00" +
-            bytes(sorted(supported_ids)) + bytes([accepted_tx_id, own_tx_id, session_id]))
+    modes = bytes(sorted(set(supported_ids)))
+    content = (_call_bytes(a) + _call_bytes(b) + bytes([session_id, len(modes)]) + modes
+               + bytes([accepted_tx_id, own_tx_id]))
+    return _connection_envelope(content)
 
 
 def _decode_connect_ack(payload):
-    a, _, rest = payload.partition(b"\x00")
-    b, _, mode_section = rest.partition(b"\x00")
-    a = a.decode("ascii", "replace")
-    b = b.decode("ascii", "replace")
-    if len(mode_section) < 3:
-        return (a, b, [], afsk.CONTROL_PROFILE.mode_id, afsk.CONTROL_PROFILE.mode_id,
-                SESSION_ID_NONE)
-    return (a, b, list(mode_section[:-3]), mode_section[-3], mode_section[-2],
-            mode_section[-1])
+    content = _decode_connection_envelope(payload)
+    a, offset = _take_call(content, 0)
+    b, offset = _take_call(content, offset)
+    if offset + 4 > len(content):
+        raise ValueError("truncated CONNECT_ACK")
+    session_id, count = content[offset], content[offset + 1]
+    offset += 2
+    if offset + count + 2 != len(content):
+        raise ValueError("invalid CONNECT_ACK mode count")
+    modes = list(content[offset:offset + count])
+    offset += count
+    return a, b, modes, content[offset], content[offset + 1], session_id
+
+
+def _encode_timing(session_id, head_received, tail_received):
+    total = int(np.ceil(CALIBRATION_SECONDS * afsk.CONTROL_PROFILE.baud))
+
+    def duration_byte(received):
+        if not 0 <= received <= total:
+            raise ValueError("invalid calibration measurement")
+        return min(255, int(np.ceil(received * 255 / total)))
+
+    return bytes([session_id, duration_byte(head_received), duration_byte(tail_received)])
+
+
+def _decode_timing(body):
+    if len(body) != 3:
+        raise ValueError("invalid TIMING_ACK")
+    return body[0], body[1], body[2]
+
+
+def _derive_timing(head_duration_byte, tail_duration_byte, baud=None):
+    if not (0 < head_duration_byte <= 255 and 0 < tail_duration_byte <= 255):
+        raise ValueError("invalid calibration measurement")
+    head_loss = CALIBRATION_SECONDS * (255 - head_duration_byte) / 255
+    tail_loss = CALIBRATION_SECONDS * (255 - tail_duration_byte) / 255
+    return (min(CALIBRATION_SECONDS, head_loss + max(HEAD_MIN_GUARD_SECONDS, head_loss * TIMING_MARGIN)),
+            min(CALIBRATION_SECONDS, tail_loss + max(TAIL_MIN_GUARD_SECONDS, tail_loss * TIMING_MARGIN)))
 
 
 def _negotiate_mode(own_supported_ids, proposed_id, fallback_id=None):
@@ -610,6 +665,11 @@ class Link:
         self._mode_step_script = _mode_step_script()
 
         self._rx_packets = queue.Queue()
+        self._rx_measurements = {}
+        self._tx_head_seconds = CALIBRATION_SECONDS
+        self._tx_tail_seconds = CALIBRATION_SECONDS
+        self._rx_head_seconds = CALIBRATION_SECONDS
+        self._rx_tail_seconds = CALIBRATION_SECONDS
         # A station asking for the floor may receive the current ISS's
         # message before its request can be granted.  send_message() has to
         # service and ACK those frames to let the ISS finish; retain any
@@ -624,6 +684,7 @@ class Link:
         # returned -- see _answer_duplicate_connect.
         self._session_id = SESSION_ID_NONE
         self._connect_ack_body = None
+        self._timing_confirm_body = None
         # When we last decoded anything from the peer, in time.monotonic()
         # terms. Written by the decode thread, read by _peer_is_stale.
         self._last_peer_frame_at = None
@@ -779,7 +840,8 @@ class Link:
         its own threshold) but hasn't seen enough samples yet for a verdict,
         this poll holds off consuming anything and just waits for more
         audio, rather than letting a different candidate's near-miss win."""
-        results = [(profile, profile.decode(snap))
+        results = [(profile, profile.decode(snap, head_seconds=self._rx_head_seconds,
+                                             tail_seconds=self._rx_tail_seconds))
                    for profile in self._candidate_decode_profiles()]
         for profile, result in results:
             payload = result.get("payload")
@@ -844,6 +906,10 @@ class Link:
                 received * 1000.0 / profile.baud,
                 clipped, clipped * 1000.0 / profile.baud,
             )
+        self._rx_measurements[(ptype, body)] = {
+            "head": decode_result.get("head_symbols_received"),
+            "tail": decode_result.get("tail_symbols_received"),
+        }
         self._handle_raw(bytes([ptype]) + body, profile)
 
     def _capture_near_miss(self, snap, confidence):
@@ -933,15 +999,7 @@ class Link:
         finished long ago", it means we stopped being able to follow what
         the peer was saying, which is the worst moment to assume the
         channel is free. See ANCHOR_AGE_SLACK."""
-        anchor = self._peer_unkeyed_at
         self._peer_unkeyed_at = None
-        now = time.monotonic()
-        if anchor is None or now - anchor > TX_TURNAROUND_DELAY + ANCHOR_AGE_SLACK:
-            time.sleep(TX_TURNAROUND_DELAY)
-            return
-        remaining = (anchor + TX_TURNAROUND_DELAY) - now
-        if remaining > 0:
-            time.sleep(remaining)
 
     def _tx_packet(self, ptype: int, body: bytes):
         """Keys one complete packet in its control or negotiated waveform."""
@@ -960,7 +1018,8 @@ class Link:
                                 body[:_air_inline_length(ptype)],
                                 self.modes.control.mode_id):
             raise ValueError(f"invalid {_ptype_name(ptype)} body/mode for air header")
-        audio = profile.encode(header + remainder)
+        audio = profile.encode(header + remainder, head_seconds=self._tx_head_seconds,
+                               tail_seconds=self._tx_tail_seconds)
         keyed = self.transport.send(audio)
         # Both numbers, because the gap between them is the PTT/settling
         # overhead this frame actually paid -- the thing to watch if air
@@ -1015,7 +1074,7 @@ class Link:
         cleared this session -- slow, but it cannot corrupt a live one.
         Telling those two cases apart is the entire reason the session id
         is on air; see the module docstring."""
-        if self.state != "CONNECTED" or self._connect_ack_body is None:
+        if self.state not in ("LISTENING", "CONNECTED") or self._connect_ack_body is None:
             return False
         src, dst, _, _, session_id = _decode_call_and_modes(body)
         if dst != self.mycall or src != self.peer_call:
@@ -1029,6 +1088,20 @@ class Link:
                     self.mycall, src, session_id)
         self.on_event("PTT", on=True)
         self._tx_packet(PT_CONNECT_ACK, self._connect_ack_body)
+        self.on_event("PTT", off=True)
+        return True
+
+    def _answer_duplicate_timing(self, body):
+        if self.state != "CONNECTED" or self._timing_confirm_body is None:
+            return False
+        try:
+            session_id, _, _ = _decode_timing(body)
+        except ValueError:
+            return False
+        if session_id != self._session_id:
+            return False
+        self.on_event("PTT", on=True)
+        self._tx_packet(PT_TIMING_CONFIRM, self._timing_confirm_body)
         self.on_event("PTT", off=True)
         return True
 
@@ -1073,6 +1146,8 @@ class Link:
                 break
             if ptype == PT_CONNECT:
                 self._answer_duplicate_connect(body)
+            elif ptype == PT_TIMING_ACK:
+                self._answer_duplicate_timing(body)
             elif ptype == PT_DISC:
                 self._handle_peer_disc()
                 return False
@@ -1096,6 +1171,8 @@ class Link:
         timeout_per_try = self.control_ack_timeout if timeout_per_try is None else timeout_per_try
         self._drain_packets()
         self.state = "CONNECTING"
+        self._tx_head_seconds = self._tx_tail_seconds = CALIBRATION_SECONDS
+        self._rx_head_seconds = self._rx_tail_seconds = CALIBRATION_SECONDS
         own_supported = list(self.modes.supported_ids)
         # Not `forced or history`: mode_id 0 is a real profile (300 baud)
         # and a perfectly reasonable thing to pin a bench run to.
@@ -1130,6 +1207,17 @@ class Link:
                     logger.info("[%s] ignoring CONNECT_ACK for session 0x%02x (calling as 0x%02x)",
                                 self.mycall, ack_session, self._session_id)
                     continue
+                measurement = self._rx_measurements.get((PT_CONNECT_ACK, ack_body), {})
+                head = measurement.get("head")
+                tail = measurement.get("tail")
+                try:
+                    timing_body = _encode_timing(self._session_id, head, tail)
+                    _, head_duration, tail_duration = _decode_timing(timing_body)
+                    self._rx_head_seconds, self._rx_tail_seconds = _derive_timing(
+                        head_duration, tail_duration)
+                except (TypeError, ValueError):
+                    logger.warning("[%s] invalid CONNECT_ACK timing measurement", self.mycall)
+                    continue
                 self.peer_call = src
                 self.peer_supported_modes = set(peer_supported)
                 # accepted_id: what the listener accepted of our proposal --
@@ -1139,6 +1227,25 @@ class Link:
                 # what we should expect its frames at.
                 self._apply_tx_profile(self.modes.resolve(accepted_id))
                 self._apply_rx_profile(self.modes.resolve(peer_tx_id))
+                confirmed = None
+                for _ in range(retries):
+                    self.on_event("PTT", on=True)
+                    self._tx_packet(PT_TIMING_ACK, timing_body)
+                    self.on_event("PTT", off=True)
+                    confirmed = self._wait_packet({PT_TIMING_CONFIRM}, timeout_per_try)
+                    if confirmed is not None:
+                        break
+                if confirmed is None:
+                    continue
+                _, confirm_body = confirmed
+                try:
+                    confirm_session, own_head, own_tail = _decode_timing(confirm_body)
+                    if confirm_session != self._session_id:
+                        continue
+                    self._tx_head_seconds, self._tx_tail_seconds = _derive_timing(
+                        own_head, own_tail, self.modes.control.baud)
+                except ValueError:
+                    continue
                 self._clean_streak = 0
                 self.state = "CONNECTED"
                 self.role = "ISS"  # the caller starts holding the floor -- see PT_FLOOR_REQ above
@@ -1170,6 +1277,8 @@ class Link:
         timeout."""
         self._drain_packets()
         self.state = "LISTENING"
+        self._tx_head_seconds = self._tx_tail_seconds = CALIBRATION_SECONDS
+        self._rx_head_seconds = self._rx_tail_seconds = CALIBRATION_SECONDS
         got = self._wait_packet({PT_CONNECT}, timeout or 1e9)
         if got is None:
             return None
@@ -1206,6 +1315,34 @@ class Link:
         self._connect_ack_body = ack_body
         self.on_event("PTT", on=True)
         self._tx_packet(PT_CONNECT_ACK, ack_body)
+        self.on_event("PTT", off=True)
+        # Once CONNECT has been accepted this is no longer an idle-listen
+        # poll. Give the rest of the handshake its full control-frame
+        # timeout even when the service called listen_once with a short
+        # polling timeout.
+        got_timing = self._wait_packet({PT_TIMING_ACK}, self.control_ack_timeout)
+        if got_timing is None:
+            self.state = "IDLE"
+            return None
+        _, timing_body = got_timing
+        try:
+            timing_session, own_head, own_tail = _decode_timing(timing_body)
+            if timing_session != session_id:
+                raise ValueError("wrong timing session")
+            self._tx_head_seconds, self._tx_tail_seconds = _derive_timing(
+                own_head, own_tail)
+            measurement = self._rx_measurements[(PT_TIMING_ACK, timing_body)]
+            peer_head, peer_tail = measurement["head"], measurement["tail"]
+            confirm_body = _encode_timing(session_id, peer_head, peer_tail)
+            _, peer_head_duration, peer_tail_duration = _decode_timing(confirm_body)
+            self._rx_head_seconds, self._rx_tail_seconds = _derive_timing(
+                peer_head_duration, peer_tail_duration)
+        except (KeyError, TypeError, ValueError):
+            self.state = "IDLE"
+            return None
+        self._timing_confirm_body = confirm_body
+        self.on_event("PTT", on=True)
+        self._tx_packet(PT_TIMING_CONFIRM, confirm_body)
         self.on_event("PTT", off=True)
         self._apply_rx_profile(self.modes.resolve(negotiated_id))
         self._apply_tx_profile(self.modes.resolve(own_tx_id))
@@ -1553,6 +1690,9 @@ class Link:
         re-answered as a retry of a session that no longer exists."""
         self._session_id = SESSION_ID_NONE
         self._connect_ack_body = None
+        self._timing_confirm_body = None
+        self._tx_head_seconds = self._tx_tail_seconds = CALIBRATION_SECONDS
+        self._rx_head_seconds = self._rx_tail_seconds = CALIBRATION_SECONDS
         self._last_peer_frame_at = None
 
     def _handle_peer_disc(self):

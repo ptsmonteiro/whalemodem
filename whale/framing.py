@@ -167,8 +167,8 @@ _HEAD_PAD_TAPS = (1, 15)
 _TAIL_PAD_TAPS = (1, 2, 3, 15)
 
 
-def tail_pad_bits(baud):
-    n = math.ceil(TAIL_PAD_SECONDS * baud)
+def tail_pad_bits(baud, seconds=TAIL_PAD_SECONDS):
+    n = math.ceil(seconds * baud)
     return _lfsr_bits(n, _PAD_LFSR_ORDER, _TAIL_PAD_TAPS,
                       seed=_PAD_LFSR_SEED)
 
@@ -281,8 +281,8 @@ def tail_pad_bits(baud):
 HEAD_PAD_SECONDS = 1.0
 
 
-def head_pad_bits(baud):
-    n = math.ceil(HEAD_PAD_SECONDS * baud)
+def head_pad_bits(baud, seconds=HEAD_PAD_SECONDS):
+    n = math.ceil(seconds * baud)
     return _lfsr_bits(n, _PAD_LFSR_ORDER, _HEAD_PAD_TAPS,
                       seed=_PAD_LFSR_SEED)
 
@@ -306,7 +306,8 @@ def bits_to_bytes(bits) -> bytes:
     return bytes(out)
 
 
-def build_frame_bits(payload: bytes, baud=300, *, include_head=True, include_tail=True):
+def build_frame_bits(payload: bytes, baud=300, *, include_head=True, include_tail=True,
+                     head_seconds=HEAD_PAD_SECONDS, tail_seconds=TAIL_PAD_SECONDS):
     if len(payload) > MAX_PAYLOAD_BYTES:
         raise ValueError(f"payload too long ({len(payload)} > {MAX_PAYLOAD_BYTES})")
     length = len(payload).to_bytes(LENGTH_FIELD_BITS // 8, "big")
@@ -315,17 +316,17 @@ def build_frame_bits(payload: bytes, baud=300, *, include_head=True, include_tai
     if len(payload) < AIR_HEADER_BYTES:
         checked = length + payload
         checked += crc16_ccitt_false(checked).to_bytes(2, "big")
-        return ((head_pad_bits(baud) if include_head else []) + sync_bits(baud)
+        return ((head_pad_bits(baud, head_seconds) if include_head else []) + sync_bits(baud)
                 + bytes_to_bits(checked)
-                + (tail_pad_bits(baud) if include_tail else []))
+                + (tail_pad_bits(baud, tail_seconds) if include_tail else []))
     header, body = payload[:AIR_HEADER_BYTES], payload[AIR_HEADER_BYTES:]
     header_crc = crc16_ccitt_false(length + header).to_bytes(2, "big")
     checked = length + header + header_crc
     if body:
         checked += body + crc16_ccitt_false(body).to_bytes(2, "big")
-    return ((head_pad_bits(baud) if include_head else []) + sync_bits(baud)
+    return ((head_pad_bits(baud, head_seconds) if include_head else []) + sync_bits(baud)
             + bytes_to_bits(checked)
-            + (tail_pad_bits(baud) if include_tail else []))
+            + (tail_pad_bits(baud, tail_seconds) if include_tail else []))
 
 
 def declared_length(bits_after_sync):

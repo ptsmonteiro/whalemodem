@@ -687,10 +687,18 @@ def test_connect_body_roundtrip():
 
 def test_connect_ack_body_roundtrip():
     body = link._encode_connect_ack("STA2", "STA1", [0, 1, 2], 1, 0, 0x5A)
-    a, b, supported, accepted_id, own_id, session = link._decode_connect_ack(body)
-    assert (a, b, supported, accepted_id, own_id, session) == \
-        ("STA2", "STA1", [0, 1, 2], 1, 0, 0x5A), \
-        (a, b, supported, accepted_id, own_id, session)
+    decoded = link._decode_connect_ack(body)
+    assert decoded == ("STA2", "STA1", [0, 1, 2], 1, 0, 0x5A), decoded
+
+
+def test_timing_measurements_derive_guarded_session_pads():
+    baud = afsk.CONTROL_PROFILE.baud
+    body = link._encode_timing(0x5A, 270, 297)
+    assert link._decode_timing(body) == (0x5A, 230, 253)
+    head, tail = link._derive_timing(230, 253, baud)
+    assert abs(head - (25 / 255 + 0.05)) < 1e-9, head
+    assert abs(tail - (2 / 255 + 0.03)) < 1e-9, tail
+    print("test_timing_measurements_derive_guarded_session_pads OK")
     print("test_connect_ack_body_roundtrip OK")
 
 
@@ -710,14 +718,17 @@ def test_link_uses_waveform_mode_contract():
             self.encoded = 0
             self.decoded = 0
 
-        def encode(self, payload, profile, *, include_head=True, include_tail=True):
+        def encode(self, payload, profile, *, include_head=True, include_tail=True,
+                   head_seconds=framing.HEAD_PAD_SECONDS,
+                   tail_seconds=framing.TAIL_PAD_SECONDS):
             self.encoded += 1
             return afsk.modulate(payload, profile=profile, include_head=include_head,
-                                 include_tail=include_tail)
+                                 include_tail=include_tail, head_seconds=head_seconds,
+                                 tail_seconds=tail_seconds)
 
-        def decode(self, audio, profile):
+        def decode(self, audio, profile, **kwargs):
             self.decoded += 1
-            return afsk.demodulate(audio, profile=profile)
+            return afsk.demodulate(audio, profile=profile, **kwargs)
 
         def airtime(self, payload_len, profile):
             return afsk.frame_seconds(payload_len, profile)
@@ -822,37 +833,27 @@ def test_seq_ahead_wraps():
     print("test_seq_ahead_wraps OK")
 
 
-def test_await_turnaround_is_anchored_on_peer_audio():
-    """The wait is measured from when the peer's audio ended, so time
-    already spent decoding does not get charged twice."""
+def test_await_turnaround_does_not_add_dead_air():
+    """Effective clipping is absorbed by the calibrated head sequence."""
     a = link.Link(_FakeTransport(), "STA1")
     saved = link.TX_TURNAROUND_DELAY
     link.TX_TURNAROUND_DELAY = 0.4
     try:
-        # An anchor from seconds ago does not mean the channel went quiet
-        # seconds ago -- it means we lost track of the peer that long ago,
-        # which is the worst moment to key up. Wait in full instead.
         a._peer_unkeyed_at = time.monotonic() - 5.0
         start = time.monotonic()
         a._await_turnaround()
-        assert time.monotonic() - start >= 0.35, "stale anchor must not skip the wait"
-
-        # Anchor is consumed, so the next transmission has nothing to
-        # measure from and waits the whole allowance.
+        assert time.monotonic() - start < 0.05
         assert a._peer_unkeyed_at is None
         start = time.monotonic()
         a._await_turnaround()
-        assert time.monotonic() - start >= 0.35, "no anchor should wait in full"
-
-        # A fresh anchor waits out only the remainder.
+        assert time.monotonic() - start < 0.05
         a._peer_unkeyed_at = time.monotonic() - 0.3
         start = time.monotonic()
         a._await_turnaround()
-        waited = time.monotonic() - start
-        assert 0.02 < waited < 0.25, waited
+        assert time.monotonic() - start < 0.05
     finally:
         link.TX_TURNAROUND_DELAY = saved
-    print("test_await_turnaround_is_anchored_on_peer_audio OK")
+    print("test_await_turnaround_does_not_add_dead_air OK")
 
 
 def test_link_multi_chunk_message_roundtrip():
@@ -1144,13 +1145,14 @@ if __name__ == "__main__":
     test_link_packet_roundtrip()
     test_connect_body_roundtrip()
     test_connect_ack_body_roundtrip()
+    test_timing_measurements_derive_guarded_session_pads()
     test_negotiate_mode()
     test_link_uses_waveform_mode_contract()
     test_mode_change_packet_roundtrip()
     test_demodulate_returns_the_earliest_frame_not_the_loudest()
     test_sync_confidence_does_not_depend_on_surrounding_silence()
     test_seq_ahead_wraps()
-    test_await_turnaround_is_anchored_on_peer_audio()
+    test_await_turnaround_does_not_add_dead_air()
     test_roles_assigned_at_connect()
     test_irs_can_request_and_use_the_floor()
     test_concurrent_send_attempts_do_not_collide()
