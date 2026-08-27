@@ -213,7 +213,8 @@ class StationServer:
 
 def main():
     ap = argparse.ArgumentParser(description=__doc__)
-    ap.add_argument("--radio", required=True, help="radio name from shark/hw/radios.py (ic705, ht, ic7300)")
+    ap.add_argument("--radio", required=True, help="radio name from the configured inventory")
+    ap.add_argument("--radio-config", help="TOML radio inventory (or set WHALE_RADIO_CONFIG)")
     ap.add_argument("--mycall", required=True)
     ap.add_argument("--cmd-port", type=int, default=8300)
     ap.add_argument("--data-port", type=int, default=8301)
@@ -224,7 +225,7 @@ def main():
     logging.basicConfig(level=logging.DEBUG if args.verbose else logging.INFO,
                          format="%(asctime)s %(levelname)s %(name)s: %(message)s")
 
-    service = ModemService.for_radio(args.radio, args.mycall)
+    service = ModemService.for_radio(args.radio, args.mycall, radio_config=args.radio_config)
     server = StationServer(service, args.mycall, args.cmd_port, args.data_port, args.host)
     server.serve_forever()
 

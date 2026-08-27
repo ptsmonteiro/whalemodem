@@ -131,10 +131,8 @@ RX_BUFFER_SECONDS = 10.0
 class RadioTransport:
     """One radio: continuous RX capture + on-demand keyed TX."""
 
-    def __init__(self, radio_name: str):
-        if radio_name not in radios_mod.RADIOS:
-            raise ValueError(f"unknown radio {radio_name!r}; have {list(radios_mod.RADIOS)}")
-        self.radio = radios_mod.RADIOS[radio_name]
+    def __init__(self, radio_name: str, radio_config=None):
+        self.radio = radios_mod.get_radio(radio_name, radio_config)
         self.out_device, self.in_device = self.radio.devices()
         self.ptt = self.radio.ptt()
 
@@ -219,7 +217,7 @@ class RadioTransport:
 
     # -- transmit -------------------------------------------------------
 
-    def send(self, tx_audio, ptt_lead=PTT_LEAD, ptt_tail=PTT_TAIL, retries=5):
+    def send(self, tx_audio, ptt_lead=None, ptt_tail=None, retries=5):
         """Keys PTT, plays tx_audio, un-keys. Returns the key-to-unkey
         duration in seconds -- the frame's actual air time. RX capture keeps
         running throughout (see module docstring); half duplex is enforced
@@ -242,6 +240,9 @@ class RadioTransport:
         raised PaErrorCode -9996, and the retry loop's natural instinct was
         to key again -- into a radio whose CI-V had stopped answering.
         """
+        timing = getattr(self.radio, "timing", None)
+        ptt_lead = getattr(timing, "lead", PTT_LEAD) if ptt_lead is None else ptt_lead
+        ptt_tail = getattr(timing, "tail", PTT_TAIL) if ptt_tail is None else ptt_tail
         with self._tx_lock:
             _ensure_com_initialized()
             self._transmitting.set()

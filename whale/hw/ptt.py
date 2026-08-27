@@ -1,4 +1,4 @@
-"""PTT control mechanisms. Which radio uses which is set in radios.py.
+"""Low-level serial PTT mechanisms used by the built-in backends.
 
 IC-705:  keyed via CI-V ("Transmit ON/OFF", cmd 0x1C 0x00) over its USB CDC
          serial port. The IC-705 enumerates two COM ports (CI-V + GPS NMEA);

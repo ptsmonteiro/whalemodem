@@ -59,11 +59,11 @@ class ModemService:
         self._link.on_event = self._on_link_event
 
     @classmethod
-    def for_radio(cls, radio_name: str, mycall: str, **kwargs) -> "ModemService":
+    def for_radio(cls, radio_name: str, mycall: str, radio_config=None, **kwargs) -> "ModemService":
         """Production composition root for the current radio/link stack."""
         from whale.transport import RadioTransport
 
-        return cls(Link(RadioTransport(radio_name), mycall), **kwargs)
+        return cls(Link(RadioTransport(radio_name, radio_config), mycall), **kwargs)
 
     @property
     def state(self) -> str:
