@@ -13,14 +13,14 @@ yet.
 
 - Multi-bit integers and bytes are transmitted most-significant bit first.
 - One radio keying carries exactly one link packet.
-- Every keying starts with one fixed-size robust bootstrap header. A packet
-  may additionally have one body frame; packets are not bundled.
+- One keying carries one complete link packet in one waveform. Control packets
+  use the robust control mode; DATA packets use the negotiated data mode.
 
 ## Processing chain
 
 ```text
 link packet
-  -> robust bootstrap header and optional body frame (`whale.framing`)
+  -> checked header and optional body (`whale.framing`)
   -> waveform audio (`whale.afsk` for the built-in modes)
   -> keyed, half-duplex radio (`whale.transport`)
 ```
@@ -49,13 +49,13 @@ amplitude ramp at each end and a nominal amplitude of 0.6.
 
 | Mode ID | Name | Baud | 0 tone | 1 tone | DATA chunk size |
 | ---: | --- | ---: | ---: | ---: | ---: |
-| `0` | `300baud` | 300 | 1200 Hz | 1800 Hz | 78 bytes |
-| `1` | `600baud` | 600 | 1200 Hz | 1800 Hz | 161 bytes |
-| `2` | `1200baud` | 1200 | 1200 Hz | 2200 Hz | 326 bytes |
+| `0` | `300baud` | 300 | 1200 Hz | 1800 Hz | 88 bytes |
+| `1` | `600baud` | 600 | 1200 Hz | 1800 Hz | 193 bytes |
+| `2` | `1200baud` | 1200 | 1200 Hz | 2200 Hz | 402 bytes |
 
-Mode 0 is the mandatory bootstrap and robust-body profile. Every keying begins
-in mode 0. CONNECT and CONNECT_ACK bodies also use it. DATA bodies use the
-negotiated profile; DATA_ACK is wholly contained in the robust header. The two directions
+Mode 0 is the mandatory robust control profile. Control packets use it for the
+complete keying. DATA packets use the negotiated profile for both header and
+body. The two directions
 are negotiated and adapted independently as described in
 [`LINK.md`](LINK.md#mode-adaptation).
 
@@ -69,55 +69,52 @@ The current profiles do not use forward-error correction or interleaving. A
 CRC detects corrupted frames; recovery is performed by the link layer through
 acknowledgements and retransmission.
 
-The CRC is CRC-16/CCITT-FALSE over `Length || Payload`. Its parameters are
+Both CRC fields use CRC-16/CCITT-FALSE. The header CRC covers
+`Length || Header`; the optional body CRC covers `Body`. The parameters are
 polynomial `0x1021`, initial value `0xffff`, no reflected input or output, and
 no final XOR. The CRC byte containing bits 15..8 is sent first.
 
-## Keying and bootstrap-header format
+## Checked packet format
 
-Every keying is `robust bootstrap frame | optional body frame`. The bootstrap
-is the fixed 10-byte payload of the generic mode-0 frame described below. Its
-CRC therefore protects every decoder-control field:
+After one mode-specific sync, every keying carries a fixed 10-byte header,
+its CRC, an optional body, and a separate body CRC. The header CRC protects
+every decoder-control field before the receiver collects the body:
 
 | Field | Size | Meaning |
 | --- | ---: | --- |
 | Magic | 2 bytes | ASCII `WH` |
 | Header version | 1 byte | `0x01` |
 | Link packet type | 1 byte | Type defined in `LINK.md` |
-| Body mode ID | 1 byte | Mode used for the optional body |
+| Mode ID | 1 byte | Mode used for this complete keying |
 | Inline length | 1 byte | `0..2` |
 | Body length | 2 bytes | Decoded optional-body bytes, big-endian |
 | Inline bytes | 2 bytes | First packet-body bytes, zero-padded |
 
 Padding after the declared inline bytes must be zero. An unknown version or
 mode, invalid inline length, or nonzero inline padding invalidates the header.
-The body length is trusted only after the bootstrap CRC succeeds. The current
+The body length is trusted only after the header CRC succeeds. The current
 semantic limits require DATA bodies not to exceed the selected mode's chunk
 size and management-body remainders not to exceed 128 bytes; impossible
 type/mode/length combinations are rejected before waiting for a body.
 
-A zero-length body is omitted. Empty controls, one-byte mode messages, and the
-two-byte DATA_ACK therefore use only the bootstrap. Longer packets place their
-first two body bytes inline and their remainder in the announced body mode.
-Currently that body is a complete self-synchronizing generic frame with its own
-length and CRC. This deliberately pays a second sync so existing waveform
-decoders can be dispatched unchanged. A later optimization may replace it with
-short mode-specific training whose exact extent is derived from the header.
+A zero-length body and its CRC are omitted. Empty controls, one-byte mode
+messages, and the two-byte DATA_ACK therefore end after the header CRC. Longer
+packets place their first two link-body bytes inline and their remainder after
+the checked header in the same waveform.
 
-## Generic mode frame
+## Generic mode packet
 
-The bootstrap and, currently, every non-empty body use this frame. The head
-and tail pads are outer-keying fields: a header-only keying has both; when a
-body follows, the bootstrap omits its tail and the body omits its head. Thus
-there is exactly one head pad and one tail pad per PTT keying:
+Each keying uses this structure continuously in its selected mode:
 
 | Field | Size | Description |
 | --- | ---: | --- |
 | Head pad | `ceil(1.0 * baud)` bits | Alternating `0,1,...`; discarded |
 | Sync | Baud-dependent | One full PN sequence, approximately 0.21 seconds |
-| Length | 16 bits | Number of payload bytes, `0..65535`, big-endian |
-| Payload | `Length * 8` bits | Bootstrap header or body bytes |
-| CRC | 16 bits | CRC-16/CCITT-FALSE over `Length || Payload` |
+| Length | 16 bits | Total header-plus-body bytes, big-endian |
+| Header | 10 bytes | Fixed header above |
+| Header CRC | 16 bits | CRC over `Length || Header` |
+| Body | Declared length | Optional non-inline body bytes |
+| Body CRC | 16 bits | CRC over Body; omitted for an empty body |
 | Tail pad | `ceil(1.0 * baud)` bits | Alternating `0,1,...`; discarded |
 
 The sync word is an m-sequence selected to last approximately 0.21 seconds at
@@ -131,8 +128,8 @@ of fixed-duration receiver startup loss, approximately constant across modes:
 | 1200 | 8 | 1, 3, 4, 8 | 255 | 212.5 ms |
 
 The implementation also defines order 9, taps 1, 3, 5, 9, for a 511-bit sync
-at 2400 baud. A non-empty keying currently contains one mode-0 sync for its
-bootstrap and one body-mode sync. On each LFSR step the least-significant state bit is emitted,
+at 2400 baud. Every keying contains exactly one sync in its selected mode. On
+each LFSR step the least-significant state bit is emitted,
 the configured one-based tap positions are XORed for feedback, the state shifts
 right, and the feedback bit enters the highest position. Every sequence starts
 with seed 1 and spans the full `2^order - 1` period.
@@ -145,17 +142,17 @@ The control profile's order-6 sequence is:
 
 The length field can represent a 65,535-byte payload, but the built-in profiles
 do not send frames remotely that large. Useful framed audio is capped at 3.0
-seconds across the robust bootstrap and optional body. Here, useful audio is
-sync, length, payload, and CRC; it excludes the outer head/tail throwaway
+seconds across the complete packet. Here, useful audio is sync, length,
+header, body, and CRCs; it excludes the outer head/tail throwaway
 symbols and transport startup. Each profile's DATA chunk size is the largest
 value that fits this budget. Total keying time is calculated separately and
 will vary with the selected timing protection.
 
-The generic length is untrusted until the trailing CRC arrives. A bootstrap
-must decode to exactly 10 bytes. A body must equal the length announced by its
-already checked bootstrap. To prevent a false sync
-and random 16-bit length from making the streaming decoder retain or repeatedly
-process an impossible amount of audio, CPFSK rejects a declaration whose frame
+The generic length becomes trusted when the fixed header CRC arrives, before
+the optional body. The header's body length must agree with the generic length.
+To prevent a false sync and random 16-bit length from making the streaming
+decoder retain or repeatedly process an impossible amount of audio, CPFSK
+rejects a declaration whose frame
 would exceed eight seconds from sync through CRC. The receive audio buffer is
 capped at ten seconds, and searched audio is pruned while retaining enough for
 the longest currently expected frame.
@@ -176,7 +173,7 @@ the audio device. Leading and trailing protection is carried entirely by the
 one-second throwaway symbol pads. Receive capture remains open during
 transmission, but captured self-audio is cleared around each local keying.
 
-Control acknowledgement timeouts include the robust bootstrap and any robust
-management body. DATA acknowledgement timeouts include the outbound bootstrap
-plus negotiated DATA body, the inbound header-only DATA_ACK, two 0.4-second
+Control acknowledgement timeouts include the complete robust management
+packet. DATA acknowledgement timeouts include the negotiated DATA packet, the
+robust header-only DATA_ACK, two 0.4-second
 turnaround allowances, and a three-second margin.

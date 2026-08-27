@@ -1,11 +1,13 @@
-"""Bit-level framing for the AFSK link: sync word, length+CRC16, bit packing.
+"""Bit-level framing for the AFSK link: sync, checked header/body, bit packing.
 
 Frame layout (bits, MSB first):
     sync word (PN sequence -- good autocorrelation for sync search; its
               length depends on baud, see sync_bits)
-    length    (16 bits, big endian, payload length in bytes, 0-65535)
-    payload   (8 * length bits)
-    crc16     (16 bits, over the length field + payload)
+    length    (16 bits, big endian, complete payload length)
+    header    (the first 10 payload bytes)
+    header crc16 (over length + header)
+    body      (the remaining payload bytes, if any)
+    body crc16 (over body, present only when the body is non-empty)
 """
 
 import functools
@@ -118,15 +120,17 @@ def sync_bits(baud):
 LENGTH_FIELD_BITS = 16
 MAX_PAYLOAD_BYTES = (1 << LENGTH_FIELD_BITS) - 1
 
-# Fixed decoded size of the robust bootstrap header carried at the start of
-# every link-layer keying. Its fields are specified in FRAMING.md and encoded
+# Fixed decoded size of the checked header carried after the one sync in every
+# link-layer keying. Its fields are specified in FRAMING.md and encoded
 # by whale.link. Keeping the size here lets airtime budgeting remain in the
 # physical layer without importing the link protocol.
-BOOTSTRAP_HEADER_BYTES = 10
-BOOTSTRAP_BAUD = 300
+AIR_HEADER_BYTES = 10
+# Compatibility alias for code outside the package. This is no longer a
+# separately modulated bootstrap frame.
+BOOTSTRAP_HEADER_BYTES = AIR_HEADER_BYTES
 
 # Extra dummy bits appended after the final CRC of a keying, purely as on-air
-# padding. A bootstrap omits them when a body follows. Real
+# padding. Real
 # hardware corrupts the very end of a transmission -- our own 5ms amplitude
 # ramp-down, plus a symbol or so of radio audio tail -- and since
 # parse_frame_bits only reads the exact prefix it needs and ignores anything
@@ -156,8 +160,7 @@ def tail_pad_bits(baud):
     return [i % 2 for i in range(n)]
 
 
-# Mirrors tail_pad_bits, but at the front of the complete keying. A body frame
-# omits it because the bootstrap has already supplied it. Content doesn't matter
+# Mirrors tail_pad_bits, but at the front of the complete keying. Content doesn't matter
 # (thrown away, never parsed); what it buys is settling time, scaled to
 # duration rather than bit count so it doesn't shrink as baud rises.
 #
@@ -292,11 +295,22 @@ def bits_to_bytes(bits) -> bytes:
 def build_frame_bits(payload: bytes, baud=300, *, include_head=True, include_tail=True):
     if len(payload) > MAX_PAYLOAD_BYTES:
         raise ValueError(f"payload too long ({len(payload)} > {MAX_PAYLOAD_BYTES})")
-    body = len(payload).to_bytes(LENGTH_FIELD_BITS // 8, "big") + payload
-    crc = crc16_ccitt_false(body)
-    crc_bytes = bytes([(crc >> 8) & 0xFF, crc & 0xFF])
+    length = len(payload).to_bytes(LENGTH_FIELD_BITS // 8, "big")
+    # Retain the generic codec's small-payload form for physical-layer tests
+    # and non-link users. Link packets are always at least AIR_HEADER_BYTES.
+    if len(payload) < AIR_HEADER_BYTES:
+        checked = length + payload
+        checked += crc16_ccitt_false(checked).to_bytes(2, "big")
+        return ((head_pad_bits(baud) if include_head else []) + sync_bits(baud)
+                + bytes_to_bits(checked)
+                + (tail_pad_bits(baud) if include_tail else []))
+    header, body = payload[:AIR_HEADER_BYTES], payload[AIR_HEADER_BYTES:]
+    header_crc = crc16_ccitt_false(length + header).to_bytes(2, "big")
+    checked = length + header + header_crc
+    if body:
+        checked += body + crc16_ccitt_false(body).to_bytes(2, "big")
     return ((head_pad_bits(baud) if include_head else []) + sync_bits(baud)
-            + bytes_to_bits(body + crc_bytes)
+            + bytes_to_bits(checked)
             + (tail_pad_bits(baud) if include_tail else []))
 
 
@@ -320,9 +334,35 @@ def declared_length(bits_after_sync):
 
 
 def frame_bits_for_length(length):
-    """Bits from the start of the length field to the end of the CRC, for a
-    frame declaring `length` bytes of payload."""
-    return LENGTH_FIELD_BITS + 8 * length + 16
+    """Bits from the length field through the final applicable CRC."""
+    if length < AIR_HEADER_BYTES:
+        return LENGTH_FIELD_BITS + 8 * length + 16
+    body_len = length - AIR_HEADER_BYTES
+    return (LENGTH_FIELD_BITS + 8 * AIR_HEADER_BYTES + 16
+            + 8 * body_len + (16 if body_len else 0))
+
+
+def header_is_valid(bits_after_sync):
+    """Whether a complete fixed header is present and passes its CRC."""
+    length = declared_length(bits_after_sync)
+    if length is None:
+        return None
+    if length < AIR_HEADER_BYTES:
+        small_needed = frame_bits_for_length(length)
+        if len(bits_after_sync) < small_needed:
+            return None
+        checked_end = LENGTH_FIELD_BITS + 8 * length
+        checked = bits_to_bytes(bits_after_sync[:checked_end])
+        received = int.from_bytes(
+            bits_to_bytes(bits_after_sync[checked_end:small_needed]), "big")
+        return crc16_ccitt_false(checked) == received
+    prefix_bits = LENGTH_FIELD_BITS + 8 * AIR_HEADER_BYTES
+    needed = prefix_bits + 16
+    if len(bits_after_sync) < needed:
+        return None
+    prefix = bits_to_bytes(bits_after_sync[:prefix_bits])
+    received = int.from_bytes(bits_to_bytes(bits_after_sync[prefix_bits:needed]), "big")
+    return crc16_ccitt_false(prefix) == received
 
 
 def parse_frame_bits(bits_after_sync):
@@ -334,10 +374,25 @@ def parse_frame_bits(bits_after_sync):
     total_bits = frame_bits_for_length(length)
     if len(bits_after_sync) < total_bits:
         return None
-    body_bits = LENGTH_FIELD_BITS + 8 * length
-    body = bits_to_bytes(bits_after_sync[0:body_bits])
-    crc_bytes = bits_to_bytes(bits_after_sync[body_bits:total_bits])
-    crc_received = (crc_bytes[0] << 8) | crc_bytes[1]
-    if crc16_ccitt_false(body) != crc_received:
+    if length < AIR_HEADER_BYTES:
+        checked_end = LENGTH_FIELD_BITS + 8 * length
+        checked = bits_to_bytes(bits_after_sync[:checked_end])
+        received = int.from_bytes(bits_to_bytes(bits_after_sync[checked_end:total_bits]), "big")
+        if crc16_ccitt_false(checked) != received:
+            return None
+        return checked[LENGTH_FIELD_BITS // 8:]
+    if header_is_valid(bits_after_sync) is not True:
         return None
-    return body[LENGTH_FIELD_BITS // 8:]
+    header_start = LENGTH_FIELD_BITS
+    header_end = header_start + 8 * AIR_HEADER_BYTES
+    header = bits_to_bytes(bits_after_sync[header_start:header_end])
+    body_len = length - AIR_HEADER_BYTES
+    if not body_len:
+        return header
+    body_start = header_end + 16
+    body_end = body_start + 8 * body_len
+    body = bits_to_bytes(bits_after_sync[body_start:body_end])
+    received = int.from_bytes(bits_to_bytes(bits_after_sync[body_end:body_end + 16]), "big")
+    if crc16_ccitt_false(body) != received:
+        return None
+    return header + body

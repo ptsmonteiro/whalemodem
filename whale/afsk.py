@@ -120,7 +120,7 @@ _ENERGY_FLOOR_FRACTION = 0.05
 # max_chunk_for_useful_frame.
 CHUNK_SIZE = 40
 
-# DATA type and flags/sequence now live in the robust bootstrap header; the
+# DATA type and flags/sequence live in the checked packet header; the
 # negotiated body contains chunk bytes only.
 DATA_FRAME_HEADER_BYTES = 0
 
@@ -303,15 +303,13 @@ def max_payload_for_useful_frame(baud, budget=MAX_USEFUL_FRAME_SECONDS):
 
 
 def max_chunk_for_useful_frame(baud, budget=MAX_USEFUL_FRAME_SECONDS):
-    """Largest DATA body after paying for the useful bootstrap audio."""
-    bootstrap_seconds = (frame_bits(framing.BOOTSTRAP_HEADER_BYTES,
-                                    framing.BOOTSTRAP_BAUD, include_head=False,
-                                    include_tail=False)
-                         / framing.BOOTSTRAP_BAUD)
-    body_budget = budget - bootstrap_seconds
-    spare_bits = body_budget * baud - frame_bits(
-        0, baud, include_head=False, include_tail=False)
-    return max(0, min(int(spare_bits // 8), framing.MAX_PAYLOAD_BYTES))
+    """Largest DATA body in one checked packet under the useful budget."""
+    size = 0
+    while (size < framing.MAX_PAYLOAD_BYTES - framing.AIR_HEADER_BYTES
+           and frame_bits(framing.AIR_HEADER_BYTES + size + 1, baud,
+                          include_head=False, include_tail=False) / baud <= budget):
+        size += 1
+    return size
 
 
 PROFILE_300 = Profile(name="300baud", mode_id=0, baud=BAUD, freq0=FREQ_0, freq1=FREQ_1,
@@ -541,23 +539,19 @@ def keying_seconds(payload_len=framing.MAX_PAYLOAD_BYTES, profile: Profile = PRO
 
 
 def data_keying_seconds(chunk_len, profile: Profile = PROFILE_300):
-    """Complete DATA keying: robust bootstrap plus negotiated body."""
-    return (KEYING_OVERHEAD_SECONDS
-            + frame_seconds(framing.BOOTSTRAP_HEADER_BYTES, PROFILE_300,
-                            include_tail=False)
-            + frame_seconds(chunk_len, profile, include_head=False))
+    """Complete single-waveform DATA keying."""
+    return KEYING_OVERHEAD_SECONDS + frame_seconds(
+        framing.AIR_HEADER_BYTES + chunk_len, profile)
 
 
 def useful_data_seconds(chunk_len, profile: Profile = PROFILE_300):
-    """DATA audio from sync through CRC across bootstrap and body.
+    """DATA audio from sync through the header and optional body CRC.
 
     This is the bounded part; outer timing protection and transport latency
     are intentionally absent.
     """
-    return (frame_seconds(framing.BOOTSTRAP_HEADER_BYTES, PROFILE_300,
-                          include_head=False, include_tail=False)
-            + frame_seconds(chunk_len, profile, include_head=False,
-                            include_tail=False))
+    return frame_seconds(framing.AIR_HEADER_BYTES + chunk_len, profile,
+                         include_head=False, include_tail=False)
 
 
 # How many correlation peaks demodulate() will attempt to decode in one
@@ -648,6 +642,19 @@ def _try_sync(diff, i_star, sps, confidence, max_credible_bits, n_sync):
     sample_indices = first_index + sps * np.arange(num_symbols)
     decoded_bits = (diff[sample_indices] > 0).astype(int).tolist()
 
+    header_valid = framing.header_is_valid(decoded_bits[n_sync:])
+    if header_valid is False:
+        return {
+            "synced": False,
+            "confidence": confidence,
+            "start_index": i_star,
+            "sync_end_index": i_star + sps * n_sync,
+            "end_index": i_star + sps * min(
+                n_sync + framing.frame_bits_for_length(framing.AIR_HEADER_BYTES),
+                num_symbols),
+            "payload": None,
+        }
+
     payload = framing.parse_frame_bits(decoded_bits[n_sync:])
     length = framing.declared_length(decoded_bits[n_sync:])
     total_bits_needed = n_sync + framing.frame_bits_for_length(length)
@@ -682,7 +689,7 @@ def _try_sync(diff, i_star, sps, confidence, max_credible_bits, n_sync):
         # sps-1 sample group delay. Buffer coordinates are based on the input
         # audio, so do not carry that delay into the consumed boundary. Tail
         # padding used to hide this over-consumption; adjacent unpadded
-        # bootstrap/body waveforms make the exact boundary observable.
+        # Adjacent unpadded waveforms make the exact boundary observable.
         result["end_index"] = i_star + sps * min(total_bits_needed, num_symbols)
     return result
 

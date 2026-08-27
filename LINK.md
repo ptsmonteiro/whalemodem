@@ -27,14 +27,13 @@ local application bytes
   -> keyed, half-duplex radio (`whale.transport`)
 ```
 
-The robust bootstrap header and optional body consumed by the link layer are
-defined in [`FRAMING.md`](FRAMING.md#keying-and-bootstrap-header-format).
+The checked header and optional body consumed by the link layer are
+defined in [`FRAMING.md`](FRAMING.md#checked-packet-format).
 
 ## Link packets
 
-Every keying's checked robust bootstrap carries the packet type. Up to two
-packet-body bytes are inline in that header; any remainder follows as the
-optional body frame.
+Every keying's checked header carries the packet type. Up to two packet-body
+bytes are inline; any remainder follows in the same waveform.
 
 | Type | Name | Body | Profile |
 | ---: | --- | --- | --- |
@@ -43,7 +42,7 @@ optional body frame.
 | `0x03` | DISC | Empty | control |
 | `0x04` | DISC_ACK | Empty | control |
 | `0x05` | DATA | Flags/sequence inline, then chunk body | negotiated body |
-| `0x06` | DATA_ACK | Answered and next-expected sequences inline | bootstrap only |
+| `0x06` | DATA_ACK | Answered and next-expected sequences inline | control |
 | `0x07` | MODE_REQ | Proposed mode ID | control |
 | `0x08` | MODE_ACK | Accepted mode ID | control |
 | `0x09` | FLOOR_REQ | Empty | control |

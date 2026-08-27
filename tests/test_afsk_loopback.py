@@ -30,6 +30,27 @@ def test_framing_roundtrip():
     print("test_framing_roundtrip OK")
 
 
+def test_link_header_and_body_have_independent_crcs():
+    header, body = link._encode_air_header(link.PT_DATA, afsk.PROFILE_600.mode_id,
+                                           b"\x07payload")
+    bits = framing.build_frame_bits(header + body, baud=600,
+                                    include_head=False, include_tail=False)
+    after_sync = bits[len(framing.sync_bits(600)):]
+    assert framing.header_is_valid(after_sync) is True
+    assert framing.parse_frame_bits(after_sync) == header + body
+
+    bad_header = after_sync.copy()
+    bad_header[framing.LENGTH_FIELD_BITS + 3] ^= 1
+    assert framing.header_is_valid(bad_header) is False
+
+    bad_body = after_sync.copy()
+    body_start = (framing.LENGTH_FIELD_BITS
+                  + 8 * framing.AIR_HEADER_BYTES + 16)
+    bad_body[body_start + 3] ^= 1
+    assert framing.header_is_valid(bad_body) is True
+    assert framing.parse_frame_bits(bad_body) is None
+
+
 def test_sync_words_are_full_period_m_sequences():
     """Each profile's sync word must really be an m-sequence, because that
     is the whole reason it works as a correlation target: an m-sequence's

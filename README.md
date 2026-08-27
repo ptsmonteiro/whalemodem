@@ -325,16 +325,16 @@ the first thing a clock difference takes away.
 
 Useful framed audio is capped at three seconds by
 `afsk.MAX_USEFUL_FRAME_SECONDS`. This includes sync, length, payload, and CRC
-across the bootstrap and optional body, but excludes the outer timing pads and
+across the checked header and optional body, but excludes the outer timing pads and
 transport startup. Every profile's `chunk_size` is whatever fits that useful
 budget (`afsk.max_chunk_for_useful_frame`). Total PTT occupancy is separate
 because adaptive head/tail timing will make it radio-pair dependent:
 
 | profile | chunk | AFSK payload | useful | current keying | payload bits/s |
 |---------|-------|--------------|-------|--------|----------------|
-| 300 baud  |  78 |  78 | 2.98s | 5.14s | 121 |
-| 600 baud  | 161 | 161 | 3.00s | 5.16s | 250 |
-| 1200 baud | 326 | 326 | 3.00s | 5.16s | 506 |
+| 300 baud  |  88 |  88 | 2.98s | 5.14s | 137 |
+| 600 baud  | 193 | 193 | 3.00s | 5.16s | 299 |
+| 1200 baud | 402 | 402 | 3.00s | 5.16s | 623 |
 
 Three things worth knowing about that table:
 
@@ -365,11 +365,10 @@ Three things worth knowing about that table:
     thing to check on hardware whose clocks are not that close.
 
 The output stream contributes about 0.16s of startup/fill time to total
-occupancy, but not to the useful-frame restriction. A body-bearing packet
-still contains two independently synchronized waveforms, but only the bootstrap carries the
-one-second outer head and only the body carries the one-second outer tail.
-There is no padding or amplitude ramp at their internal join. The conservative
-one-second outer pads increase total occupancy without reducing useful payload.
+occupancy, but not to the useful-frame restriction. A packet contains one sync
+and one continuous waveform. Its header and optional body have separate CRCs,
+and the one-second head and tail pads remain outer-keying protection. The
+conservative pads increase total occupancy without reducing useful payload.
 
 Both runs passed 1 KB each way byte-for-byte with **no retransmit, no
 near-miss decode and no rx-profile correction** on either leg. Those runs
@@ -468,6 +467,6 @@ bandwidth selection, WINLINK-specific extensions.
 - Chunk size is fixed per profile -- the largest that fits the keying
   budget, see "How long one keying may be" -- and timeouts derive from it,
   but neither adapts to how the channel is actually behaving. A lost frame
-  costs a whole chunk to resend, and at 1200 baud that is now 325 bytes.
+  costs a whole chunk to resend, and at 1200 baud that is now 402 bytes.
 - Throughput is low; this was optimized for correctness on noisy real
   hardware, not speed.
