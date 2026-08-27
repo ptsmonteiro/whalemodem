@@ -625,7 +625,7 @@ def _sync_peaks(score, threshold_value, min_separation):
     return peaks
 
 
-def _try_sync(diff, i_star, sps, confidence, max_credible_bits, n_sync):
+def _try_sync(diff, i_star, sps, confidence, max_credible_bits, n_sync, baud):
     """Attempts to read a frame at one correlation peak. Same return shape
     as demodulate(). `n_sync` is the sync word's length in bits at this
     profile's baud -- it sets where the length field starts, so it has to
@@ -679,7 +679,39 @@ def _try_sync(diff, i_star, sps, confidence, max_credible_bits, n_sync):
         # word: a length we have just called implausible is not a length to
         # measure a skip with.
         result["end_index"] = result["sync_end_index"]
-    elif payload is not None or max_symbols >= total_bits_needed:
+    elif payload is not None:
+        # Do not return until the complete nominal tail interval has passed:
+        # a short observation on the first decode poll would otherwise look
+        # exactly like clipping. Continuous RX supplies silence or noise for
+        # genuinely clipped symbols, so the wait remains bounded.
+        head_bits = framing.head_pad_bits(baud)
+        tail_bits = framing.tail_pad_bits(baud)
+        if max_symbols < total_bits_needed + len(tail_bits):
+            result["payload"] = None
+            return result
+
+        def adjacent_matches(expected, indices):
+            count = 0
+            for bit, index in zip(expected, indices):
+                if index < 0 or index >= len(diff) or (diff[index] > 0) != bool(bit):
+                    break
+                count += 1
+            return count
+
+        # Walk away from the checked frame boundaries. The head sequence is
+        # inspected backwards from sync; the tail sequence forwards from the
+        # final CRC. Only contiguous aligned symbols count.
+        result["head_symbols_received"] = adjacent_matches(
+            reversed(head_bits),
+            (first_index - sps * offset for offset in range(1, len(head_bits) + 1)),
+        )
+        result["tail_symbols_received"] = adjacent_matches(
+            tail_bits,
+            (first_index + sps * (total_bits_needed + offset)
+             for offset in range(len(tail_bits))),
+        )
+        result["end_index"] = i_star + sps * (total_bits_needed + len(tail_bits))
+    elif max_symbols >= total_bits_needed:
         # Either it decoded, or we had every bit the claimed length says it
         # needed and it *still* didn't check out -- this one's done, safe
         # to skip past. If neither holds, the frame may just still be
@@ -732,7 +764,8 @@ def demodulate(audio, profile: Profile = PROFILE_300, sample_rate=SAMPLE_RATE):
     credible_bits = max_credible_frame_bits(profile.baud)
     n_sync = len(framing.sync_bits(profile.baud))
     for i_star in peaks:
-        result = _try_sync(diff, i_star, sps, float(ncc[i_star]), credible_bits, n_sync)
+        result = _try_sync(diff, i_star, sps, float(ncc[i_star]), credible_bits,
+                           n_sync, profile.baud)
         if result.get("payload") is not None:
             return result
         if "end_index" in result:

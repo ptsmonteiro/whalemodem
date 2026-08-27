@@ -203,7 +203,26 @@ def test_afsk_clean_loopback():
     result = afsk.demodulate(tx)
     assert result["synced"], result
     assert result["payload"] == payload, (result["payload"], payload)
+    assert result["head_symbols_received"] == len(framing.head_pad_bits(300))
+    assert result["tail_symbols_received"] == len(framing.tail_pad_bits(300))
     print("test_afsk_clean_loopback OK")
+
+
+def test_outer_symbol_measurements_report_clipping():
+    payload = b"outer timing probe"
+    profile = afsk.PROFILE_300
+    sps = round(afsk.SAMPLE_RATE / profile.baud)
+    head_clipped = 17
+    tail_clipped = 23
+    audio = afsk.modulate(payload, profile=profile)
+    clipped = audio[head_clipped * sps:len(audio) - tail_clipped * sps]
+    # Continuous capture continues after a transmitter is clipped/unkeyed.
+    clipped = np.concatenate([clipped, np.zeros(len(audio))])
+    result = afsk.demodulate(clipped, profile=profile)
+    assert result["payload"] == payload, result
+    assert result["head_symbols_received"] == len(framing.head_pad_bits(profile.baud)) - head_clipped
+    assert result["tail_symbols_received"] == len(framing.tail_pad_bits(profile.baud)) - tail_clipped
+    print("test_outer_symbol_measurements_report_clipping OK")
 
 
 def test_afsk_noisy_delayed_loopback():

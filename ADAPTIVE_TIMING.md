@@ -321,6 +321,15 @@ long-running connection, but neither is part of this design.
 
 ## Implementation outline
 
+The current diagnostic implementation measures the existing one-second outer
+pads on every successfully decoded frame. The decoder reports contiguous,
+aligned head and tail symbols adjacent to the sync word and final CRC. Receiver
+logs show the received symbol count and duration alongside the inferred
+clipped symbol count and duration. It waits for the nominal tail observation
+window before returning a frame so an in-progress tail is not misreported as
+clipping. These observations are not yet exchanged with the peer or used to
+change transmit padding.
+
 1. Implement and test the versioned, length-delimited CONNECT and CONNECT_ACK
    bodies from `LINK.md`, while retaining an explicitly selected legacy mode
    during migration.

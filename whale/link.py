@@ -797,7 +797,8 @@ class Link:
                 continue
             end = result.get("end_index", len(snap))
             self.transport.consume_rx(end)
-            self._finish_air_packet(ptype, inline + remainder, profile, snap, end)
+            self._finish_air_packet(ptype, inline + remainder, profile, snap, end,
+                                    result)
             return True
 
         pending = [result for candidate, result in results
@@ -818,12 +819,31 @@ class Link:
             self._prune_stale(len(snap))
         return False
 
-    def _finish_air_packet(self, ptype, body, profile, snap, end):
+    def _finish_air_packet(self, ptype, body, profile, snap, end, decode_result):
         trailing = max(0, len(snap) - end)
+        # CPFSK outer-pad measurement advances `end` through the observed
+        # tail, so that boundary is already the peer's nominal unkeying time.
+        # Other waveform codecs still end at the checked frame and retain the
+        # legacy trailing-duration estimate.
+        tail_already_observed = "tail_symbols_received" in decode_result
+        remaining_tail = 0.0 if tail_already_observed else PEER_TRAILING_TRANSMISSION
         self._peer_unkeyed_at = (time.monotonic() - trailing / profile.sample_rate
-                                 + PEER_TRAILING_TRANSMISSION)
+                                 + remaining_tail)
         logger.info("[%s] decoded %s body at profile %s", self.mycall,
                     _ptype_name(ptype), profile.name)
+        for side in ("head", "tail"):
+            received = decode_result.get(f"{side}_symbols_received")
+            if received is None:
+                continue
+            transmitted = len(getattr(framing, f"{side}_pad_bits")(profile.baud))
+            clipped = transmitted - received
+            logger.info(
+                "[%s] RX outer %s: received %d/%d symbols (%.1f ms), "
+                "clipped %d symbols (%.1f ms)",
+                self.mycall, side, received, transmitted,
+                received * 1000.0 / profile.baud,
+                clipped, clipped * 1000.0 / profile.baud,
+            )
         self._handle_raw(bytes([ptype]) + body, profile)
 
     def _capture_near_miss(self, snap, confidence):
