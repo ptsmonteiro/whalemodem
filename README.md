@@ -255,9 +255,9 @@ explanation (the detector integrates one symbol, so a tone below the baud
 rate gives it less than a full cycle) are in `PROFILE_1200`'s comment in
 `whale/afsk.py`.
 
-Frames carry a 63-bit PN sync word, a 16-bit length, the
-payload, a CRC16, and short blocks of on-air padding before the sync word
-and after the CRC, so that settling artifacts at either end of a
+Frames carry a duration-scaled PN sync word, a 16-bit length, the
+payload, a CRC16, and known PN padding before the sync word and after the CRC,
+so that settling artifacts at either end of a
 transmission eat padding rather than real bits. See the docstrings in
 `whale/afsk.py` and `whale/framing.py` for the details, and
 `whale/link.py` / `whale/transport.py` for the half-duplex, self-echo, and
@@ -266,8 +266,10 @@ WASAPI quirks this radio pair required working around.
 ## Air time
 
 Leading and trailing clipping protection is entirely in-band: every PTT keying
-carries one second of alternating throwaway symbols before its first sync and
-one second after its final CRC, rounded upward to a whole symbol. PTT is asserted immediately
+carries one second from distinct, protocol-fixed PN sequences before its first
+sync and after its final CRC, rounded upward to a whole symbol. Unlike the old
+alternating pads, these sequences make alignment and head-versus-tail identity
+unambiguous for adaptive-timing measurements. PTT is asserted immediately
 before output-stream setup and released immediately after confirmed playout;
 there is no configured carrier-only lead or tail sleep. This deliberately
 conservative baseline is intended to be replaced by connection-time adaptive

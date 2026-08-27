@@ -108,14 +108,34 @@ Each keying uses this structure continuously in its selected mode:
 
 | Field | Size | Description |
 | --- | ---: | --- |
-| Head pad | `ceil(1.0 * baud)` bits | Alternating `0,1,...`; discarded |
+| Head pad | `ceil(1.0 * baud)` bits | Fixed head PN sequence; discarded after measurement |
 | Sync | Baud-dependent | One full PN sequence, approximately 0.21 seconds |
 | Length | 16 bits | Total header-plus-body bytes, big-endian |
 | Header | 10 bytes | Fixed header above |
 | Header CRC | 16 bits | CRC over `Length || Header` |
 | Body | Declared length | Optional non-inline body bytes |
 | Body CRC | 16 bits | CRC over Body; omitted for an empty body |
-| Tail pad | `ceil(1.0 * baud)` bits | Alternating `0,1,...`; discarded |
+| Tail pad | `ceil(1.0 * baud)` bits | Fixed tail PN sequence; discarded after measurement |
+
+The head and tail pads are distinct order-15 maximal-length PN sequences.
+They use the same LFSR step convention described below for sync, seed
+`0x5a5a`, and these protocol-fixed taps:
+
+| Pad | Polynomial taps (one-based) | Full period |
+| --- | --- | ---: |
+| Head | 1, 15 | 32,767 bits |
+| Tail | 1, 2, 3, 15 | 32,767 bits |
+
+Each pad takes the first `ceil(1.0 * baud)` bits of its sequence. The long
+period makes symbol slips unambiguous, the two polynomials prevent a head from
+being accepted as a tail at the same alignment, and their prefixes exercise
+both FSK tones approximately equally. These definitions replace the former
+alternating pads and are an on-air format change.
+
+The built-in receiver measures each pad outward from its checked frame
+boundary with a 16-symbol sliding window. Up to two symbol errors per window
+are tolerated. On the third error, the whole failing window is excluded from
+the received count, keeping a noisy boundary estimate conservative.
 
 The sync word is an m-sequence selected to last approximately 0.21 seconds at
 the mode's baud. This keeps the acquisition interval, and therefore tolerance

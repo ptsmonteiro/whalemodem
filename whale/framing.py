@@ -154,14 +154,27 @@ BOOTSTRAP_HEADER_BYTES = AIR_HEADER_BYTES
 # silently shrinks at the next. See scripts/sweep_ptt_timing.py.
 TAIL_PAD_SECONDS = 1.0
 
+# The outer timing pads are measurements as well as protection, so they need
+# deterministic, alignment-safe content.  Alternating bits cannot distinguish
+# a one-symbol slip and used to give the head and tail identical content.
+# These two order-15 maximal-length sequences use different primitive
+# polynomials under _lfsr_bits' shift convention.  Their 32767-bit periods are
+# comfortably longer than every supported pad, and the nontrivial fixed seed
+# keeps the prefixes used by the current profiles close to tone-balanced.
+_PAD_LFSR_ORDER = 15
+_PAD_LFSR_SEED = 0x5A5A
+_HEAD_PAD_TAPS = (1, 15)
+_TAIL_PAD_TAPS = (1, 2, 3, 15)
+
 
 def tail_pad_bits(baud):
     n = math.ceil(TAIL_PAD_SECONDS * baud)
-    return [i % 2 for i in range(n)]
+    return _lfsr_bits(n, _PAD_LFSR_ORDER, _TAIL_PAD_TAPS,
+                      seed=_PAD_LFSR_SEED)
 
 
-# Mirrors tail_pad_bits, but at the front of the complete keying. Content doesn't matter
-# (thrown away, never parsed); what it buys is settling time, scaled to
+# Mirrors tail_pad_bits, but at the front of the complete keying. What it buys
+# is settling time, scaled to
 # duration rather than bit count so it doesn't shrink as baud rises.
 #
 # Note this is *not* the whole leading allowance, and not the expensive
@@ -270,7 +283,8 @@ HEAD_PAD_SECONDS = 1.0
 
 def head_pad_bits(baud):
     n = math.ceil(HEAD_PAD_SECONDS * baud)
-    return [i % 2 for i in range(n)]
+    return _lfsr_bits(n, _PAD_LFSR_ORDER, _HEAD_PAD_TAPS,
+                      seed=_PAD_LFSR_SEED)
 
 
 def bytes_to_bits(data: bytes):

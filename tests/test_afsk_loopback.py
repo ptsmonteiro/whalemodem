@@ -208,6 +208,44 @@ def test_afsk_clean_loopback():
     print("test_afsk_clean_loopback OK")
 
 
+def test_outer_pads_are_distinct_full_period_pn_sequences():
+    period = (1 << framing._PAD_LFSR_ORDER) - 1
+    head = framing._lfsr_bits(period, framing._PAD_LFSR_ORDER,
+                              framing._HEAD_PAD_TAPS,
+                              seed=framing._PAD_LFSR_SEED)
+    tail = framing._lfsr_bits(period, framing._PAD_LFSR_ORDER,
+                              framing._TAIL_PAD_TAPS,
+                              seed=framing._PAD_LFSR_SEED)
+    assert head != tail
+    assert len(set(head)) == len(set(tail)) == 2
+
+    # A full m-sequence visits every nonzero state exactly once before it
+    # returns to the seed. Check the state cycle, not just the output bits.
+    def state_period(taps):
+        state = framing._PAD_LFSR_SEED
+        seen = set()
+        while state not in seen:
+            seen.add(state)
+            feedback = 0
+            for tap in taps:
+                feedback ^= (state >> (tap - 1)) & 1
+            state = ((state >> 1)
+                     | (feedback << (framing._PAD_LFSR_ORDER - 1)))
+        assert state == framing._PAD_LFSR_SEED
+        return len(seen)
+
+    assert state_period(framing._HEAD_PAD_TAPS) == period
+    assert state_period(framing._TAIL_PAD_TAPS) == period
+
+    for profile in afsk.PROFILES:
+        h = framing.head_pad_bits(profile.baud)
+        t = framing.tail_pad_bits(profile.baud)
+        assert h != t
+        assert abs(sum(h) / len(h) - 0.5) < 0.1
+        assert abs(sum(t) / len(t) - 0.5) < 0.1
+    print("test_outer_pads_are_distinct_full_period_pn_sequences OK")
+
+
 def test_outer_symbol_measurements_report_clipping():
     payload = b"outer timing probe"
     profile = afsk.PROFILE_300
@@ -220,9 +258,38 @@ def test_outer_symbol_measurements_report_clipping():
     clipped = np.concatenate([clipped, np.zeros(len(audio))])
     result = afsk.demodulate(clipped, profile=profile)
     assert result["payload"] == payload, result
-    assert result["head_symbols_received"] == len(framing.head_pad_bits(profile.baud)) - head_clipped
-    assert result["tail_symbols_received"] == len(framing.tail_pad_bits(profile.baud)) - tail_clipped
+    expected_head = len(framing.head_pad_bits(profile.baud)) - head_clipped
+    expected_tail = len(framing.tail_pad_bits(profile.baud)) - tail_clipped
+    # Window look-ahead may discard up to one full suspect window, but must
+    # never credit clipped symbols as received.
+    assert expected_head - afsk.PAD_MATCH_WINDOW_SYMBOLS < result["head_symbols_received"] <= expected_head
+    assert expected_tail - afsk.PAD_MATCH_WINDOW_SYMBOLS < result["tail_symbols_received"] <= expected_tail
     print("test_outer_symbol_measurements_report_clipping OK")
+
+
+def test_outer_symbol_measurements_tolerate_isolated_errors():
+    payload = b"outer timing probe"
+    profile = afsk.PROFILE_300
+    sps = round(afsk.SAMPLE_RATE / profile.baud)
+    bits = framing.build_frame_bits(payload, baud=profile.baud)
+    head_len = len(framing.head_pad_bits(profile.baud))
+    tail_len = len(framing.tail_pad_bits(profile.baud))
+
+    # Two errors in each 16-symbol boundary window are within the policy.
+    for offset in (3, 12):
+        bits[head_len - offset] ^= 1
+    for offset in (4, 13):
+        bits[len(bits) - tail_len + offset] ^= 1
+
+    audio = afsk._apply_ramp(
+        0.6 * afsk._cpfsk_tone(bits, sps, afsk.SAMPLE_RATE,
+                               profile.freq0, profile.freq1),
+        afsk.SAMPLE_RATE).astype(np.float32)
+    result = afsk.demodulate(audio, profile=profile)
+    assert result["payload"] == payload, result
+    assert result["head_symbols_received"] == head_len
+    assert result["tail_symbols_received"] == tail_len
+    print("test_outer_symbol_measurements_tolerate_isolated_errors OK")
 
 
 def test_afsk_noisy_delayed_loopback():
@@ -1063,6 +1130,8 @@ if __name__ == "__main__":
     test_a_lock_survives_losing_the_opening_of_the_sync_word()
     test_every_keying_fits_the_budget_and_uses_it()
     test_afsk_clean_loopback()
+    test_outer_pads_are_distinct_full_period_pn_sequences()
+    test_outer_symbol_measurements_tolerate_isolated_errors()
     test_afsk_noisy_delayed_loopback()
     test_clock_offset_simulation_is_faithful()
     test_decodes_through_a_small_clock_offset()

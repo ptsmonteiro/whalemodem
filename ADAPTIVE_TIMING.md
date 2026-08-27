@@ -61,9 +61,11 @@ The calibration preamble and postamble are fixed, known sequences. They must:
 - have good autocorrelation so noise is unlikely to look like part of them;
 - have a length fixed by the protocol and known without reading the frame.
 
-The head and tail use different sequences so that one cannot be mistaken for
-the other. A PN sequence is suitable. The exact sequences and their lengths
-must be fixed before implementation and documented in `FRAMING.md`.
+The head and tail use different order-15 maximal-length PN sequences so that
+one cannot be mistaken for the other. Their LFSR taps, seed, generation rule,
+and baud-dependent lengths are fixed in `FRAMING.md`. At the current
+one-second calibration duration their 32,767-symbol periods exceed every
+supported sequence length.
 
 The sequences are deliberately generous and are used only by the three
 calibration frames. Normal control and data frames use the calibrated pads.
@@ -100,11 +102,13 @@ tail_symbols_received
 Both values are bounded by the known calibration sequence length. A value
 outside that range makes the measurement invalid.
 
-The initial implementation may stop a count at the first mismatching symbol.
-If real-radio tests show that isolated bit errors make this too conservative,
-the measurement may later use a documented error-tolerant matching rule. It
-must never count unaligned noise merely because individual hard-decoded symbols
-happen to match.
+Counting uses a 16-symbol sliding window and tolerates at most two hard-decision
+errors in each window. When a window contains three errors, the receiver stops
+and excludes that complete 16-symbol window from the received count. Excluding
+the suspect window compensates conservatively for the look-ahead needed to
+distinguish clipping from isolated errors: noise cannot earn extra received
+symbols merely because some individual decisions happen to match. Audio-buffer
+boundaries stop the count immediately.
 
 The decoder must retain enough audio before sync to inspect the entire
 calibration preamble. It must also wait for the advertised calibration
@@ -334,7 +338,8 @@ change transmit padding.
    bodies from `LINK.md`, while retaining an explicitly selected legacy mode
    during migration.
 2. Allow the framing encoder to accept per-frame head and tail sequences.
-3. Add fixed calibration sequences and their protocol constants.
+3. Add fixed calibration sequences and their protocol constants. **Done:**
+   distinct order-15 PN sequences now replace the alternating head/tail pads.
 4. Extend the decoder result for calibration frames with the two received-
    symbol counts while leaving ordinary decode behavior unchanged.
 5. Preserve sufficient leading audio and defer calibration-frame completion

@@ -451,6 +451,14 @@ PROFILES_BY_ID = {p.mode_id: p for p in PROFILES}
 # ever use the negotiated profile.
 CONTROL_PROFILE = PROFILE_300
 
+# Outer-pad measurement policy. Sparse hard-decision errors are tolerated,
+# but a window that exceeds this budget is treated wholly as suspect. Dropping
+# the complete failing window is intentional: it prevents the look-ahead
+# needed to distinguish clipping from an isolated error from inflating the
+# received-symbol count and selecting unsafe timing.
+PAD_MATCH_WINDOW_SYMBOLS = 16
+PAD_MATCH_MAX_ERRORS = 2
+
 
 def default_registry():
     """Returns the built-in modes through the link-facing registry API."""
@@ -691,16 +699,25 @@ def _try_sync(diff, i_star, sps, confidence, max_credible_bits, n_sync, baud):
             return result
 
         def adjacent_matches(expected, indices):
+            mismatches = []
             count = 0
-            for bit, index in zip(expected, indices):
-                if index < 0 or index >= len(diff) or (diff[index] > 0) != bool(bit):
-                    break
-                count += 1
+            for count, (bit, index) in enumerate(zip(expected, indices), 1):
+                # Running outside retained audio is a known hard boundary,
+                # not a noisy symbol, so no decision window is needed.
+                if index < 0 or index >= len(diff):
+                    return count - 1
+                mismatches.append((diff[index] > 0) != bool(bit))
+                if len(mismatches) > PAD_MATCH_WINDOW_SYMBOLS:
+                    mismatches.pop(0)
+                if (len(mismatches) == PAD_MATCH_WINDOW_SYMBOLS
+                        and sum(mismatches) > PAD_MATCH_MAX_ERRORS):
+                    return count - PAD_MATCH_WINDOW_SYMBOLS
             return count
 
         # Walk away from the checked frame boundaries. The head sequence is
         # inspected backwards from sync; the tail sequence forwards from the
-        # final CRC. Only contiguous aligned symbols count.
+        # final CRC. A rolling window tolerates isolated hard-decision errors;
+        # the whole first failing window is excluded from the count.
         result["head_symbols_received"] = adjacent_matches(
             reversed(head_bits),
             (first_index - sps * offset for offset in range(1, len(head_bits) + 1)),
