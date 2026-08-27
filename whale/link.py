@@ -111,12 +111,33 @@ PT_DATA = 0x05
 PT_DATA_ACK = 0x06         # body: [answered_seq, next_expected_seq] -- see _send_chunk_with_arq
 PT_MODE_REQ = 0x07         # body: [proposed_mode_id] -- mid-session speed step, see _request_mode_step
 PT_MODE_ACK = 0x08         # body: [accepted_mode_id] (may differ from proposed if rejected)
+PT_FLOOR_REQ = 0x09        # IRS asking to become ISS -- see _acquire_floor
+PT_FLOOR_GRANT = 0x0A      # ISS handing the floor to the peer -- see _handle_floor_req
 
 # Packet types whose bodies are small and must survive even when the
 # negotiated data profile is struggling -- these always go out on
 # afsk.CONTROL_PROFILE (see _tx_packet), never on self.tx_profile. Only bulk
 # data (PT_DATA/PT_DATA_ACK) ever rides the negotiated speed.
-_CONTROL_PLANE_TYPES = {PT_CONNECT, PT_CONNECT_ACK, PT_DISC, PT_DISC_ACK, PT_MODE_REQ, PT_MODE_ACK}
+_CONTROL_PLANE_TYPES = {PT_CONNECT, PT_CONNECT_ACK, PT_DISC, PT_DISC_ACK, PT_MODE_REQ, PT_MODE_ACK,
+                         PT_FLOOR_REQ, PT_FLOOR_GRANT}
+
+# Which end may originate PT_DATA right now. Real half-duplex ARQ modems
+# (PACTOR, VARA, WINMOR/Ardop) call these roles ISS (Information Sending
+# Station) and IRS (Information Receiving Station) and bake the distinction
+# into connection state rather than leaving it to the application layer:
+# without it, nothing stops both ends of this stop-and-wait link from
+# deciding to key up DATA at the same moment whenever both happen to have
+# outbound bytes queued at once -- on real RF neither transmission is heard
+# cleanly, and with no jitter between ARQ retries the collision tends to
+# repeat on the next attempt too.
+#
+# Assigned once at connect time -- the caller starts as ISS, the listener as
+# IRS (see connect()/listen_once()) -- and handed over on request via
+# PT_FLOOR_REQ/PT_FLOOR_GRANT (see _acquire_floor/_handle_floor_req).
+# send_message() requires ISS and acquires it first if this station is IRS;
+# recv_message() is where an IRS's request for it is answered, since that is
+# the only place a station that currently holds the floor is listening for
+# anything while it has nothing of its own in flight.
 
 # The complement: the only two types that ever ride self.tx_profile. A
 # decoded frame of one of these is therefore direct evidence of the profile
@@ -308,6 +329,7 @@ _PTYPE_NAMES = {
     PT_DISC: "DISC", PT_DISC_ACK: "DISC_ACK",
     PT_DATA: "DATA", PT_DATA_ACK: "DATA_ACK",
     PT_MODE_REQ: "MODE_REQ", PT_MODE_ACK: "MODE_ACK",
+    PT_FLOOR_REQ: "FLOOR_REQ", PT_FLOOR_GRANT: "FLOOR_GRANT",
 }
 
 
@@ -495,6 +517,7 @@ class Link:
         self.peer_call = None
         self.peer_supported_modes = set()
         self.state = "IDLE"
+        self.role = None  # "ISS" or "IRS" once CONNECTED -- see the constants above
         self.on_event = on_event or (lambda name, **kw: None)
         self.mode_history = {} if mode_history_store is None else mode_history_store
         self._clean_streak = 0
@@ -524,6 +547,11 @@ class Link:
         self._mode_step_script = _mode_step_script()
 
         self._rx_packets = queue.Queue()
+        # A station asking for the floor may receive the current ISS's
+        # message before its request can be granted.  send_message() has to
+        # service and ACK those frames to let the ISS finish; retain any
+        # completed message here for the application's next recv_message().
+        self._pending_messages = queue.Queue()
         self._partial_rx_buf = None  # in-progress recv_message() reassembly, see recv_message()
         self._tx_seq = 0
         self._rx_expect_seq = 0
@@ -561,6 +589,11 @@ class Link:
         chunk of the next one. Both stations start a session at zero, so
         both ends reset here and nowhere else."""
         self._partial_rx_buf = None
+        while not self._pending_messages.empty():
+            try:
+                self._pending_messages.get_nowait()
+            except queue.Empty:
+                break
         self._tx_seq = 0
         self._rx_expect_seq = 0
         self._acked_chunks = 0
@@ -1046,6 +1079,7 @@ class Link:
                 self._apply_rx_profile(afsk.PROFILES_BY_ID.get(peer_tx_id, afsk.CONTROL_PROFILE))
                 self._clean_streak = 0
                 self.state = "CONNECTED"
+                self.role = "ISS"  # the caller starts holding the floor -- see PT_FLOOR_REQ above
                 self._reset_sequence_state()
                 self.on_event("CONNECTED", mycall=self.mycall, peer=self.peer_call)
                 logger.info("[%s] connected to %s: tx=%s rx=%s", self.mycall, self.peer_call,
@@ -1114,11 +1148,75 @@ class Link:
         self._apply_tx_profile(afsk.PROFILES_BY_ID.get(own_tx_id, afsk.CONTROL_PROFILE))
         self._clean_streak = 0
         self.state = "CONNECTED"
+        self.role = "IRS"  # the listener starts waiting for the floor -- see PT_FLOOR_REQ above
         self._reset_sequence_state()
         self.on_event("CONNECTED", mycall=self.mycall, peer=self.peer_call)
         logger.info("[%s] accepted connection from %s: tx=%s rx=%s", self.mycall, src,
                     self.tx_profile.name, self.rx_profile.name)
         return self.peer_call
+
+    # -- floor (ISS/IRS) ---------------------------------------------------
+
+    def _acquire_floor(self, retries=MAX_RETRIES):
+        """Blocks until this station holds ISS -- the right to originate
+        PT_DATA -- by asking whichever end currently holds it to hand it
+        over. A no-op if we already have it.
+
+        Retried the same way a DATA chunk is: the peer only answers
+        PT_FLOOR_REQ from inside recv_message(), i.e. while it isn't itself
+        mid-send (see recv_message and _handle_floor_req), so a request that
+        lands while the peer is busy sending its own message is silently
+        dropped by its _wait_packet, same as a stray PT_MODE_REQ would be.
+        The retry after this attempt's timeout is what gets through once the
+        peer goes back to polling for incoming work."""
+        if self.role == "ISS":
+            return True
+        for attempt in range(1, retries + 1):
+            logger.info("[%s] requesting the floor (attempt %d/%d)", self.mycall, attempt, retries)
+            self.on_event("PTT", on=True)
+            self._tx_packet(PT_FLOOR_REQ, b"")
+            self.on_event("PTT", off=True)
+            deadline = time.monotonic() + self.control_ack_timeout
+            while True:
+                remaining = deadline - time.monotonic()
+                if remaining <= 0:
+                    break
+                got = self._wait_packet(
+                    {PT_FLOOR_GRANT, PT_DATA, PT_MODE_REQ, PT_DISC}, remaining)
+                if got is None:
+                    break
+                ptype, body = got
+                if ptype == PT_DISC:
+                    self._handle_peer_disc()
+                    raise LinkError("peer disconnected while we were requesting the floor")
+                if ptype == PT_DATA:
+                    # The peer still owns the floor and was already sending.
+                    # Keep its ARQ moving instead of deadlocking with both
+                    # application pumps blocked in send_message().
+                    message = self._handle_data(body)
+                    if message is not None:
+                        self._pending_messages.put(message)
+                    continue
+                if ptype == PT_MODE_REQ:
+                    self._handle_mode_req(body)
+                    continue
+                self.role = "ISS"
+                logger.info("[%s] floor granted, now ISS", self.mycall)
+                return True
+        return False
+
+    def _handle_floor_req(self):
+        """The peer (currently IRS) wants to become ISS. We only ever see
+        this from inside recv_message(), i.e. while nothing of our own is in
+        flight, so there is nothing to finish first -- hand the floor over
+        unconditionally. Granting again when we're already IRS is harmless:
+        it is exactly what happens when our own PT_FLOOR_GRANT to an earlier
+        request was lost and the peer retried it (see _acquire_floor)."""
+        self.role = "IRS"
+        self.on_event("PTT", on=True)
+        self._tx_packet(PT_FLOOR_GRANT, b"")
+        self.on_event("PTT", off=True)
+        logger.info("[%s] granted floor to peer, now IRS", self.mycall)
 
     # -- data transfer ------------------------------------------------------
 
@@ -1135,6 +1233,8 @@ class Link:
         stepping up."""
         if self.state != "CONNECTED":
             raise LinkError("not connected")
+        if self.role != "ISS" and not self._acquire_floor():
+            raise LinkError("could not acquire the floor to send")
         sent = 0
         offset = 0
         while True:
@@ -1319,6 +1419,10 @@ class Link:
         """
         if self.state != "CONNECTED":
             raise LinkError("not connected")
+        try:
+            return self._pending_messages.get_nowait()
+        except queue.Empty:
+            pass
         if self._partial_rx_buf is None:
             self._partial_rx_buf = bytearray()
         deadline = None if timeout is None else time.time() + timeout
@@ -1333,46 +1437,53 @@ class Link:
             remaining = None if deadline is None else max(0.0, deadline - time.time())
             if deadline is not None and remaining <= 0:
                 return None
-            got = self._wait_packet({PT_DATA, PT_DISC, PT_MODE_REQ}, remaining if remaining is not None else 1e9)
+            got = self._wait_packet({PT_DATA, PT_DISC, PT_MODE_REQ, PT_FLOOR_REQ},
+                                     remaining if remaining is not None else 1e9)
             if got is None:
                 return None
             ptype, body = got
             if ptype == PT_MODE_REQ:
                 self._handle_mode_req(body)
                 continue  # still waiting on the actual DATA
+            if ptype == PT_FLOOR_REQ:
+                self._handle_floor_req()
+                continue  # we're IRS now; wait for the actual DATA from the new ISS
             if ptype == PT_DISC:
                 self._handle_peer_disc()
                 return None
-            flags, chunk = body[0], body[1:]
-            seq = flags & SEQ_MASK
-            message = None
-            if seq == self._rx_expect_seq:
-                self._partial_rx_buf += chunk
-                self._rx_expect_seq = (seq + 1) % SEQ_MODULO
-                if flags & EOF_BIT:
-                    message = bytes(self._partial_rx_buf)
-                    self._partial_rx_buf = bytearray()
-            else:
-                # A duplicate retransmit: the sender missed our ACK. Already
-                # delivered, so drop the payload -- but still ack below,
-                # because the sender is waiting on exactly that.
-                logger.info("[%s] DATA seq=0x%02x already have (expecting 0x%02x) -- dropping",
-                            self.mycall, seq, self._rx_expect_seq)
-            # Ack every DATA we see, duplicates included -- the sender is
-            # waiting on it and may have missed our first ack. The ack names
-            # the frame it answers *and* the sequence number we want next,
-            # so a spare copy of it arriving later cannot be mistaken for an
-            # answer to a different frame (see PT_DATA_ACK's format note).
-            # Naming what we want next covers a duplicate as naturally as a
-            # fresh frame, including a retransmitted final chunk of a
-            # message already handed to the caller -- which is why sequence
-            # numbers run for the whole session rather than restarting per
-            # message.
-            self.on_event("PTT", on=True)
-            self._tx_packet(PT_DATA_ACK, bytes([seq, self._rx_expect_seq]))
-            self.on_event("PTT", off=True)
+            message = self._handle_data(body)
             if message is not None:
                 return message
+
+    def _handle_data(self, body):
+        """Consumes and acknowledges one DATA body, returning a completed
+        message or None.  Shared by recv_message() and floor acquisition so
+        an IRS can continue receiving while its application wants to send."""
+        if not body:
+            return None
+        flags, chunk = body[0], body[1:]
+        seq = flags & SEQ_MASK
+        message = None
+        if self._partial_rx_buf is None:
+            self._partial_rx_buf = bytearray()
+        if seq == self._rx_expect_seq:
+            self._partial_rx_buf += chunk
+            self._rx_expect_seq = (seq + 1) % SEQ_MODULO
+            if flags & EOF_BIT:
+                message = bytes(self._partial_rx_buf)
+                self._partial_rx_buf = bytearray()
+        else:
+            # A duplicate retransmit: the sender missed our ACK. Already
+            # delivered, so drop the payload -- but still ack below.
+            logger.info("[%s] DATA seq=0x%02x already have (expecting 0x%02x) -- dropping",
+                        self.mycall, seq, self._rx_expect_seq)
+        # ACK every DATA we see, duplicates included. The ACK names both the
+        # answered frame and the sequence wanted next so a stale duplicate
+        # cannot be mistaken for an answer to a later frame.
+        self.on_event("PTT", on=True)
+        self._tx_packet(PT_DATA_ACK, bytes([seq, self._rx_expect_seq]))
+        self.on_event("PTT", off=True)
+        return message
 
     # -- teardown ------------------------------------------------------
 

@@ -825,6 +825,97 @@ def test_unanswered_chunk_gives_up_after_max_retries():
     print("test_unanswered_chunk_gives_up_after_max_retries OK")
 
 
+def test_roles_assigned_at_connect():
+    """The connecting station starts holding the floor (ISS); the listener
+    starts waiting for it (IRS) -- mirroring how PACTOR/VARA/WINMOR-style ARQ
+    modems assign ISS/IRS at connect time rather than letting either side
+    originate DATA on a whim."""
+    a, b, ta, tb = _connected_pair()
+    try:
+        assert a.role == "ISS", a.role
+        assert b.role == "IRS", b.role
+        print("test_roles_assigned_at_connect OK")
+    finally:
+        a.stop()
+        b.stop()
+
+
+def test_irs_can_request_and_use_the_floor():
+    """The listening side (IRS) may not originate DATA until it asks the
+    connecting side (ISS) for the floor. send_message() must do that
+    transparently -- request, wait for grant, then send -- and both ends'
+    roles must flip once it's granted."""
+    a, b, ta, tb = _connected_pair()
+    try:
+        assert a.role == "ISS" and b.role == "IRS", (a.role, b.role)
+        data = bytes((i * 17 + 5) % 256 for i in range(300))
+        got = _transfer(b, a, data)  # b (IRS) sends, a (ISS) receives
+        assert got == data, (len(got or b""), len(data))
+        assert b.role == "ISS" and a.role == "IRS", (a.role, b.role)
+        print("test_irs_can_request_and_use_the_floor OK")
+    finally:
+        a.stop()
+        b.stop()
+
+
+def _pump_send_recv(link_, outbox, inbox, stop_event, timeout=0.3):
+    """Minimal stand-in for vara_server.py's session pump: alternates trying
+    to send whatever's queued in `outbox` (mutated like a list-backed queue)
+    with polling for incoming messages, appending anything received to
+    `inbox`. Used to reproduce the scenario that used to let both ends key up
+    DATA over each other -- both sides deciding to send at once -- without
+    pulling in vara_server.py's sockets."""
+    while not stop_event.is_set():
+        if outbox:
+            data = outbox.pop(0)
+            link_.send_message(data)
+            continue
+        msg = link_.recv_message(timeout=timeout)
+        if msg is not None:
+            inbox.append(msg)
+
+
+def test_concurrent_send_attempts_do_not_collide():
+    """Both sides decide to send at once -- the scenario that used to let
+    both key up PT_DATA over each other with nothing arbitrating who goes
+    first. With ISS/IRS roles, only the ISS may originate DATA; the IRS's
+    send_message() blocks acquiring the floor first instead of colliding
+    with it. Both messages must still arrive intact and neither pump loop
+    may raise."""
+    a, b, ta, tb = _connected_pair()
+    try:
+        a.control_ack_timeout = 0.3  # keep a lost floor request's retry fast
+        b.control_ack_timeout = 0.3
+
+        data_ab = bytes((i * 11 + 1) % 256 for i in range(300))
+        data_ba = bytes((i * 13 + 2) % 256 for i in range(300))
+
+        a_out, b_out = [data_ab], [data_ba]
+        a_in, b_in = [], []
+        stop_a, stop_b = threading.Event(), threading.Event()
+
+        thread_a = threading.Thread(target=_pump_send_recv, args=(a, a_out, a_in, stop_a))
+        thread_b = threading.Thread(target=_pump_send_recv, args=(b, b_out, b_in, stop_b))
+        thread_a.start()
+        thread_b.start()
+
+        deadline = time.monotonic() + 60
+        while time.monotonic() < deadline and not (a_in and b_in):
+            time.sleep(0.05)
+
+        stop_a.set()
+        stop_b.set()
+        thread_a.join(timeout=5)
+        thread_b.join(timeout=5)
+
+        assert a_in and a_in[0] == data_ba, "A never received B's message intact"
+        assert b_in and b_in[0] == data_ab, "B never received A's message intact"
+        print("test_concurrent_send_attempts_do_not_collide OK")
+    finally:
+        a.stop()
+        b.stop()
+
+
 def test_link_negotiation_and_mode_step():
     """Each direction of the link negotiates and adapts independently: A's
     TX rate to B need not match B's TX rate to A (see whale/afsk.py's
@@ -910,6 +1001,9 @@ if __name__ == "__main__":
     test_sync_confidence_does_not_depend_on_surrounding_silence()
     test_seq_ahead_wraps()
     test_await_turnaround_is_anchored_on_peer_audio()
+    test_roles_assigned_at_connect()
+    test_irs_can_request_and_use_the_floor()
+    test_concurrent_send_attempts_do_not_collide()
     test_spare_ack_for_an_earlier_chunk_does_not_provoke_a_retransmit()
     test_ack_for_a_duplicate_still_advances_the_sender()
     test_unanswered_chunk_gives_up_after_max_retries()
