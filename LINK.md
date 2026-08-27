@@ -42,9 +42,9 @@ bytes are inline; any remainder follows in the same waveform.
 | `0x03` | DISC | Empty | control |
 | `0x04` | DISC_ACK | Empty | control |
 | `0x05` | DATA | Flags/sequence inline, then chunk body | negotiated body |
-| `0x06` | DATA_ACK | Answered and next-expected sequences inline | control |
-| `0x07` | MODE_REQ | Proposed mode ID | control |
-| `0x08` | MODE_ACK | Accepted mode ID | control |
+| `0x06` | DATA_ACK | Answered sequence, next expected sequence, received mode | control |
+| `0x07` | reserved | Must be ignored | control |
+| `0x08` | reserved | Must be ignored | control |
 | `0x09` | FLOOR_REQ | Empty | control |
 | `0x0a` | FLOOR_GRANT | Empty | control |
 | `0x0b` | TIMING_ACK | Reverse-direction timing measurement | control |
@@ -103,15 +103,17 @@ mode 0 is always a valid fallback. Callsigns are compared according to the
 existing link addressing policy after their encoding has been validated.
 The limits above bound all variable fields before allocation.
 
-The format version defines the complete handshake feature set. Version 1
-includes adaptive timing and therefore requires the calibration handshake
+The format version defines the complete handshake feature set. Version 2
+includes adaptive timing and ACK-embedded mode confirmation, and therefore
+requires the calibration handshake
 described in `ADAPTIVE_TIMING.md`. Its CONNECT carries the protocol-fixed
 calibration sequences around the frame. The
 decoder retains enough leading audio to measure them and, after decoding the
 body, waits a bounded time for the tail. CONNECT_ACK is surrounded by
 calibration sequences and begins the two-probe exchange. An
-endpoint that does not implement every required version-1 behavior rejects
-version 1 rather than accepting a reduced feature set.
+endpoint that does not implement every required version-2 behavior rejects
+version 2 rather than accepting a reduced feature set. Version 1 used the
+removed MODE_REQ/MODE_ACK exchange and is not wire-compatible.
 
 The session ID and the complete encoded CONNECT body identify an attempt. A
 listener answers an identical duplicate CONNECT using the same format version
@@ -143,16 +145,17 @@ first chunk of the following message.
 
 Only the ISS may originate DATA. Each DATA frame is sent using stop-and-wait
 ARQ and must be acknowledged before the next sequence is sent. DATA_ACK has
-exactly two significant body bytes:
+exactly three significant body bytes:
 
 ```text
-answered_sequence next_expected_sequence
+answered_sequence next_expected_sequence received_mode_id
 ```
 
-Both values use their low seven bits. An ACK accepts the outstanding frame
+The sequence values use their low seven bits. An ACK accepts the outstanding frame
 only when `answered_sequence` equals that frame's sequence and
-`next_expected_sequence` is one step ahead modulo 128. An ACK for an older
-frame is ignored while the sender continues waiting.
+`next_expected_sequence` is one step ahead modulo 128, and the mode ID equals
+the mode in which the sender transmitted it. An ACK for an older frame or a
+different mode is ignored while the sender continues waiting.
 
 The receiver appends a chunk only when its sequence equals the expected
 sequence, then advances the expectation. A duplicate is discarded. Every
@@ -179,21 +182,17 @@ be discarded and must succeed on a later retry.
 
 Each endpoint adapts only its own transmit direction from ARQ outcomes:
 
-- A chunk requiring at least three attempts requests one step down.
-- Three consecutive first-attempt chunks request one step up.
+- Three unanswered attempts change one step down before retrying the same chunk.
+- Three consecutive first-attempt chunks change one step up before the next chunk.
 - Steps follow mode order 0, 1, 2 and are limited to modes the peer advertised.
 
-MODE_REQ carries the proposed one-byte mode ID. The receiver replies with the
-accepted ID in MODE_ACK, using mode 0 for an absent or unsupported value, and
-then changes the profile at which it expects that peer's DATA and DATA_ACK.
-The requester changes its transmit profile only after receiving MODE_ACK.
-
-Because MODE_ACK can be lost, the receiver temporarily retains the previous
-profile as a decode fallback. A decoded DATA or DATA_ACK is authoritative: it
-confirms whichever profile actually decoded and removes or corrects the
-fallback. Thus a lost MODE_ACK leaves the requester at its old profile and the
-next data-plane frame makes the receiver converge back to that profile. Control
-frames do not confirm a data profile because they always use the control mode.
+There is no separate mode-change exchange. While connected, a receiver tries
+the control mode and every mutually advertised DATA mode. A decoded DATA frame
+is authoritative: the receiver adopts that mode and returns it as
+`received_mode_id` in DATA_ACK. Consequently an ISS can recover from complete
+silence at one speed by retransmitting the same sequence at a lower speed; the
+first successful ACK confirms both delivery and the new mode. DATA_ACK remains
+in the robust control mode and does not describe the reverse-direction mode.
 
 ### Disconnect
 

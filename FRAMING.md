@@ -98,7 +98,8 @@ size and management-body remainders not to exceed 128 bytes; impossible
 type/mode/length combinations are rejected before waiting for a body.
 
 A zero-length body and its CRC are omitted. Empty controls, one-byte mode
-messages, and the two-byte DATA_ACK therefore end after the header CRC. Longer
+messages. The first two DATA_ACK bytes are inline; its received-mode byte is a
+one-byte control-mode body after the header. Longer
 packets place their first two link-body bytes inline and their remainder after
 the checked header in the same waveform.
 

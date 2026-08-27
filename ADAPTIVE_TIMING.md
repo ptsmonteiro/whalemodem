@@ -230,7 +230,7 @@ startup, receiver recovery, and audio buffering as one effective duration.
 
 ## Packet fields
 
-Adaptive timing is required by connection format version 1, using the sole
+Adaptive timing is required by connection format version 2, using the sole
 CONNECT and CONNECT_ACK body format specified in
 [`LINK.md`](LINK.md#connection-bodies). There is no legacy connection mode or
 downgrade path.

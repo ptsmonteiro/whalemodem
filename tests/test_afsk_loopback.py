@@ -756,16 +756,16 @@ def test_link_uses_waveform_mode_contract():
     print("test_link_uses_waveform_mode_contract OK")
 
 
-def test_mode_change_packet_roundtrip():
-    """PT_MODE_REQ/PT_MODE_ACK bodies through modulate/demodulate at
-    PROFILE_600 -- confirms the existing framing/codec machinery, already
-    profile-parameterized, works unchanged at a non-control profile."""
-    for ptype in (link.PT_MODE_REQ, link.PT_MODE_ACK):
-        payload = bytes([ptype, afsk.PROFILE_600.mode_id])
-        tx = afsk.modulate(payload, profile=afsk.PROFILE_600)
-        result = afsk.demodulate(tx, profile=afsk.PROFILE_600)
-        assert result["payload"] == payload, (ptype, result)
-    print("test_mode_change_packet_roundtrip OK")
+def test_data_ack_carries_received_mode():
+    """The ACK identifies both the sequence result and DATA mode decoded."""
+    header, remainder = link._encode_air_header(
+        link.PT_DATA_ACK, afsk.CONTROL_PROFILE.mode_id,
+        bytes([7, 8, afsk.PROFILE_600.mode_id]))
+    assert len(remainder) == 1
+    decoded = link._decode_air_header(header)
+    assert decoded[-1] == bytes([7, 8])
+    assert remainder == bytes([afsk.PROFILE_600.mode_id])
+    print("test_data_ack_carries_received_mode OK")
 
 
 def test_demodulate_returns_the_earliest_frame_not_the_loudest():
@@ -946,7 +946,8 @@ def test_spare_ack_for_an_earlier_chunk_does_not_provoke_a_retransmit():
     # Waiting on 0x07. First the spare ack for 0x06 -- which names 0x07 as
     # what the peer wants next, exactly the value the frame in flight would
     # be acked with -- then the real answer.
-    a, keyings = _arq_sender([bytes([0x06, 0x07]), bytes([0x07, 0x08])])
+    mode = afsk.CONTROL_PROFILE.mode_id
+    a, keyings = _arq_sender([bytes([0x06, 0x07, mode]), bytes([0x07, 0x08, mode])])
     assert a._send_chunk_with_arq(0x07, b"aaaa", False) == 1
     assert len(keyings) == 1, f"{len(keyings)} keyings for one chunk -- retransmitted on a stale ACK"
     print("test_spare_ack_for_an_earlier_chunk_does_not_provoke_a_retransmit OK")
@@ -956,7 +957,7 @@ def test_ack_for_a_duplicate_still_advances_the_sender():
     """The other half of the same format: when the sender retransmits after
     a lost ACK, the peer's answer is about a frame it has already taken and
     moved past. That must still count as acked, or the transfer stalls."""
-    a, keyings = _arq_sender([bytes([0x07, 0x08])])
+    a, keyings = _arq_sender([bytes([0x07, 0x08, afsk.CONTROL_PROFILE.mode_id])])
     assert a._send_chunk_with_arq(0x07, b"aaaa", True) == 1
     print("test_ack_for_a_duplicate_still_advances_the_sender OK")
 
@@ -1104,15 +1105,15 @@ def test_link_negotiation_and_mode_step():
         assert a.peer_supported_modes == {p.mode_id for p in afsk.PROFILES}
         assert b.peer_supported_modes == {p.mode_id for p in afsk.PROFILES}
 
-        # Mid-session step down of A's tx (600 -> 300): B must be listening
-        # (recv_message) to catch and ack A's PT_MODE_REQ. B's own tx
-        # direction (already at the control profile) must be unaffected.
+        # A changes its own transmit mode locally. B discovers it from the
+        # next DATA and confirms that mode in DATA_ACK.
         def do_recv():
             b.recv_message(timeout=20)
 
         t = threading.Thread(target=do_recv)
         t.start()
-        a._request_mode_step(-1)
+        a._step_tx_mode(-1)
+        a.send_message(b"mode confirmation")
         t.join(timeout=20)
 
         assert a.tx_profile.mode_id == afsk.PROFILE_300.mode_id, a.tx_profile
@@ -1148,7 +1149,7 @@ if __name__ == "__main__":
     test_timing_measurements_derive_guarded_session_pads()
     test_negotiate_mode()
     test_link_uses_waveform_mode_contract()
-    test_mode_change_packet_roundtrip()
+    test_data_ack_carries_received_mode()
     test_demodulate_returns_the_earliest_frame_not_the_loudest()
     test_sync_confidence_does_not_depend_on_surrounding_silence()
     test_seq_ahead_wraps()

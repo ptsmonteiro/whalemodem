@@ -450,7 +450,7 @@ PROFILES_BY_ID = {p.mode_id: p for p in PROFILES}
 
 # Always used for CONNECT/CONNECT_ACK (before speed is agreed) and, per
 # whale/link.py's design, for every other control-plane packet (DISC,
-# MODE_REQ/MODE_ACK) regardless of the currently negotiated data speed --
+# DATA_ACK, floor control) regardless of the current data speed --
 # the control plane always runs at the most robust profile so it keeps
 # working even when the data channel is struggling. Only PT_DATA/PT_DATA_ACK
 # ever use the negotiated profile.

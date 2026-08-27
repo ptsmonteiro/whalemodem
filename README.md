@@ -162,19 +162,12 @@ leaves the two ends disagreeing -- and a retransmit repeats a
 disagreement, it does not repair it. Two of those used to be
 unrecoverable, and neither could be reached by the test suite as it stood.
 
-**A lost MODE_ACK was session-fatal.** The responder moves its rx_profile
-when it sends the ack; the requester moves its tx_profile only when it
-receives one. Lose that frame and the peer transmits at a profile the
-responder has stopped listening for -- and the only way to notice is to
-decode a frame, which is exactly what has become impossible. Every DATA
-frame then failed and the session died. `rx_profile` is now a hint rather
-than an assertion: the pre-step profile stays a decode candidate until a
-data frame settles it, and a decoded DATA/DATA_ACK is treated as ground
-truth about what the peer is really sending. Recovery takes one frame,
-whichever end lost the ack. Note which cases were fatal -- 600<->1200 and
-any step down to the control profile. Stepping *up* from 300 always
-limped on, because 300 is the control profile and every station always
-tries it, and that is why the bug survived so long.
+**Mode changes no longer have a separate control exchange.** The ISS changes
+its own DATA mode and the IRS searches every mutually advertised mode. The
+next DATA_ACK carries the mode in which DATA decoded, confirming delivery and
+speed together. After three unanswered attempts, the ISS steps down and
+retries the same sequence at the lower speed; this works even when no frame at
+the previous speed reached the IRS.
 
 **A lost CONNECT_ACK left the session half open.** The caller retried into
 a listener that had already returned from `listen_once`, where nothing
@@ -197,38 +190,35 @@ build across that change.
 It is measured, not guessed: the worst silence a healthy session produces
 is a full MAX_RETRIES cycle, which timed at **44.4s** on the bench against
 the 34.8s the ACK-timeout arithmetic predicts -- the five retransmissions'
-own airtime and turnaround land inside the same silence. Plus an
-unanswered mode step (4.3s) that puts the worst legitimate quiet at ~49s,
-and the constant a little over 3x that. See `scripts/measure_peer_gap.py`.
+own airtime and turnaround land inside the same silence. The 150s constant
+is a little over 3x that. See `scripts/measure_peer_gap.py`.
 It deliberately does not keep an *idle* session alive; that would need a
 keepalive probe, and every keepalive is a keying.
 
 ### Reproducing frame loss on the bench
 
 A real channel cannot be told to lose a chosen frame. But from the peer's
-side a MODE_ACK that was never sent is indistinguishable from one that was
-sent and lost, so loss is reproduced by suppressing the transmission.
-Three environment hooks in `whale/link.py` do this, all off by default and
+side a frame that was never sent is indistinguishable from one that was sent
+and lost, so loss is reproduced by suppressing the transmission. Three
+environment hooks in `whale/link.py` do this, all off by default and
 all invisible on air; the software tests drive the same code, so the bench
 and the suite exercise one mechanism rather than two:
 
 ```
-WHALE_DROP_PTYPE=MODE_ACK,CONNECT_ACK   packet types not to transmit
+WHALE_DROP_PTYPE=DATA_ACK,CONNECT_ACK   packet types not to transmit
 WHALE_DROP_NTH=1                        which occurrences (or "all")
 WHALE_FORCE_MODE=1                      start a session at a chosen profile
 WHALE_MODE_STEP_SCRIPT=1:up             step at a chosen chunk, not by luck
 ```
 
 `scripts/run_acceptance_test.py` takes `--a-env`/`--b-env` to set them per
-station, which is what the scenarios need -- "the responder loses its
-MODE_ACK" is a different run from "both ends lose one":
+station. For example, suppressing the first three DATA frames forces the
+silent-downgrade path:
 
 ```
 python scripts/run_acceptance_test.py --log-dir logs/b1 --size 512 \
-    --a-env WHALE_FORCE_MODE=1 --a-env WHALE_MODE_STEP_SCRIPT=1:up \
-    --a-env WHALE_DROP_PTYPE=MODE_ACK \
-    --b-env WHALE_FORCE_MODE=1 --b-env WHALE_MODE_STEP_SCRIPT=1:up \
-    --b-env WHALE_DROP_PTYPE=MODE_ACK
+    --a-env WHALE_FORCE_MODE=1 --a-env WHALE_DROP_PTYPE=DATA \
+    --a-env WHALE_DROP_NTH=1,2,3
 ```
 
 ## Why CPFSK, why these numbers

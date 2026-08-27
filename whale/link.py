@@ -47,19 +47,10 @@ what each end is doing, so losing one leaves the two ends disagreeing, and
 a disagreement is not something a retransmit repairs. Two of those used to
 be unrecoverable.
 
-  - A lost PT_MODE_ACK ended the session. _handle_mode_req moves rx_profile
-    when it *sends* the ack; _request_mode_step moves the requester's
-    tx_profile only when it *receives* one. Lose that frame and the peer
-    goes on transmitting at a profile this station has stopped listening
-    for -- and the only way to notice is to decode a frame, which is
-    exactly what has become impossible. Every DATA frame then failed, ARQ
-    exhausted its retries, and send_message raised.
-
-    The checked header names and CRC-protects the DATA mode. Distinct sync
-    words let the receiver try its expected and fallback modes. A decoded
-    PT_DATA is ground truth about what the peer
-    is really transmitting (see _confirm_rx_profile), so the receiver can
-    converge even if MODE_ACK was lost.
+  - Mode changes use no control exchange. The receiver searches every
+    mutually advertised DATA mode, and DATA_ACK echoes the mode actually
+    decoded. This lets a sender step down after silence and retry the same
+    chunk without first delivering a request at the failing speed.
 
   - A lost PT_CONNECT_ACK left the session half open. The caller retried
     PT_CONNECT into a listener that had already returned from listen_once,
@@ -105,9 +96,9 @@ PT_CONNECT_ACK = 0x02
 PT_DISC = 0x03
 PT_DISC_ACK = 0x04
 PT_DATA = 0x05
-PT_DATA_ACK = 0x06         # body: [answered_seq, next_expected_seq] -- see _send_chunk_with_arq
-PT_MODE_REQ = 0x07         # body: [proposed_mode_id] -- mid-session speed step, see _request_mode_step
-PT_MODE_ACK = 0x08         # body: [accepted_mode_id] (may differ from proposed if rejected)
+PT_DATA_ACK = 0x06         # body: [answered_seq, next_expected_seq, received_mode_id]
+# 0x07 and 0x08 were MODE_REQ/MODE_ACK in version 1. They are reserved so an
+# old control exchange is rejected rather than reinterpreted as another type.
 PT_FLOOR_REQ = 0x09        # IRS asking to become ISS -- see _acquire_floor
 PT_FLOOR_GRANT = 0x0A      # ISS handing the floor to the peer -- see _handle_floor_req
 PT_TIMING_ACK = 0x0B
@@ -118,12 +109,11 @@ PT_TIMING_CONFIRM = 0x0C
 # afsk.CONTROL_PROFILE (see _tx_packet), never on self.tx_profile. Only bulk
 # only the DATA body ever rides the negotiated speed.
 _CONTROL_PLANE_TYPES = {PT_CONNECT, PT_CONNECT_ACK, PT_DISC, PT_DISC_ACK, PT_DATA_ACK,
-                         PT_MODE_REQ, PT_MODE_ACK,
                          PT_FLOOR_REQ, PT_FLOOR_GRANT, PT_TIMING_ACK,
                          PT_TIMING_CONFIRM}
 
 CONNECT_FORMAT_MAGIC = b"\xffWHL"
-CONNECT_FORMAT_VERSION = 1
+CONNECT_FORMAT_VERSION = 2
 CALIBRATION_SECONDS = 1.0
 HEAD_MIN_GUARD_SECONDS = 0.05
 TAIL_MIN_GUARD_SECONDS = 0.03
@@ -169,11 +159,11 @@ _AIR_HEADER_LEN = framing.BOOTSTRAP_HEADER_BYTES
 def _air_inline_length(ptype):
     if ptype == PT_DATA:
         return 1
-    if ptype in (PT_CONNECT, PT_CONNECT_ACK, PT_DATA_ACK, PT_TIMING_ACK,
+    if ptype in (PT_CONNECT, PT_CONNECT_ACK, PT_TIMING_ACK,
                  PT_TIMING_CONFIRM):
         return 2
-    if ptype in (PT_MODE_REQ, PT_MODE_ACK):
-        return 1
+    if ptype == PT_DATA_ACK:
+        return 2
     return 0
 
 
@@ -213,9 +203,7 @@ def _valid_air_shape(ptype, profile, body_len, inline, control_mode_id):
     if ptype in (PT_CONNECT, PT_CONNECT_ACK):
         return len(inline) == 2 and 0 < body_len <= 128
     if ptype == PT_DATA_ACK:
-        return len(inline) == 2 and body_len == 0
-    if ptype in (PT_MODE_REQ, PT_MODE_ACK):
-        return len(inline) == 1 and body_len == 0
+        return len(inline) == 2 and body_len == 1
     if ptype == PT_TIMING_ACK:
         return len(inline) == 2 and body_len == 1
     if ptype == PT_TIMING_CONFIRM:
@@ -303,11 +291,8 @@ def _new_session_id():
 #     by suppressing the first five DATA_ACKs
 #     (WHALE_DROP_PTYPE=DATA_ACK
 #      WHALE_DROP_NTH=1,2,3,4,5)                44.4s
-#   a mode step whose MODE_ACK never arrives:
-#     control_ack_timeout                         4.3s
-#
-# So ~48.7s is the worst silence a *healthy* session can legitimately
-# present, and this is a little over 3x that.
+# The full retry cycle remains the longest active-session silence; 150s is
+# a little over 3x the measured 44.4s.
 #
 # Note the retry cycle measured 44.4s where the arithmetic says 34.8s (six
 # data_ack_timeouts). The formula counts only the waiting; the five
@@ -374,7 +359,6 @@ _PTYPE_NAMES = {
     PT_CONNECT: "CONNECT", PT_CONNECT_ACK: "CONNECT_ACK",
     PT_DISC: "DISC", PT_DISC_ACK: "DISC_ACK",
     PT_DATA: "DATA", PT_DATA_ACK: "DATA_ACK",
-    PT_MODE_REQ: "MODE_REQ", PT_MODE_ACK: "MODE_ACK",
     PT_FLOOR_REQ: "FLOOR_REQ", PT_FLOOR_GRANT: "FLOOR_GRANT",
     PT_TIMING_ACK: "TIMING_ACK", PT_TIMING_CONFIRM: "TIMING_CONFIRM",
 }
@@ -393,7 +377,7 @@ _PTYPES_BY_NAME = {name: ptype for ptype, name in _PTYPE_NAMES.items()}
 # variable is set. They exist because the failures this module now handles
 # cannot otherwise be produced on demand over a real radio link.
 #
-#   WHALE_DROP_PTYPE   comma-separated packet type names (MODE_ACK,
+#   WHALE_DROP_PTYPE   comma-separated packet type names (DATA_ACK,
 #                      CONNECT_ACK, DATA_ACK, ...) or numeric ids, whose
 #                      transmission is suppressed.
 #   WHALE_DROP_NTH     which occurrences of each to suppress: comma-
@@ -408,21 +392,14 @@ _PTYPES_BY_NAME = {name: ptype for ptype, name in _PTYPE_NAMES.items()}
 #
 # Why suppression rather than a dropped frame. A real channel cannot be
 # told to lose a chosen frame, and waiting for it to lose the right one is
-# not a test. But from the peer's side a MODE_ACK that was never sent is
-# indistinguishable from one that was sent and lost -- the peer sees
-# silence either way -- so suppressing the transmission reproduces the
-# failure exactly. The software tests in tests/test_link_recovery.py drive
+# not a test. From the peer's side a frame that was never sent is
+# indistinguishable from one that was sent and lost, so suppressing the
+# transmission reproduces the failure. The software recovery tests drive
 # the same hook, so the bench and the suite exercise one mechanism rather
 # than two that have to be kept in agreement.
 #
-# Why the other two. The lost-MODE_ACK cases that used to be fatal are
-# specific transitions -- 600<->1200, and any step down to the control
-# profile -- and reaching them by waiting for _maybe_adapt to adapt its way
-# there over a real channel is slow and unreliable. WHALE_FORCE_MODE picks
-# the profile a session starts at; WHALE_MODE_STEP_SCRIPT picks which step
-# it then takes. Neither is visible on air: the first only changes which
-# mode_id a station proposes through the negotiation that already exists,
-# and the second only changes when an ordinary PT_MODE_REQ goes out.
+# WHALE_FORCE_MODE picks the starting profile; WHALE_MODE_STEP_SCRIPT makes
+# a local DATA-mode step occur at a repeatable chunk boundary.
 
 
 class _TxSuppressor:
@@ -742,8 +719,8 @@ class Link:
         at -- i.e. the peer's own tx_profile, as far as this station knows
         it. Used by the decode loop and (indirectly) by the ACK timeout.
 
-        `fallback` lets the decoder straddle a mode transition until a valid
-        packet confirms which whole-frame waveform the peer is using."""
+        `fallback` is retained for callers predating all-mode receive; normal
+        connected operation now searches every mutually supported mode."""
         self.rx_profile = profile
         self._rx_profile_fallback = fallback if fallback is not profile else None
         self._recompute_timings()
@@ -752,11 +729,8 @@ class Link:
         """Takes a decoded data-plane frame as ground truth about what the
         peer is transmitting at, correcting rx_profile if they disagree.
 
-        This is the other half of _apply_rx_profile's fallback, and it is
-        what makes the two ends converge again after a lost PT_MODE_ACK --
-        in one frame, and whichever end lost it. rx_profile is only ever a
-        belief about the peer's tx_profile; a frame that actually decoded
-        is not a belief.
+        rx_profile is only a belief about the peer's tx_profile; a frame that
+        actually decoded is not a belief.
 
         Only PT_DATA counts (_DATA_PLANE_TYPES). DATA_ACK and all other
         controls are robust-header transmissions, so they say nothing about
@@ -777,7 +751,9 @@ class Link:
         # frame out at tx_profile, then the peer's (tiny) ACK back at
         # rx_profile, with a turnaround at each end.
         tx_airtime = self.tx_profile.airtime(_AIR_HEADER_LEN + self.tx_profile.chunk_size)
-        ack_airtime = self.modes.control.airtime(_AIR_HEADER_LEN)
+        # The two sequence bytes are inline; received_mode_id is the ACK's
+        # one-byte control-mode body.
+        ack_airtime = self.modes.control.airtime(_AIR_HEADER_LEN + 1)
         self.data_ack_timeout = (tx_airtime + ack_airtime
                                  + 2 * TX_TURNAROUND_DELAY + 3.0)
 
@@ -794,12 +770,13 @@ class Link:
         tx_profile) -- try both since the decode loop can't otherwise tell
         which is arriving next.
 
-        A third appears transiently, while a mode step is still unconfirmed
-        and the peer may not have taken it: see _apply_rx_profile. It is
-        dropped again as soon as one data frame says which of the two the
-        peer is really using."""
+        A sender may step down after silence, when it cannot notify us first.
+        Therefore every mutually advertised data mode remains a candidate;
+        the DATA frame itself is authoritative notification of a change."""
         candidates = [self.modes.control]
-        for profile in (self.rx_profile, self._rx_profile_fallback):
+        data_profiles = [p for p in self.modes.modes
+                         if p.mode_id in self.peer_supported_modes]
+        for profile in (self.rx_profile, *data_profiles):
             if profile is not None and profile not in candidates:
                 candidates.append(profile)
         return tuple(candidates)
@@ -1366,7 +1343,7 @@ class Link:
         PT_FLOOR_REQ from inside recv_message(), i.e. while it isn't itself
         mid-send (see recv_message and _handle_floor_req), so a request that
         lands while the peer is busy sending its own message is silently
-        dropped by its _wait_packet, same as a stray PT_MODE_REQ would be.
+        dropped by its _wait_packet.
         The retry after this attempt's timeout is what gets through once the
         peer goes back to polling for incoming work."""
         if self.role == "ISS":
@@ -1382,7 +1359,7 @@ class Link:
                 if remaining <= 0:
                     break
                 got = self._wait_packet(
-                    {PT_FLOOR_GRANT, PT_DATA, PT_MODE_REQ, PT_DISC}, remaining)
+                    {PT_FLOOR_GRANT, PT_DATA, PT_DISC}, remaining)
                 if got is None:
                     break
                 ptype, body = got
@@ -1396,9 +1373,6 @@ class Link:
                     message = self._handle_data(body)
                     if message is not None:
                         self._pending_messages.put(message)
-                    continue
-                if ptype == PT_MODE_REQ:
-                    self._handle_mode_req(body)
                     continue
                 self.role = "ISS"
                 logger.info("[%s] floor granted, now ISS", self.mycall)
@@ -1441,13 +1415,19 @@ class Link:
             chunk = data[offset:offset + self.tx_profile.chunk_size]
             offset += len(chunk)
             is_last = offset >= len(data)
+            starting_profile = self.tx_profile
             attempts = self._send_chunk_with_arq(self._tx_seq, chunk, is_last)
             sent += 1
             if attempts is None:
                 raise LinkError(f"no ACK for chunk {sent} ({offset}/{len(data)} bytes) "
                                 f"after {MAX_RETRIES} tries")
             self._tx_seq = (self._tx_seq + 1) % SEQ_MODULO
-            self._maybe_adapt(attempts)
+            if self.tx_profile is starting_profile:
+                self._maybe_adapt(attempts)
+            else:
+                # The retry loop already reacted to silence; do not take a
+                # second step for the same chunk after its eventual ACK.
+                self._clean_streak = 0
             if is_last:
                 break
         logger.info("send_message: %d bytes in %d chunk(s) acked", len(data), sent)
@@ -1465,15 +1445,9 @@ class Link:
         something useful about the current one. One frame per keying, and
         that channel of information is gone with it.)
 
-        PT_MODE_REQ is answered here as well as in recv_message. It should
-        not normally arrive while we are the sender -- the peer only steps
-        its own TX rate after a chunk *it* sent got acked, which means we
-        were receiving -- but the roles can swap between the ack and the
-        step, and until this was handled the request was simply discarded
-        and the peer spent a full control_ack_timeout waiting for an answer
-        that no longer had anywhere to come from. Accepting it mid-ARQ is
-        safe: it moves rx_profile, and _apply_rx_profile's fallback covers
-        the DATA_ACK that may already be in flight at the old one."""
+        DATA_ACK confirms both the sequence and the mode the IRS decoded.
+        After repeated silence the sender steps down and retries this same
+        chunk; receivers search every mutually supported mode."""
         body = bytes([seq | (EOF_BIT if is_eof else 0)]) + chunk
         for attempt in range(1, MAX_RETRIES + 1):
             self.on_event("PTT", on=True)
@@ -1484,19 +1458,17 @@ class Link:
                 remaining = deadline - time.monotonic()
                 if remaining <= 0:
                     break
-                got = self._wait_packet({PT_DATA_ACK, PT_DISC, PT_MODE_REQ}, remaining)
+                got = self._wait_packet({PT_DATA_ACK, PT_DISC}, remaining)
                 if got is None:
                     break
                 ptype, body_in = got
                 if ptype == PT_DISC:
                     self._handle_peer_disc()
                     raise LinkError("peer disconnected mid-transfer")
-                if ptype == PT_MODE_REQ:
-                    self._handle_mode_req(body_in)
-                    continue
-                if len(body_in) < 2:
+                if len(body_in) != 3:
                     continue
                 answered, expects = body_in[0] & SEQ_MASK, body_in[1] & SEQ_MASK
+                received_mode_id = body_in[2]
                 if answered != seq:
                     # An answer to a frame we have already moved past --
                     # most often the receiver's second ack of a chunk we
@@ -1510,8 +1482,12 @@ class Link:
                     # Accepted. True of a duplicate as naturally as of a
                     # fresh frame, which is what makes retransmitting after
                     # a lost ACK safe.
-                    logger.info("[%s] DATA seq=0x%02x acked after %d attempt(s)",
-                                self.mycall, seq, attempt)
+                    if received_mode_id != self.tx_profile.mode_id:
+                        logger.warning("[%s] ignoring ACK reporting mode %d; transmitting at %s",
+                                       self.mycall, received_mode_id, self.tx_profile.name)
+                        continue
+                    logger.info("[%s] DATA seq=0x%02x acked after %d attempt(s) at %s",
+                                self.mycall, seq, attempt, self.tx_profile.name)
                     return attempt
                 # The peer decoded this very frame and still did not advance
                 # past it, so the two ends disagree about where the sequence
@@ -1520,6 +1496,8 @@ class Link:
                 logger.warning("[%s] peer answered seq 0x%02x but expects 0x%02x -- sequence desync",
                                self.mycall, answered, expects)
             logger.warning("DATA seq=0x%02x: no ACK, retry %d/%d", seq, attempt, MAX_RETRIES)
+            if attempt == STEP_DOWN_AFTER_ATTEMPTS:
+                self._step_tx_mode(-1)
         return None
 
     # -- mid-session speed adaptation ---------------------------------------
@@ -1538,66 +1516,31 @@ class Link:
             logger.warning("[%s] taking scripted mode step %+d after chunk %d -- "
                            "WHALE_MODE_STEP_SCRIPT", self.mycall, scripted, self._acked_chunks)
             self._clean_streak = 0
-            self._request_mode_step(scripted)
+            self._step_tx_mode(scripted)
             return
         if attempts >= STEP_DOWN_AFTER_ATTEMPTS:
             self._clean_streak = 0
-            self._request_mode_step(-1)
+            self._step_tx_mode(-1)
             return
         self._clean_streak += 1
         if self._clean_streak >= STEP_UP_AFTER_CLEAN_STREAK:
             self._clean_streak = 0
-            self._request_mode_step(+1)
+            self._step_tx_mode(+1)
 
-    def _request_mode_step(self, direction):
-        """Steps *this station's own* TX rate (the direction it's actually
-        been having trouble/success with in _maybe_adapt) up or down. Never
-        touches the reverse leg -- that's the peer's own tx_profile, and
-        gets adapted independently by the peer's own _maybe_adapt calls
-        when it's the one sending."""
+    def _step_tx_mode(self, direction):
+        """Change this station's DATA mode without a control exchange.
+
+        The next DATA frame announces the change. Its DATA_ACK echoes the
+        mode actually decoded, while the reverse direction remains wholly
+        independent."""
         candidate = self.modes.step(self.tx_profile, direction)
         if candidate is None:
             return
         if candidate.mode_id not in self.peer_supported_modes:
             return
-        logger.info("[%s] requesting mode step to %s", self.mycall, candidate.name)
-        self.on_event("PTT", on=True)
-        self._tx_packet(PT_MODE_REQ, bytes([candidate.mode_id]))
-        self.on_event("PTT", off=True)
-        got = self._wait_packet({PT_MODE_ACK}, self.control_ack_timeout)
-        if got is None:
-            logger.warning("[%s] MODE_REQ to %s: no ack, staying at %s", self.mycall, candidate.name,
-                            self.tx_profile.name)
-            return
-        _, body = got
-        accepted_id = body[0] if body else self.modes.control.mode_id
-        self._apply_tx_profile(self.modes.resolve(accepted_id))
-        logger.info("[%s] switched tx profile to %s", self.mycall, self.tx_profile.name)
-
-    def _handle_mode_req(self, body):
-        """The peer is telling us it's stepping *its own* TX rate -- i.e.
-        our rx expectation. Accept/reject based on whether we can decode
-        that rate, and update only self.rx_profile; our own tx_profile
-        (the reverse leg) is unrelated and stays put.
-
-        Note the asymmetry this has to live with, which is not fixable from
-        here: we move on *sending* the ack, the peer moves on *receiving*
-        it, and no acknowledgement scheme removes the last hop's
-        uncertainty. So the old profile is kept as a decode fallback rather
-        than assumed dead -- if the ack is lost, the peer goes on
-        transmitting at it, and that frame is the only thing that can tell
-        us so. See _apply_rx_profile and _confirm_rx_profile."""
-        proposed_id = body[0] if body else self.modes.control.mode_id
-        own_supported = set(self.modes.supported_ids)
-        accepted_id = proposed_id if proposed_id in own_supported else self.modes.control.mode_id
-        previous = self.rx_profile
-        self.on_event("PTT", on=True)
-        self._tx_packet(PT_MODE_ACK, bytes([accepted_id]))
-        self.on_event("PTT", off=True)
-        self._apply_rx_profile(self.modes.resolve(accepted_id), fallback=previous)
-        logger.info("[%s] accepted peer mode step, now expecting rx at %s (still trying %s "
-                    "until a data frame settles it)", self.mycall, self.rx_profile.name,
-                    previous.name)
+        self._apply_tx_profile(candidate)
+        logger.info("[%s] switched tx profile to %s; awaiting DATA_ACK confirmation",
+                    self.mycall, self.tx_profile.name)
 
     def recv_message(self, timeout=None):
         """Blocks for the chunks of one message (as delimited by the EOF bit)
@@ -1634,14 +1577,11 @@ class Link:
             remaining = None if deadline is None else max(0.0, deadline - time.time())
             if deadline is not None and remaining <= 0:
                 return None
-            got = self._wait_packet({PT_DATA, PT_DISC, PT_MODE_REQ, PT_FLOOR_REQ},
+            got = self._wait_packet({PT_DATA, PT_DISC, PT_FLOOR_REQ},
                                      remaining if remaining is not None else 1e9)
             if got is None:
                 return None
             ptype, body = got
-            if ptype == PT_MODE_REQ:
-                self._handle_mode_req(body)
-                continue  # still waiting on the actual DATA
             if ptype == PT_FLOOR_REQ:
                 self._handle_floor_req()
                 continue  # we're IRS now; wait for the actual DATA from the new ISS
@@ -1678,7 +1618,8 @@ class Link:
         # answered frame and the sequence wanted next so a stale duplicate
         # cannot be mistaken for an answer to a later frame.
         self.on_event("PTT", on=True)
-        self._tx_packet(PT_DATA_ACK, bytes([seq, self._rx_expect_seq]))
+        self._tx_packet(PT_DATA_ACK,
+                        bytes([seq, self._rx_expect_seq, self.rx_profile.mode_id]))
         self.on_event("PTT", off=True)
         return message
 
