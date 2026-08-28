@@ -23,7 +23,7 @@ import threading
 import numpy as np
 
 from acceptance_test import StationClient
-from whale import afsk, link
+from whale import afsk, link, rx_audio
 from whale.link import Link
 from whale.modes.hc0_mode import HC0
 from whale.modes.hc1_mode import HC1
@@ -66,8 +66,12 @@ class PairedAudioTransport:
         self._transmitting.set()
         try:
             waveform = np.asarray(tx_audio, dtype=np.float32)
+            received = rx_audio.downsample(np.concatenate((
+                waveform,
+                np.zeros(rx_audio.FILTER_DELAY_CAPTURE_SAMPLES, dtype=np.float32),
+            )))
             with self.peer._lock:
-                self.peer._audio = np.concatenate((self.peer._audio, waveform))
+                self.peer._audio = np.concatenate((self.peer._audio, received))
             keyed = len(waveform) / afsk.SAMPLE_RATE
             self.airtime += keyed
             return keyed

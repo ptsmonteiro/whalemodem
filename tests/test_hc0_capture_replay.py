@@ -26,6 +26,7 @@ import pathlib
 import numpy as np
 import pytest
 
+from whale import rx_audio
 from whale.modes import hc0
 from whale.modes.hc0_mode import HC0
 
@@ -34,7 +35,7 @@ CAPTURES = pathlib.Path(__file__).parent / "data" / "hc0_captures"
 #: What each leg measured on the day, as the yardstick for "still working
 #: for the right reason".  The weak one is the interesting number.
 EXPECTED = {
-    "ic7300_to_ic705": {"cfo_hz": -8.0, "tone_snr_db": 36.9, "raw_errors": 0},
+    "ic7300_to_ic705": {"cfo_hz": -8.0, "tone_snr_db": 33.0, "raw_errors": 0},
     "ic705_to_ic7300": {"cfo_hz": +8.9, "tone_snr_db": 14.5, "raw_errors": 2},
 }
 
@@ -45,7 +46,7 @@ def capture_names():
 
 @pytest.fixture(scope="module")
 def decoded():
-    return {name: HC0.decode(np.load(CAPTURES / f"{name}.npy"))
+    return {name: HC0.decode(rx_audio.downsample(np.load(CAPTURES / f"{name}.npy")))
             for name in capture_names()}
 
 
@@ -66,7 +67,7 @@ def test_the_weak_leg_is_the_one_hc1_could_not_carry():
     written for.
     """
     name = "ic705_to_ic7300"
-    result = HC0.decode(np.load(CAPTURES / f"{name}.npy"))
+    result = HC0.decode(rx_audio.downsample(np.load(CAPTURES / f"{name}.npy")))
     assert result["payload"] == (CAPTURES / f"{name}.bin").read_bytes()
     assert result["confidence"] >= 3 * HC0.confidence_threshold
 
@@ -107,7 +108,7 @@ def test_how_much_work_the_error_correction_actually_had_to_do(name):
     """
     audio = np.load(CAPTURES / f"{name}.npy")
     expected = (CAPTURES / f"{name}.bin").read_bytes()
-    errors = hc0.demodulate_debug(audio, expected)["total_bit_errors"]
+    errors = hc0.demodulate_debug(rx_audio.downsample(audio), expected)["total_bit_errors"]
     assert errors <= EXPECTED[name]["raw_errors"]
     assert errors / hc0.PAYLOAD_BITS < 0.01
 

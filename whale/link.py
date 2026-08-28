@@ -878,7 +878,7 @@ class Link:
 
     def _finish_air_packet(self, ptype, body, profile, snap, end, decode_result):
         trailing = max(0, len(snap) - end)
-        self._peer_unkeyed_at = time.monotonic() - trailing / profile.sample_rate
+        self._peer_unkeyed_at = time.monotonic() - trailing / profile.rx_sample_rate
         cost = self._decode_cost.get(profile.name)
         if cost is not None:
             cost.frames += 1
@@ -941,13 +941,15 @@ class Link:
 
         Without it the buffer grows to transport.RX_BUFFER_SECONDS through
         any idle stretch and every later poll re-searches all of it.
-        demodulate() costs roughly 14ms per second of buffer per candidate
-        profile, so a full 10s buffer turns a 40ms poll into a 280ms one --
-        and that lands directly on the turnaround, since the reply cannot
-        be sent until the poll that decodes the frame finishes. Keeping the
-        most recent _rx_keep_seconds bounds the cost at about one frame's
-        worth while leaving any part-arrived frame intact."""
-        keep = int(self._rx_keep_seconds * max(p.sample_rate for p in self._candidate_decode_profiles()))
+        Decode cost is proportional to buffer length.  At 12 kHz the current
+        VHF ladder still takes about 105 ms to search all four candidates in
+        a full 10-second buffer (see scripts/benchmark_rx.py), and that lands
+        directly on the turnaround because the reply cannot be sent until
+        the poll that decodes the frame finishes. Keeping the most recent
+        _rx_keep_seconds bounds the cost at about one frame's worth while
+        leaving any part-arrived frame intact."""
+        keep = int(self._rx_keep_seconds * max(
+            p.rx_sample_rate for p in self._candidate_decode_profiles()))
         if snap_len > keep:
             self.transport.consume_rx(snap_len - keep)
 
@@ -1020,7 +1022,7 @@ class Link:
         # time regresses. See scripts/sweep_ptt_timing.py.
         logger.info("[%s] TX %s at %s (%d body byte(s), %.2fs audio, %.2fs keyed)",
                     self.mycall, _ptype_name(ptype), profile.name, len(body),
-                    len(audio) / profile.sample_rate, keyed)
+                    len(audio) / profile.tx_sample_rate, keyed)
 
     def _apply_head_feedback(self, requested_byte, *, seq):
         """Apply an absolute peer request monotonically and idempotently."""

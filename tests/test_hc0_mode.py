@@ -20,7 +20,7 @@ import numpy as np
 import pytest
 from scipy.signal import hilbert
 
-from whale import afsk, framing, waveform
+from whale import afsk, framing, rx_audio, waveform
 from whale.modes import hc0
 from whale.modes.hc0_mode import HC0, hf_registry
 from whale.modes.hc1_mode import HC1
@@ -40,9 +40,9 @@ def _packet(body_len=None):
 
 
 def _snapshot(audio, before=4_000, after=2_000):
-    return np.concatenate((np.zeros(before, np.float32),
-                           np.asarray(audio, np.float32),
-                           np.zeros(after, np.float32)))
+    return rx_audio.downsample(np.concatenate((np.zeros(before, np.float32),
+                                               np.asarray(audio, np.float32),
+                                               np.zeros(after, np.float32))))
 
 
 def _noisy(audio, snr_db):
@@ -62,7 +62,8 @@ def _offset(audio, hz):
 
 def test_hc0_satisfies_the_waveform_mode_protocol():
     assert isinstance(HC0, waveform.WaveformMode)
-    assert HC0.sample_rate == afsk.SAMPLE_RATE  # one transport, one rate
+    assert HC0.tx_sample_rate == afsk.SAMPLE_RATE
+    assert HC0.rx_sample_rate == rx_audio.DECODE_SAMPLE_RATE
     assert HC0.chunk_size == hc0.MAX_PAYLOAD_BYTES - framing.AIR_HEADER_BYTES
 
 
@@ -126,7 +127,9 @@ def test_a_full_chunk_round_trips_and_reports_where_the_frame_ended():
     assert result["confidence"] >= HC0.confidence_threshold
     # The link consumes up to end_index and dates the peer's unkeying from
     # what is left after it, so this has to be the end of our audio.
-    assert abs(result["end_index"] - (4_000 + len(audio))) <= 8
+    expected = ((4_000 + len(audio)) // rx_audio.DECIMATION
+                + rx_audio.FILTER_DELAY_DECODE_SAMPLES)
+    assert abs(result["end_index"] - expected) <= 2
 
 
 def test_the_smallest_control_packet_round_trips_too():
@@ -145,7 +148,9 @@ def test_a_partial_frame_reports_a_lock_but_no_end_index():
     to keep waiting instead of consuming a half-arrived frame."""
     audio = HC0.encode(_packet())
     arrived = hc0.lead_in_samples() + 100 * hc0.SYMBOL_SAMPLES
-    result = HC0.decode(_snapshot(audio)[:4_000 + arrived])
+    arrived_rx = ((4_000 + arrived) // rx_audio.DECIMATION
+                  + rx_audio.FILTER_DELAY_DECODE_SAMPLES)
+    result = HC0.decode(_snapshot(audio)[:arrived_rx])
 
     assert result["confidence"] >= HC0.confidence_threshold
     assert "end_index" not in result
@@ -253,7 +258,7 @@ def test_nothing_that_is_not_a_frame_clears_the_threshold():
                                dtype=np.uint8))), np.float64),
     }
     for name, audio in candidates.items():
-        result = HC0.decode(audio)
+        result = HC0.decode(rx_audio.downsample(audio))
         assert result["payload"] is None, name
         assert result["confidence"] < HC0.confidence_threshold, (
             f"{name} scored {result['confidence']:.3f}")

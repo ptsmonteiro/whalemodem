@@ -25,6 +25,7 @@ import pathlib
 import numpy as np
 import pytest
 
+from whale import rx_audio
 from whale.modes import hc1
 from whale.modes.hc1_mode import HC1
 
@@ -37,7 +38,7 @@ def capture_names():
 
 @pytest.fixture(scope="module")
 def decoded():
-    return {name: HC1.decode(np.load(CAPTURES / f"{name}.npy"))
+    return {name: HC1.decode(rx_audio.downsample(np.load(CAPTURES / f"{name}.npy")))
             for name in capture_names()}
 
 
@@ -78,17 +79,20 @@ def test_the_whole_band_arrived_through_the_ssb_filter(name, decoded):
 
 
 @pytest.mark.parametrize("name", capture_names())
-def test_the_forward_error_correction_had_nothing_to_do(name, decoded):
-    """Both captures decoded with zero raw bit errors.
+def test_the_forward_error_correction_remains_comfortably_in_hand(name, decoded):
+    """Both captures remain far inside the code's correction margin.
 
-    Recorded so the margin is visible rather than assumed: these frames did
-    not squeak through on the Viterbi decoder, they arrived clean, and the
-    coding is all still in hand for a worse path.  `demodulate_debug`
-    against the known payload is how the number is obtained.
+    The 12 kHz receive path has 9-10 raw errors in 1,292 coded bits on these
+    captures, below 0.8%, and the decoded bytes remain exact.  Recording the
+    number keeps the cost of downsampling visible rather than hiding it
+    behind the CRC.  `demodulate_debug` against the known payload is how the
+    number is obtained.
     """
     audio = np.load(CAPTURES / f"{name}.npy")
     expected = (CAPTURES / f"{name}.bin").read_bytes()
-    assert hc1.demodulate_debug(audio, expected)["total_bit_errors"] == 0
+    result = hc1.demodulate_debug(rx_audio.downsample(audio), expected)
+    assert result["total_bit_errors"] <= 12
+    assert result["ber"] < 0.01
 
 
 if __name__ == "__main__":

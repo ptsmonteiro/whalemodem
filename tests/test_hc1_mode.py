@@ -15,7 +15,7 @@ import numpy as np
 import pytest
 from scipy.signal import hilbert
 
-from whale import afsk, framing, waveform
+from whale import afsk, framing, rx_audio, waveform
 from whale.modes import hc1
 from whale.modes.hc1_mode import HC1, hf_registry
 
@@ -31,9 +31,9 @@ def _packet(body_len=None):
 
 def _snapshot(audio, before=3_000, after=1_500):
     """One frame sitting in a receive buffer, with silence either side."""
-    return np.concatenate((np.zeros(before, np.float32),
-                           np.asarray(audio, np.float32),
-                           np.zeros(after, np.float32)))
+    return rx_audio.downsample(np.concatenate((np.zeros(before, np.float32),
+                                               np.asarray(audio, np.float32),
+                                               np.zeros(after, np.float32))))
 
 
 def _offset(audio, hz):
@@ -54,7 +54,8 @@ def _noisy(audio, snr_db):
 
 def test_hc1_satisfies_the_waveform_mode_protocol():
     assert isinstance(HC1, waveform.WaveformMode)
-    assert HC1.sample_rate == afsk.SAMPLE_RATE  # one transport, one rate
+    assert HC1.tx_sample_rate == afsk.SAMPLE_RATE
+    assert HC1.rx_sample_rate == rx_audio.DECODE_SAMPLE_RATE
     assert HC1.chunk_size == hc1.MAX_PAYLOAD_BYTES - framing.AIR_HEADER_BYTES
 
 
@@ -106,7 +107,9 @@ def test_a_full_chunk_round_trips_and_reports_where_the_frame_ended():
     # The link consumes up to end_index and dates the peer's unkeying from
     # what is left after it, so this has to be the end of our audio -- give
     # or take the sample or two acquisition may be out by.
-    assert abs(result["end_index"] - (3_000 + len(audio))) <= 4
+    expected = ((3_000 + len(audio)) // rx_audio.DECIMATION
+                + rx_audio.FILTER_DELAY_DECODE_SAMPLES)
+    assert abs(result["end_index"] - expected) <= 2
 
 
 def test_the_smallest_control_packet_round_trips_too():
@@ -126,7 +129,9 @@ def test_a_partial_frame_reports_a_lock_but_no_end_index():
     keep waiting instead of consuming a half-arrived frame."""
     audio = HC1.encode(_packet())
     arrived = hc1.lead_in_samples() + 20 * hc1.SYMBOL_SAMPLES
-    result = HC1.decode(_snapshot(audio)[:3_000 + arrived])
+    arrived_rx = ((3_000 + arrived) // rx_audio.DECIMATION
+                  + rx_audio.FILTER_DELAY_DECODE_SAMPLES)
+    result = HC1.decode(_snapshot(audio)[:arrived_rx])
 
     assert result["confidence"] >= HC1.confidence_threshold
     assert "end_index" not in result
@@ -150,7 +155,7 @@ def test_noise_and_a_bare_tone_decode_to_nothing():
     t = np.arange(hc1.FRAME_SAMPLES) / hc1.SAMPLE_RATE
     tone = 0.3 * np.sin(2 * np.pi * 1_500.0 * t)
     for audio in (noise, tone):
-        assert HC1.decode(audio)["payload"] is None
+        assert HC1.decode(rx_audio.downsample(audio))["payload"] is None
 
 
 # -- the reason the mode exists -------------------------------------------

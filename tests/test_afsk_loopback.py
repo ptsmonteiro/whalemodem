@@ -8,7 +8,7 @@ import time
 
 import numpy as np
 
-from whale import afsk, framing, link, mode_history, modes
+from whale import afsk, framing, link, mode_history, modes, rx_audio
 from whale.waveform import ModeRegistry
 
 # The two-Link-in-one-process harness these tests share with
@@ -760,7 +760,8 @@ def test_negotiate_mode():
 def test_link_uses_waveform_mode_contract():
     """Link dispatches through a mode's codec rather than CPFSK directly."""
     class SpyCodec:
-        sample_rate = afsk.SAMPLE_RATE
+        tx_sample_rate = afsk.SAMPLE_RATE
+        rx_sample_rate = afsk.RX_SAMPLE_RATE
 
         def __init__(self):
             self.encoded = 0
@@ -774,7 +775,8 @@ def test_link_uses_waveform_mode_contract():
 
         def decode(self, audio, profile, **kwargs):
             self.decoded += 1
-            return afsk.demodulate(audio, profile=profile, **kwargs)
+            return afsk.demodulate(audio, profile=profile,
+                                   sample_rate=self.rx_sample_rate, **kwargs)
 
         def airtime(self, payload_len, profile):
             return afsk.frame_seconds(payload_len, profile)

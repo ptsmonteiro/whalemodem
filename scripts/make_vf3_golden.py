@@ -22,6 +22,7 @@ import pathlib
 
 import numpy as np
 
+from whale import rx_audio
 from whale.modes import vf3
 
 ROOT = pathlib.Path(__file__).resolve().parent.parent
@@ -63,7 +64,7 @@ def capture_paths() -> list[pathlib.Path]:
 def summarise(path: pathlib.Path) -> dict:
     audio = np.load(path)
     expected = (path.with_suffix(".bin")).read_bytes()
-    result = vf3.demodulate(audio)
+    result = vf3.demodulate(rx_audio.downsample(audio))
     if result["payload"] != expected:
         raise SystemExit(f"{path} does not decode to its reference payload")
     entry: dict = {

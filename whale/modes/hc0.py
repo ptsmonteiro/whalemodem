@@ -57,17 +57,19 @@ import numpy as np
 import numpy as _np
 from scipy.signal import hilbert as _hilbert
 
-from .. import dsp
+from .. import dsp, rx_audio
 from ..dsp import freq as _freq, head as _head, mfsk as _mfsk
 
 # -- geometry -------------------------------------------------------------
 
 SAMPLE_RATE = 48_000
+RX_SAMPLE_RATE = rx_audio.DECODE_SAMPLE_RATE
 
 #: 512 samples: 10.667 ms, so 93.75 baud and 93.75 Hz of tone spacing.
 #: Slow enough that a symbol carries real energy, fast enough that 283 of
 #: them still fit in a keying an operator will tolerate.
 SYMBOL_SAMPLES = 512
+RX_SYMBOL_SAMPLES = SYMBOL_SAMPLES // rx_audio.DECIMATION
 
 #: 16 tones from bin 8, i.e. 750 Hz to 2,156.25 Hz.  1.5 kHz of occupied
 #: bandwidth, centred at 1,453 Hz -- comfortably inside a 2.4 kHz SSB data
@@ -78,6 +80,9 @@ TONE_COUNT = 16
 
 BANK = _mfsk.ToneBank(sample_rate=SAMPLE_RATE, symbol_samples=SYMBOL_SAMPLES,
                       first_bin=FIRST_BIN, tone_count=TONE_COUNT)
+RX_BANK = _mfsk.ToneBank(sample_rate=RX_SAMPLE_RATE,
+                         symbol_samples=RX_SYMBOL_SAMPLES,
+                         first_bin=FIRST_BIN, tone_count=TONE_COUNT)
 
 BITS_PER_SYMBOL = BANK.bits_per_symbol
 TONE_HZ = BANK.tone_hz
@@ -134,6 +139,7 @@ ACQUISITION_THRESHOLD = 0.12
 
 HEAD_BLOCK_SYMBOLS = 4
 HEAD_BLOCK_SAMPLES = HEAD_BLOCK_SYMBOLS * SYMBOL_SAMPLES
+RX_HEAD_BLOCK_SAMPLES = HEAD_BLOCK_SYMBOLS * RX_SYMBOL_SAMPLES
 
 #: Two blocks, 85.3 ms.  SSB has no squelch to blank the start of a
 #: transmission, so this floor is only what ramps the transmitter and the
@@ -142,6 +148,7 @@ LEAD_IN_BLOCKS = 2
 LEAD_IN_SAMPLES = LEAD_IN_BLOCKS * HEAD_BLOCK_SAMPLES
 LEAD_IN_FADE_SAMPLES = 240
 TAIL_SAMPLES = 960
+RX_TAIL_SAMPLES = TAIL_SAMPLES // rx_audio.DECIMATION
 
 DEFAULT_HEAD_SECONDS = LEAD_IN_SAMPLES / SAMPLE_RATE
 
@@ -149,8 +156,9 @@ DEFAULT_HEAD_SECONDS = LEAD_IN_SAMPLES / SAMPLE_RATE
 #: HEAD_MAX_SECONDS), plus a block, which is as far back as there is any
 #: point looking.
 MAX_HEAD_SAMPLES = SAMPLE_RATE + HEAD_BLOCK_SAMPLES
+MAX_RX_HEAD_SAMPLES = RX_SAMPLE_RATE + RX_HEAD_BLOCK_SAMPLES
 
-#: Two samples of block-to-block alignment drift, because the head is
+#: Two receive samples of block-to-block alignment drift, because the head is
 #: measured on frequency-corrected audio; see `_measure_head`.
 HEAD_PHASE_TOLERANCE = 2
 
@@ -226,6 +234,11 @@ def head_block() -> np.ndarray:
     return _mfsk.modulate(BANK, HEAD_PATTERN, TX_AMPLITUDE)
 
 
+def rx_head_block() -> np.ndarray:
+    """The receive-rate representation of one repeated head block."""
+    return _mfsk.modulate(RX_BANK, HEAD_PATTERN, TX_AMPLITUDE)
+
+
 def modulate(payload: bytes, *,
              head_seconds: float = DEFAULT_HEAD_SECONDS) -> np.ndarray:
     tones = np.concatenate((
@@ -265,13 +278,13 @@ def _measure_head(samples: np.ndarray, start: int,
     for, so the analytic signal is computed over a slice rather than the
     whole receive buffer.
     """
-    span = min(start, MAX_HEAD_SAMPLES)
-    if span < HEAD_BLOCK_SAMPLES:
+    span = min(start, MAX_RX_HEAD_SAMPLES)
+    if span < RX_HEAD_BLOCK_SAMPLES:
         return 0, 0.0
     window = _np.asarray(samples[start - span:start], dtype=_np.float64)
     corrected = _np.real(
-        _freq.derotate(_hilbert(window), offset_hz, SAMPLE_RATE))
-    return _head.measure(corrected, len(corrected), head_block(),
+        _freq.derotate(_hilbert(window), offset_hz, RX_SAMPLE_RATE))
+    return _head.measure(corrected, len(corrected), rx_head_block(),
                          phase_tolerance=HEAD_PHASE_TOLERANCE)
 
 
@@ -284,14 +297,14 @@ def _base_result() -> dict:
 
 def _acquire(audio: np.ndarray) -> tuple[int | None, float]:
     """Best sync-pattern match in `audio`, refined to 8 samples."""
-    scores, step = _mfsk.correlate(BANK, audio, SYNC_PATTERN)
+    scores, step = _mfsk.correlate(RX_BANK, audio, SYNC_PATTERN)
     if not len(scores):
         return None, 0.0
     coarse = int(np.argmax(scores))
     if scores[coarse] < ACQUISITION_THRESHOLD:
         return coarse * step, float(scores[coarse])
-    start = _mfsk.refine(BANK, audio, SYNC_PATTERN, coarse * step, radius=step)
-    score = _mfsk.pattern_score(BANK, audio, SYNC_PATTERN, start)
+    start = _mfsk.refine(RX_BANK, audio, SYNC_PATTERN, coarse * step, radius=step)
+    score = _mfsk.pattern_score(RX_BANK, audio, SYNC_PATTERN, start)
     return start, float(max(score, scores[coarse]))
 
 
@@ -313,7 +326,7 @@ def demodulate(audio: np.ndarray, *,
     del head_seconds  # acquisition finds the preamble, not the head
     result = _base_result()
     samples = np.asarray(audio, dtype=np.float64).reshape(-1)
-    if len(samples) < SYNC_SYMBOLS * SYMBOL_SAMPLES:
+    if len(samples) < SYNC_SYMBOLS * RX_SYMBOL_SAMPLES:
         result["failure"] = "capture shorter than the preamble"
         return result
 
@@ -322,18 +335,18 @@ def demodulate(audio: np.ndarray, *,
     if start is None or confidence < ACQUISITION_THRESHOLD:
         result["failure"] = "preamble not found"
         return result
-    result["sync_end_index"] = start + SYNC_SYMBOLS * SYMBOL_SAMPLES
+    result["sync_end_index"] = start + SYNC_SYMBOLS * RX_SYMBOL_SAMPLES
 
     # Measured, never gated on: a bad estimate costs accuracy, not the
     # frame, because nothing in the detector needed the phase it came from.
-    offset = _mfsk.offset_hz(BANK, samples, start, SYNC_PATTERN)
+    offset = _mfsk.offset_hz(RX_BANK, samples, start, SYNC_PATTERN)
     result["cfo_hz"] = offset
 
     head_blocks, head_score = _measure_head(samples, start, offset)
     result["head_blocks_received"] = head_blocks
     result["head_match"] = head_score
 
-    values = _mfsk.analyze(BANK, samples, result["sync_end_index"],
+    values = _mfsk.analyze(RX_BANK, samples, result["sync_end_index"],
                            PAYLOAD_SYMBOLS, offset)
     if values is None:
         # Still arriving.  Deliberately no end_index: the caller must keep
@@ -342,13 +355,13 @@ def demodulate(audio: np.ndarray, *,
         return result
     result["end_index"] = min(
         len(samples),
-        start + TOTAL_SYMBOLS * SYMBOL_SAMPLES + TAIL_SAMPLES)
+        start + TOTAL_SYMBOLS * RX_SYMBOL_SAMPLES + RX_TAIL_SAMPLES)
 
     magnitudes = np.abs(values)
     result["tone_snr_db"] = _tone_snr_db(magnitudes)
-    result["raw_payload_bits"] = BANK.bits_from_symbols(
+    result["raw_payload_bits"] = RX_BANK.bits_from_symbols(
         np.argmax(magnitudes, axis=1))
-    payload, meta = CODEC.decode_soft(_mfsk.soft_bits(BANK, magnitudes))
+    payload, meta = CODEC.decode_soft(_mfsk.soft_bits(RX_BANK, magnitudes))
     result.update(meta)
     result.update(payload=payload, synced=True, tone_magnitudes=magnitudes)
     return result

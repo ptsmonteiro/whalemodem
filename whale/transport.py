@@ -1,7 +1,8 @@
 """Radio transport: continuous receive capture + keyed transmit, on top of
-whale.hw (sound card lookup, PTT). No DSP lives here -- only wiring a
-continuously running input stream to a buffer, and handing transmit audio to
-hw.audio_io.transmit() (which keys PTT, plays, un-keys).
+whale.hw (sound card lookup, PTT). The sole DSP operation here is the shared
+anti-aliased conversion from the 48 kHz device stream to the 12 kHz receive
+buffer; waveform-specific decoding remains outside the transport. Transmit
+audio is handed to hw.audio_io.transmit() at 48 kHz.
 
 The input stream is opened once and left running for the transport's whole
 life, including while transmitting -- stopping/restarting it around every TX
@@ -25,8 +26,17 @@ import sounddevice as sd
 from whale import afsk
 from whale.hw import audio_io
 from whale.hw import radios as radios_mod
+from whale import rx_audio
 
-SAMPLE_RATE = audio_io.SAMPLE_RATE
+TX_SAMPLE_RATE = audio_io.SAMPLE_RATE
+CAPTURE_SAMPLE_RATE = audio_io.SAMPLE_RATE
+RX_SAMPLE_RATE = rx_audio.DECODE_SAMPLE_RATE
+# Backwards-compatible name for callers measuring transmitted arrays.
+SAMPLE_RATE = TX_SAMPLE_RATE
+if CAPTURE_SAMPLE_RATE != rx_audio.CAPTURE_SAMPLE_RATE:
+    raise RuntimeError(
+        f"audio capture runs at {CAPTURE_SAMPLE_RATE} Hz but the receive "
+        f"decimator expects {rx_audio.CAPTURE_SAMPLE_RATE} Hz")
 
 _COINIT_APARTMENTTHREADED = 0x2
 _com_ready = threading.local()
@@ -78,7 +88,8 @@ if abs(_KEYING_OVERHEAD - afsk.KEYING_OVERHEAD_SECONDS) > 0.005:
 # loop prunes audio it has already searched and found nothing in, so the
 # buffer only approaches this length while a frame is actually arriving.
 # That matters because demodulate() costs time proportional to buffer
-# length (~14ms per second of audio per profile).
+# length (currently about 3 ms per second for each CPFSK candidate on the
+# development machine; scripts/benchmark_rx.py keeps this reproducible).
 RX_BUFFER_SECONDS = 10.0
 
 
@@ -90,9 +101,9 @@ class RadioTransport:
         self.out_device, self.in_device = self.radio.devices()
         self.ptt = self.radio.ptt()
 
-        # A deque of raw chunks rather than one growing array: the audio
+        # A deque of 12 kHz receive chunks rather than one growing array: the audio
         # callback runs on PortAudio's realtime thread, and re-concatenating
-        # an array that can be RX_BUFFER_SECONDS long (480k samples) on every
+        # an array that can be RX_BUFFER_SECONDS long on every
         # callback -- ~10x/sec -- is real work on that thread. Appending a
         # chunk is O(1); the expensive concatenate+trim happens lazily in
         # snapshot_rx(), called from the (non-realtime) decode thread.
@@ -102,14 +113,18 @@ class RadioTransport:
         self._stream = None
         self._tx_lock = threading.Lock()  # serializes TX attempts
         self._transmitting = threading.Event()
+        self._rx_decimator = rx_audio.ReceiveDecimator()
 
     # -- receive ------------------------------------------------------
 
     def _in_callback(self, indata, frames, time_info, status):
         with self._buf_lock:
-            self._chunks.append(indata[:, 0].copy())
-            self._chunks_len += frames
-            max_len = int(RX_BUFFER_SECONDS * SAMPLE_RATE)
+            if not hasattr(self, "_rx_decimator"):
+                self._rx_decimator = rx_audio.ReceiveDecimator()
+            decoded = self._rx_decimator.process(indata[:, 0])
+            self._chunks.append(decoded)
+            self._chunks_len += len(decoded)
+            max_len = int(RX_BUFFER_SECONDS * RX_SAMPLE_RATE)
             while self._chunks_len - len(self._chunks[0]) > max_len:
                 self._chunks_len -= len(self._chunks.popleft())
 
@@ -118,7 +133,7 @@ class RadioTransport:
             return
         _ensure_com_initialized()
         self._stream = sd.InputStream(
-            device=self.in_device, samplerate=SAMPLE_RATE, channels=1,
+            device=self.in_device, samplerate=CAPTURE_SAMPLE_RATE, channels=1,
             dtype="float32", latency=0.1, callback=self._in_callback,
         )
         self._stream.start()
@@ -133,6 +148,12 @@ class RadioTransport:
         with self._buf_lock:
             self._chunks.clear()
             self._chunks_len = 0
+            if hasattr(self, "_rx_decimator"):
+                self._rx_decimator.reset()
+            else:
+                # Some safety tests construct a transport without running
+                # __init__; keep the emergency send/close paths valid.
+                self._rx_decimator = rx_audio.ReceiveDecimator()
 
     def snapshot_rx(self):
         """Everything captured so far, flattened into one array."""
@@ -142,7 +163,7 @@ class RadioTransport:
             flat = np.concatenate(self._chunks)
             self._chunks.clear()
             self._chunks.append(flat)
-            max_len = int(RX_BUFFER_SECONDS * SAMPLE_RATE)
+            max_len = int(RX_BUFFER_SECONDS * RX_SAMPLE_RATE)
             if len(flat) > max_len:
                 flat = flat[-max_len:]
                 self._chunks[0] = flat
@@ -208,7 +229,7 @@ class RadioTransport:
                     try:
                         keyed_seconds = audio_io.transmit(
                             tx_audio, self.out_device, self.ptt,
-                            samplerate=SAMPLE_RATE, ptt_lead=ptt_lead, ptt_tail=ptt_tail)
+                            samplerate=TX_SAMPLE_RATE, ptt_lead=ptt_lead, ptt_tail=ptt_tail)
                         last_exc = None
                         break
                     except sd.PortAudioError as exc:

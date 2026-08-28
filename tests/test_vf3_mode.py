@@ -13,7 +13,7 @@ Software only -- no radios, no sound cards.
 import numpy as np
 import pytest
 
-from whale import afsk, framing, waveform
+from whale import afsk, framing, rx_audio, waveform
 from whale.modes import vf3
 from whale.modes.vf3_mode import VF3, registry_with_vf3
 
@@ -29,16 +29,17 @@ def _packet(body_len=None):
 
 def _snapshot(audio, before=3_000, after=1_500):
     """One frame sitting in a receive buffer, with silence either side."""
-    return np.concatenate((np.zeros(before, np.float32),
-                           np.asarray(audio, np.float32),
-                           np.zeros(after, np.float32)))
+    return rx_audio.downsample(np.concatenate((np.zeros(before, np.float32),
+                                               np.asarray(audio, np.float32),
+                                               np.zeros(after, np.float32))))
 
 
 # -- the mode surface -----------------------------------------------------
 
 def test_vf3_satisfies_the_waveform_mode_protocol():
     assert isinstance(VF3, waveform.WaveformMode)
-    assert VF3.sample_rate == afsk.SAMPLE_RATE  # one transport, one rate
+    assert VF3.tx_sample_rate == afsk.SAMPLE_RATE
+    assert VF3.rx_sample_rate == rx_audio.DECODE_SAMPLE_RATE
     assert VF3.chunk_size == vf3.MAX_PAYLOAD_BYTES - framing.AIR_HEADER_BYTES
 
 
@@ -81,13 +82,15 @@ def test_a_full_chunk_round_trips_and_reports_where_the_frame_ended():
     assert result["confidence"] >= VF3.confidence_threshold
     # The link consumes up to end_index and dates the peer's unkeying from
     # what is left after it, so this has to be the true end of our audio.
-    assert result["end_index"] == 3_000 + len(VF3.encode(packet))
+    expected = ((3_000 + len(VF3.encode(packet))) // rx_audio.DECIMATION
+                + rx_audio.FILTER_DELAY_DECODE_SAMPLES)
+    assert abs(result["end_index"] - expected) <= 1
 
 
 def test_a_partial_frame_reports_a_lock_but_no_end_index():
     """Confidence over threshold with no end_index is how the link is told to
     keep waiting instead of consuming a half-arrived frame."""
-    snap = _snapshot(VF3.encode(_packet()))[:80_000]
+    snap = _snapshot(VF3.encode(_packet()))[:20_000]
     result = VF3.decode(snap)
 
     assert result["confidence"] >= VF3.confidence_threshold
@@ -112,7 +115,7 @@ def test_noise_and_a_bare_tone_decode_to_nothing():
     t = np.arange(vf3.frame_samples()) / vf3.SAMPLE_RATE
     tone = 0.3 * np.sin(2 * np.pi * 1_500.0 * t)
     for audio in (noise, tone):
-        assert VF3.decode(audio)["payload"] is None
+        assert VF3.decode(rx_audio.downsample(audio))["payload"] is None
 
 
 # -- the adaptive head ----------------------------------------------------

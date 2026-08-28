@@ -19,7 +19,11 @@ class WaveformMode(Protocol):
     mode_id: int
     chunk_size: int
     confidence_threshold: float
-    sample_rate: int
+    # Encoded arrays and receive-buffer indices deliberately use different
+    # clocks: radio I/O/TX stays at 48 kHz while the shared RX front end
+    # supplies every decoder at 12 kHz.
+    tx_sample_rate: int
+    rx_sample_rate: int
 
     def encode(self, payload: bytes, *, include_head: bool = True,
                head_seconds: float = ...) -> np.ndarray: ...

@@ -31,8 +31,10 @@ head_seconds_received
 
 Seconds, because the head measurement crosses layers that do not share a
 symbol. The CPFSK profiles count matched pad symbols and divide by their baud;
-mode 3 (VF3) and mode 4 (HC1) count sync cores and divide by the sample rate;
-mode 5 (HC0) does the same with four-symbol reference blocks. Each also
+mode 3 (VF3) and mode 4 (HC1) count 12 kHz receive-rate sync cores and divide
+by 12 kHz; mode 5 (HC0) does the same with four-symbol receive-rate reference
+blocks. These durations are identical to dividing the corresponding on-air
+counts by 48 kHz. Each also
 reports its native count as a diagnostic -- `head_symbols_received` for
 CPFSK, `head_cores_observed` for VF3/HC1, and `head_blocks_observed` for HC0 --
 but nothing in the link reads those.

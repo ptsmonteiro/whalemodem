@@ -61,7 +61,8 @@ CONFIDENCE_THRESHOLD = vf3.ACQUISITION_THRESHOLD
 class Vf3Codec:
     """Bridges the link's codec calls onto `whale.modes.vf3`."""
 
-    sample_rate = vf3.SAMPLE_RATE
+    tx_sample_rate = vf3.SAMPLE_RATE
+    rx_sample_rate = vf3.RX_SAMPLE_RATE
 
     def encode(self, payload: bytes, mode: "Vf3Mode", *, include_head=True,
                head_seconds=vf3.DEFAULT_HEAD_SECONDS) -> np.ndarray:
@@ -117,8 +118,12 @@ class Vf3Mode:
     codec: Vf3Codec = field(default=VF3_CODEC, compare=False, repr=False)
 
     @property
-    def sample_rate(self) -> int:
-        return self.codec.sample_rate
+    def tx_sample_rate(self) -> int:
+        return self.codec.tx_sample_rate
+
+    @property
+    def rx_sample_rate(self) -> int:
+        return self.codec.rx_sample_rate
 
     @property
     def baud(self) -> float:

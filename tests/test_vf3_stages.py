@@ -15,6 +15,7 @@ import numpy as np
 import pytest
 from scipy.signal import hilbert
 
+from whale import rx_audio
 from whale.modes import vf3
 from whale.modes.vf3 import (CARRIER_BINS, CORE_SAMPLES, GUARD_SAMPLES,
                              HEADER_SYMBOLS, HEADER_VALUES, MAX_PAYLOAD_BYTES,
@@ -81,11 +82,14 @@ def test_acquisition_finds_a_frame_placed_at_a_known_offset():
     audio = vf3.modulate(_payload(64))
     lead = vf3.lead_in_samples()
     padded = np.concatenate((np.zeros(5_000), audio))
-    start, confidence = vf3._acquire(hilbert(padded))
+    received = rx_audio.downsample(padded)
+    start, confidence = vf3._acquire(hilbert(received))
     assert confidence > vf3.ACQUISITION_THRESHOLD
     # Acquisition may land inside the cyclic prefix, which is exactly what
     # the FFT offset absorbs.
-    assert abs(start - (5_000 + lead)) <= GUARD_SAMPLES
+    expected = ((5_000 + lead) // rx_audio.DECIMATION
+                + rx_audio.FILTER_DELAY_DECODE_SAMPLES)
+    assert abs(start - expected) <= vf3.RX_GUARD_SAMPLES
 
 
 def test_acquisition_ignores_symbol_periodic_decoy_energy():
@@ -109,20 +113,23 @@ def test_acquisition_ignores_symbol_periodic_decoy_energy():
     signal = np.concatenate((decoy, audio)).astype(np.float64)
     true_start = len(decoy) + vf3.lead_in_samples()
 
-    start, confidence = vf3._acquire(hilbert(signal))
+    received = rx_audio.downsample(signal)
+    start, confidence = vf3._acquire(hilbert(received))
     assert confidence > vf3.ACQUISITION_THRESHOLD
-    assert abs(start - true_start) <= GUARD_SAMPLES
-    assert vf3.demodulate(signal)["payload"] == payload
+    expected = (true_start // rx_audio.DECIMATION
+                + rx_audio.FILTER_DELAY_DECODE_SAMPLES)
+    assert abs(start - expected) <= vf3.RX_GUARD_SAMPLES
+    assert vf3.demodulate(received)["payload"] == payload
 
 
 def test_acquisition_is_unconfident_on_noise():
-    noise = RNG.normal(0.0, 0.1, 8 * SYMBOL_SAMPLES)
+    noise = RNG.normal(0.0, 0.1, 8 * vf3.RX_SYMBOL_SAMPLES)
     _, confidence = vf3._acquire(hilbert(noise))
     assert confidence < vf3.ACQUISITION_THRESHOLD
 
 
 def test_acquisition_declines_a_capture_shorter_than_its_correlation_span():
-    start, confidence = vf3._acquire(hilbert(np.zeros(SYMBOL_SAMPLES)))
+    start, confidence = vf3._acquire(hilbert(np.zeros(vf3.RX_SYMBOL_SAMPLES)))
     assert start is None and confidence == 0.0
 
 
@@ -226,7 +233,10 @@ def test_head_measurement_counts_the_cores_that_were_sent():
     head_seconds = 0.5
     audio = vf3.modulate(_payload(64), head_seconds=head_seconds)
     start = vf3.lead_in_samples(head_seconds)
-    count, score = vf3._measure_head(audio, start)
+    received = rx_audio.downsample(audio)
+    rx_start = (start // rx_audio.DECIMATION
+                + rx_audio.FILTER_DELAY_DECODE_SAMPLES)
+    count, score = vf3._measure_head(received, rx_start)
     assert score > vf3.HEAD_MATCH_THRESHOLD
     # The ramped-up first core and the partial core left by the resize are
     # not required to count; everything between them is.
@@ -239,7 +249,10 @@ def test_head_measurement_stops_at_a_blackout():
         np.float64)
     start = vf3.lead_in_samples(head_seconds)
     audio[:start - 3 * CORE_SAMPLES] = 0.0
-    count, _ = vf3._measure_head(audio, start)
+    received = rx_audio.downsample(audio)
+    rx_start = (start // rx_audio.DECIMATION
+                + rx_audio.FILTER_DELAY_DECODE_SAMPLES)
+    count, _ = vf3._measure_head(received, rx_start)
     assert count == 3
 
 

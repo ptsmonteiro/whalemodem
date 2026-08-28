@@ -21,15 +21,21 @@ The current connection protocol is version 4 and checked air-header version is
 ```text
 link packet
   -> checked header and optional body (`whale.framing`)
-  -> waveform audio (`whale.afsk` for the built-in modes)
+  -> 48 kHz waveform audio (`whale.afsk` for the CPFSK modes)
   -> keyed, half-duplex radio (`whale.transport`)
+
+radio capture at 48 kHz
+  -> one stateful anti-aliased 4:1 decimator (`whale.rx_audio`)
+  -> 12 kHz receive buffer
+  -> candidate waveform decoders
 ```
 
 ## Physical-layer interface
 
 The link protocol depends on the `WaveformMode` contract in
 `whale.waveform`, not on CPFSK functions directly. A mode supplies its own
-packet encoder, streaming-buffer decoder, airtime calculation, sample rate,
+packet encoder, streaming-buffer decoder, airtime calculation, separate
+transmit and receive sample rates,
 DATA chunk size, synchronization confidence threshold, and stable on-air mode
 ID. `ModeRegistry` provides the ordered set used for negotiation/adaptation
 and identifies the robust control-plane mode.
@@ -43,9 +49,17 @@ changing connection management or ARQ.
 
 ## Modulation profiles
 
-Audio is mono, 48 kHz, continuous-phase binary FSK. A zero or one selects the
+Transmitted audio is mono, 48 kHz, continuous-phase binary FSK. A zero or one selects the
 corresponding profile tone for one symbol. The complete waveform has a 5 ms
 amplitude ramp at each end and a nominal amplitude of 0.6.
+
+All current receive decoders consume the shared 12 kHz buffer. The sound card
+still captures at 48 kHz; `whale.rx_audio` low-pass filters it and decimates it
+once before the link tries any candidate mode. Consequently decoder sample
+indices, buffer consumption, and trailing-audio timing are in 12 kHz units,
+while encoder lengths and documented on-air sample counts remain in 48 kHz
+units. The filter has a 64-sample input/16-sample output group delay; ordinary
+radio turnaround provides its tail, and the adaptive head absorbs its startup.
 
 | Mode ID | Name | Baud | 0 tone | 1 tone | DATA chunk size |
 | ---: | --- | ---: | ---: | ---: | ---: |

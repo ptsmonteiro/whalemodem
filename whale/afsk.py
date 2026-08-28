@@ -71,9 +71,10 @@ from typing import Protocol
 import numpy as np
 from scipy.signal import correlate
 
-from whale import framing
+from whale import framing, rx_audio
 
 SAMPLE_RATE = 48000
+RX_SAMPLE_RATE = rx_audio.DECODE_SAMPLE_RATE
 BAUD = 300
 
 # The centre the profiles share: a profile's tone pair is CENTER_FREQ +/-
@@ -165,7 +166,8 @@ def max_credible_frame_bits(baud):
 class Codec(Protocol):
     """Codec strategy used by a negotiable Profile."""
 
-    sample_rate: int
+    tx_sample_rate: int
+    rx_sample_rate: int
 
     def encode(self, payload: bytes, profile: "Profile"): ...
     def decode(self, audio, profile: "Profile"): ...
@@ -175,15 +177,16 @@ class Codec(Protocol):
 class CpfskCodec:
     """Current CPFSK + PN-sync + length/CRC framing implementation."""
 
-    sample_rate = SAMPLE_RATE
+    tx_sample_rate = SAMPLE_RATE
+    rx_sample_rate = RX_SAMPLE_RATE
 
     def encode(self, payload: bytes, profile: "Profile", *, include_head=True,
                head_seconds=framing.HEAD_PAD_SECONDS):
-        return modulate(payload, profile=profile, sample_rate=self.sample_rate,
+        return modulate(payload, profile=profile, sample_rate=self.tx_sample_rate,
                         include_head=include_head, head_seconds=head_seconds)
 
     def decode(self, audio, profile: "Profile", **kwargs):
-        return demodulate(audio, profile=profile, sample_rate=self.sample_rate, **kwargs)
+        return demodulate(audio, profile=profile, sample_rate=self.rx_sample_rate, **kwargs)
 
     def airtime(self, payload_len: int, profile: "Profile") -> float:
         return frame_seconds(payload_len, profile=profile)
@@ -221,8 +224,12 @@ class Profile:
     codec: Codec = field(default=CPFSK_CODEC, compare=False, repr=False)
 
     @property
-    def sample_rate(self):
-        return self.codec.sample_rate
+    def tx_sample_rate(self):
+        return self.codec.tx_sample_rate
+
+    @property
+    def rx_sample_rate(self):
+        return self.codec.rx_sample_rate
 
     @property
     def head_match_allowance_seconds(self):

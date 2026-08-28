@@ -64,7 +64,8 @@ CONFIDENCE_THRESHOLD = hc1.ACQUISITION_THRESHOLD
 class Hc1Codec:
     """Bridges the link's codec calls onto `whale.modes.hc1`."""
 
-    sample_rate = hc1.SAMPLE_RATE
+    tx_sample_rate = hc1.SAMPLE_RATE
+    rx_sample_rate = hc1.RX_SAMPLE_RATE
 
     def encode(self, payload: bytes, mode: "Hc1Mode", *, include_head=True,
                head_seconds=hc1.DEFAULT_HEAD_SECONDS) -> np.ndarray:
@@ -118,8 +119,12 @@ class Hc1Mode:
     codec: Hc1Codec = field(default=HC1_CODEC, compare=False, repr=False)
 
     @property
-    def sample_rate(self) -> int:
-        return self.codec.sample_rate
+    def tx_sample_rate(self) -> int:
+        return self.codec.tx_sample_rate
+
+    @property
+    def rx_sample_rate(self) -> int:
+        return self.codec.rx_sample_rate
 
     @property
     def baud(self) -> float:

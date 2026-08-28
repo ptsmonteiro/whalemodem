@@ -1,7 +1,7 @@
 """VF3 pinned to the recorded on-air captures, stage by stage.
 
 `tests/test_vf3_kernels.py` holds the two vectorized kernels to their scalar
-originals.  This file holds the *whole* decode -- acquisition, the timing
+originals.  This file holds the *whole 12 kHz receive decode* -- acquisition, the timing
 regression, the header channel fit, the soft-bit mapper, the Viterbi input
 and the CRC -- to what it produced on real HF audio, so that lifting those
 stages into `whale/dsp/` can be shown to change nothing.
@@ -21,6 +21,7 @@ import pathlib
 import numpy as np
 import pytest
 
+from whale import rx_audio
 from whale.modes import vf3
 from scripts.make_vf3_golden import (ARRAY_KEYS, CAPTURES, SCALAR_KEYS,
                                      digest)
@@ -46,7 +47,7 @@ def decoded():
     results = {}
     for name in capture_ids():
         audio = np.load(CAPTURES / name)
-        results[name] = vf3.demodulate(audio)
+        results[name] = vf3.demodulate(rx_audio.downsample(audio))
     return results
 
 

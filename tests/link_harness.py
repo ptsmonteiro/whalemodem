@@ -28,7 +28,7 @@ import time
 
 import numpy as np
 
-from whale import afsk, link
+from whale import afsk, link, rx_audio
 
 
 class FakeTransport:
@@ -67,8 +67,15 @@ class FakeTransport:
         self.keyings += 1
         if self.corrupt is not None:
             tx_audio = self.corrupt(tx_audio)
+        # A real capture continues through the radio turnaround, giving the
+        # causal RX filter time to emit its tail.  Model that gap so adjacent
+        # in-memory keyings do not overlap by the filter's group delay.
+        rx = rx_audio.downsample(np.concatenate((
+            tx_audio,
+            np.zeros(rx_audio.FILTER_DELAY_CAPTURE_SAMPLES, dtype=np.float32),
+        )))
         with self.peer._lock:
-            self.peer._buf = np.concatenate([self.peer._buf, tx_audio])
+            self.peer._buf = np.concatenate([self.peer._buf, rx])
         return len(tx_audio) / afsk.SAMPLE_RATE
 
 

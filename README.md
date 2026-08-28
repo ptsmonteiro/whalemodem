@@ -24,6 +24,7 @@ whale/
   framing.py     bit-level framing: sync word, length+CRC16, bit packing
   afsk.py         CPFSK modulate/demodulate (300 baud, 1200/1800 Hz tones)
   waveform.py     physical-layer mode contract and negotiable mode registry
+  rx_audio.py      shared anti-aliased 48 -> 12 kHz receive conversion
   transport.py    one radio: continuous RX capture + keyed TX
   link.py         stateful stop-and-wait ARQ: connect / send / recv / disconnect
   link_protocol.py  pure link packet constants, validation, and serialization
@@ -54,6 +55,7 @@ scripts/
   hw_smoke_link.py           full connect/send/disconnect via Link, no sockets
   hw_half_open_recovery.py   kill one station mid-session, time the other
   measure_peer_gap.py        worst legitimate peer silence, from the logs
+  benchmark_rx.py             shared decimator + per-mode receive CPU benchmark
   sweep_ptt_timing.py        the four dead-time knobs inside one keying
   sweep_turnaround.py        the dead time *between* two stations' keyings
 acceptance_test.py            drives the full acceptance scenario over TCP
@@ -68,6 +70,14 @@ frame-span diagnostic printed on a near miss, which was wrong in its first
 form (it compared an absolute `end_index` against a bare frame duration, so
 every cleanly-read frame reported as ~1.2x and looked like a false sync
 lock) and had to be fixed separately in each copy.
+
+Production audio uses two explicit clocks. Sound devices and transmitted
+waveforms remain at 48 kHz. The transport filters and downsamples captured
+audio once to a 12 kHz receive buffer, and every current decoder operates in
+that coordinate system. `WaveformMode.tx_sample_rate` therefore describes an
+encoded array, while `rx_sample_rate` describes decoder indices and buffered
+audio. The conversion is shared rather than repeated by every candidate mode
+on every receive poll.
 
 ## Documentation
 

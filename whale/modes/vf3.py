@@ -26,7 +26,7 @@ from dataclasses import dataclass
 import numpy as np
 from scipy.signal import hilbert
 
-from .. import dsp
+from .. import dsp, rx_audio
 from ..dsp import (acquire as _acquire_kernel, differential as _diff,
                    equalize as _eq, freq as _freq, head as _head,
                    ofdm as _ofdm, timing as _timing)
@@ -37,6 +37,10 @@ SAMPLE_RATE = 48_000
 CORE_SAMPLES = 1_024
 GUARD_SAMPLES = 128
 SYMBOL_SAMPLES = GUARD_SAMPLES + CORE_SAMPLES
+RX_SAMPLE_RATE = rx_audio.DECODE_SAMPLE_RATE
+RX_CORE_SAMPLES = CORE_SAMPLES // rx_audio.DECIMATION
+RX_GUARD_SAMPLES = GUARD_SAMPLES // rx_audio.DECIMATION
+RX_SYMBOL_SAMPLES = RX_GUARD_SAMPLES + RX_CORE_SAMPLES
 
 CARRIER_BINS = np.arange(10, 68, dtype=np.int32)
 CARRIER_SPACING_HZ = SAMPLE_RATE / CORE_SAMPLES
@@ -57,6 +61,10 @@ GEOMETRY = _ofdm.Geometry(
     sample_rate=SAMPLE_RATE, core_samples=CORE_SAMPLES,
     guard_samples=GUARD_SAMPLES, carrier_bins=CARRIER_BINS,
 ).scaled_to_rms(TX_RMS)
+RX_GEOMETRY = _ofdm.Geometry(
+    sample_rate=RX_SAMPLE_RATE, core_samples=RX_CORE_SAMPLES,
+    guard_samples=RX_GUARD_SAMPLES, carrier_bins=CARRIER_BINS,
+)
 
 LEAD_IN_SAMPLES = 2_160
 LEAD_IN_FADE_SAMPLES = 240
@@ -65,6 +73,8 @@ FRAME_SAMPLES = LEAD_IN_SAMPLES + TOTAL_SYMBOLS * SYMBOL_SAMPLES + TAIL_SAMPLES
 FRAME_SECONDS = FRAME_SAMPLES / SAMPLE_RATE
 
 FFT_OFFSET = GUARD_SAMPLES
+RX_FFT_OFFSET = RX_GUARD_SAMPLES
+RX_TAIL_SAMPLES = TAIL_SAMPLES // rx_audio.DECIMATION
 ACQUISITION_THRESHOLD = 0.70
 MIN_PRESENT_CARRIERS = 40
 CARRIER_FLOOR_DB = 35.0
@@ -180,6 +190,11 @@ def sync_core() -> np.ndarray:
     return build_symbol(SYNC_VALUES)[GUARD_SAMPLES:]
 
 
+def rx_sync_core() -> np.ndarray:
+    """The receive-rate representation of the periodic sync core."""
+    return _ofdm.build_symbol(RX_GEOMETRY, SYNC_VALUES)[RX_GUARD_SAMPLES:]
+
+
 def frame_constellation(payload: bytes) -> np.ndarray:
     payload_values = differential_encode(
         encode_payload_bits(payload), HEADER_VALUES[-1])
@@ -208,8 +223,8 @@ _TIMING_SYMBOLS = np.arange(SYNC_SYMBOLS, TOTAL_SYMBOLS, dtype=np.int32)
 
 
 def _header_bank(analytic: np.ndarray, start: int) -> np.ndarray | None:
-    return _ofdm.carrier_bank(GEOMETRY, analytic, start, HEADER_SYMBOLS,
-                              offset=FFT_OFFSET)
+    return _ofdm.carrier_bank(RX_GEOMETRY, analytic, start, HEADER_SYMBOLS,
+                              offset=RX_FFT_OFFSET)
 
 
 def _header_candidate_snr(analytic: np.ndarray, start: int) -> float:
@@ -222,13 +237,13 @@ def _header_candidate_snr(analytic: np.ndarray, start: int) -> float:
 
 def _acquire(analytic: np.ndarray) -> tuple[int | None, float]:
     return _acquire_kernel.acquire(
-        GEOMETRY, analytic, sync_symbols=SYNC_SYMBOLS,
+        RX_GEOMETRY, analytic, sync_symbols=SYNC_SYMBOLS,
         rank=lambda start: _header_candidate_snr(analytic, start))
 
 
 def _estimate_timing(analytic: np.ndarray,
                      start: int) -> tuple[float, float, float]:
-    fit = _timing.estimate(GEOMETRY, analytic, start, _TIMING_SYMBOLS)
+    fit = _timing.estimate(RX_GEOMETRY, analytic, start, _TIMING_SYMBOLS)
     return fit.intercept, fit.slope, fit.confidence
 
 
@@ -238,7 +253,7 @@ def _measure_head(samples: np.ndarray, start: int) -> tuple[int, float]:
     Nothing in the decode path uses this; see `vf3_mode` for how the link
     turns it into head feedback.
     """
-    return _head.measure(samples, start, sync_core())
+    return _head.measure(samples, start, rx_sync_core())
 
 
 def _base_result() -> dict:
@@ -269,7 +284,7 @@ def demodulate(audio: np.ndarray, *,
     del head_seconds  # acquisition finds the header wherever the head ended
     result = _base_result()
     samples = np.asarray(audio, dtype=np.float64).reshape(-1)
-    if len(samples) < HEADER_SYMBOLS * SYMBOL_SAMPLES:
+    if len(samples) < HEADER_SYMBOLS * RX_SYMBOL_SAMPLES:
         result["failure"] = "capture shorter than header"
         return result
 
@@ -279,18 +294,18 @@ def demodulate(audio: np.ndarray, *,
     if start is None or confidence < ACQUISITION_THRESHOLD:
         result["failure"] = "header not found"
         return result
-    result["sync_end_index"] = start + HEADER_SYMBOLS * SYMBOL_SAMPLES
+    result["sync_end_index"] = start + HEADER_SYMBOLS * RX_SYMBOL_SAMPLES
 
     head_cores, head_score = _measure_head(samples, start)
     result["head_cores_received"] = head_cores
     result["head_match"] = head_score
 
-    fit = _timing.estimate(GEOMETRY, analytic, start, _TIMING_SYMBOLS)
+    fit = _timing.estimate(RX_GEOMETRY, analytic, start, _TIMING_SYMBOLS)
     result["timing_drift_samples"] = fit.drift_samples(TOTAL_SYMBOLS)
     result["timing_confidence"] = fit.confidence
 
-    carriers = _ofdm.carrier_bank(GEOMETRY, analytic, start, TOTAL_SYMBOLS,
-                                  fit.intercept, fit.slope, FFT_OFFSET)
+    carriers = _ofdm.carrier_bank(RX_GEOMETRY, analytic, start, TOTAL_SYMBOLS,
+                                  fit.intercept, fit.slope, RX_FFT_OFFSET)
     if carriers is None:
         # Still arriving.  Deliberately no end_index: the caller must keep
         # this audio and try again rather than consume a partial frame.
@@ -298,7 +313,7 @@ def demodulate(audio: np.ndarray, *,
         return result
     result["end_index"] = min(
         len(samples),
-        start + TOTAL_SYMBOLS * SYMBOL_SAMPLES + TAIL_SAMPLES)
+        start + TOTAL_SYMBOLS * RX_SYMBOL_SAMPLES + RX_TAIL_SAMPLES)
 
     channel = _eq.fit_header(carriers[:HEADER_SYMBOLS], HEADER_VALUES)
     present = channel.present_carriers(CARRIER_FLOOR_DB)
@@ -330,12 +345,12 @@ def demodulate(audio: np.ndarray, *,
     result.update(payload=payload, synced=True, channel=channel.gain,
                   interference=channel.offset, constellation=corrected,
                   soft_payload_bits=soft_bits)
-    result["clock_offset_ppm"] = fit.clock_offset_ppm(GEOMETRY)
+    result["clock_offset_ppm"] = fit.clock_offset_ppm(RX_GEOMETRY)
     # Diagnostic only.  A differential payload behind a per-carrier
     # equalizer is already indifferent to a static offset, so nothing above
     # corrects with this; it is here because it is worth seeing.
     result["cfo_hz"] = _freq.coarse_offset_hz(
-        GEOMETRY, analytic, start, _TIMING_SYMBOLS,
+        RX_GEOMETRY, analytic, start, _TIMING_SYMBOLS,
         np.array([fit.shift_at(int(i)) for i in _TIMING_SYMBOLS]))
     return result
 

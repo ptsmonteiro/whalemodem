@@ -16,9 +16,12 @@ import numpy as np
 import pytest
 from scipy.signal import hilbert
 
+from whale import rx_audio
 from whale.dsp.fec import ConvolutionalCode
 from whale.modes import vf3
-from whale.modes.vf3 import (CORE_SAMPLES, GUARD_SAMPLES, SYMBOL_SAMPLES,
+from whale.modes.vf3 import (RX_CORE_SAMPLES as CORE_SAMPLES,
+                             RX_GUARD_SAMPLES as GUARD_SAMPLES,
+                             RX_SYMBOL_SAMPLES as SYMBOL_SAMPLES,
                              SYNC_SYMBOLS, TOTAL_SYMBOLS)
 
 RNG = np.random.default_rng(20260828)
@@ -112,7 +115,7 @@ def _live_soft_bits(audio):
 
     ConvolutionalCode.decode_soft = spy
     try:
-        vf3.demodulate(audio)
+        vf3.demodulate(rx_audio.downsample(audio))
     finally:
         ConvolutionalCode.decode_soft = original
     return captured
@@ -158,8 +161,10 @@ def test_viterbi_still_rejects_an_odd_soft_bit_count():
 @pytest.mark.parametrize("snr_db", [None, 12.0, 3.0])
 def test_timing_matches_the_scalar_loop_on_a_real_frame(snr_db):
     _, audio = _frame(snr_db)
-    analytic = hilbert(audio)
-    for start in (vf3.LEAD_IN_SAMPLES, vf3.LEAD_IN_SAMPLES + 7):
+    analytic = hilbert(rx_audio.downsample(audio))
+    nominal = (vf3.LEAD_IN_SAMPLES // rx_audio.DECIMATION
+               + rx_audio.FILTER_DELAY_DECODE_SAMPLES)
+    for start in (nominal, nominal + 7):
         assert (vf3._estimate_timing(analytic, start)
                 == _scalar_estimate_timing(analytic, start))
 
@@ -167,7 +172,7 @@ def test_timing_matches_the_scalar_loop_on_a_real_frame(snr_db):
 def test_timing_matches_the_scalar_loop_when_windows_fall_off_the_signal():
     """Starts where some -- or every -- shift is outside the buffer."""
     _, audio = _frame()
-    analytic = hilbert(audio)
+    analytic = hilbert(rx_audio.downsample(audio))
     for start in (0, 3, 40, len(analytic) - 1_200, len(analytic) - 100,
                   len(analytic)):
         assert (vf3._estimate_timing(analytic, start)
@@ -179,6 +184,6 @@ def test_timing_matches_the_scalar_loop_on_signals_with_no_prefix(signal):
     samples = (np.zeros(50_000) if signal == "silence"
                else RNG.normal(size=50_000))
     analytic = hilbert(samples)
-    for start in (0, vf3.LEAD_IN_SAMPLES, 40_000):
+    for start in (0, vf3.LEAD_IN_SAMPLES // rx_audio.DECIMATION, 40_000):
         assert (vf3._estimate_timing(analytic, start)
                 == _scalar_estimate_timing(analytic, start))
