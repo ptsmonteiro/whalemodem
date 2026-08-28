@@ -7,7 +7,7 @@ not know which modulation is underneath.
 """
 
 
-def default_registry():
+def default_registry(budget=None):
     """The station's negotiable mode ladder: the CPFSK profiles, then VF3.
 
     This -- not `afsk.default_registry()` -- is what a Link uses when it is
@@ -21,7 +21,14 @@ def default_registry():
     clean streak and steps down after silence, so a link that cannot hold
     VF3 falls back to 1200 baud on its own.  Negotiation is per-station --
     a peer that does not advertise mode 3 simply never has it selected.
+
+    `budget` is the useful-frame budget in seconds (see
+    whale/policy.py's `max_useful_frame_seconds`), which sizes the CPFSK
+    rungs' chunks; None means afsk's own default. VF3 is unaffected -- its
+    payload is fixed by its OFDM frame structure, not by a time budget.
     """
+    from .. import afsk
     from .vf3_mode import registry_with_vf3
 
-    return registry_with_vf3()
+    base = None if budget is None else afsk.default_registry(budget)
+    return registry_with_vf3(base)

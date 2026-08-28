@@ -95,6 +95,7 @@ import time
 import numpy as np
 
 from whale import afsk, framing, mode_history
+from whale.policy import VHF_FM
 
 logger = logging.getLogger(__name__)
 
@@ -261,7 +262,11 @@ SEQ_MODULO = SEQ_MASK + 1
 # frame-airtime-derived ACK timeout both depend on the active afsk.Profile
 # (baud, in particular) -- see Link._apply_tx_profile/_apply_rx_profile,
 # which compute them per instance instead of as module constants.
-MAX_RETRIES = 6
+#
+# The retry budget itself moved to whale/policy.py: how many times to try
+# again is a bet about the channel, not a protocol fact. See ChannelPolicy
+# and _channel_value below for what this name still does here.
+MAX_RETRIES = VHF_FM.max_retries
 
 #: `_send_chunk_with_arq` returning this means "no ACK, and the step-down it
 #: just took landed on a mode whose chunk_size cannot carry the chunk in
@@ -296,49 +301,16 @@ def _new_session_id():
 
 
 # How long a CONNECTED station will go without decoding anything at all
-# from its peer before tearing the session down.
-#
-# MEASURED on the bench, both stations logged, by
-# scripts/measure_peer_gap.py -- which reads the worst gap between frames
-# decoded off the air out of each station's log. Three runs, because the
-# silences that matter are not the ones a clean run produces:
-#
-#   clean acceptance run, 1 KB each way          5.2s  (ht->ic705 leg;
-#                                                       4.0s the other way)
-#   a full MAX_RETRIES cycle at 300 baud, forced
-#     by suppressing the first five DATA_ACKs
-#     (WHALE_DROP_PTYPE=DATA_ACK
-#      WHALE_DROP_NTH=1,2,3,4,5)                44.4s
-# The full retry cycle remains the longest active-session silence; 150s is
-# a little over 3x the measured 44.4s.
-#
-# Note the retry cycle measured 44.4s where the arithmetic says 34.8s (six
-# data_ack_timeouts). The formula counts only the waiting; the five
-# retransmissions in between are each a keying of their own, and their
-# airtime, PTT lead and turnaround land inside the same silence. That gap
-# between the computed and the measured figure is the reason this is
-# measured at all -- a reasoned constant here would have been ~20% short of
-# a case that occurs in normal operation.
-#
-# The margin on top is deliberately wide, because the cost of being wrong
-# is asymmetric: too long only delays a teardown that something else
-# usually beats to it (the peer's DISC, or the caller's parting DISC in
-# connect()), while too short kills a session that was about to recover.
-#
-# What this deliberately does NOT do is keep an idle session alive. A
-# station with a connection up and no user data to send transmits nothing,
-# so its peer decodes nothing, and after this long the session is torn
-# down. That is the accepted trade for not adding keepalive frames -- every
-# keepalive is a keying, on a link where a keying costs seconds of air time
-# and PTT wear. If sessions that idle longer than this ever need to
-# survive, the answer is a keepalive probe (send one, retry it, tear down
-# only when the probe itself goes unanswered), not a bigger number here.
-INACTIVITY_TIMEOUT = 150.0
+# from its peer before tearing the session down. Moved, with the bench
+# measurement that produced it, to ChannelPolicy.inactivity_timeout -- see
+# _channel_value below for what this name still does here.
+INACTIVITY_TIMEOUT = VHF_FM.inactivity_timeout
 
 # Kept as a compatibility name for diagnostics/tests. No fixed dead-air delay
-# is applied: replies begin after the checked frame ends, and calibrated head
-# audio absorbs the effective direction-change loss.
-TX_TURNAROUND_DELAY = 0.0
+# is applied on VHF FM: replies begin after the checked frame ends, and
+# calibrated head audio absorbs the effective direction-change loss. Now
+# ChannelPolicy.tx_turnaround_delay -- see _channel_value below.
+TX_TURNAROUND_DELAY = VHF_FM.tx_turnaround_delay
 
 # How much older than the turnaround itself an anchor may be and still be
 # believed. Beyond that it is not evidence about when the peer stopped
@@ -357,18 +329,45 @@ def _seq_ahead(a, b):
     only answers that arise here are 0 and 1."""
     return (a - b) % SEQ_MODULO
 
-# Mid-session speed adaptation thresholds -- deliberately just ARQ-outcome
-# based (no SNR estimate, no throughput math). React fast to trouble, be
-# conservative about speeding up.
-STEP_DOWN_AFTER_ATTEMPTS = 3   # a chunk needing this many tries triggers an immediate step down
+# Mid-session speed adaptation thresholds. How much evidence a step up needs
+# and how fast a step down fires are both bets about how the channel varies,
+# so the reasoning and the numbers live on ChannelPolicy; these names remain
+# as the VHF values for diagnostics and bench scripts.
+STEP_DOWN_AFTER_ATTEMPTS = VHF_FM.step_down_after_attempts
+STEP_UP_AFTER_CLEAN_STREAK_INITIAL = VHF_FM.step_up_after_clean_streak_initial
+STEP_UP_AFTER_CLEAN_STREAK_MAX = VHF_FM.step_up_after_clean_streak_max
 
-# The clean-streak length needed to step up is not fixed: it starts at 1
-# (one clean chunk earns a step up) and grows by 1 every time a step down
-# happens, so a session that has been burned needs more evidence before it
-# is trusted to speed up again. Capped so a persistently bad link doesn't
-# make the threshold unbounded.
-STEP_UP_AFTER_CLEAN_STREAK_INITIAL = 1
-STEP_UP_AFTER_CLEAN_STREAK_MAX = 8
+# The module names above are no longer what the Link reads -- it reads
+# self.policy -- but they are not vestigial either. The test suite and the
+# bench scripts reach in and reassign them on a *live* station to make a
+# policy number bite in seconds instead of minutes (link.INACTIVITY_TIMEOUT
+# = 0.3 in test_link_recovery, link.TX_TURNAROUND_DELAY = 0.02 in the test
+# harness), which is the only way to exercise a timeout whose real value is
+# measured in minutes of air time. Constructing a whole policy for that
+# would work, but it cannot reach a station that already exists.
+#
+# So each name stays as a live override: reassigning it to something other
+# than the VHF value wins over whatever policy the Link holds. Leaving it
+# alone -- the normal case, and the only case in production -- means the
+# policy decides, so a station running HF_SSB is not silently given VHF
+# numbers.
+_CHANNEL_OVERRIDES = {
+    "tx_turnaround_delay": "TX_TURNAROUND_DELAY",
+    "inactivity_timeout": "INACTIVITY_TIMEOUT",
+    "max_retries": "MAX_RETRIES",
+    "step_down_after_attempts": "STEP_DOWN_AFTER_ATTEMPTS",
+    "step_up_after_clean_streak_initial": "STEP_UP_AFTER_CLEAN_STREAK_INITIAL",
+    "step_up_after_clean_streak_max": "STEP_UP_AFTER_CLEAN_STREAK_MAX",
+}
+
+
+def _channel_value(policy, field):
+    """`policy.<field>`, unless the module-level alias has been reassigned."""
+    override = globals()[_CHANNEL_OVERRIDES[field]]
+    if override != getattr(VHF_FM, field):
+        return override
+    return getattr(policy, field)
+
 
 # Rough control-frame payload size used to size the control-plane ACK
 # timeout (callsigns + mode list all comfortably fit) -- not a hard limit.
@@ -709,11 +708,20 @@ class Link:
     """
 
     def __init__(self, transport, mycall, on_event=None, mode_history_store=None,
-                 mode_registry=None):
+                 mode_registry=None, policy=VHF_FM):
         self.transport = transport
+        # What this station assumes about the channel it is on -- retry
+        # budget, timeouts, keying length, how eagerly it speeds up. See
+        # whale/policy.py. Nothing here is negotiated or on air, so two
+        # stations running different policies interoperate.
+        self.policy = policy
         if mode_registry is None:
             from whale.modes import default_registry
-            mode_registry = default_registry()
+            # The useful-frame budget sizes every CPFSK rung's chunk, so a
+            # policy that keys longer has to be threaded into the ladder
+            # rather than merely remembered.
+            mode_registry = default_registry(
+                budget=self.policy.max_useful_frame_seconds)
         self.modes = mode_registry
         self.mycall = mycall
         self.peer_call = None
@@ -723,11 +731,12 @@ class Link:
         self.on_event = on_event or (lambda name, **kw: None)
         self.mode_history = {} if mode_history_store is None else mode_history_store
         self._clean_streak = 0
-        self._data_ack_to_speed_up = STEP_UP_AFTER_CLEAN_STREAK_INITIAL
+        self._data_ack_to_speed_up = self._channel("step_up_after_clean_streak_initial")
 
         # Control-plane frames always use afsk.CONTROL_PROFILE (see
         # _tx_packet), so this timeout is fixed for the life of the Link.
-        self.control_ack_timeout = self.modes.control.airtime(_CONTROL_FRAME_LEN_ESTIMATE) + 3.0
+        self.control_ack_timeout = (self.modes.control.airtime(_CONTROL_FRAME_LEN_ESTIMATE)
+                                    + self.policy.ack_timeout_slack)
 
         # self.tx_profile / self.rx_profile are the *negotiated data*
         # profiles for each direction -- only meaningful once CONNECTED.
@@ -857,6 +866,14 @@ class Link:
                     self.mycall, profile.name, self.rx_profile.name)
         self._apply_rx_profile(profile)
 
+    def _channel(self, field):
+        """This station's value for one ChannelPolicy field.
+
+        Goes through the module-level override hook rather than reading
+        self.policy directly -- see _CHANNEL_OVERRIDES.
+        """
+        return _channel_value(self.policy, field)
+
     def _recompute_timings(self):
         # Everything here is a function of the two negotiated profiles, and
         # the two legs can run at different baud, so each is accounted for
@@ -870,7 +887,8 @@ class Link:
         # are the ACK's two-byte control-mode body.
         ack_airtime = self.modes.control.airtime(_AIR_HEADER_LEN + 2)
         self.data_ack_timeout = (tx_airtime + ack_airtime
-                                 + 2 * TX_TURNAROUND_DELAY + 3.0)
+                                 + 2 * self._channel("tx_turnaround_delay")
+                                 + self.policy.ack_timeout_slack)
 
         # How much recent audio a poll that found nothing must leave alone
         # (see _prune_stale) -- enough that the longest frame either
@@ -1245,7 +1263,8 @@ class Link:
         INACTIVITY_TIMEOUT with nothing decoded from its peer at all."""
         if self.state != "CONNECTED" or self._last_peer_frame_at is None:
             return False
-        return time.monotonic() - self._last_peer_frame_at > INACTIVITY_TIMEOUT
+        return (time.monotonic() - self._last_peer_frame_at
+                > self._channel("inactivity_timeout"))
 
     def _abandon_stale_session(self):
         """Tears down a session whose peer has stopped saying anything.
@@ -1258,7 +1277,7 @@ class Link:
         and quite likely lands on nobody; it costs one keying and, when
         there *is* somebody, ends their side too."""
         logger.warning("[%s] nothing decoded from %s in %.0fs -- abandoning the session",
-                       self.mycall, self.peer_call, INACTIVITY_TIMEOUT)
+                       self.mycall, self.peer_call, self._channel("inactivity_timeout"))
         self.disconnect(retries=1)
 
     def service_while_idle(self):
@@ -1302,8 +1321,12 @@ class Link:
 
     # -- connection setup -------------------------------------------------
 
-    def connect(self, dst_call, timeout_per_try=None, retries=MAX_RETRIES):
+    def connect(self, dst_call, timeout_per_try=None, retries=None):
+        # Defaults resolved here rather than in the signature: both come
+        # from this station's channel policy, which the class does not have
+        # at def time.
         timeout_per_try = self.control_ack_timeout if timeout_per_try is None else timeout_per_try
+        retries = self._channel("max_retries") if retries is None else retries
         self._drain_packets()
         self.state = "CONNECTING"
         self._tx_head_seconds = CALIBRATION_SECONDS
@@ -1380,7 +1403,7 @@ class Link:
                 except ValueError:
                     continue
                 self._clean_streak = 0
-                self._data_ack_to_speed_up = STEP_UP_AFTER_CLEAN_STREAK_INITIAL
+                self._data_ack_to_speed_up = self._channel("step_up_after_clean_streak_initial")
                 self.state = "CONNECTED"
                 self.role = "ISS"  # the caller starts holding the floor -- see PT_FLOOR_REQ above
                 self._reset_sequence_state()
@@ -1479,7 +1502,7 @@ class Link:
         self._apply_rx_profile(self.modes.resolve(negotiated_id))
         self._apply_tx_profile(self.modes.resolve(own_tx_id))
         self._clean_streak = 0
-        self._data_ack_to_speed_up = STEP_UP_AFTER_CLEAN_STREAK_INITIAL
+        self._data_ack_to_speed_up = self._channel("step_up_after_clean_streak_initial")
         self.state = "CONNECTED"
         self.role = "IRS"  # the listener starts waiting for the floor -- see PT_FLOOR_REQ above
         self._reset_sequence_state()
@@ -1490,7 +1513,7 @@ class Link:
 
     # -- floor (ISS/IRS) ---------------------------------------------------
 
-    def _acquire_floor(self, retries=MAX_RETRIES):
+    def _acquire_floor(self, retries=None):
         """Blocks until this station holds ISS -- the right to originate
         PT_DATA -- by asking whichever end currently holds it to hand it
         over. A no-op if we already have it.
@@ -1504,6 +1527,7 @@ class Link:
         peer goes back to polling for incoming work."""
         if self.role == "ISS":
             return True
+        retries = self._channel("max_retries") if retries is None else retries
         for attempt in range(1, retries + 1):
             logger.info("[%s] requesting the floor (attempt %d/%d)", self.mycall, attempt, retries)
             self.on_event("PTT", on=True)
@@ -1583,7 +1607,7 @@ class Link:
             sent += 1
             if attempts is None:
                 raise LinkError(f"no ACK for chunk {sent} ({offset}/{len(data)} bytes) "
-                                f"after {MAX_RETRIES} tries")
+                                f"after {self._channel('max_retries')} tries")
             self._tx_seq = (self._tx_seq + 1) % SEQ_MODULO
             if self.tx_profile is starting_profile:
                 self._maybe_adapt(attempts)
@@ -1611,7 +1635,8 @@ class Link:
         DATA_ACK confirms both the sequence and the mode the IRS decoded.
         After repeated silence the sender steps down and retries this same
         chunk; receivers search every mutually supported mode."""
-        for attempt in range(1, MAX_RETRIES + 1):
+        max_retries = self._channel("max_retries")
+        for attempt in range(1, max_retries + 1):
             advertised_head = _encode_head_duration(self._tx_head_seconds)
             body = bytes([seq | (EOF_BIT if is_eof else 0), advertised_head]) + chunk
             self.on_event("PTT", on=True)
@@ -1663,8 +1688,8 @@ class Link:
                 # run out and surface it as a LinkError instead of looping.
                 logger.warning("[%s] peer answered seq 0x%02x but expects 0x%02x -- sequence desync",
                                self.mycall, answered, expects)
-            logger.warning("DATA seq=0x%02x: no ACK, retry %d/%d", seq, attempt, MAX_RETRIES)
-            if attempt == STEP_DOWN_AFTER_ATTEMPTS:
+            logger.warning("DATA seq=0x%02x: no ACK, retry %d/%d", seq, attempt, max_retries)
+            if attempt == self._channel("step_down_after_attempts"):
                 self._step_tx_mode(-1)
                 if len(chunk) > self.tx_profile.chunk_size:
                     logger.info("[%s] stepped down to %s mid-chunk; re-cutting seq=0x%02x "
@@ -1692,10 +1717,10 @@ class Link:
             self._clean_streak = 0
             self._step_tx_mode(scripted)
             return
-        if attempts >= STEP_DOWN_AFTER_ATTEMPTS:
+        if attempts >= self._channel("step_down_after_attempts"):
             self._clean_streak = 0
             self._data_ack_to_speed_up = min(
-                self._data_ack_to_speed_up + 1, STEP_UP_AFTER_CLEAN_STREAK_MAX)
+                self._data_ack_to_speed_up + 1, self._channel("step_up_after_clean_streak_max"))
             self._step_tx_mode(-1)
             return
         self._clean_streak += 1

@@ -64,6 +64,7 @@ these numbers drift with the physical setup, not with anything in this
 module.
 """
 
+import dataclasses
 from dataclasses import dataclass, field
 from typing import Protocol
 
@@ -469,10 +470,30 @@ PAD_MATCH_WINDOW_SYMBOLS = 16
 PAD_MATCH_MAX_ERRORS = 2
 
 
-def default_registry():
+def profiles_for_budget(budget=MAX_USEFUL_FRAME_SECONDS):
+    """The three CPFSK profiles, sized for a `budget`-second useful frame.
+
+    The module-level PROFILE_* objects are what this returns for the default
+    budget, and are returned unchanged in that case so identity comparisons
+    and the PROFILES_BY_ID table keep working. Only chunk_size varies with
+    the budget: tones, baud and mode_id are on-air facts and are not a
+    station's to choose. See whale/policy.py, which owns the budget.
+    """
+    if budget == MAX_USEFUL_FRAME_SECONDS:
+        return PROFILES
+    return [dataclasses.replace(p, chunk_size=max_chunk_for_useful_frame(p.baud, budget))
+            for p in PROFILES]
+
+
+def default_registry(budget=MAX_USEFUL_FRAME_SECONDS):
     """Returns the built-in modes through the link-facing registry API."""
     from whale.waveform import ModeRegistry
-    return ModeRegistry(PROFILES, CONTROL_PROFILE)
+    profiles = profiles_for_budget(budget)
+    # The control plane keeps whatever position CONTROL_PROFILE holds in the
+    # ladder rather than the object itself, so a re-sized ladder does not end
+    # up with a control profile from the default one.
+    control = profiles[PROFILES.index(CONTROL_PROFILE)]
+    return ModeRegistry(profiles, control)
 
 
 def _cpfsk_tone(bits, sps, sample_rate, freq0, freq1):
