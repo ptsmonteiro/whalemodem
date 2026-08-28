@@ -149,6 +149,10 @@ a duplicate, draws another spare ACK, and the link settles into two keyings
 per chunk for the rest of the session. One extra byte -- ~27ms of airtime
 at 300 baud -- removes the ambiguity entirely.
 
+Protocol version 4 also carries the decoded DATA mode and an absolute
+head-duration request in that ACK. The request is piggybacked feedback, not an
+extra exchange.
+
 `WHALE_CAPTURE_DIR` is left in place: set it and the link saves the audio
 behind every near-miss decode, which is the input to whatever finally
 explains the ceiling.
@@ -246,24 +250,27 @@ rate gives it less than a full cycle) are in `PROFILE_1200`'s comment in
 `whale/afsk.py`.
 
 Frames carry a duration-scaled PN sync word, a 16-bit length, the
-payload, a CRC16, and known PN padding before the sync word and after the CRC,
-so that settling artifacts at either end of a
-transmission eat padding rather than real bits. See the docstrings in
+payload, a CRC16, and known PN padding before the sync word, so that leading
+settling artifacts eat padding rather than real bits. See the docstrings in
 `whale/afsk.py` and `whale/framing.py` for the details, and
 `whale/link.py` / `whale/transport.py` for the half-duplex, self-echo, and
 WASAPI quirks this radio pair required working around.
 
 ## Air time
 
-Leading and trailing clipping protection is entirely in-band: every PTT keying
-carries one second from distinct, protocol-fixed PN sequences before its first
-sync and after its final CRC, rounded upward to a whole symbol. Unlike the old
-alternating pads, these sequences make alignment and head-versus-tail identity
-unambiguous for adaptive-timing measurements. PTT is asserted immediately
+Leading clipping protection is entirely in-band. Every calibration keying
+carries one second from a protocol-fixed PN sequence before its first sync;
+ordinary frames use a sync-anchored suffix at the per-direction adaptive
+duration. PTT is asserted immediately
 before output-stream setup and released immediately after confirmed playout;
 there is no configured carrier-only lead or tail sleep. This deliberately
-conservative baseline is intended to be replaced by connection-time adaptive
-timing.
+conservative baseline is replaced at connection time by a per-direction
+duration. During transfer, every valid DATA frame reports its transmitted head
+duration and DATA_ACK piggybacks an absolute request derived from the observed
+residual. Requests only increase the connection value, are idempotent across
+retries, and are capped at 1.00 s. There is no tail guard or tail PN sequence;
+audio ends at the final CRC. Connection protocol version 4 and air-header
+version 2 make this explicit and are not wire-compatible with version 3.
 
 Re-run it in earnest, too. Swapping the bench HT -- a Wouxun KG-UV9D Plus,
 briefly replaced by a Baofeng UV-B5 -- broke `PROFILE_1200` in one
@@ -278,8 +285,8 @@ transient with no tone in it), and the 80ms head pad no longer covered it.
 Only the fast profile died, and that asymmetry was the real defect. The
 sync word was a fixed 63 *bits*, so it lasted 210ms at 300 baud and 52ms at
 1200: a fixed-duration impairment cost the fastest profile the largest
-fraction of the one thing it cannot lose. Both pads had been scaled to a
-duration for exactly this reason, and the sync word between them had not.
+fraction of the one thing it cannot lose. The head pad had been scaled to a
+duration for exactly this reason, and the sync word after it had not.
 
 It is now scaled too (`framing.SYNC_SECONDS`, 0.21s at every profile, using
 one m-sequence order per baud), so a blackout costs every profile the same
@@ -317,16 +324,16 @@ the first thing a clock difference takes away.
 
 Useful framed audio is capped at three seconds by
 `afsk.MAX_USEFUL_FRAME_SECONDS`. This includes sync, length, payload, and CRC
-across the checked header and optional body, but excludes the outer timing pads and
+across the checked header and optional body, but excludes the outer head pad and
 transport startup. Every profile's `chunk_size` is whatever fits that useful
 budget (`afsk.max_chunk_for_useful_frame`). Total PTT occupancy is separate
-because adaptive head/tail timing will make it radio-pair dependent:
+because adaptive head timing makes it radio-pair dependent:
 
 | profile | chunk | AFSK payload | useful | current keying | payload bits/s |
 |---------|-------|--------------|-------|--------|----------------|
-| 300 baud  |  88 |  88 | 2.98s | 5.14s | 137 |
-| 600 baud  | 193 | 193 | 3.00s | 5.16s | 299 |
-| 1200 baud | 402 | 402 | 3.00s | 5.16s | 623 |
+| 300 baud  |  88 |  88 | 3.04s | 4.20s | 137 |
+| 600 baud  | 193 | 193 | 3.03s | 4.19s | 299 |
+| 1200 baud | 402 | 402 | 3.01s | 4.17s | 623 |
 
 Three things worth knowing about that table:
 
@@ -359,8 +366,8 @@ Three things worth knowing about that table:
 The output stream contributes about 0.16s of startup/fill time to total
 occupancy, but not to the useful-frame restriction. A packet contains one sync
 and one continuous waveform. Its header and optional body have separate CRCs,
-and the one-second head and tail pads remain outer-keying protection. The
-conservative pads increase total occupancy without reducing useful payload.
+and the adaptive head remains outer-keying protection. No tail symbols are
+appended after the final CRC.
 
 Both runs passed 1 KB each way byte-for-byte with **no retransmit, no
 near-miss decode and no rx-profile correction** on either leg. Those runs

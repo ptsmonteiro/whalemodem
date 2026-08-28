@@ -71,7 +71,8 @@ def transmit(tx_signal, tx_device, ptt, samplerate=SAMPLE_RATE, ptt_lead=0.3, pt
     transmission. Measured on the bench by modulating a long alternating
     tail pad and counting how many of its bits came back intact: 471/600
     with CallbackStop, 600/600 with the zero-fill below. That missing 100ms
-    is what framing.TAIL_PAD_SECONDS was sized to absorb; see its comment.
+    was formerly masked by a tail pad; the pad was removed after this output
+    truncation bug was fixed and radio acceptance runs showed no need for it.
 
     ptt_tail is therefore carrier held after the last sample is genuinely on
     air, not after the last sample was queued.

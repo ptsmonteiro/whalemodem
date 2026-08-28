@@ -12,7 +12,7 @@ Run: python scripts/hw_smoke_link.py
 --profile seeds both sides' mode_history so connect() proposes/negotiates
 straight into that profile instead of starting at CONTROL_PROFILE (300baud)
 and stepping up -- lets you bench a specific speed mode directly, including
-the pre-TX turnaround and waveform-embedded head/tail settling that has to
+the pre-TX turnaround and waveform-embedded head settling that has to
 hold up at that profile's shorter frame timing. Printed timings
 below (PTT-on -> PTT-off wall clock per TX) are how you check that math:
 compare against afsk.frame_seconds(...) for the payload sent -- the gap

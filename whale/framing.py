@@ -1,6 +1,7 @@
 """Bit-level framing for the AFSK link: sync, checked header/body, bit packing.
 
 Frame layout (bits, MSB first):
+    head pad  (sync-anchored PN suffix -- leading-loss protection and measurement)
     sync word (PN sequence -- good autocorrelation for sync search; its
               length depends on baud, see sync_bits)
     length    (16 bits, big endian, complete payload length)
@@ -43,9 +44,9 @@ def _lfsr_bits(num_bits, order, taps, seed=1):
 
 
 # The sync word, as a *duration* rather than a bit count -- for exactly the
-# reason head_pad_bits and tail_pad_bits are: what a radio corrupts is a
+# reason head_pad_bits is: what a radio corrupts is a
 # span of time, so a fixed bit count tuned at one baud silently shrinks at
-# the next. The sync word was the one thing between those two pads that did
+# the next. The sync word after the head pad did
 # not follow the rule, and it is what a receiver has to survive the start of
 # a transmission with.
 #
@@ -129,52 +130,15 @@ AIR_HEADER_BYTES = 10
 # separately modulated bootstrap frame.
 BOOTSTRAP_HEADER_BYTES = AIR_HEADER_BYTES
 
-# Extra dummy bits appended after the final CRC of a keying, purely as on-air
-# padding. Real
-# hardware corrupts the very end of a transmission -- our own 5ms amplitude
-# ramp-down, plus a symbol or so of radio audio tail -- and since
-# parse_frame_bits only reads the exact prefix it needs and ignores anything
-# after, these throwaway bits eat that instead of the real CRC bits.
-#
-# This was 213ms, sized against a "tail corruption" that turned out to be a
-# software bug, not the radios: audio_io.transmit()'s output callback used
-# to raise CallbackStop on the last partial block, and PortAudio then tore
-# the stream down with roughly one `latency` -- ~100ms -- of the signal
-# still sitting in the device buffer, unplayed. Every transmission was
-# silently truncated by that much, and 213ms of padding was what it took to
-# keep the truncation off the CRC. With the zero-fill fix in transmit(), a
-# bench measurement (modulate a 500ms alternating tail pad, count how many
-# of its bits decode at the far end) shows 598-600 of 600 bits surviving in
-# both directions even when PTT drops the instant the audio ends -- i.e.
-# the genuine on-air tail costs 1-2 bits, ~1ms. 30ms is that plus the 5ms
-# ramp plus an order of magnitude of margin.
-#
-# Still expressed as a duration rather than a bit count: what the radio
-# corrupts is a span of time, so a fixed bit count tuned at one baud
-# silently shrinks at the next. See scripts/sweep_ptt_timing.py.
-TAIL_PAD_SECONDS = 1.0
-
-# The outer timing pads are measurements as well as protection, so they need
-# deterministic, alignment-safe content.  Alternating bits cannot distinguish
-# a one-symbol slip and used to give the head and tail identical content.
-# These two order-15 maximal-length sequences use different primitive
-# polynomials under _lfsr_bits' shift convention.  Their 32767-bit periods are
-# comfortably longer than every supported pad, and the nontrivial fixed seed
-# keeps the prefixes used by the current profiles close to tone-balanced.
+# The outer head timing pad is both measurement and protection, so it needs
+# deterministic, alignment-safe content. Its order-15 maximal-length sequence
+# has a period comfortably longer than every supported pad.
 _PAD_LFSR_ORDER = 15
 _PAD_LFSR_SEED = 0x5A5A
 _HEAD_PAD_TAPS = (1, 15)
-_TAIL_PAD_TAPS = (1, 2, 3, 15)
 
 
-def tail_pad_bits(baud, seconds=TAIL_PAD_SECONDS):
-    n = math.ceil(seconds * baud)
-    return _lfsr_bits(n, _PAD_LFSR_ORDER, _TAIL_PAD_TAPS,
-                      seed=_PAD_LFSR_SEED)
-
-
-# Mirrors tail_pad_bits, but at the front of the complete keying. What it buys
-# is settling time, scaled to
+# The head pad buys settling time, scaled to
 # duration rather than bit count so it doesn't shrink as baud rises.
 #
 # Note this is *not* the whole leading allowance, and not the expensive
@@ -281,10 +245,26 @@ def tail_pad_bits(baud, seconds=TAIL_PAD_SECONDS):
 HEAD_PAD_SECONDS = 1.0
 
 
+@functools.lru_cache(maxsize=16)
+def _head_pad_anchor_bits(num_bits):
+    """Return the immutable PN prefix whose end is anchored beside sync."""
+    return tuple(_lfsr_bits(num_bits, _PAD_LFSR_ORDER, _HEAD_PAD_TAPS,
+                            seed=_PAD_LFSR_SEED))
+
+
 def head_pad_bits(baud, seconds=HEAD_PAD_SECONDS):
     n = math.ceil(seconds * baud)
-    return _lfsr_bits(n, _PAD_LFSR_ORDER, _HEAD_PAD_TAPS,
-                      seed=_PAD_LFSR_SEED)
+    anchor_n = math.ceil(HEAD_PAD_SECONDS * baud)
+    if n < 0 or n > anchor_n:
+        raise ValueError(
+            f"head duration must be between 0 and {HEAD_PAD_SECONDS:g} seconds")
+    if n == 0:
+        return []
+    # Every operational duration is a suffix of the protocol-fixed
+    # calibration head. The symbol touching sync therefore stays at the same
+    # PN phase when feedback changes the duration, so a receiver measuring
+    # with its earlier expectation still compares the correct symbols.
+    return list(_head_pad_anchor_bits(anchor_n)[-n:])
 
 
 def bytes_to_bits(data: bytes):
@@ -306,8 +286,8 @@ def bits_to_bytes(bits) -> bytes:
     return bytes(out)
 
 
-def build_frame_bits(payload: bytes, baud=300, *, include_head=True, include_tail=True,
-                     head_seconds=HEAD_PAD_SECONDS, tail_seconds=TAIL_PAD_SECONDS):
+def build_frame_bits(payload: bytes, baud=300, *, include_head=True,
+                     head_seconds=HEAD_PAD_SECONDS):
     if len(payload) > MAX_PAYLOAD_BYTES:
         raise ValueError(f"payload too long ({len(payload)} > {MAX_PAYLOAD_BYTES})")
     length = len(payload).to_bytes(LENGTH_FIELD_BITS // 8, "big")
@@ -317,16 +297,14 @@ def build_frame_bits(payload: bytes, baud=300, *, include_head=True, include_tai
         checked = length + payload
         checked += crc16_ccitt_false(checked).to_bytes(2, "big")
         return ((head_pad_bits(baud, head_seconds) if include_head else []) + sync_bits(baud)
-                + bytes_to_bits(checked)
-                + (tail_pad_bits(baud, tail_seconds) if include_tail else []))
+                + bytes_to_bits(checked))
     header, body = payload[:AIR_HEADER_BYTES], payload[AIR_HEADER_BYTES:]
     header_crc = crc16_ccitt_false(length + header).to_bytes(2, "big")
     checked = length + header + header_crc
     if body:
         checked += body + crc16_ccitt_false(body).to_bytes(2, "big")
     return ((head_pad_bits(baud, head_seconds) if include_head else []) + sync_bits(baud)
-            + bytes_to_bits(checked)
-            + (tail_pad_bits(baud, tail_seconds) if include_tail else []))
+            + bytes_to_bits(checked))
 
 
 def declared_length(bits_after_sync):

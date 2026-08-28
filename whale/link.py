@@ -76,6 +76,13 @@ guessing "new session" resets the sequence state of a transfer that may
 have chunks in flight. One byte of airtime buys an unambiguous answer.
 Stations running builds from either side of this change will not
 interoperate.
+
+ON-AIR FORMAT CHANGE for connection version 4: DATA adds one inline byte
+declaring its transmitted head duration and DATA_ACK adds one byte carrying
+the receiver's absolute requested duration. Version 2 is rejected explicitly;
+silently accepting version 2 would reinterpret the first application byte as
+timing. Version 4 additionally removes tail timing fields and tail symbols and
+uses checked air-header version 2.
 """
 
 import logging
@@ -96,7 +103,7 @@ PT_CONNECT_ACK = 0x02
 PT_DISC = 0x03
 PT_DISC_ACK = 0x04
 PT_DATA = 0x05
-PT_DATA_ACK = 0x06         # body: [answered_seq, next_expected_seq, received_mode_id]
+PT_DATA_ACK = 0x06         # v3 body: [answered_seq, next_expected_seq, received_mode_id, requested_head]
 # 0x07 and 0x08 were MODE_REQ/MODE_ACK in version 1. They are reserved so an
 # old control exchange is rejected rather than reinterpreted as another type.
 PT_FLOOR_REQ = 0x09        # IRS asking to become ISS -- see _acquire_floor
@@ -113,11 +120,13 @@ _CONTROL_PLANE_TYPES = {PT_CONNECT, PT_CONNECT_ACK, PT_DISC, PT_DISC_ACK, PT_DAT
                          PT_TIMING_CONFIRM}
 
 CONNECT_FORMAT_MAGIC = b"\xffWHL"
-CONNECT_FORMAT_VERSION = 2
+CONNECT_FORMAT_VERSION = 4
 CALIBRATION_SECONDS = 1.0
-HEAD_MIN_GUARD_SECONDS = 0.05
-TAIL_MIN_GUARD_SECONDS = 0.03
-TIMING_MARGIN = 0.20
+HEAD_MIN_GUARD_SECONDS = 0.01
+TIMING_MARGIN = 0.0
+HEAD_FEEDBACK_UNIT_SECONDS = 0.01
+HEAD_MAX_SECONDS = 1.0
+HEAD_ZERO_INCREASE_SECONDS = 0.1
 
 # Which end may originate PT_DATA right now. Real half-duplex ARQ modems
 # (PACTOR, VARA, WINMOR/Ardop) call these roles ISS (Information Sending
@@ -151,14 +160,14 @@ _DATA_PLANE_TYPES = {PT_DATA}
 # decoder.  Up to two bytes live inline, making the common ACK and one-byte
 # control packets header-only transmissions.
 _AIR_HEADER_MAGIC = b"WH"
-_AIR_HEADER_VERSION = 1
+_AIR_HEADER_VERSION = 2
 _AIR_HEADER_INLINE_BYTES = 2
 _AIR_HEADER_LEN = framing.BOOTSTRAP_HEADER_BYTES
 
 
 def _air_inline_length(ptype):
     if ptype == PT_DATA:
-        return 1
+        return 2
     if ptype in (PT_CONNECT, PT_CONNECT_ACK, PT_TIMING_ACK,
                  PT_TIMING_CONFIRM):
         return 2
@@ -197,17 +206,17 @@ def _decode_air_header(raw: bytes):
 def _valid_air_shape(ptype, profile, body_len, inline, control_mode_id):
     """Semantic checks applied only after the header CRC has passed."""
     if ptype == PT_DATA:
-        return len(inline) == 1 and body_len <= profile.chunk_size
+        return len(inline) == 2 and body_len <= profile.chunk_size
     if profile.mode_id != control_mode_id:
         return False
     if ptype in (PT_CONNECT, PT_CONNECT_ACK):
         return len(inline) == 2 and 0 < body_len <= 128
     if ptype == PT_DATA_ACK:
-        return len(inline) == 2 and body_len == 1
+        return len(inline) == 2 and body_len == 2
     if ptype == PT_TIMING_ACK:
-        return len(inline) == 2 and body_len == 1
+        return len(inline) == 2 and body_len == 0
     if ptype == PT_TIMING_CONFIRM:
-        return len(inline) == 2 and body_len == 1
+        return len(inline) == 2 and body_len == 0
     if ptype in (PT_DISC, PT_DISC_ACK, PT_FLOOR_REQ, PT_FLOOR_GRANT):
         return len(inline) == 0 and body_len == 0
     return False
@@ -318,15 +327,9 @@ def _new_session_id():
 INACTIVITY_TIMEOUT = 150.0
 
 # Kept as a compatibility name for diagnostics/tests. No fixed dead-air delay
-# is applied: replies begin after the decoder has observed the expected tail,
-# and calibrated head audio absorbs the effective direction-change loss.
+# is applied: replies begin after the checked frame ends, and calibrated head
+# audio absorbs the effective direction-change loss.
 TX_TURNAROUND_DELAY = 0.0
-
-# What the peer is still transmitting after the last bit we decoded:
-# framing.TAIL_PAD_SECONDS of pad. This is the peer's setting and nothing on
-# air tells us what it is, so this is a nominal figure for peers running the
-# same build.
-PEER_TRAILING_TRANSMISSION = framing.TAIL_PAD_SECONDS
 
 # How much older than the turnaround itself an anchor may be and still be
 # believed. Beyond that it is not evidence about when the peer stopped
@@ -556,7 +559,7 @@ def _decode_connect_ack(payload):
     return a, b, modes, content[offset], content[offset + 1], session_id
 
 
-def _encode_timing(session_id, head_received, tail_received):
+def _encode_timing(session_id, head_received):
     total = int(np.ceil(CALIBRATION_SECONDS * afsk.CONTROL_PROFILE.baud))
 
     def duration_byte(received):
@@ -564,22 +567,53 @@ def _encode_timing(session_id, head_received, tail_received):
             raise ValueError("invalid calibration measurement")
         return min(255, int(np.ceil(received * 255 / total)))
 
-    return bytes([session_id, duration_byte(head_received), duration_byte(tail_received)])
+    return bytes([session_id, duration_byte(head_received)])
 
 
 def _decode_timing(body):
-    if len(body) != 3:
+    if len(body) != 2:
         raise ValueError("invalid TIMING_ACK")
-    return body[0], body[1], body[2]
+    return body[0], body[1]
 
 
-def _derive_timing(head_duration_byte, tail_duration_byte, baud=None):
-    if not (0 < head_duration_byte <= 255 and 0 < tail_duration_byte <= 255):
+def _derive_timing(head_duration_byte, baud=None):
+    if not 0 < head_duration_byte <= 255:
         raise ValueError("invalid calibration measurement")
     head_loss = CALIBRATION_SECONDS * (255 - head_duration_byte) / 255
-    tail_loss = CALIBRATION_SECONDS * (255 - tail_duration_byte) / 255
-    return (min(CALIBRATION_SECONDS, head_loss + max(HEAD_MIN_GUARD_SECONDS, head_loss * TIMING_MARGIN)),
-            min(CALIBRATION_SECONDS, tail_loss + max(TAIL_MIN_GUARD_SECONDS, tail_loss * TIMING_MARGIN)))
+    return min(CALIBRATION_SECONDS,
+               head_loss + max(HEAD_MIN_GUARD_SECONDS, head_loss * TIMING_MARGIN))
+
+
+def _encode_head_duration(seconds):
+    """Encode a duration upward in protocol-v3 10 ms units."""
+    if not 0 < seconds <= HEAD_MAX_SECONDS:
+        raise ValueError("invalid head duration")
+    return min(255, int(np.ceil(seconds / HEAD_FEEDBACK_UNIT_SECONDS)))
+
+
+def _decode_head_duration(value):
+    if not 0 < value <= int(HEAD_MAX_SECONDS / HEAD_FEEDBACK_UNIT_SECONDS):
+        raise ValueError("invalid head duration")
+    return value * HEAD_FEEDBACK_UNIT_SECONDS
+
+
+def _head_feedback_request(advertised_head, observed_symbols, baud):
+    """Return (absolute request byte, reason) for one valid DATA frame."""
+    sent = _decode_head_duration(advertised_head)
+    if observed_symbols is None or observed_symbols < 0:
+        return advertised_head, "missing or invalid observation"
+    observed = observed_symbols / baud
+    if observed_symbols == 0:
+        requested = min(HEAD_MAX_SECONDS, sent + HEAD_ZERO_INCREASE_SECONDS)
+        return _encode_head_duration(requested), "zero observation is a lower bound"
+    deficit = HEAD_MIN_GUARD_SECONDS - observed
+    matcher_allowance = afsk.PAD_MATCH_WINDOW_SYMBOLS / baud
+    if deficit <= 0:
+        return advertised_head, "target residual guard met"
+    if deficit <= matcher_allowance:
+        return advertised_head, "deficit is within matcher-window allowance"
+    requested = min(HEAD_MAX_SECONDS, sent + deficit)
+    return _encode_head_duration(requested), "residual guard below target"
 
 
 def _negotiate_mode(own_supported_ids, proposed_id, fallback_id=None):
@@ -644,9 +678,7 @@ class Link:
         self._rx_packets = queue.Queue()
         self._rx_measurements = {}
         self._tx_head_seconds = CALIBRATION_SECONDS
-        self._tx_tail_seconds = CALIBRATION_SECONDS
         self._rx_head_seconds = CALIBRATION_SECONDS
-        self._rx_tail_seconds = CALIBRATION_SECONDS
         # A station asking for the floor may receive the current ISS's
         # message before its request can be granted.  send_message() has to
         # service and ACK those frames to let the ISS finish; retain any
@@ -751,9 +783,9 @@ class Link:
         # frame out at tx_profile, then the peer's (tiny) ACK back at
         # rx_profile, with a turnaround at each end.
         tx_airtime = self.tx_profile.airtime(_AIR_HEADER_LEN + self.tx_profile.chunk_size)
-        # The two sequence bytes are inline; received_mode_id is the ACK's
-        # one-byte control-mode body.
-        ack_airtime = self.modes.control.airtime(_AIR_HEADER_LEN + 1)
+        # The two sequence bytes are inline; mode and absolute head request
+        # are the ACK's two-byte control-mode body.
+        ack_airtime = self.modes.control.airtime(_AIR_HEADER_LEN + 2)
         self.data_ack_timeout = (tx_airtime + ack_airtime
                                  + 2 * TX_TURNAROUND_DELAY + 3.0)
 
@@ -817,8 +849,7 @@ class Link:
         its own threshold) but hasn't seen enough samples yet for a verdict,
         this poll holds off consuming anything and just waits for more
         audio, rather than letting a different candidate's near-miss win."""
-        results = [(profile, profile.decode(snap, head_seconds=self._rx_head_seconds,
-                                             tail_seconds=self._rx_tail_seconds))
+        results = [(profile, profile.decode(snap, head_seconds=self._rx_head_seconds))
                    for profile in self._candidate_decode_profiles()]
         for profile, result in results:
             payload = result.get("payload")
@@ -860,27 +891,15 @@ class Link:
 
     def _finish_air_packet(self, ptype, body, profile, snap, end, decode_result):
         trailing = max(0, len(snap) - end)
-        # CPFSK outer-pad measurement advances `end` through the observed
-        # tail, so that boundary is already the peer's nominal unkeying time.
-        # Other waveform codecs still end at the checked frame and retain the
-        # legacy trailing-duration estimate.
-        tail_already_observed = "tail_symbols_received" in decode_result
-        remaining_tail = 0.0 if tail_already_observed else PEER_TRAILING_TRANSMISSION
-        self._peer_unkeyed_at = (time.monotonic() - trailing / profile.sample_rate
-                                 + remaining_tail)
+        self._peer_unkeyed_at = time.monotonic() - trailing / profile.sample_rate
         logger.info("[%s] decoded %s body at profile %s", self.mycall,
                     _ptype_name(ptype), profile.name)
-        for side in ("head", "tail"):
-            received = decode_result.get(f"{side}_symbols_received")
-            if received is None:
-                continue
-            logger.info(
-                "[%s] RX outer %s: observed %d adjacent symbols (%.1f ms)",
-                self.mycall, side, received, received * 1000.0 / profile.baud,
-            )
+        received = decode_result.get("head_symbols_received")
+        if received is not None:
+            logger.info("[%s] RX outer head: observed %d adjacent symbols (%.1f ms)",
+                        self.mycall, received, received * 1000.0 / profile.baud)
         self._rx_measurements[(ptype, body)] = {
             "head": decode_result.get("head_symbols_received"),
-            "tail": decode_result.get("tail_symbols_received"),
         }
         self._handle_raw(bytes([ptype]) + body, profile)
 
@@ -956,7 +975,7 @@ class Link:
 
         A reply sent essentially back-to-back with the frame it's replying
         to reaches the peer garbled or not at all on this rig: the peer is
-        still transmitting its tail pad and holding its carrier, and
+        still transmitting or holding its carrier, and
         neither radio has finished swapping T/R. What that costs is a fixed
         span of time *after the peer's audio ends*, so that -- not the
         moment we happen to reach this line -- is what it is measured from.
@@ -990,8 +1009,7 @@ class Link:
                                 body[:_air_inline_length(ptype)],
                                 self.modes.control.mode_id):
             raise ValueError(f"invalid {_ptype_name(ptype)} body/mode for air header")
-        audio = profile.encode(header + remainder, head_seconds=self._tx_head_seconds,
-                               tail_seconds=self._tx_tail_seconds)
+        audio = profile.encode(header + remainder, head_seconds=self._tx_head_seconds)
         keyed = self.transport.send(audio)
         # Both numbers, because the gap between them is the PTT/settling
         # overhead this frame actually paid -- the thing to watch if air
@@ -999,6 +1017,29 @@ class Link:
         logger.info("[%s] TX %s at %s (%d body byte(s), %.2fs audio, %.2fs keyed)",
                     self.mycall, _ptype_name(ptype), profile.name, len(body),
                     len(audio) / profile.sample_rate, keyed)
+
+    def _apply_head_feedback(self, requested_byte, *, seq):
+        """Apply an absolute peer request monotonically and idempotently."""
+        old = self._tx_head_seconds
+        try:
+            requested = _decode_head_duration(requested_byte)
+        except ValueError:
+            logger.warning("[%s] ignoring head feedback for seq=0x%02x: invalid request 0x%02x",
+                           self.mycall, seq, requested_byte)
+            return False
+        if requested <= old + 1e-12:
+            reason = ("duplicate/no increase" if requested >= old - HEAD_FEEDBACK_UNIT_SECONDS
+                      else "would decrease padding")
+            logger.info("[%s] ignoring head feedback for seq=0x%02x: requested %.1f ms, "
+                        "TX head %.1f ms (%s)", self.mycall, seq, requested * 1000,
+                        old * 1000, reason)
+            return False
+        new = min(HEAD_MAX_SECONDS, requested)
+        self._tx_head_seconds = new
+        logger.info("[%s] applied head feedback for seq=0x%02x: requested %.1f ms, "
+                    "TX head %.1f -> %.1f ms", self.mycall, seq, requested * 1000,
+                    old * 1000, new * 1000)
+        return True
 
     def _wait_packet(self, want_types, timeout):
         deadline = time.time() + timeout
@@ -1067,7 +1108,7 @@ class Link:
         if self.state != "CONNECTED" or self._timing_confirm_body is None:
             return False
         try:
-            session_id, _, _ = _decode_timing(body)
+            session_id, _ = _decode_timing(body)
         except ValueError:
             return False
         if session_id != self._session_id:
@@ -1143,8 +1184,8 @@ class Link:
         timeout_per_try = self.control_ack_timeout if timeout_per_try is None else timeout_per_try
         self._drain_packets()
         self.state = "CONNECTING"
-        self._tx_head_seconds = self._tx_tail_seconds = CALIBRATION_SECONDS
-        self._rx_head_seconds = self._rx_tail_seconds = CALIBRATION_SECONDS
+        self._tx_head_seconds = CALIBRATION_SECONDS
+        self._rx_head_seconds = CALIBRATION_SECONDS
         own_supported = list(self.modes.supported_ids)
         # Not `forced or history`: mode_id 0 is a real profile (300 baud)
         # and a perfectly reasonable thing to pin a bench run to.
@@ -1181,12 +1222,10 @@ class Link:
                     continue
                 measurement = self._rx_measurements.get((PT_CONNECT_ACK, ack_body), {})
                 head = measurement.get("head")
-                tail = measurement.get("tail")
                 try:
-                    timing_body = _encode_timing(self._session_id, head, tail)
-                    _, head_duration, tail_duration = _decode_timing(timing_body)
-                    self._rx_head_seconds, self._rx_tail_seconds = _derive_timing(
-                        head_duration, tail_duration)
+                    timing_body = _encode_timing(self._session_id, head)
+                    _, head_duration = _decode_timing(timing_body)
+                    self._rx_head_seconds = _derive_timing(head_duration)
                 except (TypeError, ValueError):
                     logger.warning("[%s] invalid CONNECT_ACK timing measurement", self.mycall)
                     continue
@@ -1211,11 +1250,11 @@ class Link:
                     continue
                 _, confirm_body = confirmed
                 try:
-                    confirm_session, own_head, own_tail = _decode_timing(confirm_body)
+                    confirm_session, own_head = _decode_timing(confirm_body)
                     if confirm_session != self._session_id:
                         continue
-                    self._tx_head_seconds, self._tx_tail_seconds = _derive_timing(
-                        own_head, own_tail, self.modes.control.baud)
+                    self._tx_head_seconds = _derive_timing(
+                        own_head, self.modes.control.baud)
                 except ValueError:
                     continue
                 self._clean_streak = 0
@@ -1249,8 +1288,8 @@ class Link:
         timeout."""
         self._drain_packets()
         self.state = "LISTENING"
-        self._tx_head_seconds = self._tx_tail_seconds = CALIBRATION_SECONDS
-        self._rx_head_seconds = self._rx_tail_seconds = CALIBRATION_SECONDS
+        self._tx_head_seconds = CALIBRATION_SECONDS
+        self._rx_head_seconds = CALIBRATION_SECONDS
         got = self._wait_packet({PT_CONNECT}, timeout or 1e9)
         if got is None:
             return None
@@ -1298,17 +1337,15 @@ class Link:
             return None
         _, timing_body = got_timing
         try:
-            timing_session, own_head, own_tail = _decode_timing(timing_body)
+            timing_session, own_head = _decode_timing(timing_body)
             if timing_session != session_id:
                 raise ValueError("wrong timing session")
-            self._tx_head_seconds, self._tx_tail_seconds = _derive_timing(
-                own_head, own_tail)
+            self._tx_head_seconds = _derive_timing(own_head)
             measurement = self._rx_measurements[(PT_TIMING_ACK, timing_body)]
-            peer_head, peer_tail = measurement["head"], measurement["tail"]
-            confirm_body = _encode_timing(session_id, peer_head, peer_tail)
-            _, peer_head_duration, peer_tail_duration = _decode_timing(confirm_body)
-            self._rx_head_seconds, self._rx_tail_seconds = _derive_timing(
-                peer_head_duration, peer_tail_duration)
+            peer_head = measurement["head"]
+            confirm_body = _encode_timing(session_id, peer_head)
+            _, peer_head_duration = _decode_timing(confirm_body)
+            self._rx_head_seconds = _derive_timing(peer_head_duration)
         except (KeyError, TypeError, ValueError):
             self.state = "IDLE"
             return None
@@ -1443,8 +1480,9 @@ class Link:
         DATA_ACK confirms both the sequence and the mode the IRS decoded.
         After repeated silence the sender steps down and retries this same
         chunk; receivers search every mutually supported mode."""
-        body = bytes([seq | (EOF_BIT if is_eof else 0)]) + chunk
         for attempt in range(1, MAX_RETRIES + 1):
+            advertised_head = _encode_head_duration(self._tx_head_seconds)
+            body = bytes([seq | (EOF_BIT if is_eof else 0), advertised_head]) + chunk
             self.on_event("PTT", on=True)
             self._tx_packet(PT_DATA, body)
             self.on_event("PTT", off=True)
@@ -1460,10 +1498,13 @@ class Link:
                 if ptype == PT_DISC:
                     self._handle_peer_disc()
                     raise LinkError("peer disconnected mid-transfer")
-                if len(body_in) != 3:
+                if len(body_in) != 4:
+                    logger.info("[%s] ignoring malformed DATA_ACK for seq=0x%02x (%d bytes)",
+                                self.mycall, seq, len(body_in))
                     continue
                 answered, expects = body_in[0] & SEQ_MASK, body_in[1] & SEQ_MASK
                 received_mode_id = body_in[2]
+                requested_head = body_in[3]
                 if answered != seq:
                     # An answer to a frame we have already moved past --
                     # most often the receiver's second ack of a chunk we
@@ -1481,6 +1522,7 @@ class Link:
                         logger.warning("[%s] ignoring ACK reporting mode %d; transmitting at %s",
                                        self.mycall, received_mode_id, self.tx_profile.name)
                         continue
+                    self._apply_head_feedback(requested_head, seq=seq)
                     logger.info("[%s] DATA seq=0x%02x acked after %d attempt(s) at %s",
                                 self.mycall, seq, attempt, self.tx_profile.name)
                     return attempt
@@ -1591,10 +1633,30 @@ class Link:
         """Consumes and acknowledges one DATA body, returning a completed
         message or None.  Shared by recv_message() and floor acquisition so
         an IRS can continue receiving while its application wants to send."""
-        if not body:
+        if len(body) < 2:
+            logger.info("[%s] ignoring DATA without v3 head-duration field", self.mycall)
             return None
-        flags, chunk = body[0], body[1:]
+        flags, advertised_head, chunk = body[0], body[1], body[2:]
         seq = flags & SEQ_MASK
+        measurement = self._rx_measurements.get((PT_DATA, body), {})
+        observed_symbols = measurement.get("head")
+        try:
+            requested_head, feedback_reason = _head_feedback_request(
+                advertised_head, observed_symbols, self.rx_profile.baud)
+            observed_ms = (observed_symbols * 1000.0 / self.rx_profile.baud
+                           if observed_symbols is not None else float("nan"))
+            if requested_head == advertised_head:
+                logger.info("[%s] DATA seq=0x%02x head observation ignored: observed %.1f ms, "
+                            "reported unchanged %.1f ms (%s)", self.mycall, seq, observed_ms,
+                            _decode_head_duration(requested_head) * 1000, feedback_reason)
+            else:
+                logger.info("[%s] DATA seq=0x%02x head feedback: observed %.1f ms, "
+                            "reported request %.1f ms (%s)", self.mycall, seq, observed_ms,
+                            _decode_head_duration(requested_head) * 1000, feedback_reason)
+        except ValueError:
+            logger.info("[%s] ignoring head observation for DATA seq=0x%02x: "
+                        "invalid advertised duration 0x%02x", self.mycall, seq, advertised_head)
+            return None
         message = None
         if self._partial_rx_buf is None:
             self._partial_rx_buf = bytearray()
@@ -1614,7 +1676,8 @@ class Link:
         # cannot be mistaken for an answer to a later frame.
         self.on_event("PTT", on=True)
         self._tx_packet(PT_DATA_ACK,
-                        bytes([seq, self._rx_expect_seq, self.rx_profile.mode_id]))
+                        bytes([seq, self._rx_expect_seq, self.rx_profile.mode_id,
+                               requested_head]))
         self.on_event("PTT", off=True)
         return message
 
@@ -1627,8 +1690,8 @@ class Link:
         self._session_id = SESSION_ID_NONE
         self._connect_ack_body = None
         self._timing_confirm_body = None
-        self._tx_head_seconds = self._tx_tail_seconds = CALIBRATION_SECONDS
-        self._rx_head_seconds = self._rx_tail_seconds = CALIBRATION_SECONDS
+        self._tx_head_seconds = CALIBRATION_SECONDS
+        self._rx_head_seconds = CALIBRATION_SECONDS
         self._last_peer_frame_at = None
 
     def _handle_peer_disc(self):

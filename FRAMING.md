@@ -5,9 +5,9 @@ current `whale` package. It defines how a link packet becomes an over-the-air
 audio waveform. See [`LINK.md`](LINK.md) for connection management,
 mode negotiation, ARQ, and the local TCP interface.
 
-This is a description of the present implementation, not a compatibility
-promise: there is no on-air version field or formal interoperability guarantee
-yet.
+The checked header and connection envelope contain explicit version fields.
+The current connection protocol is version 4 and checked air-header version is
+2; older versions are rejected.
 
 ## Conventions
 
@@ -83,7 +83,7 @@ every decoder-control field before the receiver collects the body:
 | Field | Size | Meaning |
 | --- | ---: | --- |
 | Magic | 2 bytes | ASCII `WH` |
-| Header version | 1 byte | `0x01` |
+| Header version | 1 byte | `0x02` |
 | Link packet type | 1 byte | Type defined in `LINK.md` |
 | Mode ID | 1 byte | Mode used for this complete keying |
 | Inline length | 1 byte | `0..2` |
@@ -97,9 +97,10 @@ semantic limits require DATA bodies not to exceed the selected mode's chunk
 size and management-body remainders not to exceed 128 bytes; impossible
 type/mode/length combinations are rejected before waiting for a body.
 
-A zero-length body and its CRC are omitted. Empty controls, one-byte mode
-messages. The first two DATA_ACK bytes are inline; its received-mode byte is a
-one-byte control-mode body after the header. Longer
+A zero-length body and its CRC are omitted. Empty controls are header-only.
+The first two DATA_ACK bytes are inline; its received-mode and absolute
+requested-head bytes form a two-byte control-mode body after the header.
+DATA's flags and sent-head-duration bytes are inline. Longer
 packets place their first two link-body bytes inline and their remainder after
 the checked header in the same waveform.
 
@@ -109,32 +110,32 @@ Each keying uses this structure continuously in its selected mode:
 
 | Field | Size | Description |
 | --- | ---: | --- |
-| Head pad | `ceil(1.0 * baud)` bits | Fixed head PN sequence; discarded after measurement |
+| Head pad | `ceil(head_seconds * baud)` bits | Fixed head PN sequence; discarded after measurement |
 | Sync | Baud-dependent | One full PN sequence, approximately 0.21 seconds |
 | Length | 16 bits | Total header-plus-body bytes, big-endian |
 | Header | 10 bytes | Fixed header above |
 | Header CRC | 16 bits | CRC over `Length || Header` |
 | Body | Declared length | Optional non-inline body bytes |
 | Body CRC | 16 bits | CRC over Body; omitted for an empty body |
-| Tail pad | `ceil(1.0 * baud)` bits | Fixed tail PN sequence; discarded after measurement |
 
-The head and tail pads are distinct order-15 maximal-length PN sequences.
-They use the same LFSR step convention described below for sync, seed
-`0x5a5a`, and these protocol-fixed taps:
+The head pad is an order-15 maximal-length PN sequence. It uses the same LFSR
+step convention described below for sync, seed `0x5a5a`, and these
+protocol-fixed taps:
 
 | Pad | Polynomial taps (one-based) | Full period |
 | --- | --- | ---: |
 | Head | 1, 15 | 32,767 bits |
-| Tail | 1, 2, 3, 15 | 32,767 bits |
 
-Each pad takes the first `ceil(1.0 * baud)` bits of its sequence. The long
-period makes symbol slips unambiguous, the two polynomials prevent a head from
-being accepted as a tail at the same alignment, and their prefixes exercise
-both FSK tones approximately equally. These definitions replace the former
-alternating pads and are an on-air format change.
+Calibration heads take the first `ceil(1.0 * baud)` bits. An ordinary head is
+the suffix of that calibration sequence whose length is
+`ceil(head_seconds * baud)`, using the per-connection duration described in
+`ADAPTIVE_TIMING.md`. Anchoring every duration to the same sequence end keeps
+the PN phase beside sync unchanged when adaptive feedback changes the head
+length. The long period makes symbol slips unambiguous, and the portions used
+by the supported profiles exercise both FSK tones approximately equally.
 
-The built-in receiver measures each pad outward from its checked frame
-boundary with a 16-symbol sliding window. Up to two symbol errors per window
+The built-in receiver measures the head backward from sync with a 16-symbol
+sliding window. Up to two symbol errors per window
 are tolerated. On the third error, the whole failing window is excluded from
 the received count, keeping a noisy boundary estimate conservative.
 
@@ -164,7 +165,7 @@ The control profile's order-6 sequence is:
 The length field can represent a 65,535-byte payload, but the built-in profiles
 do not send frames remotely that large. Useful framed audio is capped at 3.0
 seconds across the complete packet. Here, useful audio is sync, length,
-header, body, and CRCs; it excludes the outer head/tail throwaway
+header, body, and CRCs; it excludes the outer head throwaway
 symbols and transport startup. Each profile's DATA chunk size is the largest
 value that fits this budget. Total keying time is calculated separately and
 will vary with the selected timing protection.
@@ -181,18 +182,19 @@ the longest currently expected frame.
 ## On-air timing
 
 There is no fixed radio-turnaround sleep. A reply may key as soon as the peer's
-complete expected tail has been observed. The calibrated head sequence absorbs
+final checked CRC has been observed. The calibrated head sequence absorbs
 effective clipping caused by peer unkeying, both radios changing direction,
 transmitter startup, receiver recovery, and audio buffering.
 
 The transport asserts PTT and immediately opens and fills the output stream;
 there is no configured carrier-only lead or tail sleep. Stream startup still
 contributes a measured worst-case 0.16 seconds before the first sample leaves
-the audio device. Leading and trailing protection is carried entirely by
-throwaway symbol pads: one second during calibration and the derived
-per-session durations afterward. Receive capture remains open during
+the audio device. Leading protection is carried by a throwaway head sequence:
+one second during calibration and the derived per-session duration afterward.
+Valid DATA observations can monotonically increase it up to 1.00 second.
+There is no tail sequence or guard; audio ends at the final CRC. Receive capture remains open during
 transmission, but captured self-audio is cleared around each local keying.
 
 Control acknowledgement timeouts include the complete robust management
 packet. DATA acknowledgement timeouts include the negotiated DATA packet, the
-robust header-only DATA_ACK, and a three-second margin.
+robust small DATA_ACK, and a three-second margin.

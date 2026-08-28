@@ -1,8 +1,8 @@
 """Bench sweep: how soon after the peer stops talking may we key up?
 
 This is the one dead-time knob scripts/sweep_ptt_timing.py never touched.
-That script measures the four allowances *around* a frame (ptt_lead,
-head_pad, tail_pad, ptt_tail), all of which are inside one station's own
+That script measures the remaining allowances around a frame (ptt_lead,
+head_pad, ptt_tail), all of which are inside one station's own
 keying. This one measures the gap *between* two stations' keyings --
 whale/link.py's TX_TURNAROUND_DELAY -- which timing the acceptance run
 frame by frame showed to be the single largest item in the link's budget:
@@ -10,7 +10,6 @@ frame by frame showed to be the single largest item in the link's budget:
 
 What the wait has to cover, measured from the peer's last CRC bit:
 
-    framing.TAIL_PAD_SECONDS   the peer is still transmitting pad
     transport.PTT_TAIL         the peer is still keyed, carrier only
     the peer's T/R switch releasing, and ours engaging
 
