@@ -315,36 +315,23 @@ are durations and are converted to the new mode's symbol count. A later feature
 may persist successful measurements by radio configuration or recalibrate a
 long-running connection, but neither is part of this design.
 
-## Implementation outline
+## Implementation status
 
-The current diagnostic implementation measures the existing one-second outer
-pads on every successfully decoded frame. The decoder reports contiguous,
-aligned head and tail symbols adjacent to the sync word and final CRC. Receiver
-logs show the received symbol count and duration alongside the inferred
-clipped symbol count and duration. It waits for the nominal tail observation
-window before returning a frame so an in-progress tail is not misreported as
-clipping. These observations are not yet exchanged with the peer or used to
-change transmit padding.
+Connection format version 2 and the adaptive-timing handshake are implemented.
+CONNECT and CONNECT_ACK use the length-delimited bodies from `LINK.md`; the
+former NUL-delimited format has no legacy decoder or downgrade path. Calibration
+frames use the fixed PN sequences and per-frame timing support in the framing
+layer. Their decoder results include head and tail observations, which the link
+exchanges through `TIMING_ACK` and `TIMING_CONFIRM` and converts into
+per-connection transmit padding.
 
-1. Replace the current NUL-delimited CONNECT and CONNECT_ACK encoding with the
-   length-delimited bodies from `LINK.md`; do not retain a legacy decoder or
-   downgrade path.
-2. Allow the framing encoder to accept per-frame head and tail sequences.
-3. Add fixed calibration sequences and their protocol constants. **Done:**
-   distinct order-15 PN sequences now replace the alternating head/tail pads.
-4. Extend the decoder result for calibration frames with the two received-
-   symbol counts while leaving ordinary decode behavior unchanged.
-5. Preserve sufficient leading audio and defer calibration-frame completion
-   until the tail can be measured.
-6. Add the `TIMING_ACK` and `TIMING_CONFIRM` packet types and encode/decode
-   helpers for their fields.
-7. Add per-connection transmit head and tail durations to `Link`.
-8. Implement the calibration state transitions, conservative aggregation, and
-   idempotent retry behavior.
-9. Make frame airtime, keying-budget, and timeout calculations accept the
-   active timing, including the separate bounded calibration budget.
-10. Add unit tests with controlled leading and trailing truncation, followed by
-   bidirectional hardware tests using `scripts/sweep_ptt_timing.py`.
+The implementation also includes bounded calibration decoding, timing-aware
+airtime and timeout calculations, conservative aggregation of repeated
+observations, and idempotent handling of repeated handshake packets. Software
+tests cover the encoding, timing derivation, clipping behavior, and link
+recovery paths. Bidirectional hardware sweeps with
+`scripts/sweep_ptt_timing.py` remain part of validation for particular radio
+and audio configurations rather than an unimplemented protocol step.
 
 ## Acceptance criteria
 

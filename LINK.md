@@ -53,16 +53,16 @@ bytes are inline; any remainder follows in the same waveform.
 ### Connection bodies
 
 CONNECT and CONNECT_ACK use the following length-delimited format. This is the
-only connection-body format; the current NUL-delimited implementation is to be
-replaced outright rather than retained as a compatibility mode. All sizes are
-unsigned byte counts and all multi-byte integers are big-endian.
+only connection-body format; the former NUL-delimited development format is
+not accepted as a compatibility mode. All sizes are unsigned byte counts and
+all multi-byte integers are big-endian.
 
 Both packet types begin with this envelope:
 
 | Field | Size | Value or meaning |
 | --- | ---: | --- |
 | Magic | 4 bytes | `ff 57 48 4c` (`0xff` followed by ASCII `WHL`) |
-| Format version | 1 byte | `0x01` |
+| Format version | 1 byte | `0x02` |
 | Content length | 2 bytes | Bytes after this field |
 | Content | `content_length` bytes | The version-specific fields below |
 
@@ -71,7 +71,7 @@ body with the wrong magic, an unsupported format version, a content length
 that does not equal the remaining body size, a truncated field, or extra
 bytes.
 
-CONNECT v1 Content is:
+CONNECT v2 Content is:
 
 | Field | Size | Meaning |
 | --- | ---: | --- |
@@ -84,7 +84,7 @@ CONNECT v1 Content is:
 | Supported mode IDs | `mode_count` bytes | Unique one-byte IDs in preference order |
 | Proposed transmit mode | 1 byte | One of the advertised IDs |
 
-CONNECT_ACK v1 Content is:
+CONNECT_ACK v2 Content is:
 
 | Field | Size | Meaning |
 | --- | ---: | --- |
@@ -258,11 +258,10 @@ is an implementation detail and must not be used for application framing.
 
 ## Current limitations and compatibility notes
 
-- The length-delimited connection body and adaptive-timing handshake specified
-  above are not implemented yet. The current code still uses the older
-  NUL-delimited body and must replace it; no interoperability with that
-  development format will be retained. The new format adds magic, versioning,
-  and lengths, but not authentication or encryption.
+- Connection format version 2 is the only implemented format. The former
+  NUL-delimited development format and version 1 are not accepted. The current
+  format adds magic, versioning, and lengths, but not authentication or
+  encryption.
 - There is one outstanding DATA frame at a time; no windowing or cumulative
   multi-frame ACK is implemented.
 - The link is point-to-point and has no channel addressing outside callsigns
