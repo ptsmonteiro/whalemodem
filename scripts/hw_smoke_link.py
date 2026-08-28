@@ -11,8 +11,8 @@ Run: python scripts/hw_smoke_link.py
 --profile seeds both sides' mode_history so connect() proposes/negotiates
 straight into that profile instead of starting at CONTROL_PROFILE (300baud)
 and stepping up -- lets you bench a specific speed mode directly, including
-the pre-TX (TX_TURNAROUND_DELAY) and post-TX (ptt_lead/ptt_tail) settling
-that has to hold up at that profile's shorter frame timing. Printed timings
+the pre-TX turnaround and waveform-embedded head/tail settling that has to
+hold up at that profile's shorter frame timing. Printed timings
 below (PTT-on -> PTT-off wall clock per TX) are how you check that math:
 compare against afsk.frame_seconds(...) for the payload sent -- the gap
 between them is turnaround/PTT margin actually consumed, not just assumed.
@@ -25,7 +25,7 @@ import time
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(name)s: %(message)s")
 
-from whale import afsk, link as link_mod, mode_history, transport as transport_mod
+from whale import afsk, link as link_mod, mode_history
 from whale.link import Link
 from whale.transport import RadioTransport
 
@@ -41,10 +41,9 @@ def main():
                           "(default: start at the control profile, as a normal connect would)")
     args = ap.parse_args()
 
-    print(f"opening radios... (TX_TURNAROUND_DELAY={link_mod.TX_TURNAROUND_DELAY}s, "
-          f"ptt_lead={transport_mod.PTT_LEAD}s, ptt_tail={transport_mod.PTT_TAIL}s -- see "
-          f"whale/transport.py for the latter two, both baud-independent radio settling "
-          f"measured by scripts/sweep_ptt_timing.py)")
+    print(f"opening radios... (TX_TURNAROUND_DELAY={link_mod.TX_TURNAROUND_DELAY}s; "
+          "radio settling is carried by waveform timing symbols and calibrated "
+          "per session -- see ADAPTIVE_TIMING.md)")
     t1 = RadioTransport("ic705")
     t2 = RadioTransport("ht")
 
