@@ -23,6 +23,7 @@ station's request. Verified byte-for-byte on real hardware (see
 whale/
   framing.py     bit-level framing: sync word, length+CRC16, bit packing
   afsk.py         CPFSK modulate/demodulate (300 baud, 1200/1800 Hz tones)
+  waveform.py     physical-layer mode contract and negotiable mode registry
   transport.py    one radio: continuous RX capture + keyed TX
   link.py         stop-and-wait ARQ: connect / send / recv / disconnect
   vara_server.py  VARA-API-shaped TCP front end (StationServer, CLI)
@@ -51,6 +52,15 @@ frame-span diagnostic printed on a near miss, which was wrong in its first
 form (it compared an absolute `end_index` against a bare frame duration, so
 every cleanly-read frame reported as ~1.2x and looked like a false sync
 lock) and had to be fixed separately in each copy.
+
+## Documentation
+
+- [`LINK.md`](LINK.md) describes the link protocol, ARQ, negotiation,
+  and local TCP interface.
+- [`FRAMING.md`](FRAMING.md) describes modulation profiles, coding,
+  framing, synchronization, error detection, and on-air timing.
+- [`GOALS.md`](GOALS.md) describes the project's goals and architectural
+  direction.
 
 ## Where the time goes
 
@@ -152,19 +162,12 @@ leaves the two ends disagreeing -- and a retransmit repeats a
 disagreement, it does not repair it. Two of those used to be
 unrecoverable, and neither could be reached by the test suite as it stood.
 
-**A lost MODE_ACK was session-fatal.** The responder moves its rx_profile
-when it sends the ack; the requester moves its tx_profile only when it
-receives one. Lose that frame and the peer transmits at a profile the
-responder has stopped listening for -- and the only way to notice is to
-decode a frame, which is exactly what has become impossible. Every DATA
-frame then failed and the session died. `rx_profile` is now a hint rather
-than an assertion: the pre-step profile stays a decode candidate until a
-data frame settles it, and a decoded DATA/DATA_ACK is treated as ground
-truth about what the peer is really sending. Recovery takes one frame,
-whichever end lost the ack. Note which cases were fatal -- 600<->1200 and
-any step down to the control profile. Stepping *up* from 300 always
-limped on, because 300 is the control profile and every station always
-tries it, and that is why the bug survived so long.
+**Mode changes no longer have a separate control exchange.** The ISS changes
+its own DATA mode and the IRS searches every mutually advertised mode. The
+next DATA_ACK carries the mode in which DATA decoded, confirming delivery and
+speed together. After three unanswered attempts, the ISS steps down and
+retries the same sequence at the lower speed; this works even when no frame at
+the previous speed reached the IRS.
 
 **A lost CONNECT_ACK left the session half open.** The caller retried into
 a listener that had already returned from `listen_once`, where nothing
@@ -187,38 +190,35 @@ build across that change.
 It is measured, not guessed: the worst silence a healthy session produces
 is a full MAX_RETRIES cycle, which timed at **44.4s** on the bench against
 the 34.8s the ACK-timeout arithmetic predicts -- the five retransmissions'
-own airtime and turnaround land inside the same silence. Plus an
-unanswered mode step (4.3s) that puts the worst legitimate quiet at ~49s,
-and the constant a little over 3x that. See `scripts/measure_peer_gap.py`.
+own airtime and turnaround land inside the same silence. The 150s constant
+is a little over 3x that. See `scripts/measure_peer_gap.py`.
 It deliberately does not keep an *idle* session alive; that would need a
 keepalive probe, and every keepalive is a keying.
 
 ### Reproducing frame loss on the bench
 
 A real channel cannot be told to lose a chosen frame. But from the peer's
-side a MODE_ACK that was never sent is indistinguishable from one that was
-sent and lost, so loss is reproduced by suppressing the transmission.
-Three environment hooks in `whale/link.py` do this, all off by default and
+side a frame that was never sent is indistinguishable from one that was sent
+and lost, so loss is reproduced by suppressing the transmission. Three
+environment hooks in `whale/link.py` do this, all off by default and
 all invisible on air; the software tests drive the same code, so the bench
 and the suite exercise one mechanism rather than two:
 
 ```
-WHALE_DROP_PTYPE=MODE_ACK,CONNECT_ACK   packet types not to transmit
+WHALE_DROP_PTYPE=DATA_ACK,CONNECT_ACK   packet types not to transmit
 WHALE_DROP_NTH=1                        which occurrences (or "all")
 WHALE_FORCE_MODE=1                      start a session at a chosen profile
 WHALE_MODE_STEP_SCRIPT=1:up             step at a chosen chunk, not by luck
 ```
 
 `scripts/run_acceptance_test.py` takes `--a-env`/`--b-env` to set them per
-station, which is what the scenarios need -- "the responder loses its
-MODE_ACK" is a different run from "both ends lose one":
+station. For example, suppressing the first three DATA frames forces the
+silent-downgrade path:
 
 ```
 python scripts/run_acceptance_test.py --log-dir logs/b1 --size 512 \
-    --a-env WHALE_FORCE_MODE=1 --a-env WHALE_MODE_STEP_SCRIPT=1:up \
-    --a-env WHALE_DROP_PTYPE=MODE_ACK \
-    --b-env WHALE_FORCE_MODE=1 --b-env WHALE_MODE_STEP_SCRIPT=1:up \
-    --b-env WHALE_DROP_PTYPE=MODE_ACK
+    --a-env WHALE_FORCE_MODE=1 --a-env WHALE_DROP_PTYPE=DATA \
+    --a-env WHALE_DROP_NTH=1,2,3
 ```
 
 ## Why CPFSK, why these numbers
@@ -245,9 +245,9 @@ explanation (the detector integrates one symbol, so a tone below the baud
 rate gives it less than a full cycle) are in `PROFILE_1200`'s comment in
 `whale/afsk.py`.
 
-Frames carry a 63-bit PN sync word, a 16-bit length, the
-payload, a CRC16, and short blocks of on-air padding before the sync word
-and after the CRC, so that settling artifacts at either end of a
+Frames carry a duration-scaled PN sync word, a 16-bit length, the
+payload, a CRC16, and known PN padding before the sync word and after the CRC,
+so that settling artifacts at either end of a
 transmission eat padding rather than real bits. See the docstrings in
 `whale/afsk.py` and `whale/framing.py` for the details, and
 `whale/link.py` / `whale/transport.py` for the half-duplex, self-echo, and
@@ -255,14 +255,15 @@ WASAPI quirks this radio pair required working around.
 
 ## Air time
 
-Everything held around a frame -- PTT lead-in, the two padding blocks, PTT
-tail -- is dead air, and all of it is measured rather than guessed:
-`scripts/sweep_ptt_timing.py` sweeps each allowance over the real radios in
-both directions and lets the worst direction decide. The constants it
-produced live in `whale/transport.py` (`PTT_LEAD`/`PTT_TAIL`) and
-`whale/framing.py` (`HEAD_PAD_SECONDS`/`TAIL_PAD_SECONDS`), each with the
-measurement behind it in a comment. Re-run the sweep after any change to
-the radios, the audio chain, or the PTT wiring.
+Leading and trailing clipping protection is entirely in-band: every PTT keying
+carries one second from distinct, protocol-fixed PN sequences before its first
+sync and after its final CRC, rounded upward to a whole symbol. Unlike the old
+alternating pads, these sequences make alignment and head-versus-tail identity
+unambiguous for adaptive-timing measurements. PTT is asserted immediately
+before output-stream setup and released immediately after confirmed playout;
+there is no configured carrier-only lead or tail sleep. This deliberately
+conservative baseline is intended to be replaced by connection-time adaptive
+timing.
 
 Re-run it in earnest, too. Swapping the bench HT -- a Wouxun KG-UV9D Plus,
 briefly replaced by a Baofeng UV-B5 -- broke `PROFILE_1200` in one
@@ -296,12 +297,10 @@ Two lessons for a new radio, both of which cost time here: a profile can
 fail with a clean channel underneath it, and a timing allowance that
 nothing on the bench needs is not thereby margin.
 
-The binding constraint is the transmitter: the IC-705 takes 129-310ms
-(variable, 28 samples) between the CI-V key command and being usably on
-air, which is most of the ~430ms of lead-in. The trailing side costs
-almost nothing by comparison.
+The measured IC-705 startup variation is now absorbed by the transmitted head
+symbols rather than a carrier-only PTT lead.
 
-Note that `link.TX_TURNAROUND_DELAY` -- a 1s pause *before* keying -- is
+Note that `link.TX_TURNAROUND_DELAY` -- a nominal 0.4s pause before keying -- is
 not air time, but it is now the largest single delay per frame, and it has
 not had the same measurement treatment.
 
@@ -316,26 +315,28 @@ we hold the carrier; and the decoder has no timing recovery, so its
 tolerance to sample-clock offset falls as `0.5/n_bits` and long frames are
 the first thing a clock difference takes away.
 
-So a keying is capped in *duration* -- `afsk.MAX_KEYING_SECONDS`, 3.0s,
-measured PTT key-down to PTT release -- and every profile's `chunk_size` is
-whatever fits inside that cap at its baud rather than a number picked per
-profile (`afsk.max_chunk_for_keying`):
+Useful framed audio is capped at three seconds by
+`afsk.MAX_USEFUL_FRAME_SECONDS`. This includes sync, length, payload, and CRC
+across the checked header and optional body, but excludes the outer timing pads and
+transport startup. Every profile's `chunk_size` is whatever fits that useful
+budget (`afsk.max_chunk_for_useful_frame`). Total PTT occupancy is separate
+because adaptive head/tail timing will make it radio-pair dependent:
 
-| profile | chunk | AFSK payload | frame | keying | payload bits/s |
+| profile | chunk | AFSK payload | useful | current keying | payload bits/s |
 |---------|-------|--------------|-------|--------|----------------|
-| 300 baud  |  75 |  77 | 2.56s | 2.99s | 201 |
-| 600 baud  | 157 | 159 | 2.56s | 3.00s | 419 |
-| 1200 baud | 320 | 322 | 2.57s | 3.00s | 855 |
+| 300 baud  |  88 |  88 | 2.98s | 5.14s | 137 |
+| 600 baud  | 193 | 193 | 3.00s | 5.16s | 299 |
+| 1200 baud | 402 | 402 | 3.00s | 5.16s | 623 |
 
 Three things worth knowing about that table:
 
-  - **3.0s is chosen, not measured.** None of the three reasons above has a
+  - **3.0s of useful audio is chosen, not measured.** None of the three reasons above has a
     cliff in it, so the figure is round rather than derived, and it is the
     knob to turn if the trade changes. If a radio ever does impose a hard
     limit -- some receivers mute themselves periodically to scan, on a timer
     set at the *far* station where this modem can neither see nor change it
     -- that would be a measurement, and it would replace this.
-  - **1200 baud used to be capped by the format, not the clock.** 3.0s of
+  - **1200 baud used to be capped by the format, not the clock.** The former 3.0s of
     air there carries 322 bytes, but the length field was 8 bits, so the
     chunk stopped at 253 and most of a second of every keying went unspent.
     The field is 16 bits now (`framing.LENGTH_FIELD_BITS`) and the budget
@@ -355,25 +356,15 @@ Three things worth knowing about that table:
     measure 3.4 ppm apart, so this costs nothing here, but it is the first
     thing to check on hardware whose clocks are not that close.
 
-The budget is spent on `transport.PTT_LEAD` + the output stream's
-`STREAM_FILL` + `transport.PTT_TAIL` (0.43s in total) before any frame bits
-are paid for, and `whale/afsk.py` cannot import those without dragging the
-sound-card stack into the DSP module. `whale/transport.py` therefore
-asserts at import that its own constants still sum to
-`afsk.KEYING_OVERHEAD_SECONDS`; if that fires, the chunk sizes derived from
-it are over budget and need re-deriving, not silencing.
-
-That 0.43s is measured, and measuring it mattered: it was first reasoned at
-0.40 from `audio_io`'s requested stream latency, which made every derived
-chunk ~20ms too big for the cap. Every transmission logs `Ns audio, Ms
-keyed`, so an acceptance run reads the real figure straight off -- 0.42-0.43s
-over 88 keyings across two runs, both radios, all three profiles, every
-frame type, with no value outside that range. Re-read it after any change to
-the audio chain, the same as `sweep_ptt_timing.py`'s constants.
+The output stream contributes about 0.16s of startup/fill time to total
+occupancy, but not to the useful-frame restriction. A packet contains one sync
+and one continuous waveform. Its header and optional body have separate CRCs,
+and the one-second head and tail pads remain outer-keying protection. The
+conservative pads increase total occupancy without reducing useful payload.
 
 Both runs passed 1 KB each way byte-for-byte with **no retransmit, no
 near-miss decode and no rx-profile correction** on either leg. Those runs
-predate the move to a 3.0s cap and the 16-bit length field, so their chunk
+predate the move to the duration-derived cap and the 16-bit length field, so their chunk
 sizes were smaller than the table above; the acceptance run should be
 repeated at the current sizes.
 
@@ -409,6 +400,7 @@ name matching, PTT wiring, COM ports) is configured in `whale/hw/radios.py`.
 Software-only self-tests (no radios needed):
 
 ```
+pytest tests/test_audio_e2e.py -q       # full TCP stack over paired audio samples
 python tests/test_afsk_loopback.py
 python tests/test_link_recovery.py
 ```
@@ -428,6 +420,20 @@ python -m whale.vara_server --radio ic705 --mycall STA1 --cmd-port 8300 --data-p
 python -m whale.vara_server --radio ht    --mycall STA2 --cmd-port 8310 --data-port 8311
 python acceptance_test.py --a-cmd 8300 --a-data 8301 --b-cmd 8310 --b-data 8311 --a-call STA1 --b-call STA2
 ```
+
+## Radio and PTT configuration
+
+Radio hardware is selected from a TOML inventory rather than requiring a
+source edit. See `radios.example.toml`, then run the server with
+`--radio-config PATH --radio NAME` (or set `WHALE_RADIO_CONFIG`). Each entry
+selects an audio-device substring, a PTT backend, backend-specific settings,
+and backend-specific settings.
+
+Built-in backends are `icom-civ`, `serial-line` (RTS or DTR), `hamlib`, and
+`vox`. External packages can provide GPIO, USB-interface, CAT, or other
+station-specific implementations with a `whalemodem.ptt_backends` Python
+entry point. Its object implements `PttBackend` from
+`whale.hw.ptt_backends`; applications may also call `register_backend()`.
 
 ## VARA-API surface implemented
 
@@ -453,6 +459,6 @@ bandwidth selection, WINLINK-specific extensions.
 - Chunk size is fixed per profile -- the largest that fits the keying
   budget, see "How long one keying may be" -- and timeouts derive from it,
   but neither adapts to how the channel is actually behaving. A lost frame
-  costs a whole chunk to resend, and at 1200 baud that is now 325 bytes.
+  costs a whole chunk to resend, and at 1200 baud that is now 402 bytes.
 - Throughput is low; this was optimized for correctness on noisy real
   hardware, not speed.

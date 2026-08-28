@@ -1,109 +1,67 @@
-"""Which radios are on this bench, and how to reach each one.
-
-This is the single place that knows bench-specific facts -- device names, USB
-IDs, CI-V addresses. audio_io.py and ptt.py hold only the mechanism (find a
-WASAPI device, key a radio); every test and sweep script selects a radio by
-name from RADIOS here.
-
-To add a radio, append one Radio to RADIOS: give it the substring Windows
-shows for its sound card and a zero-argument callable that opens its PTT.
-
-Copied from radiomodem's shark/hw/radios.py (unchanged).
-"""
-
-from dataclasses import dataclass
-from functools import partial
-from typing import Callable
-
-from . import audio_io
-from . import ptt
-
-# Both Icoms use the same generic "USB Audio CODEC" chip and are told apart
-# only by the model name Windows prefixes to it ("IC-705 (USB Audio CODEC )"
-# vs "IC-7300 (2- USB Audio CODEC )"). Match on the model, never on the "2-"
-# enumeration-order prefix, which moves when devices are replugged.
-IC705_AUDIO = "IC-705"
-IC7300_AUDIO = "IC-7300"
-HT_AUDIO = "USB Audio Device"
-
-# The Digirig has no distinguishing USB ID worth probing, so its port stays
-# pinned here; the Icoms are discovered by USB ID inside ptt.py.
-HT_PTT_PORT = "COM5"
-
+"""Configured radios: audio-device selection plus a pluggable PTT backend."""
+from __future__ import annotations
+from dataclasses import dataclass, field
+import os
+from pathlib import Path
+try:
+    import tomllib
+except ModuleNotFoundError:  # pragma: no cover - compatibility for dev Python 3.10
+    import tomli as tomllib
+from typing import Any, Mapping
+from . import audio_io, ptt
+from .ptt_backends import PttCapabilities, available_backends, open_backend
 
 @dataclass(frozen=True)
 class Radio:
-    """One radio: a sound card to match, and a way to key it."""
-
     name: str
     description: str
     audio_name: str
-    open_ptt: Callable[[], object]
+    ptt_backend: str
+    ptt_config: Mapping[str, Any] = field(default_factory=dict)
+
+    @property
+    def capabilities(self) -> PttCapabilities:
+        return available_backends()[self.ptt_backend].capabilities
 
     def devices(self):
-        """Returns (output_device_index, input_device_index) for this radio."""
-        return (
-            audio_io.find_device(self.audio_name, "output"),
-            audio_io.find_device(self.audio_name, "input"),
-        )
+        return (audio_io.find_device(self.audio_name, "output"), audio_io.find_device(self.audio_name, "input"))
 
     def ptt(self):
-        """Opens and returns this radio's PTT control."""
-        return self.open_ptt()
+        return open_backend(self.ptt_backend, self.ptt_config)
 
+def _radio(name: str, value: Mapping[str, Any]) -> Radio:
+    ptt_value = value.get("ptt", {})
+    try:
+        backend, audio_name = ptt_value["backend"], value["audio_name"]
+    except (KeyError, TypeError):
+        raise ValueError(f"radio {name!r} requires audio_name and ptt.backend") from None
+    config = {key: item for key, item in ptt_value.items() if key != "backend"}
+    return Radio(name, value.get("description", name), audio_name, backend, config)
 
+def load_radios(path: str | os.PathLike[str]) -> dict[str, Radio]:
+    """Load ``[radios.NAME]`` tables from a TOML inventory."""
+    with Path(path).open("rb") as stream:
+        document = tomllib.load(stream)
+    values = document.get("radios")
+    if not isinstance(values, dict) or not values:
+        raise ValueError(f"{path} contains no [radios.NAME] tables")
+    return {name: _radio(name, value) for name, value in values.items()}
+
+# Compatibility inventory for the original bench. Installations should use
+# an external file selected by --radio-config or WHALE_RADIO_CONFIG.
 RADIOS = {
-    radio.name: radio
-    for radio in [
-        Radio(
-            name="ic705",
-            description="IC-705 (VHF), CI-V PTT over its USB CDC port",
-            audio_name=IC705_AUDIO,
-            open_ptt=partial(
-                ptt.open_icom_ptt, ptt.IC705_USB_ID, "IC-705", ptt.IC705_DEFAULT_ADDR
-            ),
-        ),
-        Radio(
-            name="ic7300",
-            description="IC-7300 (HF), CI-V PTT over its CP210x USB-UART bridge",
-            audio_name=IC7300_AUDIO,
-            open_ptt=partial(
-                ptt.open_icom_ptt, ptt.IC7300_USB_ID, "IC-7300", ptt.IC7300_DEFAULT_ADDR
-            ),
-        ),
-        Radio(
-            name="ht",
-            # A Wouxun KG-UV9D Plus. Worth naming, because constants
-            # elsewhere are sized against whatever is plugged in here, and
-            # two different HTs have each broken this modem in a different
-            # way on a few-hundred-millisecond timescale:
-            #
-            #   Wouxun KG-UV9D Plus  priority scan muting its receiver
-            #                        ~280ms every ~3s (see the README).
-            #                        Fixed by turning the setting off.
-            #   Baofeng UV-B5        blacks out ~110ms after its squelch
-            #                        opens. On the bench for a few hours on
-            #                        2026-08-18; framing.HEAD_PAD_SECONDS
-            #                        and framing.SYNC_SECONDS are both sized
-            #                        from it, so those figures describe a
-            #                        radio this bench can no longer produce.
-            #
-            # The Baofeng was swapped back out because its battery was
-            # failing, which showed up as its transmit dropping ~20dB
-            # intermittently -- worth recognising, since a dying HT battery
-            # and a genuine modem regression look identical from the logs.
-            # scripts/probe_tx_duration_dropout.py in the git history and a
-            # tone-ladder sweep both separate them in a couple of minutes:
-            # a bad battery moves every frequency at once and shows up on
-            # raw tones, with no framing involved.
-            #
-            # Re-run scripts/sweep_ptt_timing.py, scripts/measure_snr.py and
-            # the acceptance test whenever this changes. Both failures above
-            # were found the hard way, after a swap, by a profile breaking
-            # rather than by anyone looking.
-            description="HT (Wouxun KG-UV9D Plus) via a Digirig-style interface, PTT on RTS",
-            audio_name=HT_AUDIO,
-            open_ptt=partial(ptt.LinePtt, HT_PTT_PORT, line="rts"),
-        ),
-    ]
+    "ic705": Radio("ic705", "IC-705 (VHF), CI-V PTT", "IC-705", "icom-civ", {"usb_id": "0C26:0036", "radio_name": "IC-705", "address": ptt.IC705_DEFAULT_ADDR}),
+    "ic7300": Radio("ic7300", "IC-7300 (HF), CI-V PTT", "IC-7300", "icom-civ", {"usb_id": "10C4:EA60", "radio_name": "IC-7300", "address": ptt.IC7300_DEFAULT_ADDR}),
+    "ht": Radio("ht", "HT via serial-interface RTS", "USB Audio Device", "serial-line", {"port": "COM5", "line": "rts"}),
 }
+
+def radio_inventory(path: str | os.PathLike[str] | None = None) -> dict[str, Radio]:
+    configured = path or os.environ.get("WHALE_RADIO_CONFIG")
+    return load_radios(configured) if configured else dict(RADIOS)
+
+def get_radio(name: str, path: str | os.PathLike[str] | None = None) -> Radio:
+    inventory = radio_inventory(path)
+    try:
+        return inventory[name]
+    except KeyError:
+        raise ValueError(f"unknown radio {name!r}; have {sorted(inventory)}") from None

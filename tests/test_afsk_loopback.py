@@ -9,6 +9,7 @@ import time
 import numpy as np
 
 from whale import afsk, framing, link, mode_history
+from whale.waveform import ModeRegistry
 
 # The two-Link-in-one-process harness these tests share with
 # tests/test_link_recovery.py.
@@ -27,6 +28,27 @@ def test_framing_roundtrip():
         decoded = framing.parse_frame_bits(bits[after_sync:])
         assert decoded == payload, (len(payload), len(decoded or b""))
     print("test_framing_roundtrip OK")
+
+
+def test_link_header_and_body_have_independent_crcs():
+    header, body = link._encode_air_header(link.PT_DATA, afsk.PROFILE_600.mode_id,
+                                           b"\x07payload")
+    bits = framing.build_frame_bits(header + body, baud=600,
+                                    include_head=False, include_tail=False)
+    after_sync = bits[len(framing.sync_bits(600)):]
+    assert framing.header_is_valid(after_sync) is True
+    assert framing.parse_frame_bits(after_sync) == header + body
+
+    bad_header = after_sync.copy()
+    bad_header[framing.LENGTH_FIELD_BITS + 3] ^= 1
+    assert framing.header_is_valid(bad_header) is False
+
+    bad_body = after_sync.copy()
+    body_start = (framing.LENGTH_FIELD_BITS
+                  + 8 * framing.AIR_HEADER_BYTES + 16)
+    bad_body[body_start + 3] ^= 1
+    assert framing.header_is_valid(bad_body) is True
+    assert framing.parse_frame_bits(bad_body) is None
 
 
 def test_sync_words_are_full_period_m_sequences():
@@ -140,12 +162,12 @@ def test_a_lock_survives_losing_the_opening_of_the_sync_word():
 
 
 def test_every_keying_fits_the_budget_and_uses_it():
-    """No transmission this modem makes may outlast afsk.MAX_KEYING_SECONDS,
+    """No useful DATA framing may outlast afsk.MAX_USEFUL_FRAME_SECONDS,
     and every DATA frame should come as close to it as the format allows.
 
     Both halves matter. The cap bounds how long the transmitter holds the
     channel, which sets the cost of a single retransmit and the floor under
-    turnaround -- see afsk.MAX_KEYING_SECONDS. The tightness is the
+    turnaround -- see afsk.MAX_USEFUL_FRAME_SECONDS. The tightness is the
     throughput: chunk sizes are derived from the budget rather than chosen,
     so a profile leaving room for another whole byte means the derivation
     has drifted from the arithmetic, not that someone made a judgement
@@ -155,9 +177,9 @@ def test_every_keying_fits_the_budget_and_uses_it():
     so the smaller frame types are checked too rather than assumed."""
     for profile in afsk.PROFILES:
         payload = production_payload_bytes(profile)
-        keying = afsk.keying_seconds(payload, profile)
-        assert keying <= afsk.MAX_KEYING_SECONDS + 1e-9, \
-            (profile.name, payload, round(keying, 3))
+        useful = afsk.useful_data_seconds(payload, profile)
+        assert useful <= afsk.MAX_USEFUL_FRAME_SECONDS + 1e-9, \
+            (profile.name, payload, round(useful, 3))
 
         # One more byte must not fit. This used to be conditional, because
         # at 1200 baud what stopped us was the 8-bit length field rather
@@ -165,17 +187,12 @@ def test_every_keying_fits_the_budget_and_uses_it():
         # binds at every profile and the exemption is gone.
         assert payload < framing.MAX_PAYLOAD_BYTES, \
             f"{profile.name} is capped by the length field again, not the clock"
-        assert afsk.keying_seconds(payload + 1, profile) > afsk.MAX_KEYING_SECONDS, \
+        assert afsk.useful_data_seconds(payload + 1, profile) > afsk.MAX_USEFUL_FRAME_SECONDS, \
             f"{profile.name} leaves room for a bigger chunk than {profile.chunk_size}"
 
-        # DATA_ACK (2 seq bytes + type) and the control-plane estimate, both
-        # of which key the radio up like anything else.
-        for small in (3, link._CONTROL_FRAME_LEN_ESTIMATE):
-            assert afsk.keying_seconds(small, profile) <= afsk.MAX_KEYING_SECONDS, \
-                (profile.name, small)
     print("test_every_keying_fits_the_budget_and_uses_it OK "
           + ", ".join(f"{p.name} {p.chunk_size}B/"
-                      f"{afsk.keying_seconds(production_payload_bytes(p), p):.2f}s"
+                      f"{afsk.useful_data_seconds(production_payload_bytes(p), p):.2f}s useful"
                       for p in afsk.PROFILES))
 
 
@@ -186,7 +203,93 @@ def test_afsk_clean_loopback():
     result = afsk.demodulate(tx)
     assert result["synced"], result
     assert result["payload"] == payload, (result["payload"], payload)
+    assert result["head_symbols_received"] == len(framing.head_pad_bits(300))
+    assert result["tail_symbols_received"] == len(framing.tail_pad_bits(300))
     print("test_afsk_clean_loopback OK")
+
+
+def test_outer_pads_are_distinct_full_period_pn_sequences():
+    period = (1 << framing._PAD_LFSR_ORDER) - 1
+    head = framing._lfsr_bits(period, framing._PAD_LFSR_ORDER,
+                              framing._HEAD_PAD_TAPS,
+                              seed=framing._PAD_LFSR_SEED)
+    tail = framing._lfsr_bits(period, framing._PAD_LFSR_ORDER,
+                              framing._TAIL_PAD_TAPS,
+                              seed=framing._PAD_LFSR_SEED)
+    assert head != tail
+    assert len(set(head)) == len(set(tail)) == 2
+
+    # A full m-sequence visits every nonzero state exactly once before it
+    # returns to the seed. Check the state cycle, not just the output bits.
+    def state_period(taps):
+        state = framing._PAD_LFSR_SEED
+        seen = set()
+        while state not in seen:
+            seen.add(state)
+            feedback = 0
+            for tap in taps:
+                feedback ^= (state >> (tap - 1)) & 1
+            state = ((state >> 1)
+                     | (feedback << (framing._PAD_LFSR_ORDER - 1)))
+        assert state == framing._PAD_LFSR_SEED
+        return len(seen)
+
+    assert state_period(framing._HEAD_PAD_TAPS) == period
+    assert state_period(framing._TAIL_PAD_TAPS) == period
+
+    for profile in afsk.PROFILES:
+        h = framing.head_pad_bits(profile.baud)
+        t = framing.tail_pad_bits(profile.baud)
+        assert h != t
+        assert abs(sum(h) / len(h) - 0.5) < 0.1
+        assert abs(sum(t) / len(t) - 0.5) < 0.1
+    print("test_outer_pads_are_distinct_full_period_pn_sequences OK")
+
+
+def test_outer_symbol_measurements_report_clipping():
+    payload = b"outer timing probe"
+    profile = afsk.PROFILE_300
+    sps = round(afsk.SAMPLE_RATE / profile.baud)
+    head_clipped = 17
+    tail_clipped = 23
+    audio = afsk.modulate(payload, profile=profile)
+    clipped = audio[head_clipped * sps:len(audio) - tail_clipped * sps]
+    # Continuous capture continues after a transmitter is clipped/unkeyed.
+    clipped = np.concatenate([clipped, np.zeros(len(audio))])
+    result = afsk.demodulate(clipped, profile=profile)
+    assert result["payload"] == payload, result
+    expected_head = len(framing.head_pad_bits(profile.baud)) - head_clipped
+    expected_tail = len(framing.tail_pad_bits(profile.baud)) - tail_clipped
+    # Window look-ahead may discard up to one full suspect window, but must
+    # never credit clipped symbols as received.
+    assert expected_head - afsk.PAD_MATCH_WINDOW_SYMBOLS < result["head_symbols_received"] <= expected_head
+    assert expected_tail - afsk.PAD_MATCH_WINDOW_SYMBOLS < result["tail_symbols_received"] <= expected_tail
+    print("test_outer_symbol_measurements_report_clipping OK")
+
+
+def test_outer_symbol_measurements_tolerate_isolated_errors():
+    payload = b"outer timing probe"
+    profile = afsk.PROFILE_300
+    sps = round(afsk.SAMPLE_RATE / profile.baud)
+    bits = framing.build_frame_bits(payload, baud=profile.baud)
+    head_len = len(framing.head_pad_bits(profile.baud))
+    tail_len = len(framing.tail_pad_bits(profile.baud))
+
+    # Two errors in each 16-symbol boundary window are within the policy.
+    for offset in (3, 12):
+        bits[head_len - offset] ^= 1
+    for offset in (4, 13):
+        bits[len(bits) - tail_len + offset] ^= 1
+
+    audio = afsk._apply_ramp(
+        0.6 * afsk._cpfsk_tone(bits, sps, afsk.SAMPLE_RATE,
+                               profile.freq0, profile.freq1),
+        afsk.SAMPLE_RATE).astype(np.float32)
+    result = afsk.demodulate(audio, profile=profile)
+    assert result["payload"] == payload, result
+    assert result["head_symbols_received"] == head_len
+    assert result["tail_symbols_received"] == tail_len
+    print("test_outer_symbol_measurements_tolerate_isolated_errors OK")
 
 
 def test_afsk_noisy_delayed_loopback():
@@ -231,9 +334,9 @@ ASSUMED_WORST_CASE_PPM = 500
 
 # The production frame: link.py sends chunk_size bytes of payload plus its
 # own type/seq header. This is per profile rather than one number now that
-# chunk_size is derived from the keying-length budget -- 80, 172 and 357
+# chunk_size is derived from the useful-frame budget -- 78, 161 and 326
 # bytes of AFSK payload at 300, 600 and 1200 baud, all three landing on a
-# keying of at most afsk.MAX_KEYING_SECONDS. Derived rather than restated so
+# useful frame of at most afsk.MAX_USEFUL_FRAME_SECONDS. Derived rather than restated so
 # these tests keep measuring what the link actually sends.
 def production_payload_bytes(profile):
     return profile.chunk_size + afsk.DATA_FRAME_HEADER_BYTES
@@ -399,9 +502,9 @@ def test_decodes_at_production_size_under_bench_clock_offset():
     decoder's half-symbol budget is 0.5/n_bits, so each profile's production
     frame has its own tolerance --
 
-        300 baud    80 bytes    735 bits    ~680 ppm
-        600 baud   172 bytes   1471 bits    ~340 ppm
-       1200 baud   357 bytes   2951 bits    ~169 ppm
+        300 baud    78 bytes   1319 bits    ~379 ppm
+        600 baud   161 bytes   2647 bits    ~189 ppm
+       1200 baud   326 bytes   5295 bits     ~94 ppm
 
     -- and the two faster profiles are the ones that cannot hold 500. Note
     the shape: the frames are sized by *airtime*, so a faster profile spends
@@ -584,10 +687,18 @@ def test_connect_body_roundtrip():
 
 def test_connect_ack_body_roundtrip():
     body = link._encode_connect_ack("STA2", "STA1", [0, 1, 2], 1, 0, 0x5A)
-    a, b, supported, accepted_id, own_id, session = link._decode_connect_ack(body)
-    assert (a, b, supported, accepted_id, own_id, session) == \
-        ("STA2", "STA1", [0, 1, 2], 1, 0, 0x5A), \
-        (a, b, supported, accepted_id, own_id, session)
+    decoded = link._decode_connect_ack(body)
+    assert decoded == ("STA2", "STA1", [0, 1, 2], 1, 0, 0x5A), decoded
+
+
+def test_timing_measurements_derive_guarded_session_pads():
+    baud = afsk.CONTROL_PROFILE.baud
+    body = link._encode_timing(0x5A, 270, 297)
+    assert link._decode_timing(body) == (0x5A, 230, 253)
+    head, tail = link._derive_timing(230, 253, baud)
+    assert abs(head - (25 / 255 + 0.05)) < 1e-9, head
+    assert abs(tail - (2 / 255 + 0.03)) < 1e-9, tail
+    print("test_timing_measurements_derive_guarded_session_pads OK")
     print("test_connect_ack_body_roundtrip OK")
 
 
@@ -598,16 +709,63 @@ def test_negotiate_mode():
     print("test_negotiate_mode OK")
 
 
-def test_mode_change_packet_roundtrip():
-    """PT_MODE_REQ/PT_MODE_ACK bodies through modulate/demodulate at
-    PROFILE_600 -- confirms the existing framing/codec machinery, already
-    profile-parameterized, works unchanged at a non-control profile."""
-    for ptype in (link.PT_MODE_REQ, link.PT_MODE_ACK):
-        payload = bytes([ptype, afsk.PROFILE_600.mode_id])
-        tx = afsk.modulate(payload, profile=afsk.PROFILE_600)
-        result = afsk.demodulate(tx, profile=afsk.PROFILE_600)
-        assert result["payload"] == payload, (ptype, result)
-    print("test_mode_change_packet_roundtrip OK")
+def test_link_uses_waveform_mode_contract():
+    """Link dispatches through a mode's codec rather than CPFSK directly."""
+    class SpyCodec:
+        sample_rate = afsk.SAMPLE_RATE
+
+        def __init__(self):
+            self.encoded = 0
+            self.decoded = 0
+
+        def encode(self, payload, profile, *, include_head=True, include_tail=True,
+                   head_seconds=framing.HEAD_PAD_SECONDS,
+                   tail_seconds=framing.TAIL_PAD_SECONDS):
+            self.encoded += 1
+            return afsk.modulate(payload, profile=profile, include_head=include_head,
+                                 include_tail=include_tail, head_seconds=head_seconds,
+                                 tail_seconds=tail_seconds)
+
+        def decode(self, audio, profile, **kwargs):
+            self.decoded += 1
+            return afsk.demodulate(audio, profile=profile, **kwargs)
+
+        def airtime(self, payload_len, profile):
+            return afsk.frame_seconds(payload_len, profile)
+
+    codec = SpyCodec()
+    custom = afsk.Profile(
+        name="custom-waveform", mode_id=42, baud=600, freq0=700, freq1=1500,
+        chunk_size=80, codec=codec)
+    registry = ModeRegistry((afsk.PROFILE_300, custom), afsk.PROFILE_300)
+    ta, tb = _FakeTransport(), _FakeTransport()
+    ta.peer, tb.peer = tb, ta
+    a = link.Link(ta, "STA1", mode_registry=registry)
+    b = link.Link(tb, "STA2", mode_registry=registry)
+    a._apply_tx_profile(custom)
+    b._apply_rx_profile(custom)
+    a._await_turnaround = lambda: None
+
+    a._tx_packet(link.PT_DATA, bytes([link.EOF_BIT]) + b"contract")
+    assert codec.encoded == 1
+    assert b._decode_one(tb.snapshot_rx())
+    assert codec.decoded >= 1
+    ptype, body = b._rx_packets.get_nowait()
+    assert ptype == link.PT_DATA
+    assert body[1:] == b"contract"
+    print("test_link_uses_waveform_mode_contract OK")
+
+
+def test_data_ack_carries_received_mode():
+    """The ACK identifies both the sequence result and DATA mode decoded."""
+    header, remainder = link._encode_air_header(
+        link.PT_DATA_ACK, afsk.CONTROL_PROFILE.mode_id,
+        bytes([7, 8, afsk.PROFILE_600.mode_id]))
+    assert len(remainder) == 1
+    decoded = link._decode_air_header(header)
+    assert decoded[-1] == bytes([7, 8])
+    assert remainder == bytes([afsk.PROFILE_600.mode_id])
+    print("test_data_ack_carries_received_mode OK")
 
 
 def test_demodulate_returns_the_earliest_frame_not_the_loudest():
@@ -675,37 +833,27 @@ def test_seq_ahead_wraps():
     print("test_seq_ahead_wraps OK")
 
 
-def test_await_turnaround_is_anchored_on_peer_audio():
-    """The wait is measured from when the peer's audio ended, so time
-    already spent decoding does not get charged twice."""
+def test_await_turnaround_does_not_add_dead_air():
+    """Effective clipping is absorbed by the calibrated head sequence."""
     a = link.Link(_FakeTransport(), "STA1")
     saved = link.TX_TURNAROUND_DELAY
     link.TX_TURNAROUND_DELAY = 0.4
     try:
-        # An anchor from seconds ago does not mean the channel went quiet
-        # seconds ago -- it means we lost track of the peer that long ago,
-        # which is the worst moment to key up. Wait in full instead.
         a._peer_unkeyed_at = time.monotonic() - 5.0
         start = time.monotonic()
         a._await_turnaround()
-        assert time.monotonic() - start >= 0.35, "stale anchor must not skip the wait"
-
-        # Anchor is consumed, so the next transmission has nothing to
-        # measure from and waits the whole allowance.
+        assert time.monotonic() - start < 0.05
         assert a._peer_unkeyed_at is None
         start = time.monotonic()
         a._await_turnaround()
-        assert time.monotonic() - start >= 0.35, "no anchor should wait in full"
-
-        # A fresh anchor waits out only the remainder.
+        assert time.monotonic() - start < 0.05
         a._peer_unkeyed_at = time.monotonic() - 0.3
         start = time.monotonic()
         a._await_turnaround()
-        waited = time.monotonic() - start
-        assert 0.02 < waited < 0.25, waited
+        assert time.monotonic() - start < 0.05
     finally:
         link.TX_TURNAROUND_DELAY = saved
-    print("test_await_turnaround_is_anchored_on_peer_audio OK")
+    print("test_await_turnaround_does_not_add_dead_air OK")
 
 
 def test_link_multi_chunk_message_roundtrip():
@@ -798,7 +946,8 @@ def test_spare_ack_for_an_earlier_chunk_does_not_provoke_a_retransmit():
     # Waiting on 0x07. First the spare ack for 0x06 -- which names 0x07 as
     # what the peer wants next, exactly the value the frame in flight would
     # be acked with -- then the real answer.
-    a, keyings = _arq_sender([bytes([0x06, 0x07]), bytes([0x07, 0x08])])
+    mode = afsk.CONTROL_PROFILE.mode_id
+    a, keyings = _arq_sender([bytes([0x06, 0x07, mode]), bytes([0x07, 0x08, mode])])
     assert a._send_chunk_with_arq(0x07, b"aaaa", False) == 1
     assert len(keyings) == 1, f"{len(keyings)} keyings for one chunk -- retransmitted on a stale ACK"
     print("test_spare_ack_for_an_earlier_chunk_does_not_provoke_a_retransmit OK")
@@ -808,7 +957,7 @@ def test_ack_for_a_duplicate_still_advances_the_sender():
     """The other half of the same format: when the sender retransmits after
     a lost ACK, the peer's answer is about a frame it has already taken and
     moved past. That must still count as acked, or the transfer stalls."""
-    a, keyings = _arq_sender([bytes([0x07, 0x08])])
+    a, keyings = _arq_sender([bytes([0x07, 0x08, afsk.CONTROL_PROFILE.mode_id])])
     assert a._send_chunk_with_arq(0x07, b"aaaa", True) == 1
     print("test_ack_for_a_duplicate_still_advances_the_sender OK")
 
@@ -823,6 +972,97 @@ def test_unanswered_chunk_gives_up_after_max_retries():
     assert a._send_chunk_with_arq(0x07, b"aaaa", True) is None
     assert len(keyings) == link.MAX_RETRIES, keyings
     print("test_unanswered_chunk_gives_up_after_max_retries OK")
+
+
+def test_roles_assigned_at_connect():
+    """The connecting station starts holding the floor (ISS); the listener
+    starts waiting for it (IRS) -- mirroring how PACTOR/VARA/WINMOR-style ARQ
+    modems assign ISS/IRS at connect time rather than letting either side
+    originate DATA on a whim."""
+    a, b, ta, tb = _connected_pair()
+    try:
+        assert a.role == "ISS", a.role
+        assert b.role == "IRS", b.role
+        print("test_roles_assigned_at_connect OK")
+    finally:
+        a.stop()
+        b.stop()
+
+
+def test_irs_can_request_and_use_the_floor():
+    """The listening side (IRS) may not originate DATA until it asks the
+    connecting side (ISS) for the floor. send_message() must do that
+    transparently -- request, wait for grant, then send -- and both ends'
+    roles must flip once it's granted."""
+    a, b, ta, tb = _connected_pair()
+    try:
+        assert a.role == "ISS" and b.role == "IRS", (a.role, b.role)
+        data = bytes((i * 17 + 5) % 256 for i in range(300))
+        got = _transfer(b, a, data)  # b (IRS) sends, a (ISS) receives
+        assert got == data, (len(got or b""), len(data))
+        assert b.role == "ISS" and a.role == "IRS", (a.role, b.role)
+        print("test_irs_can_request_and_use_the_floor OK")
+    finally:
+        a.stop()
+        b.stop()
+
+
+def _pump_send_recv(link_, outbox, inbox, stop_event, timeout=0.3):
+    """Minimal stand-in for vara_server.py's session pump: alternates trying
+    to send whatever's queued in `outbox` (mutated like a list-backed queue)
+    with polling for incoming messages, appending anything received to
+    `inbox`. Used to reproduce the scenario that used to let both ends key up
+    DATA over each other -- both sides deciding to send at once -- without
+    pulling in vara_server.py's sockets."""
+    while not stop_event.is_set():
+        if outbox:
+            data = outbox.pop(0)
+            link_.send_message(data)
+            continue
+        msg = link_.recv_message(timeout=timeout)
+        if msg is not None:
+            inbox.append(msg)
+
+
+def test_concurrent_send_attempts_do_not_collide():
+    """Both sides decide to send at once -- the scenario that used to let
+    both key up PT_DATA over each other with nothing arbitrating who goes
+    first. With ISS/IRS roles, only the ISS may originate DATA; the IRS's
+    send_message() blocks acquiring the floor first instead of colliding
+    with it. Both messages must still arrive intact and neither pump loop
+    may raise."""
+    a, b, ta, tb = _connected_pair()
+    try:
+        a.control_ack_timeout = 0.3  # keep a lost floor request's retry fast
+        b.control_ack_timeout = 0.3
+
+        data_ab = bytes((i * 11 + 1) % 256 for i in range(300))
+        data_ba = bytes((i * 13 + 2) % 256 for i in range(300))
+
+        a_out, b_out = [data_ab], [data_ba]
+        a_in, b_in = [], []
+        stop_a, stop_b = threading.Event(), threading.Event()
+
+        thread_a = threading.Thread(target=_pump_send_recv, args=(a, a_out, a_in, stop_a))
+        thread_b = threading.Thread(target=_pump_send_recv, args=(b, b_out, b_in, stop_b))
+        thread_a.start()
+        thread_b.start()
+
+        deadline = time.monotonic() + 60
+        while time.monotonic() < deadline and not (a_in and b_in):
+            time.sleep(0.05)
+
+        stop_a.set()
+        stop_b.set()
+        thread_a.join(timeout=5)
+        thread_b.join(timeout=5)
+
+        assert a_in and a_in[0] == data_ba, "A never received B's message intact"
+        assert b_in and b_in[0] == data_ab, "B never received A's message intact"
+        print("test_concurrent_send_attempts_do_not_collide OK")
+    finally:
+        a.stop()
+        b.stop()
 
 
 def test_link_negotiation_and_mode_step():
@@ -865,15 +1105,15 @@ def test_link_negotiation_and_mode_step():
         assert a.peer_supported_modes == {p.mode_id for p in afsk.PROFILES}
         assert b.peer_supported_modes == {p.mode_id for p in afsk.PROFILES}
 
-        # Mid-session step down of A's tx (600 -> 300): B must be listening
-        # (recv_message) to catch and ack A's PT_MODE_REQ. B's own tx
-        # direction (already at the control profile) must be unaffected.
+        # A changes its own transmit mode locally. B discovers it from the
+        # next DATA and confirms that mode in DATA_ACK.
         def do_recv():
             b.recv_message(timeout=20)
 
         t = threading.Thread(target=do_recv)
         t.start()
-        a._request_mode_step(-1)
+        a._step_tx_mode(-1)
+        a.send_message(b"mode confirmation")
         t.join(timeout=20)
 
         assert a.tx_profile.mode_id == afsk.PROFILE_300.mode_id, a.tx_profile
@@ -892,6 +1132,8 @@ if __name__ == "__main__":
     test_a_lock_survives_losing_the_opening_of_the_sync_word()
     test_every_keying_fits_the_budget_and_uses_it()
     test_afsk_clean_loopback()
+    test_outer_pads_are_distinct_full_period_pn_sequences()
+    test_outer_symbol_measurements_tolerate_isolated_errors()
     test_afsk_noisy_delayed_loopback()
     test_clock_offset_simulation_is_faithful()
     test_decodes_through_a_small_clock_offset()
@@ -904,12 +1146,17 @@ if __name__ == "__main__":
     test_link_packet_roundtrip()
     test_connect_body_roundtrip()
     test_connect_ack_body_roundtrip()
+    test_timing_measurements_derive_guarded_session_pads()
     test_negotiate_mode()
-    test_mode_change_packet_roundtrip()
+    test_link_uses_waveform_mode_contract()
+    test_data_ack_carries_received_mode()
     test_demodulate_returns_the_earliest_frame_not_the_loudest()
     test_sync_confidence_does_not_depend_on_surrounding_silence()
     test_seq_ahead_wraps()
-    test_await_turnaround_is_anchored_on_peer_audio()
+    test_await_turnaround_does_not_add_dead_air()
+    test_roles_assigned_at_connect()
+    test_irs_can_request_and_use_the_floor()
+    test_concurrent_send_attempts_do_not_collide()
     test_spare_ack_for_an_earlier_chunk_does_not_provoke_a_retransmit()
     test_ack_for_a_duplicate_still_advances_the_sender()
     test_unanswered_chunk_gives_up_after_max_retries()

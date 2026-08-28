@@ -64,7 +64,8 @@ these numbers drift with the physical setup, not with anything in this
 module.
 """
 
-from dataclasses import dataclass
+from dataclasses import dataclass, field
+from typing import Protocol
 
 import numpy as np
 from scipy.signal import correlate
@@ -116,14 +117,12 @@ _ENERGY_FLOOR_FRACTION = 0.05
 # Fallback link-layer payload bytes per DATA frame, for an ad-hoc Profile
 # built by a sweep script that has no opinion about size. Every shipped
 # profile below sizes itself from the airtime budget instead -- see
-# max_chunk_for_keying.
+# max_chunk_for_useful_frame.
 CHUNK_SIZE = 40
 
-# What whale/link.py puts in front of the chunk inside a DATA frame's AFSK
-# payload: the packet type byte and the flags/sequence byte. Stated here
-# because the profiles' chunk_size is derived from an airtime budget, and
-# that budget is spent on the whole AFSK payload rather than on the chunk.
-DATA_FRAME_HEADER_BYTES = 2
+# DATA type and flags/sequence live in the checked packet header; the
+# negotiated body contains chunk bytes only.
+DATA_FRAME_HEADER_BYTES = 0
 
 # The longest frame the decoder will believe a declared length describes.
 #
@@ -147,7 +146,7 @@ DATA_FRAME_HEADER_BYTES = 2
 #
 # The property is therefore restored explicitly rather than left to
 # arithmetic that happened to work out. 8s is comfortably longer than any
-# keying this modem makes (MAX_KEYING_SECONDS is 3.0), with room to spare for
+# useful frame this modem makes (MAX_USEFUL_FRAME_SECONDS is 3.0), with room for
 # the sweep scripts, which deliberately transmit past that budget; and
 # comfortably shorter than transport.RX_BUFFER_SECONDS, so anything the
 # decoder does agree to wait for is something it can still be holding whole
@@ -160,6 +159,38 @@ def max_credible_frame_bits(baud):
     through inside MAX_CREDIBLE_FRAME_SECONDS. A declared length implying
     more than this is a dead sync, not a frame still arriving."""
     return int(MAX_CREDIBLE_FRAME_SECONDS * baud)
+
+
+class Codec(Protocol):
+    """Codec strategy used by a negotiable Profile."""
+
+    sample_rate: int
+
+    def encode(self, payload: bytes, profile: "Profile"): ...
+    def decode(self, audio, profile: "Profile"): ...
+    def airtime(self, payload_len: int, profile: "Profile") -> float: ...
+
+
+class CpfskCodec:
+    """Current CPFSK + PN-sync + length/CRC framing implementation."""
+
+    sample_rate = SAMPLE_RATE
+
+    def encode(self, payload: bytes, profile: "Profile", *, include_head=True,
+               include_tail=True, head_seconds=framing.HEAD_PAD_SECONDS,
+               tail_seconds=framing.TAIL_PAD_SECONDS):
+        return modulate(payload, profile=profile, sample_rate=self.sample_rate,
+                        include_head=include_head, include_tail=include_tail,
+                        head_seconds=head_seconds, tail_seconds=tail_seconds)
+
+    def decode(self, audio, profile: "Profile", **kwargs):
+        return demodulate(audio, profile=profile, sample_rate=self.sample_rate, **kwargs)
+
+    def airtime(self, payload_len: int, profile: "Profile") -> float:
+        return frame_seconds(payload_len, profile=profile)
+
+
+CPFSK_CODEC = CpfskCodec()
 
 
 @dataclass(frozen=True)
@@ -188,16 +219,35 @@ class Profile:
     freq1: float
     confidence_threshold: float = CONFIDENCE_THRESHOLD
     chunk_size: int = CHUNK_SIZE
+    codec: Codec = field(default=CPFSK_CODEC, compare=False, repr=False)
+
+    @property
+    def sample_rate(self):
+        return self.codec.sample_rate
+
+    def encode(self, payload: bytes, *, include_head=True, include_tail=True,
+               head_seconds=framing.HEAD_PAD_SECONDS,
+               tail_seconds=framing.TAIL_PAD_SECONDS):
+        return self.codec.encode(payload, self, include_head=include_head,
+                                 include_tail=include_tail, head_seconds=head_seconds,
+                                 tail_seconds=tail_seconds)
+
+    def decode(self, audio, **kwargs):
+        return self.codec.decode(audio, self, **kwargs)
+
+    def airtime(self, payload_len: int):
+        return self.codec.airtime(payload_len, self)
 
 
-# -- the keying-length budget, and the chunk sizes it produces -------------
+# -- the useful-frame budget, and the chunk sizes it produces --------------
 #
-# A keying is capped in *duration*, and every profile's chunk_size is
-# whatever fits inside that cap rather than a number chosen per profile.
+# Sync-through-CRC audio is capped in duration, and every profile's chunk_size
+# is whatever fits inside that cap. Outer timing pads and transport startup do
+# not consume this budget because adaptive timing will vary them by radio pair.
 #
 # This is a design choice, not a measurement -- worth saying plainly, because
 # the number looks like the kind that gets measured. Nothing on this bench
-# fails at 3.0s. Three things make a cap worth having anyway:
+# fails at 3.0s of useful audio. Three things make a cap worth having anyway:
 #
 #   - Retransmit granularity. ARQ is stop-and-wait and a frame is all or
 #     nothing, so a keying is the unit a single bit error destroys. Longer
@@ -217,12 +267,12 @@ class Profile:
 # themselves periodically to scan, on a timer set at the *far* station where
 # this modem can neither see nor change it -- that would be a measurement,
 # and it would belong here in place of this.
-MAX_KEYING_SECONDS = 3.0
+MAX_USEFUL_FRAME_SECONDS = 3.0
 
 # Dead air inside a keying that isn't frame bits, PTT key-down to PTT
-# release. Mirrors transport.PTT_LEAD (0.22) + transport.STREAM_FILL (0.16,
-# the output stream opening and filling its first buffer) +
-# transport.PTT_TAIL (0.05); whale/transport.py asserts at import that it
+# release. This is the measured output-stream startup/fill time; leading and
+# trailing protection is now entirely represented by on-air framing symbols.
+# whale/transport.py asserts at import that it
 # still agrees with those, which is where each is measured and documented.
 # Not imported from there directly, so this module stays free of the
 # sound-card dependencies -- tests/test_afsk_loopback.py runs with no audio
@@ -235,35 +285,40 @@ MAX_KEYING_SECONDS = 3.0
 # ~20ms past the cap they were supposed to sit under. Corrected here rather
 # than by widening the cap, because the cap is the part with a measurement
 # behind it.
-KEYING_OVERHEAD_SECONDS = 0.43
+KEYING_OVERHEAD_SECONDS = 0.16
 
 
-def frame_bits(payload_len, baud):
+def frame_bits(payload_len, baud, *, include_head=True, include_tail=True):
     """Total bits on air for one frame, pads included."""
-    return (len(framing.head_pad_bits(baud)) + len(framing.sync_bits(baud))
+    return ((len(framing.head_pad_bits(baud)) if include_head else 0)
+            + len(framing.sync_bits(baud))
             + framing.frame_bits_for_length(payload_len)
-            + len(framing.tail_pad_bits(baud)))
+            + (len(framing.tail_pad_bits(baud)) if include_tail else 0))
 
 
-def max_payload_for_keying(baud, budget=MAX_KEYING_SECONDS):
-    """Largest AFSK payload, in bytes, whose whole keying fits in `budget`.
+def max_payload_for_useful_frame(baud, budget=MAX_USEFUL_FRAME_SECONDS):
+    """Largest AFSK payload whose sync-through-CRC audio fits in `budget`.
 
-    The inverse of frame_bits + KEYING_OVERHEAD_SECONDS, clamped to what the
-    length field can describe -- though since that field went to 16 bits the
-    clamp is nominal: the budget binds at every baud this modem runs.
+    Outer head/tail pads and transport startup are deliberately excluded:
+    adaptive timing will vary them per radio pair.
     """
-    spare_bits = (budget - KEYING_OVERHEAD_SECONDS) * baud - frame_bits(0, baud)
+    spare_bits = budget * baud - frame_bits(0, baud, include_head=False,
+                                           include_tail=False)
     return max(0, min(int(spare_bits // 8), framing.MAX_PAYLOAD_BYTES))
 
 
-def max_chunk_for_keying(baud, budget=MAX_KEYING_SECONDS):
-    """max_payload_for_keying less the DATA frame's own header bytes, i.e.
-    the largest link-layer chunk this baud can carry inside the budget."""
-    return max(0, max_payload_for_keying(baud, budget) - DATA_FRAME_HEADER_BYTES)
+def max_chunk_for_useful_frame(baud, budget=MAX_USEFUL_FRAME_SECONDS):
+    """Largest DATA body in one checked packet under the useful budget."""
+    size = 0
+    while (size < framing.MAX_PAYLOAD_BYTES - framing.AIR_HEADER_BYTES
+           and frame_bits(framing.AIR_HEADER_BYTES + size + 1, baud,
+                          include_head=False, include_tail=False) / baud <= budget):
+        size += 1
+    return size
 
 
 PROFILE_300 = Profile(name="300baud", mode_id=0, baud=BAUD, freq0=FREQ_0, freq1=FREQ_1,
-                      chunk_size=max_chunk_for_keying(BAUD))
+                      chunk_size=max_chunk_for_useful_frame(BAUD))
 
 # Second speed. 800 Hz of tone separation, which was arrived at the hard
 # way: 700/1900 Hz (a 1200 Hz spread, the same 2:1 separation-to-baud ratio
@@ -317,7 +372,7 @@ PROFILE_300 = Profile(name="300baud", mode_id=0, baud=BAUD, freq0=FREQ_0, freq1=
 # decodes, and test_a_frame_does_not_sync_another_profiles_correlator keeps
 # every pairing on file.
 PROFILE_600 = Profile(name="600baud", mode_id=1, baud=600, freq0=tones(600.0)[0],
-                       freq1=tones(600.0)[1], chunk_size=max_chunk_for_keying(600))
+                       freq1=tones(600.0)[1], chunk_size=max_chunk_for_useful_frame(600))
 
 # Third speed. PROFILE_600's tone-widening approach (700/1500 -> pushing
 # further apart) hit a hard wall: scripts/measure_band_edges.py found the
@@ -386,7 +441,7 @@ PROFILE_600 = Profile(name="600baud", mode_id=1, baud=600, freq0=tones(600.0)[0]
 # coherent one), not in the tone table, and this profile could join the
 # others at 1500 Hz afterwards.
 PROFILE_1200 = Profile(name="1200baud", mode_id=2, baud=1200, freq0=1200.0, freq1=2200.0,
-                        chunk_size=max_chunk_for_keying(1200))
+                        chunk_size=max_chunk_for_useful_frame(1200))
 
 # Slowest -> fastest. Index order is also step order for mid-session
 # adaptation (whale/link.py steps to PROFILES[i-1] / PROFILES[i+1]).
@@ -395,11 +450,25 @@ PROFILES_BY_ID = {p.mode_id: p for p in PROFILES}
 
 # Always used for CONNECT/CONNECT_ACK (before speed is agreed) and, per
 # whale/link.py's design, for every other control-plane packet (DISC,
-# MODE_REQ/MODE_ACK) regardless of the currently negotiated data speed --
+# DATA_ACK, floor control) regardless of the current data speed --
 # the control plane always runs at the most robust profile so it keeps
 # working even when the data channel is struggling. Only PT_DATA/PT_DATA_ACK
 # ever use the negotiated profile.
 CONTROL_PROFILE = PROFILE_300
+
+# Outer-pad measurement policy. Sparse hard-decision errors are tolerated,
+# but a window that exceeds this budget is treated wholly as suspect. Dropping
+# the complete failing window is intentional: it prevents the look-ahead
+# needed to distinguish clipping from an isolated error from inflating the
+# received-symbol count and selecting unsafe timing.
+PAD_MATCH_WINDOW_SYMBOLS = 16
+PAD_MATCH_MAX_ERRORS = 2
+
+
+def default_registry():
+    """Returns the built-in modes through the link-facing registry API."""
+    from whale.waveform import ModeRegistry
+    return ModeRegistry(PROFILES, CONTROL_PROFILE)
 
 
 def _cpfsk_tone(bits, sps, sample_rate, freq0, freq1):
@@ -420,7 +489,10 @@ def _apply_ramp(signal, sample_rate, ramp_ms=5):
     return signal
 
 
-def modulate(payload: bytes, profile: Profile = PROFILE_300, sample_rate=SAMPLE_RATE, amplitude=0.6):
+def modulate(payload: bytes, profile: Profile = PROFILE_300, sample_rate=SAMPLE_RATE,
+             amplitude=0.6, *, include_head=True, include_tail=True,
+             head_seconds=framing.HEAD_PAD_SECONDS,
+             tail_seconds=framing.TAIL_PAD_SECONDS):
     """One keying's worth of audio: `payload` framed (sync word, length,
     CRC, head/tail pads) and modulated as one continuous signal.
 
@@ -435,10 +507,17 @@ def modulate(payload: bytes, profile: Profile = PROFILE_300, sample_rate=SAMPLE_
     only about a third of the time.
     """
     sps = round(sample_rate / profile.baud)
-    bits = framing.build_frame_bits(payload, baud=profile.baud)
+    bits = framing.build_frame_bits(payload, baud=profile.baud,
+                                    include_head=include_head, include_tail=include_tail,
+                                    head_seconds=head_seconds, tail_seconds=tail_seconds)
     tone = _cpfsk_tone(bits, sps, sample_rate, profile.freq0, profile.freq1)
     audio = amplitude * tone
-    return _apply_ramp(audio, sample_rate).astype(np.float32)
+    ramped = _apply_ramp(audio, sample_rate)
+    if not include_head:
+        ramped[:int(sample_rate * 0.005)] = audio[:int(sample_rate * 0.005)]
+    if not include_tail:
+        ramped[-int(sample_rate * 0.005):] = audio[-int(sample_rate * 0.005):]
+    return ramped.astype(np.float32)
 
 
 def _tone_energy_diff(audio, sample_rate, sps, freq0, freq1):
@@ -461,18 +540,34 @@ def _sync_template(baud, sps, sample_rate, freq0, freq1):
     return _tone_energy_diff(tone, sample_rate, sps, freq0, freq1)
 
 
-def frame_seconds(payload_len=framing.MAX_PAYLOAD_BYTES, profile: Profile = PROFILE_300):
+def frame_seconds(payload_len=framing.MAX_PAYLOAD_BYTES, profile: Profile = PROFILE_300,
+                  *, include_head=True, include_tail=True):
     """How long the frame's own audio lasts."""
-    return frame_bits(payload_len, profile.baud) / profile.baud
+    return frame_bits(payload_len, profile.baud, include_head=include_head,
+                      include_tail=include_tail) / profile.baud
 
 
 def keying_seconds(payload_len=framing.MAX_PAYLOAD_BYTES, profile: Profile = PROFILE_300):
     """How long the channel is occupied, PTT key-down to PTT release --
-    frame_seconds plus the dead air held around it. This, rather than the
-    frame's own audio, is the quantity MAX_KEYING_SECONDS caps: what the cap
-    is about is how long the transmitter holds the channel, which starts at
-    key-down and not at the first bit of the sync word."""
+    frame_seconds plus transport startup. This reports total occupancy; it is
+    not the useful-frame sizing restriction."""
     return KEYING_OVERHEAD_SECONDS + frame_seconds(payload_len, profile)
+
+
+def data_keying_seconds(chunk_len, profile: Profile = PROFILE_300):
+    """Complete single-waveform DATA keying."""
+    return KEYING_OVERHEAD_SECONDS + frame_seconds(
+        framing.AIR_HEADER_BYTES + chunk_len, profile)
+
+
+def useful_data_seconds(chunk_len, profile: Profile = PROFILE_300):
+    """DATA audio from sync through the header and optional body CRC.
+
+    This is the bounded part; outer timing protection and transport latency
+    are intentionally absent.
+    """
+    return frame_seconds(framing.AIR_HEADER_BYTES + chunk_len, profile,
+                         include_head=False, include_tail=False)
 
 
 # How many correlation peaks demodulate() will attempt to decode in one
@@ -546,7 +641,8 @@ def _sync_peaks(score, threshold_value, min_separation):
     return peaks
 
 
-def _try_sync(diff, i_star, sps, confidence, max_credible_bits, n_sync):
+def _try_sync(diff, i_star, sps, confidence, max_credible_bits, n_sync, baud,
+              head_seconds, tail_seconds):
     """Attempts to read a frame at one correlation peak. Same return shape
     as demodulate(). `n_sync` is the sync word's length in bits at this
     profile's baud -- it sets where the length field starts, so it has to
@@ -563,6 +659,19 @@ def _try_sync(diff, i_star, sps, confidence, max_credible_bits, n_sync):
     sample_indices = first_index + sps * np.arange(num_symbols)
     decoded_bits = (diff[sample_indices] > 0).astype(int).tolist()
 
+    header_valid = framing.header_is_valid(decoded_bits[n_sync:])
+    if header_valid is False:
+        return {
+            "synced": False,
+            "confidence": confidence,
+            "start_index": i_star,
+            "sync_end_index": i_star + sps * n_sync,
+            "end_index": i_star + sps * min(
+                n_sync + framing.frame_bits_for_length(framing.AIR_HEADER_BYTES),
+                num_symbols),
+            "payload": None,
+        }
+
     payload = framing.parse_frame_bits(decoded_bits[n_sync:])
     length = framing.declared_length(decoded_bits[n_sync:])
     total_bits_needed = n_sync + framing.frame_bits_for_length(length)
@@ -576,7 +685,7 @@ def _try_sync(diff, i_star, sps, confidence, max_credible_bits, n_sync):
         # less unexamined audio than skipping to the end of a frame whose
         # declared length it has no reason to trust. See whale/link.py's
         # _decode_one.
-        "sync_end_index": first_index + sps * n_sync,
+        "sync_end_index": i_star + sps * n_sync,
         "payload": payload,
     }
     if total_bits_needed > max_credible_bits:
@@ -587,17 +696,65 @@ def _try_sync(diff, i_star, sps, confidence, max_credible_bits, n_sync):
         # word: a length we have just called implausible is not a length to
         # measure a skip with.
         result["end_index"] = result["sync_end_index"]
-    elif payload is not None or max_symbols >= total_bits_needed:
+    elif payload is not None:
+        # Do not return until the complete nominal tail interval has passed:
+        # a short observation on the first decode poll would otherwise look
+        # exactly like clipping. Continuous RX supplies silence or noise for
+        # genuinely clipped symbols, so the wait remains bounded.
+        head_bits = framing.head_pad_bits(baud, head_seconds)
+        tail_bits = framing.tail_pad_bits(baud, tail_seconds)
+        if max_symbols < total_bits_needed + len(tail_bits):
+            result["payload"] = None
+            return result
+
+        def adjacent_matches(expected, indices):
+            mismatches = []
+            count = 0
+            for count, (bit, index) in enumerate(zip(expected, indices), 1):
+                # Running outside retained audio is a known hard boundary,
+                # not a noisy symbol, so no decision window is needed.
+                if index < 0 or index >= len(diff):
+                    return count - 1
+                mismatches.append((diff[index] > 0) != bool(bit))
+                if len(mismatches) > PAD_MATCH_WINDOW_SYMBOLS:
+                    mismatches.pop(0)
+                if (len(mismatches) == PAD_MATCH_WINDOW_SYMBOLS
+                        and sum(mismatches) > PAD_MATCH_MAX_ERRORS):
+                    return count - PAD_MATCH_WINDOW_SYMBOLS
+            return count
+
+        # Walk away from the checked frame boundaries. The head sequence is
+        # inspected backwards from sync; the tail sequence forwards from the
+        # final CRC. A rolling window tolerates isolated hard-decision errors;
+        # the whole first failing window is excluded from the count.
+        result["head_symbols_received"] = adjacent_matches(
+            reversed(head_bits),
+            (first_index - sps * offset for offset in range(1, len(head_bits) + 1)),
+        )
+        result["tail_symbols_received"] = adjacent_matches(
+            tail_bits,
+            (first_index + sps * (total_bits_needed + offset)
+             for offset in range(len(tail_bits))),
+        )
+        result["end_index"] = i_star + sps * (total_bits_needed + len(tail_bits))
+    elif max_symbols >= total_bits_needed:
         # Either it decoded, or we had every bit the claimed length says it
         # needed and it *still* didn't check out -- this one's done, safe
         # to skip past. If neither holds, the frame may just still be
         # arriving; leave end_index out so the caller keeps waiting on the
         # same buffer instead of discarding a frame that hasn't finished.
-        result["end_index"] = first_index + sps * min(total_bits_needed, num_symbols)
+        # `first_index` is shifted by the integrate-and-dump convolution's
+        # sps-1 sample group delay. Buffer coordinates are based on the input
+        # audio, so do not carry that delay into the consumed boundary. Tail
+        # padding used to hide this over-consumption; adjacent unpadded
+        # Adjacent unpadded waveforms make the exact boundary observable.
+        result["end_index"] = i_star + sps * min(total_bits_needed, num_symbols)
     return result
 
 
-def demodulate(audio, profile: Profile = PROFILE_300, sample_rate=SAMPLE_RATE):
+def demodulate(audio, profile: Profile = PROFILE_300, sample_rate=SAMPLE_RATE, *,
+               head_seconds=framing.HEAD_PAD_SECONDS,
+               tail_seconds=framing.TAIL_PAD_SECONDS):
     """Finds and decodes the *earliest* frame in `audio`. Returns a dict
     with at least 'synced' and 'payload' (None if nothing usable was found).
 
@@ -635,7 +792,8 @@ def demodulate(audio, profile: Profile = PROFILE_300, sample_rate=SAMPLE_RATE):
     credible_bits = max_credible_frame_bits(profile.baud)
     n_sync = len(framing.sync_bits(profile.baud))
     for i_star in peaks:
-        result = _try_sync(diff, i_star, sps, float(ncc[i_star]), credible_bits, n_sync)
+        result = _try_sync(diff, i_star, sps, float(ncc[i_star]), credible_bits,
+                           n_sync, profile.baud, head_seconds, tail_seconds)
         if result.get("payload") is not None:
             return result
         if "end_index" in result:

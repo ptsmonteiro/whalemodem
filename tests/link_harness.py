@@ -7,10 +7,9 @@ genuinely exercised. What the fake replaces is only the radio -- no sound
 card, no PTT, no real time spent playing audio -- which is what makes a
 whole ARQ exchange take a second or two instead of a minute or two.
 
-That distinction matters for the bugs this exists to catch. A lost
-PT_MODE_ACK is fatal precisely because the decoder stops trying the profile
-the peer is transmitting at; a harness that shortcut the DSP and passed
-packets around as tuples would not be able to express it at all.
+That distinction matters for mode recovery: the IRS must genuinely search
+all negotiated waveforms and decode the ISS after an unannounced speed
+change. A harness that passed packets around as tuples could not prove it.
 
 Frame loss is injected two ways, at two levels:
 

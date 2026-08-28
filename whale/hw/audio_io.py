@@ -124,7 +124,7 @@ def transmit(tx_signal, tx_device, ptt, samplerate=SAMPLE_RATE, ptt_lead=0.3, pt
             # A stream whose device disappears mid-transmission simply stops
             # calling the callback, so this wait is what bounds a keying in
             # that case -- and it bounds it at tx_duration + 5s of keyed
-            # transmitter, well past afsk.MAX_KEYING_SECONDS. The timeout is
+            # transmitter, well past the expected total keying duration. The timeout is
             # left as it is (shortening it would start cutting real
             # transmissions off), but a wait that expires is now said out
             # loud, because in the logs it is otherwise indistinguishable

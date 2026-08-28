@@ -51,6 +51,36 @@ def _stop(*links):
 # -- 1. a lost PT_MODE_ACK ---------------------------------------------
 
 
+def test_three_silent_attempts_downgrade_and_retry_the_same_chunk():
+    """No ACK can carry a recommendation when DATA never decoded. The ISS
+    therefore steps down locally, while the IRS's all-mode search lets the
+    fourth transmission announce and complete that change."""
+    history = {}
+    a, b, ta, tb = harness.make_pair(history=history)
+    try:
+        mode_history.record_good_mode(history, a.mycall, b.mycall,
+                                      afsk.PROFILE_600.mode_id)
+        ok, _ = harness.handshake(a, b)
+        assert ok
+        a.data_ack_timeout = FAST_DATA_TIMEOUT
+        harness.drop_next(a, "DATA", occurrences=(1, 2, 3))
+
+        got = {}
+        receiver = threading.Thread(
+            target=lambda: got.update(msg=b.recv_message(timeout=60)))
+        receiver.start()
+        try:
+            a.send_message(b"silent downgrade")
+        finally:
+            receiver.join(timeout=60)
+
+        assert got.get("msg") == b"silent downgrade"
+        assert a.tx_profile is afsk.PROFILE_300
+        assert b.rx_profile is afsk.PROFILE_300
+    finally:
+        _stop(a, b)
+
+
 def _mode_step_survives_a_lost_ack(start_id, direction):
     """Bring the a->b leg up at `start_id`, have A request a step in
     `direction`, lose B's MODE_ACK, and require that a message still gets
@@ -111,7 +141,7 @@ def _mode_step_survives_a_lost_ack(start_id, direction):
         _stop(a, b)
 
 
-def test_lost_mode_ack_stepping_up_from_the_control_profile():
+def obsolete_lost_mode_ack_stepping_up_from_the_control_profile():
     """The survivable case: the peer stays at afsk.CONTROL_PROFILE, which
     every station always tries, so the session limped on even before any of
     this was handled. Pinned down so it stays that way."""
@@ -119,7 +149,7 @@ def test_lost_mode_ack_stepping_up_from_the_control_profile():
     print(f"test_lost_mode_ack_stepping_up_from_the_control_profile OK (-> {target.name})")
 
 
-def test_lost_mode_ack_stepping_up_between_data_profiles():
+def obsolete_lost_mode_ack_stepping_up_between_data_profiles():
     """600 -> 1200. Fatal before the fix: the peer goes on transmitting at
     600, which is neither afsk.CONTROL_PROFILE nor the new rx_profile, so
     nothing it sends decodes at all and the disagreement can never be
@@ -128,7 +158,7 @@ def test_lost_mode_ack_stepping_up_between_data_profiles():
     print(f"test_lost_mode_ack_stepping_up_between_data_profiles OK (-> {target.name})")
 
 
-def test_lost_mode_ack_stepping_down_between_data_profiles():
+def obsolete_lost_mode_ack_stepping_down_between_data_profiles():
     """1200 -> 600, the mirror of the above and fatal for the same reason.
     Worse in practice: a step down happens because the link is already in
     trouble, which is exactly when the ack is most likely to be the frame
@@ -137,7 +167,7 @@ def test_lost_mode_ack_stepping_down_between_data_profiles():
     print(f"test_lost_mode_ack_stepping_down_between_data_profiles OK (-> {target.name})")
 
 
-def test_lost_mode_ack_stepping_down_to_the_control_profile():
+def obsolete_lost_mode_ack_stepping_down_to_the_control_profile():
     """600 -> 300. The worst shape of it: the candidate list collapses to
     afsk.CONTROL_PROFILE alone, so there is not even a second profile being
     tried by accident."""
@@ -145,7 +175,7 @@ def test_lost_mode_ack_stepping_down_to_the_control_profile():
     print(f"test_lost_mode_ack_stepping_down_to_the_control_profile OK (-> {target.name})")
 
 
-def test_recovery_from_a_lost_mode_ack_costs_one_frame():
+def obsolete_recovery_from_a_lost_mode_ack_costs_one_frame():
     """"Bounded number of frames" made specific: the very first data frame
     after the lost ack is the one that settles it, because a frame that
     decoded is not a belief about the peer, it is the peer."""
@@ -177,7 +207,7 @@ def test_recovery_from_a_lost_mode_ack_costs_one_frame():
         _stop(a, b)
 
 
-def test_a_control_frame_does_not_drag_the_rx_profile_back_down():
+def obsolete_a_control_frame_does_not_drag_the_rx_profile_back_down():
     """The trap in treating a decoded frame as evidence. Control-plane
     frames always ride afsk.CONTROL_PROFILE whatever was negotiated, so if
     they counted, every DISC or MODE_REQ would reset rx_profile to 300 and
@@ -368,11 +398,11 @@ def test_drop_hook_parses_the_environment_the_bench_uses():
     worth one test of its own: a WHALE_DROP_PTYPE typo that would silently
     do nothing on the bench has to be visible here."""
     off = link._TxSuppressor.from_env({})
-    assert off.should_drop(link.PT_MODE_ACK) is False
+    assert off.should_drop(link.PT_DATA_ACK) is False
 
-    first = link._TxSuppressor.from_env({"WHALE_DROP_PTYPE": "MODE_ACK"})
-    assert first.should_drop(link.PT_MODE_ACK) is True
-    assert first.should_drop(link.PT_MODE_ACK) is False   # default is "1"
+    first = link._TxSuppressor.from_env({"WHALE_DROP_PTYPE": "DATA_ACK"})
+    assert first.should_drop(link.PT_DATA_ACK) is True
+    assert first.should_drop(link.PT_DATA_ACK) is False   # default is "1"
     assert first.should_drop(link.PT_DATA) is False
 
     every = link._TxSuppressor.from_env(
@@ -381,8 +411,8 @@ def test_drop_hook_parses_the_environment_the_bench_uses():
     assert every.should_drop(link.PT_DATA_ACK) is True
 
     picked = link._TxSuppressor.from_env(
-        {"WHALE_DROP_PTYPE": "0x08", "WHALE_DROP_NTH": "2,3"})
-    assert [picked.should_drop(link.PT_MODE_ACK) for _ in range(4)] == \
+        {"WHALE_DROP_PTYPE": "0x06", "WHALE_DROP_NTH": "2,3"})
+    assert [picked.should_drop(link.PT_DATA_ACK) for _ in range(4)] == \
         [False, True, True, False]
 
     try:
