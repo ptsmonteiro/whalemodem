@@ -192,7 +192,9 @@ Each endpoint adapts only its own transmit direction from ARQ outcomes:
 
 - Three unanswered attempts change one step down before retrying the same chunk.
 - Three consecutive first-attempt chunks change one step up before the next chunk.
-- Steps follow mode order 0, 1, 2 and are limited to modes the peer advertised.
+- Steps follow registry order and are limited to modes the peer advertised.
+  The shipped order is 0, 1, 2; `registry_with_vf3()` appends mode 3 above
+  them (see [`FRAMING.md`](FRAMING.md#mode-3-vf3-a-non-cpfsk-data-mode)).
 
 There is no separate mode-change exchange. While connected, a receiver tries
 the control mode and every mutually advertised DATA mode. A decoded DATA frame

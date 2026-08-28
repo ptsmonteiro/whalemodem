@@ -81,6 +81,54 @@ def test_three_silent_attempts_downgrade_and_retry_the_same_chunk():
         _stop(a, b)
 
 
+def test_a_step_down_re_cuts_a_chunk_too_big_for_the_new_mode(caplog):
+    """Every rung down the ladder carries less: 88 / 193 / 402 bytes for the
+    CPFSK profiles, 1426 for VF3. So a chunk cut at the mode in force when
+    send_message sliced it can be larger than the mode the ARQ loop steps
+    down to three silent attempts later -- and the air-header shape check
+    rejects a DATA body over the mode's chunk_size, which used to surface as
+    a ValueError that killed the sending thread mid-message.
+
+    Started at 1200 (chunk_size 402) with a payload that needs a full-size
+    chunk, so the step down to 600 (chunk_size 193) lands with 402 bytes in
+    hand. Nothing here is VF3-specific; VF3 only widened the gap enough that
+    a bench run hit it on the first try."""
+    history = {}
+    a, b, ta, tb = harness.make_pair(history=history)
+    try:
+        mode_history.record_good_mode(history, a.mycall, b.mycall,
+                                      afsk.PROFILE_1200.mode_id)
+        ok, _ = harness.handshake(a, b)
+        assert ok
+        assert a.tx_profile is afsk.PROFILE_1200, a.tx_profile
+        a.data_ack_timeout = FAST_DATA_TIMEOUT
+        harness.drop_next(a, "DATA", occurrences=(1, 2, 3))
+
+        payload = bytes(range(256)) * 2  # 512 > PROFILE_1200.chunk_size
+        assert len(payload) > afsk.PROFILE_1200.chunk_size
+
+        got = {}
+        receiver = threading.Thread(
+            target=lambda: got.update(msg=b.recv_message(timeout=60)))
+        receiver.start()
+        try:
+            with caplog.at_level("INFO", logger="whale.link"):
+                a.send_message(payload)
+        finally:
+            receiver.join(timeout=60)
+
+        # The whole message arrives, re-cut, with no gap or duplication at
+        # the seam where the mode changed.
+        assert got.get("msg") == payload
+        # And it really did go through the re-cut path rather than, say,
+        # never stepping down at all. The profile afterwards is deliberately
+        # not asserted: the smaller chunks ACK cleanly and _maybe_adapt is
+        # then free to climb back to 1200, which is correct behaviour.
+        assert any("re-cutting seq=" in r.message for r in caplog.records),             [r.message for r in caplog.records]
+    finally:
+        _stop(a, b)
+
+
 def _mode_step_survives_a_lost_ack(start_id, direction):
     """Bring the a->b leg up at `start_id`, have A request a step in
     `direction`, lose B's MODE_ACK, and require that a message still gets
@@ -427,12 +475,17 @@ def test_drop_hook_parses_the_environment_the_bench_uses():
 def test_mode_step_script_parses_the_environment_the_bench_uses():
     assert link._mode_step_script({}) == {}
     assert link._mode_step_script({"WHALE_MODE_STEP_SCRIPT": "2:up,5:down"}) == {2: +1, 5: -1}
+    supported = afsk.default_registry().supported_ids
     assert link._forced_mode_id({}) is None
-    assert link._forced_mode_id({"WHALE_FORCE_MODE": "2"}) == afsk.PROFILE_1200.mode_id
-    assert link._forced_mode_id({"WHALE_FORCE_MODE": "99"}) is None
+    assert link._forced_mode_id({"WHALE_FORCE_MODE": "2"}, supported) == afsk.PROFILE_1200.mode_id
+    assert link._forced_mode_id({"WHALE_FORCE_MODE": "99"}, supported) is None
     # mode_id 0 is a real profile and is falsy, so "no override" has to be
     # None rather than anything the callers can confuse with zero.
-    assert link._forced_mode_id({"WHALE_FORCE_MODE": "0"}) == afsk.PROFILE_300.mode_id
+    assert link._forced_mode_id({"WHALE_FORCE_MODE": "0"}, supported) == afsk.PROFILE_300.mode_id
+    # A mode outside the built-in AFSK table is honoured when the station
+    # actually carries it -- this is what VF3 bench runs depend on.
+    assert link._forced_mode_id({"WHALE_FORCE_MODE": "3"}, supported) is None
+    assert link._forced_mode_id({"WHALE_FORCE_MODE": "3"}, tuple(supported) + (3,)) == 3
     print("test_mode_step_script_parses_the_environment_the_bench_uses OK")
 
 

@@ -8,7 +8,7 @@ import time
 
 import numpy as np
 
-from whale import afsk, framing, link, mode_history
+from whale import afsk, framing, link, mode_history, modes
 from whale.waveform import ModeRegistry
 
 # The two-Link-in-one-process harness these tests share with
@@ -1115,8 +1115,12 @@ def test_link_negotiation_and_mode_step():
         assert a.rx_profile.mode_id == afsk.CONTROL_PROFILE.mode_id, a.rx_profile
         assert b.rx_profile.mode_id == afsk.PROFILE_600.mode_id, b.rx_profile
         assert b.tx_profile.mode_id == afsk.CONTROL_PROFILE.mode_id, b.tx_profile
-        assert a.peer_supported_modes == {p.mode_id for p in afsk.PROFILES}
-        assert b.peer_supported_modes == {p.mode_id for p in afsk.PROFILES}
+        # The whole default ladder, VF3 included -- not just the CPFSK
+        # profiles: what each end advertises is its registry, and stations
+        # run whale.modes.default_registry().
+        expected = set(modes.default_registry().supported_ids)
+        assert a.peer_supported_modes == expected
+        assert b.peer_supported_modes == expected
 
         # A changes its own transmit mode locally. B discovers it from the
         # next DATA and confirms that mode in DATA_ACK.

@@ -148,7 +148,7 @@ def main():
     ap.add_argument("--b-data", type=int, required=True)
     ap.add_argument("--a-call", default="STA1")
     ap.add_argument("--b-call", default="STA2")
-    ap.add_argument("--size", type=int, default=1024)
+    ap.add_argument("--size", type=int, default=4096)
     ap.add_argument("--connect-timeout", type=float, default=180.0)
     ap.add_argument("--transfer-timeout", type=float, default=300.0)
     args = ap.parse_args()

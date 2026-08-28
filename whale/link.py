@@ -262,6 +262,15 @@ SEQ_MODULO = SEQ_MASK + 1
 # (baud, in particular) -- see Link._apply_tx_profile/_apply_rx_profile,
 # which compute them per instance instead of as module constants.
 MAX_RETRIES = 6
+
+#: `_send_chunk_with_arq` returning this means "no ACK, and the step-down it
+#: just took landed on a mode whose chunk_size cannot carry the chunk in
+#: hand".  Every rung down the ladder is smaller (88 / 193 / 402 / 1426
+#: bytes), so this is reachable from any step-down, not just VF3's -- VF3
+#: only made it easy to hit.  The chunk was never ACKed, so nothing on the
+#: receiver depends on its size: the sender re-cuts it at the new mode's
+#: chunk_size and retries under the same sequence number.
+_RESIZE = object()
 DECODE_POLL_INTERVAL = 0.15
 
 # The one byte of session identity in PT_CONNECT/PT_CONNECT_ACK. See the
@@ -394,7 +403,9 @@ _PTYPES_BY_NAME = {name: ptype for ptype, name in _PTYPE_NAMES.items()}
 #                      separated 1-based ordinals, or "all". Default "1".
 #   WHALE_FORCE_MODE   mode_id this station proposes at connect time (as
 #                      caller) or picks for its own TX (as listener),
-#                      overriding whatever mode_history remembers.
+#                      overriding whatever mode_history remembers. Any id
+#                      in this station's own registry, extra waveforms
+#                      included; an unsupported id is ignored with a warning.
 #   WHALE_MODE_STEP_SCRIPT
 #                      comma-separated "<n>:<up|down>": after the nth
 #                      ACKed chunk of a session, take that mode step
@@ -445,14 +456,25 @@ class _TxSuppressor:
         return self.occurrences is None or seen in self.occurrences
 
 
-def _forced_mode_id(env=None):
-    """The mode_id WHALE_FORCE_MODE pins this station's own TX to, or None."""
+def _forced_mode_id(env=None, supported_ids=None):
+    """The mode_id WHALE_FORCE_MODE pins this station's own TX to, or None.
+
+    supported_ids is the station's own mode registry, not the built-in AFSK
+    profile table: a station carrying an extra waveform (VF3, mode 3) must be
+    able to pin itself to it. An id this station cannot transmit is ignored,
+    but loudly -- a silently dropped override looks exactly like a bench run
+    that never set the variable.
+    """
     env = os.environ if env is None else env
     raw = (env.get("WHALE_FORCE_MODE") or "").strip()
     if not raw:
         return None
     mode_id = int(raw, 0)
-    return mode_id if mode_id in afsk.PROFILES_BY_ID else None
+    if supported_ids is not None and mode_id not in supported_ids:
+        logger.warning("WHALE_FORCE_MODE=%s is not a mode this station supports (%s) -- ignored",
+                       raw, ", ".join(str(i) for i in sorted(supported_ids)))
+        return None
+    return mode_id
 
 
 def _mode_step_script(env=None):
@@ -636,6 +658,44 @@ class LinkError(Exception):
     pass
 
 
+#: How often the decode loop logs its running per-profile decode cost.
+DECODE_COST_REPORT_INTERVAL = 30.0
+
+
+class _DecodeCost:
+    """Per-profile CPU and wall time spent inside `profile.decode()`.
+
+    Worth measuring separately from wall time because the decode loop shares
+    a process with everything else: `time.thread_time()` is this thread's own
+    CPU, so a number close to its wall time means the decoder is genuinely
+    computing rather than waiting.
+
+    The cost that matters is not one frame.  `_decode_one` runs *every*
+    candidate profile against every snapshot, once per DECODE_POLL_INTERVAL,
+    whether or not anything is arriving -- so a mode's real burden is its
+    per-attempt cost times the poll rate, and `attempts` is here to make that
+    visible next to the far rarer `frames`.
+    """
+
+    __slots__ = ("attempts", "frames", "cpu", "wall", "max_cpu")
+
+    def __init__(self):
+        self.attempts = self.frames = 0
+        self.cpu = self.wall = self.max_cpu = 0.0
+
+    def add(self, cpu, wall):
+        self.attempts += 1
+        self.cpu += cpu
+        self.wall += wall
+        self.max_cpu = max(self.max_cpu, cpu)
+
+    def summary(self):
+        mean = (self.cpu / self.attempts * 1000.0) if self.attempts else 0.0
+        return (f"{self.attempts} attempt(s)/{self.frames} frame(s), "
+                f"cpu {self.cpu:.2f}s total, {mean:.1f} ms mean, "
+                f"{self.max_cpu * 1000.0:.1f} ms max, wall {self.wall:.2f}s")
+
+
 class Link:
     """Owns one radio transport and one session's worth of protocol state.
 
@@ -648,7 +708,10 @@ class Link:
     def __init__(self, transport, mycall, on_event=None, mode_history_store=None,
                  mode_registry=None):
         self.transport = transport
-        self.modes = mode_registry or afsk.default_registry()
+        if mode_registry is None:
+            from whale.modes import default_registry
+            mode_registry = default_registry()
+        self.modes = mode_registry
         self.mycall = mycall
         self.peer_call = None
         self.peer_supported_modes = set()
@@ -709,6 +772,10 @@ class Link:
         # time.monotonic() terms; consumed by _await_turnaround.
         self._peer_unkeyed_at = None
         self._stop = threading.Event()
+        # profile name -> _DecodeCost, written and read only by the decode
+        # thread (and by stop(), after it has been asked to finish).
+        self._decode_cost = {}
+        self._decode_cost_reported_at = None
         self._decode_thread = threading.Thread(target=self._decode_loop, daemon=True)
 
     def start(self):
@@ -718,6 +785,11 @@ class Link:
     def stop(self):
         self._stop.set()
         self.transport.stop_receiving()
+        # After _stop is set, so the decode thread is on its way out and is
+        # not concurrently mutating the counters this reads.
+        if self._decode_thread.is_alive():
+            self._decode_thread.join(timeout=2 * DECODE_POLL_INTERVAL + 1.0)
+        self._report_decode_cost(final=True)
 
     def _reset_sequence_state(self):
         """Clears everything that is scoped to one session, at the moment a
@@ -837,8 +909,28 @@ class Link:
             snap = self.transport.snapshot_rx()
             if len(snap) > 0:
                 if self._decode_one(snap):
+                    self._report_decode_cost()
                     continue  # try again immediately in case another frame follows
+            self._report_decode_cost()
             time.sleep(DECODE_POLL_INTERVAL)
+
+    def _report_decode_cost(self, final=False):
+        """Logs per-profile decode cost every DECODE_COST_REPORT_INTERVAL.
+
+        On the decode thread, so the timing it reports is its own. `final`
+        forces a report regardless of the interval and is what stop() uses,
+        so a short session still leaves one line per profile behind."""
+        now = time.monotonic()
+        if self._decode_cost_reported_at is None:
+            self._decode_cost_reported_at = now
+            if not final:
+                return
+        if not final and now - self._decode_cost_reported_at < DECODE_COST_REPORT_INTERVAL:
+            return
+        self._decode_cost_reported_at = now
+        for name, cost in sorted(self._decode_cost.items()):
+            logger.info("[%s] decode cost%s at %s: %s", self.mycall,
+                        " (session total)" if final else "", name, cost.summary())
 
     def _decode_one(self, snap) -> bool:
         """Tries every candidate profile against `snap`; handles/consumes
@@ -857,8 +949,18 @@ class Link:
         its own threshold) but hasn't seen enough samples yet for a verdict,
         this poll holds off consuming anything and just waits for more
         audio, rather than letting a different candidate's near-miss win."""
-        results = [(profile, profile.decode(snap, head_seconds=self._rx_head_seconds))
-                   for profile in self._candidate_decode_profiles()]
+        results = []
+        for profile in self._candidate_decode_profiles():
+            cpu0, wall0 = time.thread_time(), time.perf_counter()
+            result = profile.decode(snap, head_seconds=self._rx_head_seconds)
+            cpu = time.thread_time() - cpu0
+            self._decode_cost.setdefault(profile.name, _DecodeCost()).add(
+                cpu, time.perf_counter() - wall0)
+            # Carried on the result so _finish_air_packet can report what the
+            # decode that actually produced a frame cost, as opposed to the
+            # running average over mostly-empty polls.
+            result["decode_cpu_seconds"] = cpu
+            results.append((profile, result))
         for profile, result in results:
             payload = result.get("payload")
             if payload is None:
@@ -900,8 +1002,14 @@ class Link:
     def _finish_air_packet(self, ptype, body, profile, snap, end, decode_result):
         trailing = max(0, len(snap) - end)
         self._peer_unkeyed_at = time.monotonic() - trailing / profile.sample_rate
-        logger.info("[%s] decoded %s body at profile %s", self.mycall,
-                    _ptype_name(ptype), profile.name)
+        cost = self._decode_cost.get(profile.name)
+        if cost is not None:
+            cost.frames += 1
+        cpu = decode_result.get("decode_cpu_seconds")
+        logger.info("[%s] decoded %s body at profile %s (%s)", self.mycall,
+                    _ptype_name(ptype), profile.name,
+                    "decode cpu unmeasured" if cpu is None
+                    else f"decode cpu {cpu * 1000.0:.1f} ms")
         received = decode_result.get("head_symbols_received")
         if received is not None:
             logger.info("[%s] RX outer head: observed %d adjacent symbols (%.1f ms)",
@@ -1197,7 +1305,7 @@ class Link:
         own_supported = list(self.modes.supported_ids)
         # Not `forced or history`: mode_id 0 is a real profile (300 baud)
         # and a perfectly reasonable thing to pin a bench run to.
-        proposed_id = _forced_mode_id()
+        proposed_id = _forced_mode_id(supported_ids=own_supported)
         if proposed_id is None:
             proposed_id = mode_history.last_good_mode(self.mode_history, self.mycall, dst_call)
         if proposed_id is None or proposed_id not in own_supported:
@@ -1318,7 +1426,7 @@ class Link:
         # to CONTROL_PROFILE if the caller hasn't told us it supports that
         # mode. The two legs need not match: this rig's two directions
         # measure different SNR (see whale/afsk.py's module docstring).
-        own_tx_id = _forced_mode_id()   # mode_id 0 is falsy, so not `or`
+        own_tx_id = _forced_mode_id(supported_ids=own_supported)  # mode_id 0 is falsy, so not `or`
         if own_tx_id is None:
             own_tx_id = mode_history.last_good_mode(self.mode_history, self.mycall, src)
         if (own_tx_id is None or own_tx_id not in own_supported
@@ -1455,10 +1563,17 @@ class Link:
         offset = 0
         while True:
             chunk = data[offset:offset + self.tx_profile.chunk_size]
-            offset += len(chunk)
-            is_last = offset >= len(data)
+            is_last = offset + len(chunk) >= len(data)
             starting_profile = self.tx_profile
             attempts = self._send_chunk_with_arq(self._tx_seq, chunk, is_last)
+            if attempts is _RESIZE:
+                # A step-down mid-chunk left this chunk too big for the mode
+                # now in force. It was never ACKed and the sequence number
+                # has not advanced, so re-cutting it smaller and sending it
+                # again under the same seq is indistinguishable, to the
+                # receiver, from a chunk that was always that size.
+                continue
+            offset += len(chunk)
             sent += 1
             if attempts is None:
                 raise LinkError(f"no ACK for chunk {sent} ({offset}/{len(data)} bytes) "
@@ -1545,6 +1660,12 @@ class Link:
             logger.warning("DATA seq=0x%02x: no ACK, retry %d/%d", seq, attempt, MAX_RETRIES)
             if attempt == STEP_DOWN_AFTER_ATTEMPTS:
                 self._step_tx_mode(-1)
+                if len(chunk) > self.tx_profile.chunk_size:
+                    logger.info("[%s] stepped down to %s mid-chunk; re-cutting seq=0x%02x "
+                                "(%d bytes > %d chunk_size)", self.mycall,
+                                self.tx_profile.name, seq, len(chunk),
+                                self.tx_profile.chunk_size)
+                    return _RESIZE
         return None
 
     # -- mid-session speed adaptation ---------------------------------------

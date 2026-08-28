@@ -28,10 +28,15 @@ whale/
   link.py         stop-and-wait ARQ: connect / send / recv / disconnect
   vara_server.py  VARA-API-shaped TCP front end (StationServer, CLI)
   hw/             sound card lookup + PTT keying (audio_io, ptt, radios)
+  modes/          physical-layer modes that are not CPFSK
+    vf3.py          58-carrier differential-QPSK OFDM, 1436 B in 5.2s
+    vf3_mode.py     VF3 as a negotiable WaveformMode (opt-in, mode 3)
 tests/
   link_harness.py         two Links against each other, in one process
   test_afsk_loopback.py   pure-software self-test, no hardware/radios
   test_link_recovery.py   what a *lost control frame* does to a session
+  test_vf3_mode.py        the mode contract VF3 has to satisfy to be negotiable
+  test_audio_e2e.py       the full TCP stack over paired audio, CPFSK and VF3
 scripts/
   bench.py                   the rig the sweeps share: radio pair, trial loop, walk
   hw_smoke_single_frame.py   one AFSK frame each direction, no ARQ/sockets
@@ -156,6 +161,107 @@ extra exchange.
 `WHALE_CAPTURE_DIR` is left in place: set it and the link saves the audio
 behind every near-miss decode, which is the input to whatever finally
 explains the ceiling.
+
+## Going faster than CPFSK: VF3
+
+`experiments/` holds several attempts at more throughput per keying, all
+measured on the same two radios and all summarised in their own RESULTS.md.
+The ranking is not close:
+
+| mode | net user bit/s | on-air evidence |
+| --- | ---: | --- |
+| shipped `PROFILE_1200` | 947 | acceptance runs |
+| `experiments/mfsk` `4fsk_650bd` | 1,011 | 45/45 each direction |
+| `experiments/ofdm` BPSK | 915 | 28/28 |
+| `experiments/vf3` 58-carrier DQPSK | ~2,200 | 6/6 each direction |
+| `experiments/vf4` star-8-QAM + RS | ~2,945 | 6/6 each direction |
+| `experiments/vf5` 16-QAM + pilots + RS | ~3,663 | 6/6 each direction |
+
+VF3 is the first of those to be reachable from the modem rather than only
+from a bench script. `whale/modes/vf3_mode.py` presents it as a
+`WaveformMode`, which is the interface `whale/waveform.py` defines and
+`whale/link.py` already negotiates, steps up and down, and confirms through
+DATA_ACK. Nothing in the link, the ARQ or the negotiation changed to admit
+it -- which is the claim `GOALS.md` makes for that boundary, tested rather
+than asserted.
+
+The DSP moved into the package unchanged; `experiments/vf3/vf3.py` is now a
+shim over it, so that experiment's own tests and its stored captures still
+run against the same code the modem would transmit.
+`tests/test_vf3_mode.py` asserts the default head still produces a
+bit-identical waveform, which is what keeps that true.
+
+Three things the adapter had to reconcile, all recorded in its docstring:
+
+  - **VF3 does the framing CPFSK asks `whale/framing.py` for.** Its payload
+    grid already carries a length, a CRC32 and a rate-1/2 convolutional code,
+    and it acquires on an OFDM header rather than a PN correlation. So the
+    link's air header is simply the first ten bytes of a VF3 payload.
+  - **The head is adaptive, and had to stay core-periodic.** The link
+    negotiates a leading guard per direction against the receiver's squelch
+    blackout. VF3 already had one in miniature -- 45 ms of the sync symbol's
+    1024-sample *core*, repeated -- so the adaptive head is that same
+    construction made longer. Building it from repeated *symbols* instead
+    looks equivalent and is not: acquisition locks by correlating the signal
+    against itself one symbol apart, so a symbol-periodic head extends that
+    correlation's plateau across the whole head and leaves the ranking step a
+    single arbitrary offset inside it to score.
+  - **Head feedback is measured but not reported.** VF3 counts the head cores
+    that survived, and the adapter returns that for the logs only. The link's
+    `_head_feedback_request` weighs an observation against
+    `afsk.PAD_MATCH_WINDOW_SYMBOLS / baud`, a CPFSK constant in CPFSK bit
+    units; against VF3's 21.3 ms cores that allowance becomes 341 ms and would
+    swallow every real deficit. Reporting nothing takes the "missing
+    observation" branch and leaves the head where the control-plane
+    calibration put it. Making that loop mode-independent is the next piece of
+    work, not something to fake here.
+
+### It carries a session
+
+`tests/test_audio_e2e.py` now runs the whole TCP stack twice, once on the
+CPFSK ladder and once with VF3 appended: connect, 4 KB each way, disconnect,
+through both StationServers, both ModemServices, ARQ and the real
+modulate/demodulate, with only the sound cards replaced. Both directions
+climb 300 -> 600 -> 1200 -> VF3 on their own -- nothing pins the mode -- and
+each station's `rx_profile` agrees with its peer's `tx_profile`, so the
+mode-confirmation path in DATA_ACK is exercised rather than assumed.
+
+The test measures **airtime**, the seconds each station was keyed, because
+the transports hand audio over instantly and wall-clock time here means
+nothing:
+
+| bytes each way | CPFSK ladder | with VF3 | | net application rate |
+| ---: | ---: | ---: | ---: | --- |
+| 4,000 | 93.9s | 66.6s | 1.41x | 681 -> 960 bit/s |
+| 16,000 | 315.7s | 161.0s | 1.96x | 811 -> 1,590 bit/s |
+
+That is below the 2.3x the frame arithmetic suggests, for two reasons the
+measurement makes visible and the frame arithmetic hides:
+
+  - **The climb is a fixed cost.** Reaching VF3 takes one clean chunk at each
+    of 300, 600 and 1200 baud, about 15s of air, whatever the transfer is
+    worth. It is most of the difference between the two rows above, and it is
+    why mode history (`whale/mode_history.py`) matters more once a fast mode
+    exists than it did when the top rung was 1200 baud.
+  - **The ACK is now 12% of a chunk.** A 5.2s VF3 keying is answered by a
+    0.70s DATA_ACK on the 300-baud control plane. That was a rounding error
+    against a 3.0s chunk carrying 402 bytes and is not one against a 5.2s
+    chunk carrying 1,426. The control plane has to stay robust, but it does
+    not have to stay 300 baud for an ACK the peer just proved it can decode a
+    faster mode from.
+
+**VF3 is not in `afsk.default_registry()`.** It has now carried a session in
+software, but on the radios it has only the 6/6 with ARQ bypassed; putting it
+in the default registry would change what every station transmits before
+`scripts/hw_smoke_link.py` has run with it.
+`whale.modes.vf3_mode.registry_with_vf3()` appends it as the top rung for
+anyone who wants to try it on the bench.
+
+One consequence worth stating plainly: a VF3 keying is 5.2 s, against the
+3.0 s of useful audio the CPFSK profiles are sized to. That cap is CPFSK's
+own -- see "How long one keying may be" -- and the reasons behind it are
+answered differently by a waveform with a cyclic prefix and per-carrier
+equalisation. Keyings of around five seconds are acceptable here.
 
 ## Losing a control frame
 
@@ -407,7 +513,8 @@ name matching, PTT wiring, COM ports) is configured in `whale/hw/radios.py`.
 Software-only self-tests (no radios needed):
 
 ```
-pytest tests/test_audio_e2e.py -q       # full TCP stack over paired audio samples
+pytest tests/test_audio_e2e.py -q       # full TCP stack over paired audio, CPFSK and VF3
+pytest tests/test_vf3_mode.py -q         # the VF3 WaveformMode contract
 python tests/test_afsk_loopback.py
 python tests/test_link_recovery.py
 ```

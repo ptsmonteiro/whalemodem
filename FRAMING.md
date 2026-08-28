@@ -59,6 +59,28 @@ body. The two directions
 are negotiated and adapted independently as described in
 [`LINK.md`](LINK.md#mode-adaptation).
 
+### Mode 3: VF3, a non-CPFSK DATA mode
+
+Mode `3` is the first mode that is not CPFSK and not framed by this document.
+It is `whale.modes.vf3_mode.VF3`: a 58-carrier differential-QPSK OFDM frame
+over 468.75-3140.625 Hz, carrying 1,426 DATA bytes in a fixed 5.2 s waveform,
+with its own acquisition header, length field, CRC32 and rate-1/2
+convolutional code in place of everything under "Framing" below. It reaches
+the link only through the same `encode()` / `decode()` / `airtime()` contract,
+which is the point: nothing in connection management, ARQ or negotiation
+changed to accommodate it.
+
+It is not in `afsk.default_registry()`. VF3 has passed 6/6 full-capacity
+frames in each direction on the bench with ARQ bypassed
+(`experiments/vf3/RESULTS.md`) but has not yet carried a session, so it is
+opt-in through `whale.modes.vf3_mode.registry_with_vf3()` until it has.
+
+Two consequences of it being a DATA mode only. The control plane stays on mode
+0, so a station that cannot decode VF3 still completes CONNECT and still
+receives DATA once the ISS steps down. And because a VF3 keying is 5.2 s
+whatever it carries, a short packet would waste the difference -- which is
+harmless, since control packets never ride a DATA mode.
+
 The receiver detects the known sync word using normalized correlation. The
 current confidence threshold is 0.7. This is a receiver implementation detail,
 not an encoded field.
@@ -162,13 +184,21 @@ The control profile's order-6 sequence is:
 100000111111010101100110111011010010011100010111100101000110000
 ```
 
-The length field can represent a 65,535-byte payload, but the built-in profiles
+The length field can represent a 65,535-byte payload, but the CPFSK profiles
 do not send frames remotely that large. Useful framed audio is capped at 3.0
 seconds across the complete packet. Here, useful audio is sync, length,
 header, body, and CRCs; it excludes the outer head throwaway
 symbols and transport startup. Each profile's DATA chunk size is the largest
 value that fits this budget. Total keying time is calculated separately and
 will vary with the selected timing protection.
+
+The 3.0 second figure is a property of the CPFSK profiles, not of the modem:
+it is `afsk.MAX_USEFUL_FRAME_SECONDS`, and the reasons for it (retransmit
+granularity, half-duplex responsiveness, and a rigid symbol grid with no
+timing recovery) are CPFSK's. A mode that answers them differently may key
+for longer. VF3 does: its cyclic prefix and per-carrier equalisation give it
+timing tolerance CPFSK has no equivalent of, and it keys for 5.2 s. Keyings of
+around five seconds are acceptable in this project.
 
 The generic length becomes trusted when the fixed header CRC arrives, before
 the optional body. The header's body length must agree with the generic length.
