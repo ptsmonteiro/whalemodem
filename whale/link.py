@@ -1203,7 +1203,7 @@ class Link:
                     old * 1000, new * 1000)
         return True
 
-    def _wait_packet(self, want_types, timeout):
+    def _wait_packet(self, want_types, timeout, *, restart_after_duplicate_connect=False):
         deadline = time.time() + timeout
         while True:
             remaining = deadline - time.time()
@@ -1216,6 +1216,14 @@ class Link:
             if ptype in want_types:
                 return ptype, body
             if ptype == PT_CONNECT and self._answer_duplicate_connect(body):
+                # Re-answering can itself consume most or all of a control
+                # timeout on a slow control waveform (HC0 takes several
+                # seconds).  During connection establishment the caller
+                # cannot send TIMING_ACK until this retransmitted ACK has
+                # finished, so give it a fresh response window measured
+                # from the end of our transmission.
+                if restart_after_duplicate_connect:
+                    deadline = time.time() + timeout
                 continue
             # Not what we're waiting for right now (e.g. a stray DISC from a
             # previous session) -- drop it and keep waiting.
@@ -1498,7 +1506,9 @@ class Link:
         # poll. Give the rest of the handshake its full control-frame
         # timeout even when the service called listen_once with a short
         # polling timeout.
-        got_timing = self._wait_packet({PT_TIMING_ACK}, self.control_ack_timeout)
+        got_timing = self._wait_packet(
+            {PT_TIMING_ACK}, self.control_ack_timeout,
+            restart_after_duplicate_connect=True)
         if got_timing is None:
             self.state = "IDLE"
             return None

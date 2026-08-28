@@ -304,6 +304,41 @@ def test_lost_connect_ack_still_brings_both_ends_up():
         _stop(a, b)
 
 
+def test_duplicate_connect_ack_restarts_listener_timing_deadline():
+    """A slow retransmitted CONNECT_ACK must not consume TIMING_ACK's wait.
+
+    This is the real-HF form of a lost CONNECT_ACK: HC0's ACK airtime can
+    carry the listener past the deadline established before it began
+    re-answering the duplicate.  The caller is half duplex and cannot start
+    TIMING_ACK until that re-answer is complete.
+    """
+    station = link.Link(harness.FakeTransport(), "STA2")
+    duplicate = b"duplicate connect"
+    timing = b"timing ack"
+
+    def slow_reanswer(body):
+        assert body == duplicate
+        time.sleep(0.04)
+        return True
+
+    station._answer_duplicate_connect = slow_reanswer
+    station._rx_packets.put((link.PT_CONNECT, duplicate))
+
+    def deliver_after_original_deadline():
+        time.sleep(0.075)
+        station._rx_packets.put((link.PT_TIMING_ACK, timing))
+
+    sender = threading.Thread(target=deliver_after_original_deadline)
+    sender.start()
+    try:
+        got = station._wait_packet(
+            {link.PT_TIMING_ACK}, 0.05,
+            restart_after_duplicate_connect=True)
+        assert got == (link.PT_TIMING_ACK, timing), got
+    finally:
+        sender.join(timeout=1)
+
+
 def test_a_caller_that_gives_up_does_not_leave_the_listener_connected():
     """Every CONNECT_ACK is lost, so idempotency cannot save it and the
     caller is right to give up. What must not happen is the listener

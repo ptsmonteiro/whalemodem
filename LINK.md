@@ -134,7 +134,9 @@ removed MODE_REQ/MODE_ACK exchange.
 
 The session ID and the complete encoded CONNECT body identify an attempt. A
 listener answers an identical duplicate CONNECT using the same format version
-and mode choices. Adaptive-timing measurements may change only according to
+and mode choices. While awaiting TIMING_ACK, the listener starts a fresh
+control-response timeout after a duplicate CONNECT_ACK finishes transmitting;
+the half-duplex caller cannot begin TIMING_ACK before then. Adaptive-timing measurements may change only according to
 the conservative aggregation rule in `ADAPTIVE_TIMING.md`. A CONNECT with the
 same session ID but different bytes is invalid. This prevents the handshake
 feature set from changing across retries.
