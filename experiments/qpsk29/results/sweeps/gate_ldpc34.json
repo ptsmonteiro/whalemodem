@@ -1,0 +1,57 @@
+{
+  "profile": "qpsk29-ldpc34: 29 carriers 468.75-3093.75Hz QPSK, fec 3/4, 1028B/frame, 1582bit/s over 5.200s",
+  "fec": "3/4",
+  "payload_bytes": 1028,
+  "payload_bitrate": 1581.5384615384614,
+  "amplitude": 0.9,
+  "papr_db": 9.0,
+  "trials": 1,
+  "directions": {
+    "ic7300->ic705": [
+      {
+        "trial": 1,
+        "decoded": true,
+        "keyed_seconds": 5.354,
+        "decode_seconds": 3.131,
+        "confidence": 0.99278,
+        "cfo_hz": -8.149,
+        "raw_ber": 0.024259227170334432,
+        "carrier_snr_db": [
+          16.92,
+          18.6,
+          18.37,
+          18.42,
+          17.9,
+          19.42,
+          19.73,
+          16.68,
+          18.37,
+          18.49,
+          18.85,
+          17.31,
+          19.27,
+          18.03,
+          18.43,
+          19.55,
+          18.04,
+          17.34,
+          17.44,
+          19.48,
+          21.06,
+          21.05,
+          18.36,
+          17.7,
+          16.89,
+          13.17,
+          8.41,
+          -2.14,
+          -8.91
+        ],
+        "ldpc_ok": 17,
+        "ldpc_iterations_max": 3,
+        "pilot_error_rms": 0.63811,
+        "failure": null
+      }
+    ]
+  }
+}

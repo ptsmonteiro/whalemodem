@@ -388,6 +388,16 @@ at all; the weak leg -- the one HC1 could not carry -- with 2 in 1,132, which
 a rate-1/2 K=7 code does not notice. Acquisition scored 0.38-0.50 against a
 0.12 threshold in both directions.
 
+The standalone [`experiments/qpsk29`](experiments/qpsk29/README.md) follow-up
+uses that strong IC-7300 -> IC-705 direction to explore a longer, faster 4PSK
+frame. Its LDPC-3/4 profile carries 1,028 bytes in 5.200 s (1,581.5 payload
+bit/s) and passed 4/4 fresh random frames byte-for-byte. It remains an
+experiment rather than another HF ladder rung: only one direction was tested,
+its 468.75–3093.75 Hz carrier span is wider than the 2300 Hz standard-HF
+target, its keying exceeds the modem's 3.0 s cap, and decode currently costs
+about 1.8 s on replay on the development PC. The capture-led fixes and full measurements
+are in [`experiments/qpsk29/RESULTS.md`](experiments/qpsk29/RESULTS.md).
+
 Both legs measure the carrier offset at about 8 Hz, opposite in sign: a real
 difference between two crystal oscillators, and the quantity no CPFSK profile
 in this repo can see. One capture from each direction is committed under

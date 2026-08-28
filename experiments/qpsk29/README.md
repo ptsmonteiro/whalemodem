@@ -2,7 +2,9 @@
 
 A from-scratch implementation of a handed-down frame specification. It shares
 no DSP with `experiments/ofdm/` and does not obey the shipped modem's 3.0 s
-keying cap: one frame keys the transmitter for 5.200 s.
+keying cap: one frame keys the transmitter for 5.200 s. The implementation is
+complete and its fastest coded profile has been exercised on the strong
+IC-7300 -> IC-705 HF path; see [`RESULTS.md`](RESULTS.md).
 
 | parameter | value |
 |---|---|
@@ -70,10 +72,11 @@ and slides out toward 640 on a single core when it is not. `symbol_carriers()`
 raises rather than combining past `d = 128`, because silently returning garbage
 there is the failure this design makes easy.
 
-That also puts real weight on `L`. Multipath is nil on a short VHF FM path, but
-the radios' audio filters are not — a steep 300–3000 Hz filter's impulse
-response can run a millisecond or more (~48 samples), a third of the combining
-window before any timing error at all. `probe_carriers.py` measures it.
+That also puts real weight on `L`. Multipath is nil on a short bench path, but
+the radios' audio filters are not — a steep data filter's impulse response can
+run a millisecond or more (~48 samples), a third of the combining window before
+any timing error at all. `demodulate_debug()` reports the channel-derived delay
+spread alongside its carrier SNRs.
 
 ## Exactly 17 codewords, always
 
@@ -100,14 +103,16 @@ over the codeword axis.
 
 17 × 648 = 11 016 against 11 542 grid bits leaves 526 bits — 263 QPSK symbols,
 4.6% of the payload. Rather than transmit them as zeros, the interleaver
-scatters them in both time and frequency and the receiver uses them as known
-phase references.
+places them on a deterministic time/frequency lattice and the receiver uses
+them as known phase references. Every carrier receives at least eight anchors,
+including one in both the first and last quarter of the payload.
 
-The specification deliberately has no pilots and asks the tracker to run
-decision-directed across 199 symbols (4.8 s), which is the thinnest margin in
-the receiver. These anchors cost nothing and change no published parameter of
-the frame. Decision-directed tracking still does the work between them; 4.6%
-alone is too thin to carry it.
+The initial implementation scattered them with a fixed random permutation.
+The first radio capture showed why that is not a sufficient invariant: one
+carrier happened to receive its final pilot at payload symbol 70 and then
+accumulated 1.6 radians of untracked sound-card phase. Balanced placement is
+now asserted in `test_qpsk29.py`. The phase between anchors is fitted as the
+affine residual-frequency/sample-clock motion measured on this bench.
 
 ## Capacity
 
@@ -142,10 +147,7 @@ see it was a decision.
 | `qpsk29.py` | the modem — constants, profile, `modulate`, `demodulate`, `demodulate_debug` |
 | `ldpc.py` | IEEE 802.11n length-648 QC-LDPC, copied so this experiment stands alone |
 | `test_qpsk29.py` | software invariants, no hardware |
-| `screen_qpsk29.py` | software channel model, no hardware |
-| `probe_carriers.py` | on-air per-carrier SNR, channel magnitude and delay spread |
 | `run_qpsk29.py` | on-air frame runner |
-| `diagnose_qpsk29.py` | offline post-mortem of a saved capture |
 | `RESULTS.md` | dated on-air outcomes |
 
 ## Running
@@ -153,27 +155,22 @@ see it was a decision.
 Software only, no radios:
 
     python experiments/qpsk29/test_qpsk29.py
-    python experiments/qpsk29/screen_qpsk29.py
 
 On air — these key a transmitter for 5.2 s per frame:
 
-    python experiments/qpsk29/probe_carriers.py --direction ht-to-ic705 \
-        --out experiments/qpsk29/results/measurements/probe.json
-
-    python experiments/qpsk29/run_qpsk29.py --direction ht-to-ic705 \
-        --fec 2/3 --trials 10 \
-        --capture-dir experiments/qpsk29/results/captures/ldpc23 \
-        --out experiments/qpsk29/results/sweeps/ldpc23.json
-
-Post-mortem of a capture:
-
-    python experiments/qpsk29/diagnose_qpsk29.py \
-        --capture <run>.npy --payload-file <run>.bin
+    python experiments/qpsk29/run_qpsk29.py --direction ab \
+        --a ic7300 --b ic705 --fec 3/4 --trials 3 \
+        --capture-dir experiments/qpsk29/results/captures/confirm_ldpc34 \
+        --out experiments/qpsk29/results/sweeps/confirm_ldpc34.json
 
 Note `pyproject.toml` sets `testpaths = ["tests"]`, so `test_qpsk29.py` is run
 by name and is not collected by a bare `pytest`.
 
 ## Status
 
-Contract frozen, implementation in progress. Nothing has been on air yet;
-`RESULTS.md` is where that will be recorded when it has.
+Implementation complete. LDPC 3/4 is the fastest coded profile tested on the
+requested IC-7300 -> IC-705 direction: 1,028 bytes in 5.200 s, or 1,581.5
+payload bit/s, with 4/4 fresh random frames decoded byte-for-byte. This is an
+experimental one-direction result, not a production HF mode: it exceeds both
+the shipped 3.0 s keying cap and the project's 2300 Hz standard-HF comparison
+band, and the reverse radio direction has not been tested.

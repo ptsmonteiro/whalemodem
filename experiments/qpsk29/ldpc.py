@@ -188,4 +188,55 @@ def decode_batch(llrs, max_iterations=30, alpha=0.8, rate=RATE):
     optimisation sitting on the critical decode path and a divergence here
     would quietly invalidate every on-air result.
     """
-    raise NotImplementedError
+    channel = np.asarray(llrs, dtype=float)
+    if channel.ndim != 2 or channel.shape[1] != N:
+        raise ValueError(f"expected (B, {N}) LLRs")
+    blocks = channel.shape[0]
+    k = INFORMATION_BITS[rate]
+    checks = _checks(rate)
+    c_to_v = [np.zeros((blocks, len(v)), dtype=float) for v in checks]
+    posterior = channel.copy()
+    iterations = np.full(blocks, max_iterations, dtype=np.int32)
+    done = np.zeros(blocks, dtype=bool)
+
+    for iteration in range(max_iterations + 1):
+        hard = (posterior < 0).astype(np.uint8)
+        # Computing H @ hard.T in one operation is substantially cheaper than
+        # calling syndrome once per codeword, and remains exact over GF(2).
+        clear = ~np.any((parity_check(rate) @ hard.T) & 1, axis=0)
+        newly_done = clear & ~done
+        iterations[newly_done] = iteration
+        done |= clear
+        if np.all(done) or iteration == max_iterations:
+            break
+
+        old_posterior = channel.copy()
+        for variables, message in zip(checks, c_to_v):
+            old_posterior[:, variables] += message
+
+        new_messages = []
+        for ci, variables in enumerate(checks):
+            incoming = old_posterior[:, variables] - c_to_v[ci]
+            signs = np.where(incoming < 0, -1.0, 1.0)
+            magnitudes = np.abs(incoming)
+            smallest = np.argmin(magnitudes, axis=1)
+            minima = np.partition(magnitudes, 1, axis=1)[:, :2]
+            min1, min2 = minima[:, 0], minima[:, 1]
+            total_sign = np.prod(signs, axis=1)
+            outgoing = alpha * total_sign[:, None] * signs * min1[:, None]
+            rows = np.arange(blocks)
+            outgoing[rows, smallest] = (
+                alpha * total_sign * signs[rows, smallest] * min2)
+            # A block that has already converged is frozen.  Its messages no
+            # longer matter because its posterior is likewise preserved.
+            outgoing[done] = c_to_v[ci][done]
+            new_messages.append(outgoing)
+        c_to_v = new_messages
+
+        updated = channel.copy()
+        for variables, message in zip(checks, c_to_v):
+            updated[:, variables] += message
+        posterior[~done] = updated[~done]
+
+    hard = (posterior < 0).astype(np.uint8)
+    return hard[:, :k], iterations, done

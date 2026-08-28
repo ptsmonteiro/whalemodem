@@ -1,7 +1,6 @@
 # qpsk29 experiment artifacts
 
-- `sweeps/` — JSON summaries from `run_qpsk29.py`
-- `measurements/` — per-carrier SNR and delay-spread JSON from `probe_carriers.py`
+- `sweeps/` — tracked JSON summaries from `run_qpsk29.py`
 - `captures/` — paired received-audio (`.npy`) and payload (`.bin`) captures (ignored by Git)
 - `failures/` — individual failed frames saved for diagnosis (ignored by Git)
 - `logs/` — console output from longer runs (ignored by Git)
