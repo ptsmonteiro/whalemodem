@@ -94,8 +94,50 @@ import time
 
 import numpy as np
 
-from whale import afsk, framing, mode_history
+from whale import afsk, mode_history
+from whale import link_protocol as protocol
 from whale.policy import VHF_FM
+
+# Public compatibility aliases.  The wire-format implementation lives in
+# link_protocol; callers that historically imported these from whale.link
+# continue to see the same API.
+PT_CONNECT = protocol.PT_CONNECT
+PT_CONNECT_ACK = protocol.PT_CONNECT_ACK
+PT_DISC = protocol.PT_DISC
+PT_DISC_ACK = protocol.PT_DISC_ACK
+PT_DATA = protocol.PT_DATA
+PT_DATA_ACK = protocol.PT_DATA_ACK
+PT_FLOOR_REQ = protocol.PT_FLOOR_REQ
+PT_FLOOR_GRANT = protocol.PT_FLOOR_GRANT
+PT_TIMING_ACK = protocol.PT_TIMING_ACK
+PT_TIMING_CONFIRM = protocol.PT_TIMING_CONFIRM
+EOF_BIT = protocol.EOF_BIT
+SEQ_MASK = protocol.SEQ_MASK
+SEQ_MODULO = protocol.SEQ_MODULO
+SESSION_ID_NONE = protocol.SESSION_ID_NONE
+CONNECT_FORMAT_MAGIC = protocol.CONNECT_FORMAT_MAGIC
+CONNECT_FORMAT_VERSION = protocol.CONNECT_FORMAT_VERSION
+_CONTROL_PLANE_TYPES = protocol.CONTROL_PLANE_TYPES
+_DATA_PLANE_TYPES = protocol.DATA_PLANE_TYPES
+_AIR_HEADER_LEN = protocol.AIR_HEADER_LEN
+_PTYPE_NAMES = protocol.PTYPE_NAMES
+_PTYPES_BY_NAME = {name: ptype for ptype, name in _PTYPE_NAMES.items()}
+_air_inline_length = protocol.air_inline_length
+_encode_air_header = protocol.encode_air_header
+_decode_air_header = protocol.decode_air_header
+_valid_air_shape = protocol.valid_air_shape
+_seq_ahead = protocol.seq_ahead
+_ptype_name = protocol.ptype_name
+_connection_envelope = protocol.connection_envelope
+_decode_connection_envelope = protocol.decode_connection_envelope
+_call_bytes = protocol.call_bytes
+_take_call = protocol.take_call
+_decode_call_pair = protocol.decode_call_pair
+_encode_call_and_modes = protocol.encode_call_and_modes
+_decode_call_and_modes = protocol.decode_call_and_modes
+_encode_connect_ack = protocol.encode_connect_ack
+_decode_connect_ack = protocol.decode_connect_ack
+_negotiate_mode = protocol.negotiate_mode
 
 logger = logging.getLogger(__name__)
 
@@ -125,29 +167,6 @@ def _decode_snr_summary(result):
 
     return "SNR unavailable"
 
-PT_CONNECT = 0x01
-PT_CONNECT_ACK = 0x02
-PT_DISC = 0x03
-PT_DISC_ACK = 0x04
-PT_DATA = 0x05
-PT_DATA_ACK = 0x06         # v3 body: [answered_seq, next_expected_seq, received_mode_id, requested_head]
-# 0x07 and 0x08 were MODE_REQ/MODE_ACK in version 1. They are reserved so an
-# old control exchange is rejected rather than reinterpreted as another type.
-PT_FLOOR_REQ = 0x09        # IRS asking to become ISS -- see _acquire_floor
-PT_FLOOR_GRANT = 0x0A      # ISS handing the floor to the peer -- see _handle_floor_req
-PT_TIMING_ACK = 0x0B
-PT_TIMING_CONFIRM = 0x0C
-
-# Packet types whose bodies are small and must survive even when the
-# negotiated data profile is struggling -- these always go out on
-# afsk.CONTROL_PROFILE (see _tx_packet), never on self.tx_profile. Only bulk
-# only the DATA body ever rides the negotiated speed.
-_CONTROL_PLANE_TYPES = {PT_CONNECT, PT_CONNECT_ACK, PT_DISC, PT_DISC_ACK, PT_DATA_ACK,
-                         PT_FLOOR_REQ, PT_FLOOR_GRANT, PT_TIMING_ACK,
-                         PT_TIMING_CONFIRM}
-
-CONNECT_FORMAT_MAGIC = b"\xffWHL"
-CONNECT_FORMAT_VERSION = 4
 CALIBRATION_SECONDS = 1.0
 HEAD_MIN_GUARD_SECONDS = 0.01
 TIMING_MARGIN = 0.0
@@ -179,75 +198,6 @@ HEAD_ZERO_INCREASE_SECONDS = 0.1
 # self-correcting -- see _confirm_rx_profile. A decoded control-plane frame
 # says nothing of the sort, since it would have gone out at
 # afsk.CONTROL_PROFILE whatever either station had negotiated.
-_DATA_PLANE_TYPES = {PT_DATA}
-
-# Every keying starts with this fixed-size packet in the registry's robust
-# control mode.  Its ordinary frame CRC is therefore a CRC over every field
-# below, including the length and mode used to configure the following body
-# decoder.  Up to two bytes live inline, making the common ACK and one-byte
-# control packets header-only transmissions.
-_AIR_HEADER_MAGIC = b"WH"
-_AIR_HEADER_VERSION = 2
-_AIR_HEADER_INLINE_BYTES = 2
-_AIR_HEADER_LEN = framing.BOOTSTRAP_HEADER_BYTES
-
-
-def _air_inline_length(ptype):
-    if ptype == PT_DATA:
-        return 2
-    if ptype in (PT_CONNECT, PT_CONNECT_ACK, PT_TIMING_ACK,
-                 PT_TIMING_CONFIRM):
-        return 2
-    if ptype == PT_DATA_ACK:
-        return 2
-    return 0
-
-
-def _encode_air_header(ptype: int, body_mode_id: int, body: bytes):
-    inline_count = _air_inline_length(ptype)
-    inline = body[:inline_count]
-    remainder = body[len(inline):]
-    if len(remainder) > framing.MAX_PAYLOAD_BYTES:
-        raise ValueError("packet body is too long")
-    header = (_AIR_HEADER_MAGIC + bytes([_AIR_HEADER_VERSION, ptype, body_mode_id,
-                                         len(inline)])
-              + len(remainder).to_bytes(2, "big")
-              + inline.ljust(_AIR_HEADER_INLINE_BYTES, b"\x00"))
-    assert len(header) == _AIR_HEADER_LEN
-    return header, remainder
-
-
-def _decode_air_header(raw: bytes):
-    if len(raw) != _AIR_HEADER_LEN or raw[:2] != _AIR_HEADER_MAGIC:
-        return None
-    if raw[2] != _AIR_HEADER_VERSION:
-        return None
-    inline_len = raw[5]
-    if inline_len > _AIR_HEADER_INLINE_BYTES:
-        return None
-    if any(raw[8 + inline_len:10]):
-        return None
-    return raw[3], raw[4], int.from_bytes(raw[6:8], "big"), raw[8:8 + inline_len]
-
-
-def _valid_air_shape(ptype, profile, body_len, inline, control_mode_id):
-    """Semantic checks applied only after the header CRC has passed."""
-    if ptype == PT_DATA:
-        return len(inline) == 2 and body_len <= profile.chunk_size
-    if profile.mode_id != control_mode_id:
-        return False
-    if ptype in (PT_CONNECT, PT_CONNECT_ACK):
-        return len(inline) == 2 and 0 < body_len <= 128
-    if ptype == PT_DATA_ACK:
-        return len(inline) == 2 and body_len == 2
-    if ptype == PT_TIMING_ACK:
-        return len(inline) == 2 and body_len == 0
-    if ptype == PT_TIMING_CONFIRM:
-        return len(inline) == 2 and body_len == 0
-    if ptype in (PT_DISC, PT_DISC_ACK, PT_FLOOR_REQ, PT_FLOOR_GRANT):
-        return len(inline) == 0 and body_len == 0
-    return False
-
 # The seq byte of a DATA frame: one flag bit and a seven-bit sequence
 # number.
 #
@@ -258,10 +208,6 @@ def _valid_air_shape(ptype, profile, body_len, inline, control_mode_id):
 # a lost ACK at a message boundary silently duplicated data. A counter that
 # runs for the whole session has no such boundary to trip over. See
 # _reset_sequence_state.
-EOF_BIT = 0x80             # last chunk of the message
-SEQ_MASK = 0x7F
-SEQ_MODULO = SEQ_MASK + 1
-
 # A DATA_ACK carries two sequence numbers, and needs both.
 #
 #   answered_seq       the frame this ACK is a response to
@@ -308,7 +254,6 @@ DECODE_POLL_INTERVAL = 0.15
 # module docstring for why it is on air at all. 0 is reserved for "not
 # stated" so a body that decoded short reads as unknown rather than as
 # session zero; _new_session_id never returns it.
-SESSION_ID_NONE = 0
 
 
 def _new_session_id():
@@ -347,13 +292,6 @@ TX_TURNAROUND_DELAY = VHF_FM.tx_turnaround_delay
 # a peer that is still talking.
 ANCHOR_AGE_SLACK = DECODE_POLL_INTERVAL
 
-
-def _seq_ahead(a, b):
-    """How far sequence number `a` is ahead of `b`, in a space that wraps
-    at SEQ_MODULO. Only meaningful for distances shorter than half the
-    space; stop-and-wait never has more than one frame outstanding, so the
-    only answers that arise here are 0 and 1."""
-    return (a - b) % SEQ_MODULO
 
 # Mid-session speed adaptation thresholds. How much evidence a step up needs
 # and how fast a step down fires are both bets about how the channel varies,
@@ -398,22 +336,6 @@ def _channel_value(policy, field):
 # Rough control-frame payload size used to size the control-plane ACK
 # timeout (callsigns + mode list all comfortably fit) -- not a hard limit.
 _CONTROL_FRAME_LEN_ESTIMATE = 32
-
-_PTYPE_NAMES = {
-    PT_CONNECT: "CONNECT", PT_CONNECT_ACK: "CONNECT_ACK",
-    PT_DISC: "DISC", PT_DISC_ACK: "DISC_ACK",
-    PT_DATA: "DATA", PT_DATA_ACK: "DATA_ACK",
-    PT_FLOOR_REQ: "FLOOR_REQ", PT_FLOOR_GRANT: "FLOOR_GRANT",
-    PT_TIMING_ACK: "TIMING_ACK", PT_TIMING_CONFIRM: "TIMING_CONFIRM",
-}
-
-
-def _ptype_name(ptype):
-    return _PTYPE_NAMES.get(ptype, f"0x{ptype:02x}")
-
-
-_PTYPES_BY_NAME = {name: ptype for ptype, name in _PTYPE_NAMES.items()}
-
 
 # -- test affordances --------------------------------------------------
 #
@@ -515,104 +437,6 @@ def _mode_step_script(env=None):
     return script
 
 
-def _connection_envelope(content):
-    return CONNECT_FORMAT_MAGIC + bytes([CONNECT_FORMAT_VERSION]) + len(content).to_bytes(2, "big") + content
-
-
-def _decode_connection_envelope(payload):
-    if (len(payload) < 7 or payload[:4] != CONNECT_FORMAT_MAGIC
-            or payload[4] != CONNECT_FORMAT_VERSION
-            or int.from_bytes(payload[5:7], "big") != len(payload) - 7):
-        raise ValueError("invalid connection body envelope")
-    return memoryview(payload)[7:]
-
-
-def _call_bytes(call):
-    raw = call.encode("ascii")
-    if not 1 <= len(raw) <= 15 or any(chr(c) not in "ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789-" for c in raw):
-        raise ValueError("invalid callsign")
-    return bytes([len(raw)]) + raw
-
-
-def _take_call(content, offset):
-    if offset >= len(content):
-        raise ValueError("missing callsign")
-    size = content[offset]
-    end = offset + 1 + size
-    if not 1 <= size <= 15 or end > len(content):
-        raise ValueError("invalid callsign length")
-    call = bytes(content[offset + 1:end]).decode("ascii")
-    _call_bytes(call)
-    return call, end
-
-
-def _decode_call_pair(payload):
-    try:
-        content = _decode_connection_envelope(payload)
-        src, offset = _take_call(content, 0)
-        dst, _ = _take_call(content, offset)
-        return src, dst
-    except (ValueError, UnicodeError):
-        return "", ""
-
-
-def _encode_call_and_modes(a, b, supported_ids, extra_id, session_id=SESSION_ID_NONE):
-    """CONNECT body: "a\\x00b\\x00" + one byte per supported mode_id + two
-    trailing bytes -- the sender's proposed TX mode_id for the a->b
-    direction, and the session identifier it has picked for this call (see
-    the module docstring; SESSION_ID_NONE if it has none)."""
-    modes = bytes(sorted(set(supported_ids)))
-    content = (_call_bytes(a) + _call_bytes(b) + bytes([session_id, len(modes)])
-               + modes + bytes([extra_id]))
-    return _connection_envelope(content)
-
-
-def _decode_call_and_modes(payload):
-    content = _decode_connection_envelope(payload)
-    a, offset = _take_call(content, 0)
-    b, offset = _take_call(content, offset)
-    if offset + 3 > len(content):
-        raise ValueError("truncated CONNECT")
-    session_id, count = content[offset], content[offset + 1]
-    offset += 2
-    if offset + count + 1 != len(content):
-        raise ValueError("invalid CONNECT mode count")
-    modes = list(content[offset:offset + count])
-    return a, b, modes, content[-1], session_id
-
-
-def _encode_connect_ack(a, b, supported_ids, accepted_tx_id, own_tx_id,
-                        session_id=SESSION_ID_NONE):
-    """CONNECT_ACK body: same shape as CONNECT's, but with *three* trailing
-    bytes instead of two -- the two directions of the link are negotiated
-    independently (one station's TX quality to its peer is not the same as
-    the reverse leg, see whale/afsk.py's measured per-direction SNR), so the
-    listener must report back both: the mode_id it's accepting for the
-    caller's proposed (a->b) direction, and the mode_id it has separately
-    chosen for its own (b->a) transmissions. The third is the caller's own
-    session identifier echoed back unchanged, which is what lets the caller
-    tell this ack from a leftover ack for some earlier session."""
-    modes = bytes(sorted(set(supported_ids)))
-    content = (_call_bytes(a) + _call_bytes(b) + bytes([session_id, len(modes)]) + modes
-               + bytes([accepted_tx_id, own_tx_id]))
-    return _connection_envelope(content)
-
-
-def _decode_connect_ack(payload):
-    content = _decode_connection_envelope(payload)
-    a, offset = _take_call(content, 0)
-    b, offset = _take_call(content, offset)
-    if offset + 4 > len(content):
-        raise ValueError("truncated CONNECT_ACK")
-    session_id, count = content[offset], content[offset + 1]
-    offset += 2
-    if offset + count + 2 != len(content):
-        raise ValueError("invalid CONNECT_ACK mode count")
-    modes = list(content[offset:offset + count])
-    offset += count
-    return a, b, modes, content[offset], content[offset + 1], session_id
-
-
 def _encode_timing(session_id, head_seconds):
     """The connect-time calibration byte: how much of a CALIBRATION_SECONDS
     head the far end actually heard, as a fraction of it scaled to 255.
@@ -685,15 +509,6 @@ def _head_feedback_request(advertised_head, observed_seconds, match_allowance_se
         return advertised_head, "deficit is within matcher-window allowance"
     requested = min(HEAD_MAX_SECONDS, sent + deficit)
     return _encode_head_duration(requested), "residual guard below target"
-
-
-def _negotiate_mode(own_supported_ids, proposed_id, fallback_id=None):
-    """Listener's rule for picking a starting data profile: accept the
-    caller's proposal if we can decode it, else fall back to the always-
-    supported control profile."""
-    if proposed_id in own_supported_ids:
-        return proposed_id
-    return afsk.CONTROL_PROFILE.mode_id if fallback_id is None else fallback_id
 
 
 class LinkError(Exception):

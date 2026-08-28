@@ -25,7 +25,8 @@ whale/
   afsk.py         CPFSK modulate/demodulate (300 baud, 1200/1800 Hz tones)
   waveform.py     physical-layer mode contract and negotiable mode registry
   transport.py    one radio: continuous RX capture + keyed TX
-  link.py         stop-and-wait ARQ: connect / send / recv / disconnect
+  link.py         stateful stop-and-wait ARQ: connect / send / recv / disconnect
+  link_protocol.py  pure link packet constants, validation, and serialization
   vara_server.py  VARA-API-shaped TCP front end (StationServer, CLI)
   hw/             sound card lookup + PTT keying (audio_io, ptt, radios)
   policy.py       one channel's worth of assumptions, incl. its mode ladder

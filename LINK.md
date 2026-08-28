@@ -39,6 +39,7 @@ not: both HF modes have carried the acceptance test over real radios.
 ```text
 local application bytes
   -> messages and stop-and-wait ARQ (`whale.link`)
+  -> packet validation and serialization (`whale.link_protocol`)
   -> modulation, coding, and framing (`FRAMING.md`)
   -> keyed, half-duplex radio (`whale.transport`)
 ```
