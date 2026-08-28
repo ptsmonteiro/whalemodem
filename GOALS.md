@@ -31,6 +31,59 @@ should include:
 Claims of competitiveness should ultimately be supported by reproducible
 benchmarks over simulated audio channels and representative radio hardware.
 
+#### VARA HF reference target
+
+VARA HF v4.3.0 publishes the following net rates for its 2300 Hz standard
+mode. These are vendor-claimed reference points, not measurements made by this
+project:
+
+| Symbol rate | Carriers | Modulation | Claimed net rate (bit/s) |
+| ---: | ---: | :--- | ---: |
+| 23 | 32 | FSK | 18 |
+| 47 | 16 | FSK | 41 |
+| 47 | 16 | FSK | 82 |
+| 94 | 16 | FSK | 175 |
+| 94 | 3 | 4PSK | 270 |
+| 94 | 4 | 4PSK | 363 |
+| 94 | 6 | 4PSK | 549 |
+| 94 | 8 | 4PSK | 735 |
+| 94 | 10 | 4PSK | 922 |
+| 42 | 49 | 4PSK | 2,011 |
+| 42 | 49 | 4PSK | 2,682 |
+| 42 | 49 | 4PSK | 3,219 |
+| 42 | 49 | 8PSK | 4,025 |
+| 42 | 49 | 8PSK | 4,830 |
+| 42 | 49 | 16QAM | 5,872 |
+| 42 | 49 | 32QAM | 7,050 |
+
+#### VARA FM reference target
+
+VARA FM publishes the following net rates for its narrow mode. These are also
+vendor-claimed reference points rather than project measurements:
+
+| Symbol rate | Carriers | Modulation | Claimed net rate (bit/s) |
+| ---: | ---: | :--- | ---: |
+| 42 | 14 | 4PSK | 566 |
+| 42 | 29 | 4PSK | 1,188 |
+| 42 | 58 | 4PSK | 2,390 |
+| 42 | 58 | 4PSK | 3,188 |
+| 42 | 58 | 8QAM | 4,252 |
+| 42 | 58 | 16QAM | 5,668 |
+| 42 | 58 | 32QAM | 7,087 |
+| 42 | 58 | 64QAM | 8,505 |
+| 42 | 58 | 64QAM | 9,567 |
+| 42 | 58 | 128QAM | 11,162 |
+| 42 | 58 | 256QAM | 12,750 |
+
+The long-term HF and VHF mode ladders should cover the same useful ranges as
+their respective references: a robust low-rate control and fallback mode,
+intermediate modes that trade robustness for speed, and top rates competitive
+with 7,050 bit/s in a 2300 Hz HF channel and 12,750 bit/s in VARA FM Narrow.
+A valid comparison must measure useful application throughput and delivery
+reliability at stated channel conditions, including SNR and impairments; a
+nominal or codec rate alone does not demonstrate parity with a row in these
+tables.
+
 ### Adaptive radio timing
 
 The modem should learn or measure the timing characteristics of each transmit
