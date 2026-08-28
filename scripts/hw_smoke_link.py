@@ -1,5 +1,6 @@
 """Full Link-level smoke test over real hardware, in one process, no
-TCP/VARA layer: connect, send a small message each direction, disconnect.
+TCP/VARA layer: connect, send a small message each direction, and verify a
+cleanly acknowledged disconnect at both endpoints.
 Isolates the ARQ/link protocol from the VARA-API socket server -- run this
 before or instead of the full acceptance_test.py when tracking down a
 hardware/protocol issue, since it prints per-frame timing and events
@@ -129,13 +130,36 @@ def main():
         print("send ok:", sent2.get("ok"), "received:", got_ba == MSG_BA, f"({len(got_ba or b'')} bytes)")
 
         print("STA1 disconnecting...")
-        disc_ok = link1.disconnect(timeout=10, retries=3)
-        print("disconnect result:", disc_ok)
+        peer_disconnected = {}
+        disconnect_done = threading.Event()
+
+        def service_peer_during_disconnect():
+            # Unlike the server stack, this smoke test has no permanent
+            # service worker. Keep STA2 consuming packets while STA1 blocks
+            # waiting for DISC_ACK, or every DISC will sit unanswered in
+            # STA2's decoded-packet queue.
+            while not disconnect_done.is_set():
+                if not link2.service_while_idle():
+                    peer_disconnected["ok"] = link2.state == "IDLE"
+                    return
+                time.sleep(0.02)
+            peer_disconnected["ok"] = link2.state == "IDLE"
+
+        disc_thread = threading.Thread(target=service_peer_during_disconnect, daemon=True)
+        disc_thread.start()
+        try:
+            disc_ok = link1.disconnect(timeout=10, retries=3)
+        finally:
+            disconnect_done.set()
+            disc_thread.join(timeout=2)
+        clean_disconnect = disc_ok and peer_disconnected.get("ok", False)
+        print("disconnect result:", clean_disconnect)
 
         all_ok = (
             ok.get("connect") and ok.get("listen")
             and sent1.get("ok") and got_ab == MSG_AB
             and sent2.get("ok") and got_ba == MSG_BA
+            and clean_disconnect
         )
         print("\n== OVERALL:", "PASS" if all_ok else "FAIL", "==")
         return 0 if all_ok else 1

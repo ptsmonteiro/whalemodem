@@ -1651,17 +1651,20 @@ class Link:
         timeout = self.control_ack_timeout if timeout is None else timeout
         if self.state != "CONNECTED":
             self.state = "IDLE"
-            return
+            return True
         if self.peer_call is not None:
             mode_history.record_good_mode(self.mode_history, self.mycall, self.peer_call, self.tx_profile.mode_id)
+        acknowledged = False
         for attempt in range(1, retries + 1):
             self.on_event("PTT", on=True)
             self._tx_packet(PT_DISC, b"")
             self.on_event("PTT", off=True)
             got = self._wait_packet({PT_DISC_ACK, PT_DISC}, timeout)
             if got is not None:
+                acknowledged = True
                 break
         self.state = "IDLE"
         self.peer_call = None
         self._forget_session()
         self.on_event("DISCONNECTED")
+        return acknowledged

@@ -200,7 +200,9 @@ Either endpoint may send DISC. The peer answers with DISC_ACK, records the
 current transmit mode as good in its in-memory history, enters IDLE, and emits
 a disconnected event. A locally initiated disconnect tries DISC up to three
 times, accepts either DISC_ACK or a simultaneous DISC as completion, and then
-enters IDLE even if no response arrived.
+enters IDLE even if no response arrived. Its return value is `True` when the
+handshake was acknowledged (or the link was already idle) and `False` when all
+attempts timed out.
 
 A connected endpoint also abandons the session after 150 seconds without
 decoding any frame from its peer. This is a crash/out-of-range backstop, not a

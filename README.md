@@ -410,7 +410,7 @@ frequency):
 
 ```
 python scripts/hw_smoke_single_frame.py   # one frame each direction
-python scripts/hw_smoke_link.py           # full connect/send/disconnect
+python scripts/hw_smoke_link.py           # full connect/send/verified clean disconnect
 ```
 
 Full acceptance test, two station servers + a driving client:
