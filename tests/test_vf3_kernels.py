@@ -16,6 +16,7 @@ import numpy as np
 import pytest
 from scipy.signal import hilbert
 
+from whale.dsp.fec import ConvolutionalCode
 from whale.modes import vf3
 from whale.modes.vf3 import (CORE_SAMPLES, GUARD_SAMPLES, SYMBOL_SAMPLES,
                              SYNC_SYMBOLS, TOTAL_SYMBOLS)
@@ -93,19 +94,27 @@ def _frame(snr_db=None):
 
 
 def _live_soft_bits(audio):
-    """The soft bits the real decode path hands to the Viterbi decoder."""
+    """The soft bits the real decode path hands to the Viterbi decoder.
+
+    The spy goes on `ConvolutionalCode.decode_soft` itself rather than on
+    a name re-exported by `vf3`, so it stays attached to the kernel the
+    decode path actually calls no matter how the mode wires itself up.
+    Patching a re-export silently captured nothing once VF3 started
+    reaching the decoder through its `PacketCodec`, which turned this
+    whole test into a skip.
+    """
     captured = []
-    original = vf3.convolutional_decode_soft
+    original = ConvolutionalCode.decode_soft
 
-    def spy(soft_bits):
+    def spy(self, soft_bits):
         captured.append(np.asarray(soft_bits, np.float64).reshape(-1).copy())
-        return original(soft_bits)
+        return original(self, soft_bits)
 
-    vf3.convolutional_decode_soft = spy
+    ConvolutionalCode.decode_soft = spy
     try:
         vf3.demodulate(audio)
     finally:
-        vf3.convolutional_decode_soft = original
+        ConvolutionalCode.decode_soft = original
     return captured
 
 
@@ -116,6 +125,10 @@ def test_viterbi_matches_the_scalar_trellis_on_a_real_frame(snr_db):
     _, audio = _frame(snr_db)
     captured = _live_soft_bits(audio)
     if not captured:
+        # A clean frame must always reach the decoder.  Skipping there
+        # would hide a broken decode path -- or a spy that stopped being
+        # attached to it -- behind a green run.
+        assert snr_db is not None, "a noiseless frame failed to decode"
         pytest.skip("acquisition failed at this SNR, so nothing was decoded")
     for soft_bits in captured:
         assert np.array_equal(vf3.convolutional_decode_soft(soft_bits),

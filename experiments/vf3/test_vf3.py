@@ -36,7 +36,7 @@ def test_geometry_and_capacity():
 
 def test_symbol_prefix_and_carrier_recovery():
     values = vf3.qpsk_from_bits(
-        vf3._base._lfsr_bits(vf3.BITS_PER_SYMBOL, 201))
+        vf3.pn_bits(vf3.BITS_PER_SYMBOL, 201))
     symbol = vf3.build_symbol(values)
     assert len(symbol) == 1152
     assert np.allclose(symbol[:128], symbol[-128:], atol=1e-12)
