@@ -146,14 +146,16 @@ def test_the_head_absorbs_leading_audio_that_a_squelch_blackout_would_eat():
     assert VF3.decode(_snapshot(clipped))["payload"] == packet
 
 
-def test_the_surviving_head_is_measured_but_not_offered_as_head_feedback():
+def test_the_surviving_head_is_reported_in_cores_and_in_seconds():
     audio = VF3.encode(_packet(), head_seconds=0.5)
     result = VF3.decode(_snapshot(audio))
 
     # 0.5 s of head holds 23 whole 1024-sample cores.
-    assert result["head_cores_observed"] == int(0.5 * vf3.SAMPLE_RATE) // vf3.CORE_SAMPLES
-    # Deliberately absent: link._head_feedback_request weighs an observation
-    # against a CPFSK constant in CPFSK units.  See vf3_mode's docstring.
+    cores = int(0.5 * vf3.SAMPLE_RATE) // vf3.CORE_SAMPLES
+    assert result["head_cores_observed"] == cores
+    # The seconds are what link._head_feedback_request consumes; the core
+    # count stays as the diagnostic.  See vf3_mode's docstring.
+    assert result["head_seconds_received"] == cores * vf3.CORE_SAMPLES / vf3.SAMPLE_RATE
     assert "head_symbols_received" not in result
 
 

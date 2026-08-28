@@ -2,8 +2,8 @@
 station servers (see whale/vara_server.py):
 
     1. connect a session between station A and station B
-    2. A sends 1 KB to B
-    3. roles switch: B sends 1 KB back to A
+    2. A sends 4 KB to B (--size, default 4096 bytes)
+    3. roles switch: B sends 4 KB back to A
     4. either station disconnects
 
 Usage:

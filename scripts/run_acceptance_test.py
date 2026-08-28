@@ -17,7 +17,7 @@ one".
 
 Run:
     python scripts/run_acceptance_test.py
-    python scripts/run_acceptance_test.py --a-radio ic705 --b-radio ht --size 4096
+    python scripts/run_acceptance_test.py --a-radio ic705 --b-radio ht --size 8192
 
     # start both legs at 600 baud, have each station step up after its
     # first ACKed chunk, and lose the first MODE_ACK at each end -- i.e.
@@ -124,7 +124,7 @@ def main():
     ap.add_argument("--a-data", type=int, default=8301)
     ap.add_argument("--b-cmd", type=int, default=8310)
     ap.add_argument("--b-data", type=int, default=8311)
-    ap.add_argument("--size", type=int, default=1024)
+    ap.add_argument("--size", type=int, default=4096)
     ap.add_argument("--connect-timeout", type=float, default=180.0)
     ap.add_argument("--transfer-timeout", type=float, default=300.0)
     ap.add_argument("--log-dir", default=str(ROOT / "logs"))

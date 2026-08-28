@@ -223,6 +223,16 @@ class Profile:
     def sample_rate(self):
         return self.codec.sample_rate
 
+    @property
+    def head_match_allowance_seconds(self):
+        """How short a head observation may fall before the link believes it.
+
+        The backward pad matcher gives up a whole PAD_MATCH_WINDOW_SYMBOLS
+        window when it trips, so an observation is systematically short by up
+        to that much even on a perfectly received head.
+        """
+        return PAD_MATCH_WINDOW_SYMBOLS / self.baud
+
     def encode(self, payload: bytes, *, include_head=True,
                head_seconds=framing.HEAD_PAD_SECONDS):
         return self.codec.encode(payload, self, include_head=include_head,
@@ -711,6 +721,9 @@ def _try_sync(diff, i_star, sps, confidence, max_credible_bits, n_sync, baud,
             reversed(head_bits),
             (first_index - sps * offset for offset in range(1, len(head_bits) + 1)),
         )
+        # The mode-independent form the link's head feedback works in; the
+        # symbol count above stays for the logs and the CPFSK tests.
+        result["head_seconds_received"] = result["head_symbols_received"] / baud
         result["end_index"] = i_star + sps * total_bits_needed
     elif max_symbols >= total_bits_needed:
         # Either it decoded, or we had every bit the claimed length says it

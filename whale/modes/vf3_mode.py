@@ -25,16 +25,14 @@ around CPFSK and VF3 does not fit all of it:
     stays on `afsk.CONTROL_PROFILE`, where a 12-byte ACK costs 12 bytes of
     air.  The link already routes it that way (see `_tx_packet`).
 
-  - **Head feedback is not wired up.** VF3 measures its received head (see
-    `vf3._measure_head`) and this adapter reports it as `head_cores_observed`
-    for the logs, but deliberately *not* as `head_symbols_received`.  The
-    link's `_head_feedback_request` compares an observation against
-    `afsk.PAD_MATCH_WINDOW_SYMBOLS / baud`, a CPFSK constant in CPFSK bit
-    units; against VF3's 21.3 ms head cores that allowance becomes 341 ms and
-    would swallow every real deficit.  Reporting nothing makes the link take
-    the "missing observation" branch and leave the head duration where the
-    control-plane calibration put it, which is correct and conservative.
-    Making that feedback loop mode-independent is its own change.
+  - **Head feedback is in seconds, not symbols.** VF3 measures its received
+    head in whole cores (see `vf3._measure_head`); this adapter reports that
+    count as `head_cores_observed` for the logs and converts it to
+    `head_seconds_received`, which is what the link's
+    `_head_feedback_request` consumes.  The tolerance that goes with it is
+    `head_match_allowance_seconds` below -- one core, the granularity of the
+    measurement -- rather than the CPFSK pad-matcher window, so a VF3
+    transfer adapts its own head without borrowing a CPFSK constant.
 """
 
 from __future__ import annotations
@@ -85,9 +83,11 @@ class Vf3Codec:
         result = vf3.demodulate(audio, head_seconds=head_seconds, **kwargs)
         observed = result.pop("head_cores_received", None)
         if observed is not None:
-            # Diagnostic only -- see this module's docstring for why this is
-            # not returned as head_symbols_received.
+            # The core count is the diagnostic; the seconds are what the
+            # link's head feedback reads.
             result["head_cores_observed"] = observed
+            result["head_seconds_received"] = (
+                observed * vf3.CORE_SAMPLES / vf3.SAMPLE_RATE)
         return result
 
     def airtime(self, payload_len: int, mode: "Vf3Mode") -> float:
@@ -105,9 +105,9 @@ class Vf3Mode:
     It is a separate type rather than a `Profile` with a different codec
     because `Profile`'s `baud`/`freq0`/`freq1` describe a two-tone CPFSK
     signal and mean nothing here.  What the link actually reads is this
-    attribute surface, and `baud` is on it for one reason: the head-feedback
-    logging converts symbol counts to milliseconds with it.  VF3's symbol
-    rate is the honest value to put there.
+    attribute surface, and `baud` is on it because the link still reports a
+    mode's symbol rate in its logs.  VF3's OFDM symbol rate is the honest
+    value to put there.
     """
 
     name: str = "vf3"
@@ -124,6 +124,16 @@ class Vf3Mode:
     def baud(self) -> float:
         """VF3's OFDM symbol rate, 41.667 symbol/s."""
         return vf3.SAMPLE_RATE / vf3.SYMBOL_SAMPLES
+
+    @property
+    def head_match_allowance_seconds(self) -> float:
+        """One core (~21.3 ms) -- the resolution of `vf3._measure_head`.
+
+        The head measurement counts whole cores, so any observation is short
+        by up to one of them; a deficit inside that is measurement noise,
+        not a head that needs lengthening.
+        """
+        return vf3.CORE_SAMPLES / vf3.SAMPLE_RATE
 
     def encode(self, payload: bytes, *, include_head=True,
                head_seconds=vf3.DEFAULT_HEAD_SECONDS):

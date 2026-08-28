@@ -626,20 +626,23 @@ def _decode_head_duration(value):
     return value * HEAD_FEEDBACK_UNIT_SECONDS
 
 
-def _head_feedback_request(advertised_head, observed_symbols, baud):
-    """Return (absolute request byte, reason) for one valid DATA frame."""
+def _head_feedback_request(advertised_head, observed_seconds, match_allowance_seconds):
+    """Return (absolute request byte, reason) for one valid DATA frame.
+
+    Both the observation and the allowance arrive in seconds, from whichever
+    mode carried the frame, so nothing here is in symbols, cores or any other
+    mode-specific unit.
+    """
     sent = _decode_head_duration(advertised_head)
-    if observed_symbols is None or observed_symbols < 0:
+    if observed_seconds is None or observed_seconds < 0:
         return advertised_head, "missing or invalid observation"
-    observed = observed_symbols / baud
-    if observed_symbols == 0:
+    if observed_seconds == 0:
         requested = min(HEAD_MAX_SECONDS, sent + HEAD_ZERO_INCREASE_SECONDS)
         return _encode_head_duration(requested), "zero observation is a lower bound"
-    deficit = HEAD_MIN_GUARD_SECONDS - observed
-    matcher_allowance = afsk.PAD_MATCH_WINDOW_SYMBOLS / baud
+    deficit = HEAD_MIN_GUARD_SECONDS - observed_seconds
     if deficit <= 0:
         return advertised_head, "target residual guard met"
-    if deficit <= matcher_allowance:
+    if deficit <= match_allowance_seconds:
         return advertised_head, "deficit is within matcher-window allowance"
     requested = min(HEAD_MAX_SECONDS, sent + deficit)
     return _encode_head_duration(requested), "residual guard below target"
@@ -1015,7 +1018,10 @@ class Link:
             logger.info("[%s] RX outer head: observed %d adjacent symbols (%.1f ms)",
                         self.mycall, received, received * 1000.0 / profile.baud)
         self._rx_measurements[(ptype, body)] = {
+            # Symbols for the control-plane calibration, which is always
+            # CPFSK; seconds for the mode-independent head feedback.
             "head": decode_result.get("head_symbols_received"),
+            "head_seconds": decode_result.get("head_seconds_received"),
         }
         self._handle_raw(bytes([ptype]) + body, profile)
 
@@ -1772,12 +1778,13 @@ class Link:
         flags, advertised_head, chunk = body[0], body[1], body[2:]
         seq = flags & SEQ_MASK
         measurement = self._rx_measurements.get((PT_DATA, body), {})
-        observed_symbols = measurement.get("head")
+        observed_seconds = measurement.get("head_seconds")
         try:
             requested_head, feedback_reason = _head_feedback_request(
-                advertised_head, observed_symbols, self.rx_profile.baud)
-            observed_ms = (observed_symbols * 1000.0 / self.rx_profile.baud
-                           if observed_symbols is not None else float("nan"))
+                advertised_head, observed_seconds,
+                self.rx_profile.head_match_allowance_seconds)
+            observed_ms = (observed_seconds * 1000.0
+                           if observed_seconds is not None else float("nan"))
             if requested_head == advertised_head:
                 logger.info("[%s] DATA seq=0x%02x head observation ignored: observed %.1f ms, "
                             "reported unchanged %.1f ms (%s)", self.mycall, seq, observed_ms,
