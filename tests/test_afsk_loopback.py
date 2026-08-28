@@ -1126,6 +1126,10 @@ def test_link_negotiation_and_mode_step():
         t = threading.Thread(target=do_recv)
         t.start()
         a._step_tx_mode(-1)
+        # This is checking that the manual step-down sticks, not exercising
+        # speed adaptation -- pin the clean-streak threshold so the single
+        # clean ACK below doesn't immediately step back up.
+        a._data_ack_to_speed_up = 10
         a.send_message(b"mode confirmation")
         t.join(timeout=20)
 

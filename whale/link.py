@@ -352,7 +352,14 @@ def _seq_ahead(a, b):
 # based (no SNR estimate, no throughput math). React fast to trouble, be
 # conservative about speeding up.
 STEP_DOWN_AFTER_ATTEMPTS = 3   # a chunk needing this many tries triggers an immediate step down
-STEP_UP_AFTER_CLEAN_STREAK = 3  # this many first-try chunks in a row triggers a step up
+
+# The clean-streak length needed to step up is not fixed: it starts at 1
+# (one clean chunk earns a step up) and grows by 1 every time a step down
+# happens, so a session that has been burned needs more evidence before it
+# is trusted to speed up again. Capped so a persistently bad link doesn't
+# make the threshold unbounded.
+STEP_UP_AFTER_CLEAN_STREAK_INITIAL = 1
+STEP_UP_AFTER_CLEAN_STREAK_MAX = 8
 
 # Rough control-frame payload size used to size the control-plane ACK
 # timeout (callsigns + mode list all comfortably fit) -- not a hard limit.
@@ -650,6 +657,7 @@ class Link:
         self.on_event = on_event or (lambda name, **kw: None)
         self.mode_history = {} if mode_history_store is None else mode_history_store
         self._clean_streak = 0
+        self._data_ack_to_speed_up = STEP_UP_AFTER_CLEAN_STREAK_INITIAL
 
         # Control-plane frames always use afsk.CONTROL_PROFILE (see
         # _tx_packet), so this timeout is fixed for the life of the Link.
@@ -1258,6 +1266,7 @@ class Link:
                 except ValueError:
                     continue
                 self._clean_streak = 0
+                self._data_ack_to_speed_up = STEP_UP_AFTER_CLEAN_STREAK_INITIAL
                 self.state = "CONNECTED"
                 self.role = "ISS"  # the caller starts holding the floor -- see PT_FLOOR_REQ above
                 self._reset_sequence_state()
@@ -1356,6 +1365,7 @@ class Link:
         self._apply_rx_profile(self.modes.resolve(negotiated_id))
         self._apply_tx_profile(self.modes.resolve(own_tx_id))
         self._clean_streak = 0
+        self._data_ack_to_speed_up = STEP_UP_AFTER_CLEAN_STREAK_INITIAL
         self.state = "CONNECTED"
         self.role = "IRS"  # the listener starts waiting for the floor -- see PT_FLOOR_REQ above
         self._reset_sequence_state()
@@ -1557,10 +1567,12 @@ class Link:
             return
         if attempts >= STEP_DOWN_AFTER_ATTEMPTS:
             self._clean_streak = 0
+            self._data_ack_to_speed_up = min(
+                self._data_ack_to_speed_up + 1, STEP_UP_AFTER_CLEAN_STREAK_MAX)
             self._step_tx_mode(-1)
             return
         self._clean_streak += 1
-        if self._clean_streak >= STEP_UP_AFTER_CLEAN_STREAK:
+        if self._clean_streak >= self._data_ack_to_speed_up:
             self._clean_streak = 0
             self._step_tx_mode(+1)
 
