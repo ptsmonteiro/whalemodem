@@ -23,15 +23,16 @@ description of the present implementation and not a compatibility promise.
 A station is started on a *channel*, which is a `whale.policy.ChannelPolicy`:
 one set of timeouts, retry budgets and keying limits, plus the mode ladder
 that suits the path. `vhf-fm` is the two-FM-handhelds bench this modem was
-built and measured against; `hf-ssb` is HF single sideband, which offers only
-mode 4 (HC1). Nothing about a channel is negotiated or goes on air -- two
+built and measured against; `hf-ssb` is HF single sideband, which offers mode
+5 (HC0) as its control mode and mode 4 (HC1) above it. Nothing about a channel is negotiated or goes on air -- two
 stations running different policies interoperate, and negotiation over the
 advertised mode IDs does the rest. Select one with
 `python -m whale.vara_server --channel hf-ssb` or
 `scripts/run_acceptance_test.py --channel hf-ssb`.
 
-The HF policy's numbers are reasoned placeholders, not measurements. See
-`whale/policy.py`, which says so field by field.
+The HF policy's timeouts and retry budget are reasoned placeholders, not
+measurements -- `whale/policy.py` says so field by field. Its waveforms are
+not: both HF modes have carried the acceptance test over real radios.
 
 ## Layering
 
@@ -115,7 +116,7 @@ CONNECT_ACK v4 Content is:
 
 Mode count may be zero only if both selected/proposed mode fields name the
 listener's control mode, which is always a valid fallback -- mode 0 on the VHF
-FM ladder, mode 4 on the HF SSB one. Callsigns are compared according to the
+FM ladder, mode 5 on the HF SSB one. Callsigns are compared according to the
 existing link addressing policy after their encoding has been validated.
 The limits above bound all variable fields before allocation.
 
@@ -211,8 +212,7 @@ Each endpoint adapts only its own transmit direction from ARQ outcomes:
 - Steps follow registry order and are limited to modes the peer advertised.
   The VHF FM ladder is 0, 1, 2 with mode 3 (VF3) appended above them (see
   [`FRAMING.md`](FRAMING.md#mode-3-vf3-a-non-cpfsk-data-mode)). The HF SSB
-  ladder is mode 4 (HC1) alone, so a station on it never steps: HC1 is both
-  the control mode and the only data mode.
+  ladder is mode 5 (HC0, the control mode) with mode 4 (HC1) above it.
 
 There is no separate mode-change exchange. While connected, a receiver tries
 the control mode and every mutually advertised DATA mode. A decoded DATA frame

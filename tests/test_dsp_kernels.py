@@ -16,7 +16,7 @@ from scipy.signal import hilbert
 
 from whale import dsp
 from whale.dsp import (acquire, bits, differential, equalize, fec, framing,
-                       freq, head, interleave, ofdm, timing)
+                       freq, head, interleave, mfsk, ofdm, timing)
 
 RNG = np.random.default_rng(20260828)
 
@@ -632,3 +632,206 @@ def test_a_tolerance_still_stops_at_a_real_discontinuity():
                               np.tile(reference, 3)))
     assert head.measure(samples, len(samples), reference,
                         phase_tolerance=1)[0] == 3
+
+
+# -- MFSK -----------------------------------------------------------------
+
+def tone_bank(symbol=512, first=8, tones=16):
+    return mfsk.ToneBank(sample_rate=48_000, symbol_samples=symbol,
+                         first_bin=first, tone_count=tones)
+
+
+def test_tone_bank_derives_one_number_three_ways():
+    """Symbol rate, tone spacing and FFT bin width are the same quantity.
+
+    That is what orthogonal non-coherent MFSK forces, and it is why a tone
+    is an exact bin rather than something to interpolate for.
+    """
+    bank = tone_bank()
+    assert bank.symbol_rate == bank.spacing_hz == 93.75
+    assert bank.bits_per_symbol == 4
+    assert bank.bandwidth_hz == 1_500.0
+    assert bank.tone_hz[0] == 750.0 and bank.tone_hz[-1] == 2_156.25
+    assert bank.offset_limit_hz == 46.875
+
+
+@pytest.mark.parametrize("bad", [
+    dict(tones=12),                 # not a power of two
+    dict(first=0),                  # DC
+    dict(first=250, tones=16),      # past Nyquist of a 512-sample symbol
+])
+def test_tone_bank_refuses_unusable_geometry(bad):
+    with pytest.raises(ValueError):
+        tone_bank(**bad)
+
+
+def test_gray_mapping_round_trips_and_neighbours_differ_by_one_bit():
+    bank = tone_bank()
+    bits = RNG.integers(0, 2, 40 * bank.bits_per_symbol).astype(np.uint8)
+    tones = bank.symbols_from_bits(bits)
+    assert np.array_equal(bank.bits_from_symbols(tones), bits)
+    # The error the channel actually makes is reading a tone as its
+    # neighbour; Gray coding is what keeps that to one bit.
+    labels = bank.bits_from_symbols(np.arange(bank.tone_count))
+    labels = labels.reshape(bank.tone_count, bank.bits_per_symbol)
+    for i in range(bank.tone_count - 1):
+        assert np.count_nonzero(labels[i] != labels[i + 1]) == 1
+
+
+def test_modulation_is_phase_continuous():
+    """Every tone is a whole number of cycles per symbol, so a symbol
+    boundary is not a discontinuity and nothing has to be carried across
+    it: two symbols of one tone are exactly that tone, run on."""
+    bank = tone_bank()
+    audio = mfsk.modulate(bank, [3, 3, 11, 0, 15])
+    assert len(audio) == 5 * bank.symbol_samples
+    span = 2 * bank.symbol_samples
+    single = np.cos(2 * np.pi * bank.bins[3] * np.arange(span)
+                    / bank.symbol_samples)
+    assert np.allclose(audio[:span], single, atol=1e-12)
+
+
+def test_modulation_is_constant_envelope():
+    """One tone at a time, so a peak-limited transmitter can be driven
+    much harder than an OFDM waveform allows."""
+    bank = tone_bank()
+    audio = mfsk.modulate(bank, RNG.integers(0, bank.tone_count, 40))
+    crest = np.max(np.abs(audio)) / np.sqrt(np.mean(audio ** 2))
+    assert crest == pytest.approx(np.sqrt(2.0), abs=0.02)
+
+
+def test_analyze_recovers_the_transmitted_tone():
+    bank = tone_bank()
+    tones = RNG.integers(0, bank.tone_count, 20)
+    values = mfsk.analyze(bank, mfsk.modulate(bank, tones), 0, len(tones))
+    assert np.array_equal(np.argmax(np.abs(values), axis=1), tones)
+
+
+def test_analyze_takes_a_frequency_hypothesis():
+    bank = tone_bank()
+    tones = RNG.integers(0, bank.tone_count, 20)
+    audio = mfsk.modulate(bank, tones)
+    index = np.arange(len(audio))
+    shifted = np.real(hilbert(audio) * np.exp(2j * np.pi * 40.0 * index / 48_000))
+
+    def matched(values):
+        return float(np.sum(np.abs(values)[np.arange(len(tones)), tones]))
+
+    uncorrected = mfsk.analyze(bank, shifted, 0, len(tones))
+    corrected = mfsk.analyze(bank, shifted, 0, len(tones), offset_hz=40.0)
+    assert matched(corrected) > 1.3 * matched(uncorrected)
+
+
+def test_analyze_declines_a_window_that_runs_off_the_end():
+    bank = tone_bank()
+    assert mfsk.analyze(bank, np.zeros(1_000), 0, 4) is None
+
+
+def test_soft_bits_are_signed_by_the_transmitted_bit():
+    bank = tone_bank()
+    bits = RNG.integers(0, 2, 30 * bank.bits_per_symbol).astype(np.uint8)
+    tones = bank.symbols_from_bits(bits)
+    values = mfsk.analyze(bank, mfsk.modulate(bank, tones), 0, len(tones))
+    soft = mfsk.soft_bits(bank, np.abs(values))
+    assert np.array_equal((soft < 0).astype(np.uint8), bits)
+
+
+def test_soft_bits_ignore_the_receiver_gain():
+    """Only the contrast between the tones in one symbol carries
+    information, which is what makes this indifferent to an AGC."""
+    bank = tone_bank()
+    tones = RNG.integers(0, bank.tone_count, 12)
+    values = np.abs(mfsk.analyze(bank, mfsk.modulate(bank, tones), 0, len(tones)))
+    assert np.allclose(mfsk.soft_bits(bank, values),
+                       mfsk.soft_bits(bank, 17.0 * values))
+
+
+def test_correlate_finds_a_pattern_and_stays_quiet_on_noise():
+    bank = tone_bank()
+    pattern = RNG.integers(0, bank.tone_count, 24)
+    audio = np.concatenate((RNG.normal(0, 0.05, 3_000),
+                            mfsk.modulate(bank, pattern, 0.18),
+                            RNG.normal(0, 0.05, 3_000)))
+    scores, step = mfsk.correlate(bank, audio, pattern)
+    assert abs(int(np.argmax(scores)) * step - 3_000) <= step
+    assert np.max(scores) > 0.4
+
+    noise_only, _ = mfsk.correlate(bank, RNG.normal(0, 0.05, 60_000), pattern)
+    assert np.max(noise_only) < 0.15
+
+
+def test_the_across_tone_mean_is_what_keeps_noise_from_scoring():
+    """The bug `experiments/mfsk` records paying for.
+
+    Tone magnitudes are all non-negative, so every channel carries a large
+    common component; correlating them raw scores that against itself and
+    reads pure noise as a lock. Removing the across-tone mean at each
+    instant makes the channels sum to zero and the score collapse.
+    """
+    bank = tone_bank()
+    pattern = RNG.integers(0, bank.tone_count, 24)
+    noise = RNG.normal(0, 0.05, 60_000)
+    step = bank.symbol_samples // mfsk.SEARCH_DIVISOR
+    centred, _ = mfsk.correlate(bank, noise, pattern)
+
+    magnitudes, _ = mfsk._magnitude_grid(bank, noise, step)
+    per = bank.symbol_samples // step
+    count = len(magnitudes) - (len(pattern) - 1) * per
+    hit = sum(magnitudes[i * per:i * per + count, tone]
+              for i, tone in enumerate(pattern))
+    total = sum(np.sum(magnitudes[i * per:i * per + count], axis=1)
+                for i in range(len(pattern)))
+    raw = hit / total
+    # The mechanism, stated exactly: the raw statistic has a floor at 1/M
+    # that is there whatever the input, because it is scoring the common
+    # component against itself. The centred one is zero-mean on noise, so
+    # every part of its score is signal.
+    assert np.mean(raw) == pytest.approx(1.0 / bank.tone_count, rel=0.15)
+    assert abs(np.mean(centred)) < 0.01
+    assert np.max(raw) > np.max(centred)
+
+
+def test_refine_finds_the_boundary_the_score_cannot():
+    """`pattern_score` saturates: once the right tone dominates every
+    symbol it reads its ceiling whatever the timing. Matched tone energy
+    has an actual maximum at the symbol boundary."""
+    bank = tone_bank()
+    pattern = RNG.integers(0, bank.tone_count, 24)
+    audio = np.concatenate((np.zeros(3_000),
+                            mfsk.modulate(bank, pattern, 0.18),
+                            np.zeros(3_000)))
+
+    flat = [mfsk.pattern_score(bank, audio, pattern, 3_000 + d)
+            for d in (-48, 0, 48)]
+    assert max(flat) - min(flat) < 1e-6          # no timing information at all
+    assert mfsk.refine(bank, audio, pattern, 3_000 - 96, radius=128) == 3_000
+
+
+def test_offset_is_measured_from_repeated_pairs_at_any_timing():
+    """A symbol's phase carries a timing term that depends on which tone it
+    used, so only a pair sharing a tone gives an estimate that a timing
+    error cannot corrupt."""
+    bank = tone_bank()
+    pattern = np.repeat(RNG.integers(0, bank.tone_count, 12), 2)
+    # Every deliberate pair, and possibly more where the draw happened to
+    # put the same tone in two neighbouring pairs -- which is not a problem
+    # but a longer run of the same measurement.
+    pairs = mfsk.repeated_pairs(pattern)
+    assert set(range(0, 24, 2)) <= set(pairs.tolist())
+
+    audio = mfsk.modulate(bank, pattern)
+    index = np.arange(len(audio))
+    shifted = np.real(hilbert(audio) * np.exp(2j * np.pi * 11.0 * index / 48_000))
+    padded = np.concatenate((np.zeros(1_000), shifted, np.zeros(1_000)))
+    for error in (-48, 0, 48):
+        assert mfsk.offset_hz(bank, padded, 1_000 + error,
+                              pattern) == pytest.approx(11.0, abs=0.5)
+
+
+def test_a_pattern_without_repeats_declines_to_estimate():
+    """Zero is a mode saying it does not want the measurement, not a
+    failure -- there is no pair to take a phase step across."""
+    bank = tone_bank()
+    pattern = np.arange(8)
+    assert not len(mfsk.repeated_pairs(pattern))
+    assert mfsk.offset_hz(bank, mfsk.modulate(bank, pattern), 0, pattern) == 0.0

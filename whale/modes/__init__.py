@@ -35,19 +35,23 @@ def default_registry(budget=None):
 
 
 def hf_registry(budget=None):
-    """The station's mode ladder for an HF SSB channel: HC1 alone.
+    """The station's mode ladder for an HF SSB channel: HC0, then HC1.
+
+    HC0 (`whale/modes/hc0.py`) is the control mode and the bottom rung -- a
+    non-coherent 16-FSK frame that decodes 19.5 dB further into the noise
+    than the OFDM rung above it.  HC1 is that rung, five times faster on a
+    path that can carry it.
 
     Separate from `default_registry` rather than an extension of it: the
     CPFSK profiles have no carrier-frequency estimate anywhere in them, so
-    on SSB they are not a robust rung to fall back to.  See
-    `whale/modes/hc1_mode.py`.
+    on SSB they are not a robust rung to fall back to.
 
     `budget` is accepted and ignored, so this is interchangeable with
-    `default_registry` where a `ChannelPolicy` selects one -- HC1's payload
-    is fixed by its OFDM frame structure, not by a keying-time budget, in
-    exactly the way VF3's is.
+    `default_registry` where a `ChannelPolicy` selects one -- both HF rungs
+    have a payload fixed by their frame structure rather than by a
+    keying-time budget, in exactly the way VF3's is.
     """
     del budget
-    from .hc1_mode import hf_registry as _hf_registry
+    from .hc0_mode import hf_registry as _hf_registry
 
     return _hf_registry()

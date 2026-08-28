@@ -60,11 +60,12 @@ are negotiated and adapted independently as described in
 
 Which mode is the control mode is a property of the registry, and therefore of
 the channel. On the VHF FM ladder it is mode `0`, and modes `0..2` above are
-that ladder. On the HF SSB ladder it is mode `4` (HC1, below) and the CPFSK
-profiles are not offered at all: they carry no carrier-frequency estimate, so
-on SSB they are not a robust fallback but a mode that stops working as soon as
-the two stations disagree about frequency. See `whale/policy.py`, which pairs
-each `ChannelPolicy` with its ladder.
+that ladder. On the HF SSB ladder it is mode `5` (HC0, below), with mode `4`
+(HC1) above it as the fast rung; the CPFSK profiles are not offered at all,
+because they carry no carrier-frequency estimate and so on SSB they are not a
+robust fallback but a mode that stops working as soon as the two stations
+disagree about frequency. See `whale/policy.py`, which pairs each
+`ChannelPolicy` with its ladder.
 
 Mode IDs are global across channels: an ID names one waveform everywhere, even
 where no registry offers two of them together.
@@ -92,11 +93,12 @@ receives DATA once the ISS steps down. And because a VF3 keying is 5.2 s
 whatever it carries, a short packet would waste the difference -- which is
 harmless, since control packets never ride a DATA mode.
 
-### Mode 4: HC1, the HF control and data mode
+### Mode 4: HC1, the fast HF data mode
 
-Mode `4` is `whale.modes.hc1_mode.HC1`, and it is what mode 0 is on FM: the
-control plane and the data plane of an HF SSB link, both at once. It is the
-only mode in `whale.modes.hf_registry()`.
+Mode `4` is `whale.modes.hc1_mode.HC1`, the upper rung of
+`whale.modes.hf_registry()`. It carries five times HC0's payload rate on a
+path that can hold it, and gives out about 19 dB sooner, which is why it sits
+above HC0 rather than replacing it.
 
 | Property | Value |
 | --- | --- |
@@ -114,9 +116,7 @@ only mode in `whale.modes.hf_registry()`.
 
 Like VF3 it brings its own framing: acquisition is the OFDM header rather than
 a PN correlation, and the length, CRC32 and FEC live inside the payload grid,
-so nothing under "Framing" below applies to it. Unlike VF3 it is not a DATA
-mode only, which is the whole point -- on HF the control plane needs the
-frequency correction and the coding more than the data plane does.
+so nothing under "Framing" below applies to it.
 
 What it does that no earlier mode does is **correct the carrier frequency
 offset**. Two SSB receivers reproduce a transmitted audio frequency offset by
@@ -131,19 +131,88 @@ estimators are `whale.dsp.freq`, which existed as a VF3 diagnostic before HC1
 had a use for it.
 
 A consequence worth stating: an HC1 keying is 0.695 s whatever it carries, so
-a 12-byte DATA_ACK costs the same air as a 64-byte chunk. That is accepted
-rather than worked around. A variable-length OFDM frame needs the receiver to
-learn the length before it can decode, which means a separately coded header,
-and the airtime it would save is small next to what an HF keying already
-spends on PTT, ALC settling and turnaround. What the fixed frame buys is that
-every frame on the link, control included, gets the full FEC, CRC32 and
-frequency correction.
+a 12-byte packet costs the same air as a 64-byte chunk. Both HF modes are
+fixed-length for the same reason: a variable-length frame needs the receiver
+to learn the length before it can decode, which means a separately coded
+header, and the airtime it would save is small next to what an HF keying
+already spends on PTT, ALC settling and turnaround.
+
+**HC1 is not the control mode**, and the measurement that decided that
+belongs here rather than only in the code. Its `confidence` is the normalized
+self-correlation of its repeated sync symbols, whose expected value is exactly
+`SNR/(SNR+1)`; the 0.70 threshold it inherited from VF3 is therefore a 3.7 dB
+SNR floor, and lengthening the preamble does not move it, because that shrinks
+the correlation's variance and not its mean. Handed the true frame start,
+HC1's payload decodes down to -4 dB. As actually decoded it needs +3.5 dB. On
+the bench's weak leg -- about -8 dB -- it decoded 0 frames out of 10.
 
 The head is a repeat of the 512-sample sync core, quantized to a whole number
 of cores plus half a core. The half core is not decoration: a head ending on a
 core boundary reproduces a complete sync symbol in its own last 640 samples,
 which widens the acquisition correlation's plateau to 640 samples and leaves
 the start index to numerical noise.
+
+### Mode 5: HC0, the HF control mode
+
+Mode `5` is `whale.modes.hc0_mode.HC0`, the bottom rung and the control mode
+of the HF SSB ladder: every CONNECT, CONNECT_ACK, DISC, DATA_ACK,
+floor-control and timing frame rides it, and a DATA transfer falls back to it
+when nothing faster holds. It is what mode 0 is on FM.
+
+It is not OFDM and not coherent. Information is **which of 16 tones is
+present**, detected as energy, so no part of the receive path holds a phase
+reference: not the demodulator, not the synchronizer, and not the frequency
+estimator, which measures the offset but is never gated on it.
+
+| Property | Value |
+| --- | --- |
+| Symbol | 512 samples, 10.667 ms |
+| Symbol rate | 93.75 baud -- also the tone spacing and the FFT bin width |
+| Tones | 16, FFT bins 8-23, 750-2156.25 Hz, Gray coded |
+| Occupied bandwidth | 1.5 kHz |
+| Modulation | Non-coherent orthogonal 16-FSK, phase-continuous, constant envelope |
+| Preamble | 24 symbols: 12 PN-drawn tones, each sent twice |
+| Payload grid | 283 symbols x 4 = 1,132 coded bits |
+| FEC | Interleaved rate-1/2, K=7 convolutional code, soft-decision Viterbi |
+| Error detection | 16-bit length + CRC32, inside the coded payload |
+| User payload | 64 bytes, of which 54 are a DATA chunk after the air header |
+| Frame | 4,096 head + 307 x 512 + 960 tail = 162,240 samples = 3.380 s |
+| Offset tolerance | +-46.875 Hz (half a tone spacing) |
+
+Measured against HC1 at equal transmitted RMS, white noise across the whole
+band: **HC1 fails below +3.5 dB and HC0 decodes to -16 dB.** About 7 dB of
+that is spending five times the airtime; the rest is not paying for coherence.
+And that comparison is at equal RMS -- HC0's waveform is constant-envelope,
+crest factor 1.41 against HC1's 3.9, so through the same peak-limited
+transmitter it delivers roughly 8 dB more average power again.
+
+Three details follow from being non-coherent:
+
+- **Detection is a correlation against a known tone pattern**, not against the
+  signal itself, so its processing gain grows with preamble length in the
+  ordinary way. The tone magnitudes have the across-tone mean removed at each
+  instant before correlating; without that subtraction the statistic scores
+  the magnitudes' common component against itself and reads pure noise as a
+  lock, which is the failure `experiments/mfsk` records measuring at 0.73
+  against a 0.70 threshold. Centred, a real preamble scores 0.20 at -16 dB
+  where noise, a bare carrier and an HC1 frame all sit at 0.06-0.08. The
+  threshold is 0.12.
+- **The preamble is 12 tones each sent twice.** A symbol's measured phase
+  carries a symbol-timing term that depends on which tone it used, so between
+  two different tones a timing error leaks straight into the frequency
+  estimate -- 48 samples of it, well inside what the detector tolerates, read
+  a zero offset as -13.5 Hz. Across a pair sharing a tone that term is
+  identical and cancels, so the estimate is exact at any timing.
+- **Symbol timing is refined on matched tone energy**, not on the detection
+  score. That score saturates: once the right tone dominates every symbol it
+  reads its ceiling whatever the timing, flat to within 1e-9 across +-48
+  samples.
+
+The head is a repeat of a fixed four-symbol tone block. Unlike VF3's and
+HC1's, it does not have to avoid resembling the preamble -- those modes
+acquire by correlating the capture against itself, so any repeat near the
+header widens the peak into a plateau, while a pattern correlator simply does
+not score a different pattern.
 
 For the CPFSK profiles, the receiver detects the known sync word using
 normalized correlation. The current confidence threshold is 0.7. This is a

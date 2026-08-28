@@ -25,6 +25,7 @@ import numpy as np
 from acceptance_test import StationClient
 from whale import afsk, link
 from whale.link import Link
+from whale.modes.hc0_mode import HC0
 from whale.modes.hc1_mode import HC1
 from whale.modes.vf3_mode import VF3
 from whale.policy import HF_SSB, VHF_FM
@@ -197,15 +198,16 @@ def test_vf3_carries_a_session_through_the_same_stack():
         f"VF3 session spent {fast:.1f}s of air against CPFSK's {slow:.1f}s")
 
 
-def test_the_hf_channel_carries_a_session_on_hc1_alone():
+def test_the_hf_channel_carries_a_session_with_hc0_in_control():
     """The HF station, whole: HF_SSB's policy, HF_SSB's ladder, HC1 on air.
 
     This is the software half of the HF acceptance test -- everything
     `scripts/run_acceptance_test.py --channel hf-ssb` does except the
-    radios.  It matters more than the VF3 session does, because HC1 is the
+    radios.  It matters more than the VF3 session does, because HC0 is the
     *control* mode: the connect handshake, the timing calibration, every
     ACK, the floor handover and the disconnect all ride a waveform that
-    shares no DSP with CPFSK, which nothing before it had to do.
+    shares no DSP with CPFSK -- and, HC0 being MFSK, none with the OFDM
+    modes either.
 
     Nothing is passed but the policy.  The ladder comes from
     `HF_SSB.mode_ladder`, which is the pairing whale/policy.py exists to
@@ -215,12 +217,14 @@ def test_the_hf_channel_carries_a_session_on_hc1_alone():
     payload_ba = _payload(600, 13, 5)
     link_a, link_b, ta, tb = _run_session(payload_ab, payload_ba, policy=HF_SSB)
 
-    assert link_a.modes.control is HC1 and link_b.modes.control is HC1
-    assert link_a.tx_profile is HC1 and link_a.rx_profile is HC1
-    assert link_b.tx_profile is HC1 and link_b.rx_profile is HC1
-    # One rung: there is nowhere to step, so the session cannot have
-    # succeeded by quietly falling back to something else.
-    assert link_a.modes.supported_ids == (HC1.mode_id,)
+    # HC0 is the control mode, so the handshake, the calibration exchange,
+    # every ACK and the disconnect all rode the 16-FSK waveform.
+    assert link_a.modes.control is HC0 and link_b.modes.control is HC0
+    assert link_a.modes.supported_ids == (HC0.mode_id, HC1.mode_id)
+    # And the data plane climbed to the fast rung, which is the ladder
+    # working rather than one mode being hardcoded.
+    assert link_a.tx_profile is HC1 and link_b.rx_profile is HC1
+    assert link_b.tx_profile is HC1 and link_a.rx_profile is HC1
 
 
 if __name__ == "__main__":

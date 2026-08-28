@@ -15,6 +15,7 @@ geometry and a wiring of these together -- see `whale/modes/vf3.py`.
   `equalize`      per-carrier channel fit, pilot phase tracking, weights
   `differential`  differentially encoded QPSK
   `interleave`    multiplicative and block bit interleavers
+  `mfsk`          non-coherent M-ary FSK: tone bank, Gray map, sync
   `fec`           rate-1/2 convolutional coding, hard and soft Viterbi
   `framing`       the length/CRC32/whitening/FEC payload codec
   `head`          how much of a transmitted lead-in survived
@@ -26,16 +27,17 @@ definitions, not a tidy-up: changing one changes what a station transmits.
 """
 
 from . import (acquire, bits, differential, equalize, fec, framing, freq,
-               head, interleave, ofdm, timing)
+               head, interleave, mfsk, ofdm, timing)
 from .fec import K7, ConvolutionalCode
 from .framing import PacketCodec
 from .interleave import Interleaver
+from .mfsk import ToneBank
 from .ofdm import Geometry
 from .timing import TimingFit
 
 __all__ = [
     "acquire", "bits", "differential", "equalize", "fec", "framing", "freq",
-    "head", "interleave", "ofdm", "timing",
+    "head", "interleave", "mfsk", "ofdm", "timing",
     "ConvolutionalCode", "Geometry", "Interleaver", "K7", "PacketCodec",
-    "TimingFit",
+    "TimingFit", "ToneBank",
 ]
