@@ -24,8 +24,9 @@ first thing anyone changing it needs.
 """
 
 import dataclasses
+from typing import Callable
 
-from whale import afsk
+from whale import afsk, modes
 
 
 @dataclasses.dataclass(frozen=True)
@@ -163,6 +164,27 @@ class ChannelPolicy:
     # rediscovered when the detector lands.
     require_clear_channel: bool = False
 
+    # -- which waveforms suit this channel -------------------------------
+    #
+    # Called as `mode_ladder(max_useful_frame_seconds)` by Link.__init__ when
+    # it is not handed a registry outright, and returning the ModeRegistry
+    # this station offers.
+    #
+    # This is on the same footing as every other field here: local, never on
+    # air, and a bet about the channel rather than a protocol fact. Two
+    # stations still negotiate from the mode ids they each advertise, so a
+    # peer offering a ladder this one does not know simply never has those
+    # rungs selected.
+    #
+    # It lives here rather than at each call site because the pairing is not
+    # free to vary: the CPFSK profiles carry no carrier-frequency estimate,
+    # so running the VHF ladder against HF_SSB's timeouts is not a slower
+    # link but a broken one, and the reverse wastes the FM bench's whole
+    # speed ladder. Keeping the two together makes that impossible to get
+    # half right.
+    mode_ladder: Callable[[float], object] = dataclasses.field(
+        default=modes.default_registry, compare=False, repr=False)
+
 
 #: The channel this modem was built, measured and accepted against: two FM
 #: handhelds on 2 m simplex, a few metres apart, no other occupants. Every
@@ -180,6 +202,7 @@ VHF_FM = ChannelPolicy(
     step_up_after_clean_streak_max=8,
     max_useful_frame_seconds=afsk.MAX_USEFUL_FRAME_SECONDS,
     require_clear_channel=False,
+    mode_ladder=modes.default_registry,
 )
 
 #: A documented starting point for HF SSB.
@@ -228,4 +251,18 @@ HF_SSB = ChannelPolicy(
     step_up_after_clean_streak_max=32,
     max_useful_frame_seconds=8.0,
     require_clear_channel=True,
+    mode_ladder=modes.hf_registry,
 )
+
+
+#: The channels a station can be started on, by the name the CLI takes.
+#: See whale/vara_server.py's --channel and scripts/run_acceptance_test.py.
+CHANNELS = {"vhf-fm": VHF_FM, "hf-ssb": HF_SSB}
+
+
+def by_name(name: str) -> ChannelPolicy:
+    try:
+        return CHANNELS[name]
+    except KeyError:
+        raise ValueError(
+            f"unknown channel {name!r}; have {sorted(CHANNELS)}") from None

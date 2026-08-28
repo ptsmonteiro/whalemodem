@@ -588,3 +588,47 @@ def test_head_measure_reports_nothing_for_a_signal_that_is_not_the_head():
     reference = RNG.normal(0, 1, 512)
     count, score = head.measure(RNG.normal(0, 1, 4 * 512), 4 * 512, reference)
     assert count == 0 and score < head.MATCH_THRESHOLD
+
+
+def test_head_measure_holds_the_alignment_exactly_by_default():
+    """One sample of slip ends the count when no tolerance is asked for.
+
+    This is VF3's behaviour and the reason `phase_tolerance` defaults to 0:
+    a mode measuring the audio as received wants the strict check.
+    """
+    reference = RNG.normal(0, 1, 512)
+    samples = np.concatenate((np.tile(reference, 3), np.roll(reference, 1),
+                              np.tile(reference, 2)))
+    assert head.measure(samples, len(samples), reference)[0] == 2
+
+
+def test_head_measure_can_follow_an_alignment_that_drifts():
+    """What a frequency-corrected mode needs.
+
+    Correcting an offset multiplies the capture by a slow phase ramp, which
+    walks the correlation peak by a sample every so often -- a drift, not a
+    discontinuity.  With a tolerance the count follows it.
+    """
+    reference = RNG.normal(0, 1, 512)
+    # Newest block first: the walk goes backwards from `start`, so the
+    # alignment slips by one sample every two blocks going back.
+    blocks = [np.roll(reference, -(i // 2)) for i in range(6)]
+    samples = np.concatenate(list(reversed(blocks)))
+    # Strictly, the count stops at the first slip -- two blocks in.
+    assert head.measure(samples, len(samples), reference)[0] == 2
+    assert head.measure(samples, len(samples), reference,
+                        phase_tolerance=1)[0] == 6
+
+
+def test_a_tolerance_still_stops_at_a_real_discontinuity():
+    """The tolerance must not turn the phase check off.
+
+    A block that is the reference at a wholly different alignment is the
+    "the head ended and something else correlates here" case the check
+    exists for, and it jumps rather than drifts.
+    """
+    reference = RNG.normal(0, 1, 512)
+    samples = np.concatenate((np.tile(reference, 2), np.roll(reference, 200),
+                              np.tile(reference, 3)))
+    assert head.measure(samples, len(samples), reference,
+                        phase_tolerance=1)[0] == 3

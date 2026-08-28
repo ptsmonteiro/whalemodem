@@ -12,6 +12,19 @@ immediately before the header is circularly correlated against the
 reference to recover that phase, and blocks are then counted backwards
 while they keep matching at the same phase.  The count stops at the first
 block that does not, which is where the blackout (or the buffer) begins.
+
+`phase_tolerance` is how far that alignment may move from one block to the
+next.  Zero -- the default, and what VF3 has always done -- means the
+correlation peak has to land on exactly the same sample every time.  That
+is right for a mode measuring the head on the audio as received, and wrong
+for one measuring it on audio it has *frequency corrected* first: the
+correction multiplies the whole capture by a slow phase ramp, and a ramp of
+even a few degrees per head moves the peak across a sample boundary
+somewhere in a long head.  Measured on HC1: a 0.038 Hz residual -- pure
+estimator noise, on a signal with no offset at all -- cut a 94-core head to
+18.  So the tolerance is compared against the *previous* block rather than
+the first, which lets an arbitrarily slow drift accumulate while a real
+discontinuity, which jumps, still stops the count.
 """
 
 from __future__ import annotations
@@ -24,8 +37,8 @@ MIN_ENERGY_FRACTION = 0.75
 
 def measure(samples: np.ndarray, start: int, reference: np.ndarray, *,
             match_threshold: float = MATCH_THRESHOLD,
-            min_energy_fraction: float = MIN_ENERGY_FRACTION
-            ) -> tuple[int, float]:
+            min_energy_fraction: float = MIN_ENERGY_FRACTION,
+            phase_tolerance: int = 0) -> tuple[int, float]:
     """Count intact reference blocks immediately before `start`.
 
     Returns (blocks observed, the correlation of the block nearest the
@@ -61,11 +74,16 @@ def measure(samples: np.ndarray, start: int, reference: np.ndarray, *,
         best = int(np.argmax(circular))
         score = float(circular[best])
         if count == 0:
-            first, phase = score, best
-        elif best != phase:
+            first = score
+        elif min(abs(best - phase),
+                 block_samples - abs(best - phase)) > phase_tolerance:
             break
         if score < match_threshold:
             break
+        # Tracked, not fixed: see phase_tolerance in the module docstring.
+        # At tolerance 0 this is identical to holding the first block's
+        # phase, since a block that matched it becomes it.
+        phase = best
         count += 1
         at -= block_samples
     return count, first

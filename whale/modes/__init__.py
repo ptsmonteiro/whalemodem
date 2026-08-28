@@ -32,3 +32,22 @@ def default_registry(budget=None):
 
     base = None if budget is None else afsk.default_registry(budget)
     return registry_with_vf3(base)
+
+
+def hf_registry(budget=None):
+    """The station's mode ladder for an HF SSB channel: HC1 alone.
+
+    Separate from `default_registry` rather than an extension of it: the
+    CPFSK profiles have no carrier-frequency estimate anywhere in them, so
+    on SSB they are not a robust rung to fall back to.  See
+    `whale/modes/hc1_mode.py`.
+
+    `budget` is accepted and ignored, so this is interchangeable with
+    `default_registry` where a `ChannelPolicy` selects one -- HC1's payload
+    is fixed by its OFDM frame structure, not by a keying-time budget, in
+    exactly the way VF3's is.
+    """
+    del budget
+    from .hc1_mode import hf_registry as _hf_registry
+
+    return _hf_registry()

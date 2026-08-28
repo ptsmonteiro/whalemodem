@@ -25,7 +25,9 @@ import numpy as np
 from acceptance_test import StationClient
 from whale import afsk, link
 from whale.link import Link
+from whale.modes.hc1_mode import HC1
 from whale.modes.vf3_mode import VF3
+from whale.policy import HF_SSB, VHF_FM
 from whale.service import ModemService
 from whale.vara_server import StationServer
 
@@ -72,8 +74,8 @@ class PairedAudioTransport:
             self._transmitting.clear()
 
 
-def _server(transport, callsign, mode_registry=None):
-    station = Link(transport, callsign, mode_registry=mode_registry)
+def _server(transport, callsign, mode_registry=None, policy=VHF_FM):
+    station = Link(transport, callsign, mode_registry=mode_registry, policy=policy)
     service = ModemService(station, poll_interval=0.01)
     server = StationServer(service, callsign, 0, 0)
     thread = threading.Thread(target=server.serve_forever, daemon=True)
@@ -92,7 +94,7 @@ def _close_client(client):
     client.cmd.close()
 
 
-def _run_session(payload_ab, payload_ba, mode_registry=None):
+def _run_session(payload_ab, payload_ba, mode_registry=None, policy=VHF_FM):
     """One complete session -- connect, both transfers, disconnect.
 
     Returns the two Links and the two transports so a caller can assert on
@@ -111,8 +113,8 @@ def _run_session(payload_ab, payload_ba, mode_registry=None):
     link_a = link_b = None
     threads = []
     try:
-        server_a, thread_a, link_a = _server(ta, "STA1", mode_registry)
-        server_b, thread_b, link_b = _server(tb, "STA2", mode_registry)
+        server_a, thread_a, link_a = _server(ta, "STA1", mode_registry, policy)
+        server_b, thread_b, link_b = _server(tb, "STA2", mode_registry, policy)
         threads = [thread_a, thread_b]
         client_a = StationClient("A", "127.0.0.1", server_a.cmd_port, server_a.data_port)
         client_b = StationClient("B", "127.0.0.1", server_b.cmd_port, server_b.data_port)
@@ -193,6 +195,32 @@ def test_vf3_carries_a_session_through_the_same_stack():
         payload_ab, payload_ba, mode_registry=afsk.default_registry())[2:])
     assert slow > 1.25 * fast, (
         f"VF3 session spent {fast:.1f}s of air against CPFSK's {slow:.1f}s")
+
+
+def test_the_hf_channel_carries_a_session_on_hc1_alone():
+    """The HF station, whole: HF_SSB's policy, HF_SSB's ladder, HC1 on air.
+
+    This is the software half of the HF acceptance test -- everything
+    `scripts/run_acceptance_test.py --channel hf-ssb` does except the
+    radios.  It matters more than the VF3 session does, because HC1 is the
+    *control* mode: the connect handshake, the timing calibration, every
+    ACK, the floor handover and the disconnect all ride a waveform that
+    shares no DSP with CPFSK, which nothing before it had to do.
+
+    Nothing is passed but the policy.  The ladder comes from
+    `HF_SSB.mode_ladder`, which is the pairing whale/policy.py exists to
+    keep from drifting apart.
+    """
+    payload_ab = _payload(600, 7, 11)
+    payload_ba = _payload(600, 13, 5)
+    link_a, link_b, ta, tb = _run_session(payload_ab, payload_ba, policy=HF_SSB)
+
+    assert link_a.modes.control is HC1 and link_b.modes.control is HC1
+    assert link_a.tx_profile is HC1 and link_a.rx_profile is HC1
+    assert link_b.tx_profile is HC1 and link_b.rx_profile is HC1
+    # One rung: there is nowhere to step, so the session cannot have
+    # succeeded by quietly falling back to something else.
+    assert link_a.modes.supported_ids == (HC1.mode_id,)
 
 
 if __name__ == "__main__":

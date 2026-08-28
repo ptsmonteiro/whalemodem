@@ -59,11 +59,21 @@ class ModemService:
         self._link.on_event = self._on_link_event
 
     @classmethod
-    def for_radio(cls, radio_name: str, mycall: str, radio_config=None, **kwargs) -> "ModemService":
-        """Production composition root for the current radio/link stack."""
+    def for_radio(cls, radio_name: str, mycall: str, radio_config=None,
+                  policy=None, **kwargs) -> "ModemService":
+        """Production composition root for the current radio/link stack.
+
+        ``policy`` is the :class:`whale.policy.ChannelPolicy` this station
+        runs -- its timeouts, its retry budget and, through
+        ``mode_ladder``, the waveforms it offers. Defaults to the VHF FM
+        bench the modem was built against.
+        """
+        from whale.policy import VHF_FM
         from whale.transport import RadioTransport
 
-        return cls(Link(RadioTransport(radio_name, radio_config), mycall), **kwargs)
+        link = Link(RadioTransport(radio_name, radio_config), mycall,
+                    policy=policy or VHF_FM)
+        return cls(link, **kwargs)
 
     @property
     def state(self) -> str:

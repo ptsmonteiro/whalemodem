@@ -18,6 +18,21 @@ description of the present implementation and not a compatibility promise.
   floor and may originate DATA. IRS (Information Receiving Station) is the
   other endpoint.
 
+## Channels
+
+A station is started on a *channel*, which is a `whale.policy.ChannelPolicy`:
+one set of timeouts, retry budgets and keying limits, plus the mode ladder
+that suits the path. `vhf-fm` is the two-FM-handhelds bench this modem was
+built and measured against; `hf-ssb` is HF single sideband, which offers only
+mode 4 (HC1). Nothing about a channel is negotiated or goes on air -- two
+stations running different policies interoperate, and negotiation over the
+advertised mode IDs does the rest. Select one with
+`python -m whale.vara_server --channel hf-ssb` or
+`scripts/run_acceptance_test.py --channel hf-ssb`.
+
+The HF policy's numbers are reasoned placeholders, not measurements. See
+`whale/policy.py`, which says so field by field.
+
 ## Layering
 
 ```text
@@ -98,8 +113,9 @@ CONNECT_ACK v4 Content is:
 | Accepted caller transmit mode | 1 byte | Mode accepted for caller-to-listener traffic |
 | Listener transmit mode | 1 byte | Mode selected for listener-to-caller traffic |
 
-Mode count may be zero only if both selected/proposed mode fields are mode 0;
-mode 0 is always a valid fallback. Callsigns are compared according to the
+Mode count may be zero only if both selected/proposed mode fields name the
+listener's control mode, which is always a valid fallback -- mode 0 on the VHF
+FM ladder, mode 4 on the HF SSB one. Callsigns are compared according to the
 existing link addressing policy after their encoding has been validated.
 The limits above bound all variable fields before allocation.
 
@@ -193,8 +209,10 @@ Each endpoint adapts only its own transmit direction from ARQ outcomes:
 - Three unanswered attempts change one step down before retrying the same chunk.
 - Three consecutive first-attempt chunks change one step up before the next chunk.
 - Steps follow registry order and are limited to modes the peer advertised.
-  The shipped order is 0, 1, 2; `registry_with_vf3()` appends mode 3 above
-  them (see [`FRAMING.md`](FRAMING.md#mode-3-vf3-a-non-cpfsk-data-mode)).
+  The VHF FM ladder is 0, 1, 2 with mode 3 (VF3) appended above them (see
+  [`FRAMING.md`](FRAMING.md#mode-3-vf3-a-non-cpfsk-data-mode)). The HF SSB
+  ladder is mode 4 (HC1) alone, so a station on it never steps: HC1 is both
+  the control mode and the only data mode.
 
 There is no separate mode-change exchange. While connected, a receiver tries
 the control mode and every mutually advertised DATA mode. A decoded DATA frame
@@ -204,7 +222,10 @@ silence at one speed by retransmitting the same sequence at a lower speed; the
 first successful ACK confirms both delivery and the new mode. DATA_ACK remains
 in the robust control mode and does not describe the reverse-direction mode.
 Head fields encode duration rather than symbols, so a mode change preserves
-the protection and rounds it upward at the new baud.
+the protection and rounds it upward at the new mode's own head granularity.
+The connection-time calibration in `ADAPTIVE_TIMING.md` encodes duration for
+the same reason: it is what lets a mode without symbols -- HC1 measures its
+head in whole OFDM sync cores -- be the control mode at all.
 
 ### Disconnect
 
@@ -289,3 +310,7 @@ is an implementation detail and must not be used for application framing.
   this code rather than hostile input.
 - Compression, bandwidth commands, WINLINK extensions, and most of the real
   VARA command/status surface are not implemented.
+- The HF SSB policy sets `require_clear_channel`, and nothing enforces it:
+  there is no busy-channel detector in this codebase. A station on `hf-ssb`
+  transmits without listening first, which is fine on a bench pair and is not
+  fine on a shared band.

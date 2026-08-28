@@ -32,6 +32,7 @@ import logging
 import socket
 import threading
 
+from whale import policy
 from whale.service import ModemService
 
 logger = logging.getLogger(__name__)
@@ -278,13 +279,21 @@ def main():
     ap.add_argument("--cmd-port", type=int, default=8300)
     ap.add_argument("--data-port", type=int, default=8301)
     ap.add_argument("--host", default="127.0.0.1")
+    ap.add_argument("--channel", default="vhf-fm", choices=sorted(policy.CHANNELS),
+                    help="which channel this station is on: its timeouts, its "
+                         "retry budget and the waveforms it offers "
+                         "(see whale/policy.py)")
     ap.add_argument("-v", "--verbose", action="store_true")
     args = ap.parse_args()
 
     logging.basicConfig(level=logging.DEBUG if args.verbose else logging.INFO,
                          format="%(asctime)s %(levelname)s %(name)s: %(message)s")
 
-    service = ModemService.for_radio(args.radio, args.mycall, radio_config=args.radio_config)
+    channel = policy.by_name(args.channel)
+    logger.info("channel: %s", channel.name)
+    service = ModemService.for_radio(args.radio, args.mycall,
+                                     radio_config=args.radio_config,
+                                     policy=channel)
     server = StationServer(service, args.mycall, args.cmd_port, args.data_port, args.host)
     server.serve_forever()
 

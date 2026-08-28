@@ -28,18 +28,24 @@ whale/
   link.py         stop-and-wait ARQ: connect / send / recv / disconnect
   vara_server.py  VARA-API-shaped TCP front end (StationServer, CLI)
   hw/             sound card lookup + PTT keying (audio_io, ptt, radios)
+  policy.py       one channel's worth of assumptions, incl. its mode ladder
   modes/          physical-layer modes that are not CPFSK
     vf3.py          58-carrier differential-QPSK OFDM, 1436 B in 5.2s
-    vf3_mode.py     VF3 as a negotiable WaveformMode (opt-in, mode 3)
+    vf3_mode.py     VF3 as a negotiable WaveformMode (mode 3)
+    hc1.py          19-carrier DQPSK OFDM for HF SSB, offset-corrected
+    hc1_mode.py     HC1 as a WaveformMode, and the HF ladder (mode 4)
 tests/
   link_harness.py         two Links against each other, in one process
   test_afsk_loopback.py   pure-software self-test, no hardware/radios
   test_link_recovery.py   what a *lost control frame* does to a session
   test_vf3_mode.py        the mode contract VF3 has to satisfy to be negotiable
+  test_hc1_mode.py        the same contract for HC1, plus the HF properties
+  test_hc1_capture_replay.py  HC1 against audio recorded off a real HF path
   test_audio_e2e.py       the full TCP stack over paired audio, CPFSK and VF3
 scripts/
   bench.py                   the rig the sweeps share: radio pair, trial loop, walk
   hw_smoke_single_frame.py   one AFSK frame each direction, no ARQ/sockets
+  hw_hc1_frames.py           HC1 frames over the HF pair, with HF diagnostics
   hw_smoke_link.py           full connect/send/disconnect via Link, no sockets
   hw_half_open_recovery.py   kill one station mid-session, time the other
   measure_peer_gap.py        worst legitimate peer silence, from the logs
@@ -262,6 +268,123 @@ One consequence worth stating plainly: a VF3 keying is 5.2 s, against the
 own -- see "How long one keying may be" -- and the reasons behind it are
 answered differently by a waveform with a cyclic prefix and per-carrier
 equalisation. Keyings of around five seconds are acceptable here.
+
+## HF: the HC1 mode, and what mode 0 could not do there
+
+Everything above this line was built, measured and accepted against one
+channel: two FM handhelds on 2 m, a few metres apart. `whale/policy.py`
+already separated the numbers that are facts about *that channel* from the
+ones that are facts about the protocol. What it could not separate was the
+waveform, because there was only ever one family of them.
+
+`whale/modes/hc1.py` is the second. HC1 does on HF SSB what mode 0 does on
+FM -- it is the control plane and the bottom of the data ladder at once -- and
+it exists because three things mode 0 relies on are simply not true on
+sideband:
+
+  - **Frequency is exact.** An FM receiver reproduces the transmitted audio
+    frequency. Two SSB receivers reproduce it offset by the difference between
+    the stations' reference oscillators plus whatever the dials disagree
+    about. `afsk.demodulate` integrates each tone in a fixed bin and has no
+    frequency estimate anywhere in it.
+  - **A frame either arrives or it does not.** CPFSK framing has a CRC and no
+    correction, so one wrong bit costs the whole keying and a retransmit.
+  - **The channel has no memory.** An HF path has a millisecond or two of
+    delay spread; nothing on the FM bench had any.
+
+So HC1 is a 19-carrier differential-QPSK OFDM frame over 656-2344 Hz, with a
+2.67 ms cyclic prefix, an interleaved rate-1/2 K=7 convolutional code, a CRC32,
+and -- the part that is genuinely new here -- a carrier frequency offset that
+is *estimated and removed* rather than reported. 74 payload bytes, of which 64
+are a DATA chunk, in a fixed 0.695 s keying. Full geometry in
+[`FRAMING.md`](FRAMING.md#mode-4-hc1-the-hf-control-and-data-mode).
+
+It is geometry and wiring: every transform is a `whale/dsp/` kernel. The two
+frequency estimators in `whale/dsp/freq.py` were extracted alongside the
+others and, at the time, used by nothing -- that module's docstring ends "a
+coherent HF waveform would correct with them before analysis". This is that
+waveform.
+
+### HC1 on the HF bench
+
+Bench: IC-7300 and IC-705, both on 10.145 MHz USB in data mode, both antennas
+in the same room. `scripts/hw_hc1_frames.py`, ARQ bypassed, one
+modulate -> TX -> capture -> demodulate per trial.
+
+| run | payload | result |
+| --- | ---: | --- |
+| ic7300 -> ic705 | 74 B | **10/10** byte-for-byte, 0.00% raw BER on every frame |
+| ic7300 -> ic705 | 12 B (ACK-sized) | **4/4** byte-for-byte, 0.00% raw BER |
+| ic705 -> ic7300 | 74 B | **0/10** -- see below, this is the station, not the mode |
+
+On the working leg: acquisition confidence 0.991-0.993, all 19 carriers
+present every time, per-carrier header SNR 13.5-24.5 dB, and a carrier offset
+measured at **-7.8 to -8.8 Hz** on every single frame. That last number is the
+mode earning its keep. It is a real physical quantity -- the difference between
+two crystal oscillators -- and it is the thing no CPFSK profile in this repo
+can see, let alone remove. The reverse leg, when it acquires at all, measures
+it as **+7.7 Hz**: the same offset, the other way round.
+
+Two of those captures are committed under `tests/data/hc1_captures/` and
+replayed by `tests/test_hc1_capture_replay.py`, so the on-air result is a
+regression test rather than a story.
+
+Decode cost, from a live session's own log: 14.4 ms mean and 62.5 ms max per
+attempt over 377 attempts, which matters because the decode loop runs it on
+every poll whether or not anything is arriving.
+
+### What is not yet demonstrated, and why
+
+**The end-to-end acceptance test has not passed on HF.** It fails on this
+bench's reverse RF path, not in the modem, and the distinction is worth
+recording precisely.
+
+A run of `run_acceptance_test.py --channel hf-ssb --a-radio ic7300 --b-radio
+ic705` gets this far, all of it over the air on HC1:
+
+```
+[STA1] TX CONNECT at hc1          -> [STA2] decoded CONNECT
+[STA2] TX CONNECT_ACK at hc1      -> [STA1] decoded CONNECT_ACK
+[STA1] TX TIMING_ACK at hc1       -> [STA2] decoded TIMING_ACK
+[STA2] TX TIMING_CONFIRM at hc1   -> never arrives
+[STA2] accepted connection from STA1: tx=hc1 rx=hc1
+[STA1] retries TIMING_ACK, gives up
+```
+
+So the listener completed the whole handshake and reached CONNECTED; the
+caller never saw the last frame of it. The link, the ARQ, the calibration
+handshake and the negotiation all drove a non-CPFSK control mode over real
+radios correctly. What did not happen is the return path.
+
+Measured, both directions, same session:
+
+| | ic7300 -> ic705 | ic705 -> ic7300 |
+| --- | ---: | ---: |
+| median per-carrier header SNR | ~18 dB | ~5.6 dB |
+| raw BER before FEC | 0.00% | 18% |
+| receiver idle noise, RMS | 0.0015 | 0.073 |
+| 1500 Hz tone above the noise | 69 dB | 38 dB |
+
+The IC-705 is transmitting: its own meters read 40-55% forward power with ALC
+moving, and the IC-7300 does occasionally decode one of its frames. It is
+about 13 dB short of where the coding gives out, and roughly 30 dB down on the
+reverse leg overall. The receive noise floors say the same thing from the
+other side and by reciprocity: the IC-705 hears 30-odd dB less band noise than
+the IC-7300 does, which is what an antenna port that is not radiating well
+looks like. The two radios' power settings account for about 6 dB of it
+(IC-7300 at 26/255, IC-705 at 128/255); the rest is the antenna.
+
+That is a station-side fix -- the IC-705's antenna, and its power setting --
+not a modem one. When the reverse leg comes up to within about 10 dB of the
+forward one, the acceptance test should complete on the existing code.
+
+Two other things are honestly not done. `HF_SSB`'s timeouts, retry budget and
+keying limit are reasoned placeholders with no measurement behind any of them,
+which `whale/policy.py` says field by field. And `require_clear_channel` is
+set on that policy and enforced by nothing, because this codebase has no
+busy-channel detector: a station on `--channel hf-ssb` transmits without
+listening first, which is fine on a bench pair and is not fine on a shared
+band.
 
 ## Losing a control frame
 
@@ -513,8 +636,10 @@ name matching, PTT wiring, COM ports) is configured in `whale/hw/radios.py`.
 Software-only self-tests (no radios needed):
 
 ```
-pytest tests/test_audio_e2e.py -q       # full TCP stack over paired audio, CPFSK and VF3
+pytest tests/test_audio_e2e.py -q       # full TCP stack over paired audio, CPFSK, VF3 and HC1
 pytest tests/test_vf3_mode.py -q         # the VF3 WaveformMode contract
+pytest tests/test_hc1_mode.py -q         # the same for HC1, plus offset/multipath/FEC
+pytest tests/test_hc1_capture_replay.py -q   # HC1 against recorded on-air HF audio
 python tests/test_afsk_loopback.py
 python tests/test_link_recovery.py
 ```
@@ -525,6 +650,14 @@ frequency):
 ```
 python scripts/hw_smoke_single_frame.py   # one frame each direction
 python scripts/hw_smoke_link.py           # full connect/send/verified clean disconnect
+python scripts/hw_hc1_frames.py           # HC1 frames over an HF pair (ic7300/ic705)
+```
+
+On HF, start both stations on the HF channel -- which selects HF timeouts and
+the HC1 ladder -- with `--channel hf-ssb`:
+
+```
+python scripts/run_acceptance_test.py --channel hf-ssb     --a-radio ic7300 --b-radio ic705 --size 1024
 ```
 
 Full acceptance test, two station servers + a driving client:

@@ -53,11 +53,21 @@ amplitude ramp at each end and a nominal amplitude of 0.6.
 | `1` | `600baud` | 600 | 1200 Hz | 1800 Hz | 193 bytes |
 | `2` | `1200baud` | 1200 | 1200 Hz | 2200 Hz | 402 bytes |
 
-Mode 0 is the mandatory robust control profile. Control packets use it for the
-complete keying. DATA packets use the negotiated profile for both header and
-body. The two directions
+Control packets use the registry's control mode for the complete keying. DATA
+packets use the negotiated mode for both header and body. The two directions
 are negotiated and adapted independently as described in
 [`LINK.md`](LINK.md#mode-adaptation).
+
+Which mode is the control mode is a property of the registry, and therefore of
+the channel. On the VHF FM ladder it is mode `0`, and modes `0..2` above are
+that ladder. On the HF SSB ladder it is mode `4` (HC1, below) and the CPFSK
+profiles are not offered at all: they carry no carrier-frequency estimate, so
+on SSB they are not a robust fallback but a mode that stops working as soon as
+the two stations disagree about frequency. See `whale/policy.py`, which pairs
+each `ChannelPolicy` with its ladder.
+
+Mode IDs are global across channels: an ID names one waveform everywhere, even
+where no registry offers two of them together.
 
 ### Mode 3: VF3, a non-CPFSK DATA mode
 
@@ -70,10 +80,11 @@ the link only through the same `encode()` / `decode()` / `airtime()` contract,
 which is the point: nothing in connection management, ARQ or negotiation
 changed to accommodate it.
 
-It is not in `afsk.default_registry()`. VF3 has passed 6/6 full-capacity
-frames in each direction on the bench with ARQ bypassed
-(`experiments/vf3/RESULTS.md`) but has not yet carried a session, so it is
-opt-in through `whale.modes.vf3_mode.registry_with_vf3()` until it has.
+It is not in `afsk.default_registry()`, which stays the CPFSK-only ladder; it
+is the top rung of `whale.modes.default_registry()`, which is what a station
+on the VHF FM channel actually runs. VF3 passed 6/6 full-capacity frames in
+each direction on the bench with ARQ bypassed (`experiments/vf3/RESULTS.md`)
+and has since carried acceptance sessions over the air in both directions.
 
 Two consequences of it being a DATA mode only. The control plane stays on mode
 0, so a station that cannot decode VF3 still completes CONNECT and still
@@ -81,9 +92,65 @@ receives DATA once the ISS steps down. And because a VF3 keying is 5.2 s
 whatever it carries, a short packet would waste the difference -- which is
 harmless, since control packets never ride a DATA mode.
 
-The receiver detects the known sync word using normalized correlation. The
-current confidence threshold is 0.7. This is a receiver implementation detail,
-not an encoded field.
+### Mode 4: HC1, the HF control and data mode
+
+Mode `4` is `whale.modes.hc1_mode.HC1`, and it is what mode 0 is on FM: the
+control plane and the data plane of an HF SSB link, both at once. It is the
+only mode in `whale.modes.hf_registry()`.
+
+| Property | Value |
+| --- | --- |
+| Symbol | 128-sample cyclic prefix + 512-sample core = 640 samples, 13.33 ms |
+| Carrier spacing | 93.75 Hz |
+| Carriers | 19, FFT bins 7-25, 656.25-2343.75 Hz |
+| Modulation | Differential QPSK, per carrier, across symbols |
+| Header | 5 repeated sync + 8 varying training symbols |
+| Payload grid | 34 symbols x 19 carriers x 2 = 1,292 coded bits |
+| FEC | Interleaved rate-1/2, K=7 convolutional code, soft-decision Viterbi |
+| Error detection | 16-bit length + CRC32, inside the coded payload |
+| User payload | 74 bytes, of which 64 are a DATA chunk after the air header |
+| Frame | 2,304 lead-in + 47 x 640 + 960 tail = 33,344 samples = 0.695 s |
+| Offset tolerance | +-46.875 Hz (half a carrier spacing) |
+
+Like VF3 it brings its own framing: acquisition is the OFDM header rather than
+a PN correlation, and the length, CRC32 and FEC live inside the payload grid,
+so nothing under "Framing" below applies to it. Unlike VF3 it is not a DATA
+mode only, which is the whole point -- on HF the control plane needs the
+frequency correction and the coding more than the data plane does.
+
+What it does that no earlier mode does is **correct the carrier frequency
+offset**. Two SSB receivers reproduce a transmitted audio frequency offset by
+the difference between the stations' reference oscillators; the bench pair
+(IC-7300 and IC-705 on 10.145 MHz) measures about 8 Hz, and half a ppm each
+way at 14 MHz would be 14 Hz. The offset is estimated twice: coarsely from the
+cyclic-prefix correlation angle, which is undone in the time domain because an
+offset of tens of Hz against a 93.75 Hz spacing leaks each carrier into its
+neighbours; then finely from the per-symbol phase step across the known
+header, which is removed as one phase per symbol on the analyzed carriers. Both
+estimators are `whale.dsp.freq`, which existed as a VF3 diagnostic before HC1
+had a use for it.
+
+A consequence worth stating: an HC1 keying is 0.695 s whatever it carries, so
+a 12-byte DATA_ACK costs the same air as a 64-byte chunk. That is accepted
+rather than worked around. A variable-length OFDM frame needs the receiver to
+learn the length before it can decode, which means a separately coded header,
+and the airtime it would save is small next to what an HF keying already
+spends on PTT, ALC settling and turnaround. What the fixed frame buys is that
+every frame on the link, control included, gets the full FEC, CRC32 and
+frequency correction.
+
+The head is a repeat of the 512-sample sync core, quantized to a whole number
+of cores plus half a core. The half core is not decoration: a head ending on a
+core boundary reproduces a complete sync symbol in its own last 640 samples,
+which widens the acquisition correlation's plateau to 640 samples and leaves
+the start index to numerical noise.
+
+For the CPFSK profiles, the receiver detects the known sync word using
+normalized correlation. The current confidence threshold is 0.7. This is a
+receiver implementation detail, not an encoded field. VF3 and HC1 use their
+own acquisition thresholds against a different measure -- the normalized
+self-correlation of their repeated sync symbols -- and report it through the
+same `confidence` key.
 
 ## Coding and error detection
 

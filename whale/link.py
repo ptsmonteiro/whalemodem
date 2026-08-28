@@ -587,15 +587,29 @@ def _decode_connect_ack(payload):
     return a, b, modes, content[offset], content[offset + 1], session_id
 
 
-def _encode_timing(session_id, head_received):
-    total = int(np.ceil(CALIBRATION_SECONDS * afsk.CONTROL_PROFILE.baud))
+def _encode_timing(session_id, head_seconds):
+    """The connect-time calibration byte: how much of a CALIBRATION_SECONDS
+    head the far end actually heard, as a fraction of it scaled to 255.
 
-    def duration_byte(received):
-        if not 0 <= received <= total:
-            raise ValueError("invalid calibration measurement")
-        return min(255, int(np.ceil(received * 255 / total)))
+    Takes seconds, not symbols.  The quantity on air has always been that
+    fraction -- the old form divided a CPFSK symbol count by
+    `CALIBRATION_SECONDS * CONTROL_PROFILE.baud`, which is the same number
+    by a longer route -- but taking the measurement in the control mode's
+    own symbols meant only a mode with symbols could be the control mode.
+    An OFDM control mode (whale/modes/hc1.py) measures its head in cores,
+    an MFSK one would measure it in something else again, and seconds is
+    the unit they all already report.  This is the connect-time half of the
+    same move `_head_feedback_request` made for the DATA plane.
 
-    return bytes([session_id, duration_byte(head_received)])
+    An observation slightly *over* CALIBRATION_SECONDS is clamped rather
+    than rejected: a mode whose head is quantized (HC1's is, to whole sync
+    cores) can legitimately measure a hair more than was asked for, and
+    that is quantization, not corruption.
+    """
+    if head_seconds is None or head_seconds < 0:
+        raise ValueError("invalid calibration measurement")
+    fraction = min(1.0, head_seconds / CALIBRATION_SECONDS)
+    return bytes([session_id, min(255, int(np.ceil(fraction * 255)))])
 
 
 def _decode_timing(body):
@@ -604,7 +618,7 @@ def _decode_timing(body):
     return body[0], body[1]
 
 
-def _derive_timing(head_duration_byte, baud=None):
+def _derive_timing(head_duration_byte):
     if not 0 < head_duration_byte <= 255:
         raise ValueError("invalid calibration measurement")
     head_loss = CALIBRATION_SECONDS * (255 - head_duration_byte) / 255
@@ -716,12 +730,13 @@ class Link:
         # stations running different policies interoperate.
         self.policy = policy
         if mode_registry is None:
-            from whale.modes import default_registry
-            # The useful-frame budget sizes every CPFSK rung's chunk, so a
-            # policy that keys longer has to be threaded into the ladder
-            # rather than merely remembered.
-            mode_registry = default_registry(
-                budget=self.policy.max_useful_frame_seconds)
+            # Which waveforms suit this channel is the policy's call (see
+            # whale/policy.py's mode_ladder), and the useful-frame budget
+            # sizes every CPFSK rung's chunk, so a policy that keys longer
+            # has to be threaded into the ladder rather than merely
+            # remembered.
+            mode_registry = self.policy.mode_ladder(
+                self.policy.max_useful_frame_seconds)
         self.modes = mode_registry
         self.mycall = mycall
         self.peer_call = None
@@ -1031,14 +1046,21 @@ class Link:
                     _ptype_name(ptype), profile.name,
                     "decode cpu unmeasured" if cpu is None
                     else f"decode cpu {cpu * 1000.0:.1f} ms")
-        received = decode_result.get("head_symbols_received")
-        if received is not None:
-            logger.info("[%s] RX outer head: observed %d adjacent symbols (%.1f ms)",
-                        self.mycall, received, received * 1000.0 / profile.baud)
+        head_seconds = decode_result.get("head_seconds_received")
+        if head_seconds is not None:
+            # Seconds is the only unit every mode reports; whatever it
+            # counted to get there (CPFSK symbols, OFDM cores) rides along
+            # as a diagnostic where the mode chose to put one.
+            logger.info("[%s] RX outer head: observed %.1f ms%s", self.mycall,
+                        head_seconds * 1000.0,
+                        "".join(f" ({key}={decode_result[key]})"
+                                for key in ("head_symbols_received",
+                                            "head_cores_observed")
+                                if key in decode_result))
+        # Seconds, whatever the mode measured in: both the connect-time
+        # calibration (_encode_timing) and the per-frame head feedback
+        # (_head_feedback_request) read this and nothing else.
         self._rx_measurements[(ptype, body)] = {
-            # Symbols for the control-plane calibration, which is always
-            # CPFSK; seconds for the mode-independent head feedback.
-            "head": decode_result.get("head_symbols_received"),
             "head_seconds": decode_result.get("head_seconds_received"),
         }
         self._handle_raw(bytes([ptype]) + body, profile)
@@ -1366,7 +1388,7 @@ class Link:
                                 self.mycall, ack_session, self._session_id)
                     continue
                 measurement = self._rx_measurements.get((PT_CONNECT_ACK, ack_body), {})
-                head = measurement.get("head")
+                head = measurement.get("head_seconds")
                 try:
                     timing_body = _encode_timing(self._session_id, head)
                     _, head_duration = _decode_timing(timing_body)
@@ -1398,8 +1420,7 @@ class Link:
                     confirm_session, own_head = _decode_timing(confirm_body)
                     if confirm_session != self._session_id:
                         continue
-                    self._tx_head_seconds = _derive_timing(
-                        own_head, self.modes.control.baud)
+                    self._tx_head_seconds = _derive_timing(own_head)
                 except ValueError:
                     continue
                 self._clean_streak = 0
@@ -1488,7 +1509,7 @@ class Link:
                 raise ValueError("wrong timing session")
             self._tx_head_seconds = _derive_timing(own_head)
             measurement = self._rx_measurements[(PT_TIMING_ACK, timing_body)]
-            peer_head = measurement["head"]
+            peer_head = measurement["head_seconds"]
             confirm_body = _encode_timing(session_id, peer_head)
             _, peer_head_duration = _decode_timing(confirm_body)
             self._rx_head_seconds = _derive_timing(peer_head_duration)

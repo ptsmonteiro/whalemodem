@@ -26,8 +26,15 @@ conservative.
 The decoder reports:
 
 ```text
-head_symbols_received
+head_seconds_received
 ```
+
+Seconds, because the head measurement crosses layers that do not share a
+symbol. The CPFSK profiles count matched pad symbols and divide by their baud;
+mode 4 (HC1) counts whole 512-sample sync cores and divides by the sample
+rate; a future mode counts whatever its head is made of. Each may also report
+its own raw count as a diagnostic -- `head_symbols_received` for CPFSK,
+`head_cores_observed` for HC1 -- but nothing in the link reads those.
 
 Only a frame whose checked header, optional body, and CRC validate can produce
 a timing observation. Near misses and CRC failures cannot affect timing.
@@ -49,9 +56,12 @@ TIMING_ACK and TIMING_CONFIRM each contain exactly two bytes:
 session_id head_time_received
 ```
 
-`head_time_received` is `ceil(received_symbols * 255 /
-calibration_symbols)`. Values 1 through 255 represent the observed fraction of
-the protocol-fixed one-second calibration head; zero is invalid. The sender
+`head_time_received` is `ceil(head_seconds_received * 255 /
+calibration_seconds)`. Values 1 through 255 represent the observed fraction of
+the protocol-fixed one-second calibration head; zero is invalid. An
+observation above the calibration head is clamped to 255 rather than rejected,
+because a mode whose head is quantized -- HC1 rounds its head up to whole sync
+cores -- can legitimately measure a little more than was asked for. The sender
 derives:
 
 ```text
@@ -69,17 +79,21 @@ upward in 10 ms units. Only after that DATA frame validates, the IRS compares
 the observed adjacent head duration with the 10 ms residual target. DATA_ACK
 piggybacks an absolute requested duration in the same units.
 
-No increase is requested when the apparent deficit is no larger than one
-16-symbol matcher window at the DATA baud. A zero-symbol observation is a lower
-bound and requests a bounded 100 ms increase. Requests are capped at the
-documented one-second maximum.
+No increase is requested when the apparent deficit is no larger than the
+mode's own measurement resolution: one 16-symbol matcher window at the DATA
+baud for CPFSK, one 512-sample sync core (10.67 ms) for HC1, whose head is
+deliberately half a core longer than a whole number of them. A zero
+observation is a lower bound and requests a bounded 100 ms increase. Requests
+are capped at the documented one-second maximum.
 
 The request is absolute, not incremental. The ISS accepts it only in a
 sequence- and mode-valid ACK for the outstanding DATA frame, then applies
 `max(current, requested)`. Consequently retries and duplicates are idempotent,
 stale or smaller feedback cannot decrease padding, and floor or mode changes
-do not reset it. Durations are stored in seconds and converted upward to whole
-symbols at the active baud, so protection remains constant across mode changes.
+do not reset it. Durations are stored in seconds and converted upward to the
+active mode's own head granularity -- whole symbols at the active baud for
+CPFSK, whole sync cores for HC1 -- so protection remains constant across mode
+changes.
 Each endpoint owns only its transmit direction's value.
 
 ## Packet summary

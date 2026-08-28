@@ -19,6 +19,11 @@ Run:
     python scripts/run_acceptance_test.py
     python scripts/run_acceptance_test.py --a-radio ic705 --b-radio ht --size 8192
 
+    # the HF bench: both radios on one SSB frequency in data mode, both
+    # stations on the HC1 waveform (whale/modes/hc1.py)
+    python scripts/run_acceptance_test.py --channel hf-ssb \
+        --a-radio ic7300 --b-radio ic705 --size 1024
+
     # start both legs at 600 baud, have each station step up after its
     # first ACKed chunk, and lose the first MODE_ACK at each end -- i.e.
     # the 600->1200 transition failing in both directions at once
@@ -80,7 +85,8 @@ def _env_with(overrides):
     return env
 
 
-def _start_server(radio, mycall, cmd_port, data_port, host, log_path, name, env_overrides=()):
+def _start_server(radio, mycall, cmd_port, data_port, host, log_path, name,
+                  env_overrides=(), channel="vhf-fm"):
     log_file = open(log_path, "w")
     if env_overrides:
         header = f"# station {name} environment: {' '.join(env_overrides)}\n"
@@ -91,7 +97,7 @@ def _start_server(radio, mycall, cmd_port, data_port, host, log_path, name, env_
         [sys.executable, "-m", "whale.vara_server",
          "--radio", radio, "--mycall", mycall,
          "--cmd-port", str(cmd_port), "--data-port", str(data_port),
-         "--host", host, "--verbose"],
+         "--host", host, "--channel", channel, "--verbose"],
         cwd=ROOT, stdout=subprocess.PIPE, stderr=subprocess.STDOUT,
         env=_env_with(env_overrides),
     )
@@ -125,6 +131,9 @@ def main():
     ap.add_argument("--b-cmd", type=int, default=8310)
     ap.add_argument("--b-data", type=int, default=8311)
     ap.add_argument("--size", type=int, default=4096)
+    ap.add_argument("--channel", default="vhf-fm",
+                    help="channel both stations run on (see whale/policy.py's "
+                         "CHANNELS): vhf-fm or hf-ssb")
     ap.add_argument("--connect-timeout", type=float, default=180.0)
     ap.add_argument("--transfer-timeout", type=float, default=300.0)
     ap.add_argument("--log-dir", default=str(ROOT / "logs"))
@@ -137,14 +146,17 @@ def main():
     log_dir = Path(args.log_dir)
     log_dir.mkdir(exist_ok=True)
 
+    print(f"channel: {args.channel}")
     print(f"starting station A ({args.a_radio}, {args.a_call}) on cmd={args.a_cmd} data={args.a_data}, "
           f"logging to {log_dir / 'sta1.log'}...")
     proc_a, log_a, pump_a = _start_server(args.a_radio, args.a_call, args.a_cmd, args.a_data, args.host,
-                                           log_dir / "sta1.log", "A", args.a_env)
+                                           log_dir / "sta1.log", "A", args.a_env,
+                                           channel=args.channel)
     print(f"starting station B ({args.b_radio}, {args.b_call}) on cmd={args.b_cmd} data={args.b_data}, "
           f"logging to {log_dir / 'sta2.log'}...")
     proc_b, log_b, pump_b = _start_server(args.b_radio, args.b_call, args.b_cmd, args.b_data, args.host,
-                                           log_dir / "sta2.log", "B", args.b_env)
+                                           log_dir / "sta2.log", "B", args.b_env,
+                                           channel=args.channel)
 
     exit_code = 1
     try:

@@ -706,13 +706,29 @@ def test_connect_ack_body_roundtrip():
 
 
 def test_timing_measurement_derives_guarded_session_head():
-    baud = afsk.CONTROL_PROFILE.baud
-    body = link._encode_timing(0x5A, 270)
+    # 0.9 s of a 1 s calibration head arrived: 270 of PROFILE_300's symbols,
+    # but the measurement crosses the air in seconds so that a control mode
+    # without symbols can make it too. See link._encode_timing.
+    body = link._encode_timing(0x5A, 270 / afsk.CONTROL_PROFILE.baud)
     assert link._decode_timing(body) == (0x5A, 230)
-    head = link._derive_timing(230, baud)
+    head = link._derive_timing(230)
     assert abs(head - (25 / 255 + link.HEAD_MIN_GUARD_SECONDS)) < 1e-9, head
     print("test_timing_measurement_derives_guarded_session_head OK")
-    print("test_connect_ack_body_roundtrip OK")
+
+
+def test_a_head_measured_slightly_long_is_clamped_not_rejected():
+    """A mode that quantizes its head can measure a hair over what it asked
+    for. That is quantization, not a corrupt measurement -- rejecting it
+    would fail the handshake every time (whale/modes/hc1.py rounds its head
+    up to whole sync cores)."""
+    assert link._encode_timing(0x5A, link.CALIBRATION_SECONDS * 1.01)[1] == 255
+    for bad in (None, -0.1):
+        try:
+            link._encode_timing(0x5A, bad)
+        except ValueError:
+            continue
+        raise AssertionError(f"{bad!r} should not encode as a measurement")
+    print("test_a_head_measured_slightly_long_is_clamped_not_rejected OK")
 
 
 def test_negotiate_mode():
