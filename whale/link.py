@@ -99,6 +99,32 @@ from whale.policy import VHF_FM
 
 logger = logging.getLogger(__name__)
 
+
+def _decode_snr_summary(result):
+    """Return the mode's receive-SNR diagnostic in a common log format.
+
+    HC0 measures the winning tone against the other tones. VF3 and HC1
+    estimate every carrier separately, for which the median is the stable
+    frame-level summary. CPFSK fits its confirmed sync tones and reports
+    their power against the unexplained residual.
+    """
+    tone_snr = result.get("tone_snr_db")
+    if tone_snr is not None and np.isfinite(tone_snr):
+        return f"SNR {float(tone_snr):.1f} dB (tone)"
+
+    carrier_snr = result.get("carrier_snr_db")
+    if carrier_snr is not None:
+        finite = np.asarray(carrier_snr, dtype=float)
+        finite = finite[np.isfinite(finite)]
+        if finite.size:
+            return f"SNR {float(np.median(finite)):.1f} dB (median carrier)"
+
+    snr = result.get("snr_db")
+    if snr is not None and np.isfinite(snr):
+        return f"SNR {float(snr):.1f} dB (effective sync)"
+
+    return "SNR unavailable"
+
 PT_CONNECT = 0x01
 PT_CONNECT_ACK = 0x02
 PT_DISC = 0x03
@@ -1042,10 +1068,11 @@ class Link:
         if cost is not None:
             cost.frames += 1
         cpu = decode_result.get("decode_cpu_seconds")
-        logger.info("[%s] decoded %s body at profile %s (%s)", self.mycall,
+        logger.info("[%s] decoded %s body at profile %s (%s; %s)", self.mycall,
                     _ptype_name(ptype), profile.name,
                     "decode cpu unmeasured" if cpu is None
-                    else f"decode cpu {cpu * 1000.0:.1f} ms")
+                    else f"decode cpu {cpu * 1000.0:.1f} ms",
+                    _decode_snr_summary(decode_result))
         head_seconds = decode_result.get("head_seconds_received")
         if head_seconds is not None:
             # Seconds is the only unit every mode reports; whatever it

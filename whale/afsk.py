@@ -561,6 +561,46 @@ def _sync_template(baud, sps, sample_rate, freq0, freq1):
     return _tone_energy_diff(tone, sample_rate, sps, freq0, freq1)
 
 
+def _sync_snr_db(audio, start, profile, sample_rate=SAMPLE_RATE):
+    """Effective SNR over a confirmed CPFSK sync word.
+
+    Fit sine and cosine components for each of the two known tones plus DC.
+    Separate tone coefficients tolerate ordinary receive-filter gain and
+    phase differences. Anything the fitted sync cannot explain -- noise,
+    interference, distortion, clipping, or timing error -- is residual, so
+    this is deliberately an effective receive SNR rather than an optimistic
+    amplitude reading.
+    """
+    sps = round(sample_rate / profile.baud)
+    bits = np.asarray(framing.sync_bits(profile.baud), dtype=np.uint8)
+    count = len(bits) * sps
+    observed = np.asarray(audio[start:start + count], dtype=np.float64)
+    if len(observed) != count:
+        return None
+
+    bit_samples = np.repeat(bits, sps)
+    reference = _cpfsk_tone(bits, sps, sample_rate, profile.freq0, profile.freq1)
+    # _cpfsk_tone returns cosine. Its cumulative phase is known, so derive
+    # the matching sine without another phase accumulator.
+    freqs = np.repeat(np.where(bits == 0, profile.freq0, profile.freq1), sps)
+    phase = 2 * np.pi * np.cumsum(freqs) / sample_rate
+    quadrature = np.sin(phase)
+    tone0 = bit_samples == 0
+    tone1 = ~tone0
+    design = np.column_stack((
+        reference * tone0, quadrature * tone0,
+        reference * tone1, quadrature * tone1,
+        np.ones(count),
+    ))
+    coefficients, _, _, _ = np.linalg.lstsq(design, observed, rcond=None)
+    fitted = design @ coefficients
+    signal_power = float(np.mean((fitted - coefficients[-1]) ** 2))
+    residual_power = float(np.mean((observed - fitted) ** 2))
+    if signal_power <= 0.0:
+        return None
+    return float(10.0 * np.log10(signal_power / max(residual_power, 1e-30)))
+
+
 def frame_seconds(payload_len=framing.MAX_PAYLOAD_BYTES, profile: Profile = PROFILE_300,
                   *, include_head=True):
     """How long the frame's own audio lasts."""
@@ -803,6 +843,7 @@ def demodulate(audio, profile: Profile = PROFILE_300, sample_rate=SAMPLE_RATE, *
         result = _try_sync(diff, i_star, sps, float(ncc[i_star]), credible_bits,
                            n_sync, profile.baud, head_seconds)
         if result.get("payload") is not None:
+            result["snr_db"] = _sync_snr_db(audio, i_star, profile, sample_rate)
             return result
         if "end_index" in result:
             if near_miss is None:

@@ -221,6 +221,15 @@ own acquisition thresholds against a different measure -- the normalized
 self-correlation of their repeated sync symbols -- and report it through the
 same `confidence` key.
 
+Every successfully decoded packet produces a link log entry with its receive
+SNR. HC0 reports winning-tone power against the mean power of the other 15
+tones. VF3 and HC1 report the median of their finite per-carrier header SNR
+estimates. CPFSK fits the two known tones over the confirmed sync word and
+reports fitted signal power against residual power. That residual includes
+noise, interference, distortion, clipping, and timing error, so the log calls
+it `effective sync` SNR. Normalized sync confidence is not relabeled as SNR
+because the two quantities are not interchangeable.
+
 ## Coding and error detection
 
 The current profiles do not use forward-error correction or interleaving. A

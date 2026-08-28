@@ -109,6 +109,25 @@ def test_a_frame_does_not_sync_another_profiles_correlator():
     print("test_a_frame_does_not_sync_another_profiles_correlator OK")
 
 
+def test_successful_decodes_report_effective_sync_snr():
+    """The post-lock estimator should track known full-band AWGN.
+
+    Its residual intentionally also counts receiver defects, but in this
+    controlled case the only unexplained component is noise.
+    """
+    rng = np.random.default_rng(20260828)
+    expected_db = 10.0
+    for profile in afsk.PROFILES:
+        clean = afsk.modulate(b"snr diagnostic", profile=profile).astype(float)
+        signal_power = np.mean(clean ** 2)
+        noise_rms = np.sqrt(signal_power / 10 ** (expected_db / 10))
+        audio = clean + rng.normal(0.0, noise_rms, len(clean))
+        result = afsk.demodulate(audio, profile=profile)
+        assert result["payload"] == b"snr diagnostic"
+        assert abs(result["snr_db"] - expected_db) < 1.0, (
+            profile.name, result["snr_db"])
+
+
 def test_a_lock_survives_losing_the_opening_of_the_sync_word():
     """The structural property behind framing.SYNC_SECONDS.
 
