@@ -39,6 +39,41 @@ its own raw count as a diagnostic -- `head_symbols_received` for CPFSK,
 Only a frame whose checked header, optional body, and CRC validate can produce
 a timing observation. Near misses and CRC failures cannot affect timing.
 
+### Weak-signal ambiguity
+
+A short head observation does not by itself prove that the transmitter or
+receiver clipped the beginning of the audio. The head measurement is made
+only after waveform acquisition and a checked payload decode, but it uses a
+separate detector from both of them. A frame can therefore acquire and pass
+FEC/CRC while noise or distortion makes the adjacent head detector stop
+early.
+
+This matters especially for HC0. HC0 acquires from its known 24-symbol tone
+pattern and decodes its coded payload from non-coherent tone energies. Its
+head measurement instead correlates repeated four-symbol reference waveforms
+backward from the acquired preamble. Counting stops at the first block that
+falls below the correlation threshold, the relative-energy gate, or the
+allowed phase continuity. At low SNR that can yield a short or zero count even
+when the head audio was physically present. HC1 can fail acquisition on the
+same weak direction because its acquisition threshold is much higher; that
+failure does not cause the HC0 head result, although both can have the same
+weak-signal cause.
+
+The 2026-08-28 HF end-to-end radio run showed this unresolved ambiguity on the
+STA2-to-STA1 direction: validated HC0 frames reported head observations from
+zero to 128 ms, feedback drove the transmitted head to the one-second maximum,
+and HC1 attempts did not decode. The logs alone cannot distinguish actual
+leading loss from a present but weak head. A capture must be inspected or
+replayed to make that distinction.
+
+Until measurement quality is represented separately from duration, the
+implementation deliberately treats zero as a lower bound and remains safe by
+increasing the head. This may waste up to one second per keying on a weak path
+without improving reception. A future resolution should make the estimator or
+feedback confidence-aware and prevent repeated inconclusive observations from
+being interpreted indefinitely as additional physical clipping. It must still
+preserve conservative timing when the audio really is clipped.
+
 ## Connection calibration
 
 Connection format version 4 uses a three-frame timing handshake:

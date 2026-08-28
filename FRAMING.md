@@ -212,7 +212,12 @@ The head is a repeat of a fixed four-symbol tone block. Unlike VF3's and
 HC1's, it does not have to avoid resembling the preamble -- those modes
 acquire by correlating the capture against itself, so any repeat near the
 header widens the peak into a plateau, while a pattern correlator simply does
-not score a different pattern.
+not score a different pattern. After a checked frame decode, the receiver
+counts these blocks backward using waveform correlation. This head detector
+is distinct from both HC0's known-pattern acquisition and its non-coherent,
+FEC-protected payload decoder. On a weak path it can stop early even though
+the preamble and payload decode and the head audio was present; see
+[`ADAPTIVE_TIMING.md`](ADAPTIVE_TIMING.md#weak-signal-ambiguity).
 
 For the CPFSK profiles, the receiver detects the known sync word using
 normalized correlation. The current confidence threshold is 0.7. This is a
