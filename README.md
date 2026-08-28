@@ -428,6 +428,10 @@ python -m whale.vara_server --radio ht    --mycall STA2 --cmd-port 8310 --data-p
 python acceptance_test.py --a-cmd 8300 --a-data 8301 --b-cmd 8310 --b-data 8311 --a-call STA1 --b-call STA2
 ```
 
+For each direction, the acceptance test reports elapsed transfer time and net
+throughput in useful application-payload bits per second. Protocol overhead
+and retransmitted data are therefore not counted as useful throughput.
+
 ## Radio and PTT configuration
 
 Radio hardware is selected from a TOML inventory rather than requiring a

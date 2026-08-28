@@ -22,6 +22,15 @@ import threading
 import time
 
 
+def _transfer_summary(receiver: str, nbytes: int, elapsed: float) -> str:
+    """Format elapsed time and net application-payload throughput."""
+    net_bps = nbytes * 8 / elapsed
+    return (
+        f"   {receiver} received {nbytes} bytes in {elapsed:.1f}s "
+        f"({net_bps:.1f} bit/s net)"
+    )
+
+
 class StationClient:
     """Owns one command connection + one data connection to a station
     server. The command socket is drained continuously by a background
@@ -168,18 +177,18 @@ def main():
     payload_ba = payload_ba[:args.size]
 
     print(f"== A -> B: sending {len(payload_ab)} bytes ==")
-    t0 = time.time()
+    t0 = time.perf_counter()
     a.send_data(payload_ab)
     got = b.recv_data(len(payload_ab), args.transfer_timeout)
-    print(f"   B received {len(got)} bytes in {time.time()-t0:.1f}s")
+    print(_transfer_summary("B", len(got), time.perf_counter() - t0))
     assert got == payload_ab, "A->B payload MISMATCH"
     print("   A->B payload verified byte-for-byte OK")
 
     print(f"== roles switch: B -> A: sending {len(payload_ba)} bytes ==")
-    t0 = time.time()
+    t0 = time.perf_counter()
     b.send_data(payload_ba)
     got2 = a.recv_data(len(payload_ba), args.transfer_timeout)
-    print(f"   A received {len(got2)} bytes in {time.time()-t0:.1f}s")
+    print(_transfer_summary("A", len(got2), time.perf_counter() - t0))
     assert got2 == payload_ba, "B->A payload MISMATCH"
     print("   B->A payload verified byte-for-byte OK")
 
