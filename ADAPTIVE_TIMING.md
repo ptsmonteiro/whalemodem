@@ -31,10 +31,11 @@ head_seconds_received
 
 Seconds, because the head measurement crosses layers that do not share a
 symbol. The CPFSK profiles count matched pad symbols and divide by their baud;
-mode 4 (HC1) counts whole 512-sample sync cores and divides by the sample
-rate; a future mode counts whatever its head is made of. Each may also report
-its own raw count as a diagnostic -- `head_symbols_received` for CPFSK,
-`head_cores_observed` for HC1 -- but nothing in the link reads those.
+mode 3 (VF3) and mode 4 (HC1) count sync cores and divide by the sample rate;
+mode 5 (HC0) does the same with four-symbol reference blocks. Each also
+reports its native count as a diagnostic -- `head_symbols_received` for
+CPFSK, `head_cores_observed` for VF3/HC1, and `head_blocks_observed` for HC0 --
+but nothing in the link reads those.
 
 Only a frame whose checked header, optional body, and CRC validate can produce
 a timing observation. Near misses and CRC failures cannot affect timing.

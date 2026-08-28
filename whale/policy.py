@@ -207,14 +207,14 @@ VHF_FM = ChannelPolicy(
 
 #: A documented starting point for HF SSB.
 #:
-#: THESE NUMBERS ARE UNVALIDATED PLACEHOLDERS. Nothing in this repo has been
-#: run on HF, no measurement stands behind any figure here, and none of them
-#: should be quoted as if one did -- contrast VHF_FM's inactivity_timeout,
-#: which has a bench run and a script behind it. They are reasoned from how
-#: an HF path differs from the VHF one, and they exist so the shape of the
-#: difference is written down and so the engine has a second policy proving
-#: it is actually policy-driven rather than accidentally still hardcoded.
-#: Every one of them wants replacing with a measured value;
+#: THESE POLICY NUMBERS ARE UNVALIDATED PLACEHOLDERS. The HC0/HC1 ladder has
+#: carried the end-to-end acceptance test over the IC-7300/IC-705 HF bench,
+#: validating the waveforms and protocol path, but that clean run did not
+#: measure the timeout, retry, turnaround, or adaptation choices below. None
+#: of those figures should be quoted as measured -- contrast VHF_FM's
+#: inactivity_timeout, which has a forced-loss bench run and a script behind
+#: it. They are reasoned from how an HF path differs from the VHF one, and
+#: every one of them wants replacing with a dedicated measurement;
 #: scripts/measure_peer_gap.py is the tool for the timeout, exactly as it
 #: was on VHF.
 #:
@@ -228,10 +228,10 @@ VHF_FM = ChannelPolicy(
 #:     entirely) and propagation delay is no longer negligible, so both the
 #:     turnaround and the ACK slack grow.
 #:   - Longer frames are worth more when turnaround is expensive, and HF
-#:     modems conventionally key for several seconds. A bigger budget widens
-#:     every CPFSK chunk_size. The counter-pressure is that a fade takes a
-#:     whole frame with it, so this is a real trade and 8s is a guess at
-#:     where it sits, not a finding.
+#:     modems conventionally key for several seconds. The 8s useful-frame
+#:     budget records that policy choice, but the current fixed-geometry HC0
+#:     and HC1 modes accept and ignore it; it will matter only to a future HF
+#:     mode whose payload is sized from the channel budget.
 #:   - Conditions change over minutes, and a step up that fails costs a full
 #:     retry cycle. So: step up far more reluctantly, and let the reluctance
 #:     grow further after each burn.

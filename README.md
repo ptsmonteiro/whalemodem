@@ -217,22 +217,19 @@ Three things the adapter had to reconcile, all recorded in its docstring:
     against itself one symbol apart, so a symbol-periodic head extends that
     correlation's plateau across the whole head and leaves the ranking step a
     single arbitrary offset inside it to score.
-  - **Head feedback is measured but not reported.** VF3 counts the head cores
-    that survived, and the adapter returns that for the logs only. The link's
-    `_head_feedback_request` weighs an observation against
-    `afsk.PAD_MATCH_WINDOW_SYMBOLS / baud`, a CPFSK constant in CPFSK bit
-    units; against VF3's 21.3 ms cores that allowance becomes 341 ms and would
-    swallow every real deficit. Reporting nothing takes the "missing
-    observation" branch and leaves the head where the control-plane
-    calibration put it. Making that loop mode-independent is the next piece of
-    work, not something to fake here.
+  - **Head feedback is expressed in seconds, not symbols.** VF3 counts the
+    surviving head cores and converts that observation to seconds for the
+    link. Its `head_match_allowance_seconds` is one 21.3 ms core, matching the
+    measurement's actual resolution. CPFSK supplies its own allowance in the
+    same unit, so `_head_feedback_request` is waveform-independent and VF3 can
+    lengthen its ordinary-frame head when the receiver observes leading loss.
 
 ### It carries a session
 
-`tests/test_audio_e2e.py` now runs the whole TCP stack twice, once on the
-CPFSK ladder and once with VF3 appended: connect, 4 KB each way, disconnect,
-through both StationServers, both ModemServices, ARQ and the real
-modulate/demodulate, with only the sound cards replaced. Both directions
+`tests/test_audio_e2e.py` runs the whole TCP stack with both the CPFSK-only
+ladder and the default VHF ladder, whose top rung is VF3: connect, 4 KB each
+way, disconnect, through both StationServers, both ModemServices, ARQ and the
+real modulate/demodulate, with only the sound cards replaced. Both directions
 climb 300 -> 600 -> 1200 -> VF3 on their own -- nothing pins the mode -- and
 each station's `rx_profile` agrees with its peer's `tx_profile`, so the
 mode-confirmation path in DATA_ACK is exercised rather than assumed.
@@ -261,12 +258,13 @@ measurement makes visible and the frame arithmetic hides:
     not have to stay 300 baud for an ACK the peer just proved it can decode a
     faster mode from.
 
-**VF3 is not in `afsk.default_registry()`.** It has now carried a session in
-software, but on the radios it has only the 6/6 with ARQ bypassed; putting it
-in the default registry would change what every station transmits before
-`scripts/hw_smoke_link.py` has run with it.
-`whale.modes.vf3_mode.registry_with_vf3()` appends it as the top rung for
-anyone who wants to try it on the bench.
+**VF3 is on the default VHF ladder.** `afsk.default_registry()` intentionally
+remains CPFSK-only for callers and tests concerned with that waveform family;
+`whale.modes.default_registry()` appends VF3 and is what the `vhf-fm` channel
+actually uses. VF3 has carried full acceptance-test sessions over the radios
+in both directions without ARQ retries. Mode negotiation keeps mixed-capability
+peers compatible: a peer that does not advertise mode 3 stays on the mutually
+supported CPFSK rungs.
 
 One consequence worth stating plainly: a VF3 keying is 5.2 s, against the
 3.0 s of useful audio the CPFSK profiles are sized to. That cap is CPFSK's
@@ -409,9 +407,11 @@ climbed to HC1 and stayed there; every chunk acked on its first attempt.
 Decode cost 15-31 ms per frame, and 19 ms for a poll of a 10 s buffer with
 nothing in it.
 
-Two things are honestly not done. `HF_SSB`'s timeouts, retry budget and keying
-limit are reasoned placeholders with no measurement behind them, which
-`whale/policy.py` says field by field. And `require_clear_channel` is set on
+Two things are honestly not done. The successful bench acceptance run validates
+the HF waveforms and end-to-end protocol path, but not `HF_SSB`'s timeout,
+retry, turnaround, or adaptation constants; those remain reasoned placeholders
+without dedicated measurements. (`max_useful_frame_seconds` is accepted and
+ignored by the fixed-geometry HF modes.) And `require_clear_channel` is set on
 that policy and enforced by nothing, because this codebase has no busy-channel
 detector: a station on `--channel hf-ssb` transmits without listening first,
 which is fine on a bench pair and is not fine on a shared band.
