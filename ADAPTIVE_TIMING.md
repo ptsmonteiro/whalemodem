@@ -353,8 +353,8 @@ The feature is complete when:
 - malformed measurements cannot select unsafe padding;
 - ordinary frames do not wait for a calibration postamble;
 - the software loopback and link recovery suites pass;
-- logs expose transmitted calibration lengths, received counts, inferred
-  losses, guards, clamps, and active per-direction timing;
+- receive logs expose the observed adjacent head and tail symbol counts and
+  their durations without claiming knowledge of the peer's active padding;
 - repeated hardware connections establish an acceptable observed spread for
   the minimum guards and complete the existing acceptance transfer without new
   retransmissions.

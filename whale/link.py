@@ -874,14 +874,9 @@ class Link:
             received = decode_result.get(f"{side}_symbols_received")
             if received is None:
                 continue
-            transmitted = len(getattr(framing, f"{side}_pad_bits")(profile.baud))
-            clipped = transmitted - received
             logger.info(
-                "[%s] RX outer %s: received %d/%d symbols (%.1f ms), "
-                "clipped %d symbols (%.1f ms)",
-                self.mycall, side, received, transmitted,
-                received * 1000.0 / profile.baud,
-                clipped, clipped * 1000.0 / profile.baud,
+                "[%s] RX outer %s: observed %d adjacent symbols (%.1f ms)",
+                self.mycall, side, received, received * 1000.0 / profile.baud,
             )
         self._rx_measurements[(ptype, body)] = {
             "head": decode_result.get("head_symbols_received"),

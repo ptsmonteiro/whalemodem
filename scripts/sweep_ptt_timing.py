@@ -2,11 +2,11 @@
 
 Total key-to-unkey (PTT ON -> PTT OFF) air time for one frame is
 
-    ptt_lead + output-stream startup + head_pad + frame body + tail_pad + ptt_tail
+    output-stream startup + head_pad + frame body + tail_pad
 
-and only "frame body" carries information. The other four are settling
-allowances, each picked conservatively when it was introduced and never
-measured:
+and only "frame body" carries information. The pads are disposable in-band
+audio around it; output-stream startup is measured rather than configured.
+Explicit PTT lead/tail remain available here only as experimental knobs:
 
     ptt_lead   (whale/transport.py send())      unmodulated carrier, so the
                                                 local radio's T/R switch has
@@ -32,13 +32,10 @@ can land on a bad split. Minimise the *modulated* pad first while the
 carrier-only allowance is still generous, then the carrier-only
 allowance, then check alternative splits of the same total.
 
-Pass/fail over 5 trials cannot resolve anything near a cliff edge. What
-actually settled the numbers was measuring the pads *continuously*: both
-pads are an alternating 0,1,0,1,... bit pattern, so walking the demodulated
-symbol stream outward from the sync word and finding where the alternation
-breaks says, in ms, exactly how much of each pad survived. That turns one
-transmission into a measurement instead of a coin flip, and it is what
-found the two real results here:
+Pass/fail over 5 trials cannot resolve anything near a cliff edge. The decoder
+also reports how many adjacent symbols of the distinct head and tail PN
+sequences it observed. That turns a padded transmission into a measurement
+instead of only a coin flip, and it is what found the two real results here:
 
   - The ~213ms "tail corruption" the pads were originally sized against was
     audio_io.transmit() discarding ~100ms of queued audio on CallbackStop,
@@ -61,7 +58,7 @@ import sys
 import time
 
 import bench
-from whale import afsk, framing, transport as transport_mod
+from whale import afsk, framing
 from whale.hw import audio_io
 from whale.transport import SAMPLE_RATE
 
@@ -70,8 +67,8 @@ from whale.transport import SAMPLE_RATE
 CAPTURE_TAIL = 0.45
 INTER_TRIAL = 0.25
 
-BASELINE = dict(ptt_lead=transport_mod.PTT_LEAD, head_pad=framing.HEAD_PAD_SECONDS,
-                tail_pad=framing.TAIL_PAD_SECONDS, ptt_tail=transport_mod.PTT_TAIL)
+BASELINE = dict(ptt_lead=0.0, head_pad=framing.HEAD_PAD_SECONDS,
+                tail_pad=framing.TAIL_PAD_SECONDS, ptt_tail=0.0)
 
 # Instrument the real key-to-unkey duration rather than inferring it from
 # wall time around transport.send(), which also includes buffer clears and
@@ -100,27 +97,36 @@ def ack_payload():
 
 
 def run_point(tx, rx, profile, payload, cfg, trials, label, verbose=True):
-    framing.HEAD_PAD_SECONDS = cfg["head_pad"]
-    framing.TAIL_PAD_SECONDS = cfg["tail_pad"]
     ok = 0
     confidences = []
     keyed = []
     for i in range(1, trials + 1):
         stale = rx.snapshot_rx()
         rx.consume_rx(len(stale))
-        audio = afsk.modulate(payload, profile=profile)
+        # Pass durations explicitly. afsk.modulate()'s defaults are bound at
+        # import time, so mutating framing constants here would not sweep the
+        # value placed on air.
+        audio = afsk.modulate(payload, profile=profile,
+                              head_seconds=cfg["head_pad"],
+                              tail_seconds=cfg["tail_pad"])
         tx.send(audio, ptt_lead=cfg["ptt_lead"], ptt_tail=cfg["ptt_tail"])
         keyed.append(_last_keyed.get("seconds", float("nan")))
         time.sleep(CAPTURE_TAIL)
         captured = rx.snapshot_rx()
-        result = afsk.demodulate(captured, profile=profile)
+        result = afsk.demodulate(captured, profile=profile,
+                                 head_seconds=cfg["head_pad"],
+                                 tail_seconds=cfg["tail_pad"])
         good = result.get("payload") == payload
         confidences.append(result.get("confidence", 0.0))
         ok += int(good)
         if verbose:
+            observed = ""
+            if "head_symbols_received" in result:
+                observed = (f" head={result['head_symbols_received']}sym"
+                            f" tail={result['tail_symbols_received']}sym")
             print(f"    [{label}] trial {i}/{trials}: keyed={keyed[-1]:.3f}s "
                   f"audio={len(audio)/SAMPLE_RATE:.3f}s confidence={result.get('confidence', 0.0):.1f} "
-                  f"decoded={good}")
+                  f"decoded={good}{observed}")
         time.sleep(INTER_TRIAL)
     rate = ok / trials
     return rate, sum(confidences) / len(confidences), sum(keyed) / len(keyed)
