@@ -99,6 +99,49 @@ Doppler centroid and 2-sigma width, delay, and seeded replay. These validate
 the simulator process itself; modem performance sweeps still require test
 durations appropriate to the selected Doppler spread.
 
+## Complete scenario presets
+
+`whale.scenario` provides a composition layer above individual channel stages.
+For HF, `HfSsbScenario` builds the complete ordered path:
+
+```text
+TX response -> clipping -> frequency offset/drift -> Watterson propagation
+            -> narrowband interference -> AWGN -> RX response
+```
+
+```python
+from whale.channel import SnrSpec
+from whale.scenario import HfSsbScenario
+
+scenario = HfSsbScenario.from_preset(
+    "moderate", sample_rate=48_000, snr=SnrSpec(8.0), seed=1234)
+channel = scenario.build()
+```
+
+The `quiet`, `moderate`, and `disturbed` recipes expand to explicit filter,
+clip, oscillator, interference, noise, and propagation parameters in
+`scenario.describe()`. They currently select the corresponding mid-latitude
+F.1487 cases. They do not replace or alias `WATTERSON_PRESETS`: callers that
+need a particular F.1487 geography continue to use its full geographic name.
+The scenario values are reproducible project test recipes, not additional ITU
+recommendations.
+
+`channel.describe()` returns that same expanded scenario description, so a
+trial can retain a replayable recipe after the scenario builder goes out of
+scope.
+
+`FmScenario` (also exported as `VhfFmScenario`) supplies the same three
+scenario names around the complex-IQ narrow-FM model. Its defaults use the
+`vhf_bench_conservative` measured response, while `radio_preset=` can select a
+directional measured leg and `carrier_to_noise_db=` can override the recipe's
+RF C/N. The expanded description includes
+`profile_authority="whalemodem_project_simulation"` and
+`is_propagation_standard=false`. These are convenient stress profiles based
+on this project's particular bench plus explicit exploratory RF assumptions;
+they are not universal FM propagation conditions or radio specifications.
+The geographically named F.1487 and measured `FM_RADIO_PRESETS` registries
+remain the authoritative underlying component presets.
+
 ## Hardware mode sweeps
 
 `scripts/sweep_modes.py` performs direct frame qualification over two radios.
