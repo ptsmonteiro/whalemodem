@@ -269,7 +269,7 @@ the group status.
 | --- | --- | --- | --- | --- | --- |
 | Unit, framing, malformed input | passed | passed | provisional | provisional |
 | Bounded policy channel CI | passed | passed | passed | passed |
-| Qualified frame Monte Carlo | failed (retained 2026-08-29 FM campaign missed the gate; diagnostics identify a frame-boundary artifact) | unmeasured | unmeasured | unmeasured |
+| Qualified frame Monte Carlo | passed (2026-08-29 clean-tree rerun after the channel-drain fix; 300 and 600 baud delivered 600/600 and 598/600, 1200 baud delivered 591/600, all within the FER/acquisition gate) | unmeasured | unmeasured | unmeasured |
 | Full-stack connection and bidirectional ARQ | passed | passed | passed | passed |
 | Scripted adaptation/fault recovery artifact | provisional | provisional | provisional | provisional |
 | Bidirectional hardware frame gate | unmeasured | provisional (6/6, 3 each way) | provisional (saved captures each way, below trial minimum) | failed (documented 0/10 weak direction; successful captures cover only the other leg) |
@@ -384,6 +384,16 @@ physical payload. The command
 failing terminal-zero frame for all three presets, plus terminal-one trial 2;
 all six cases decoded exactly. The complete focused file also includes the
 ordinary VHF/HF fixed-seed regressions.
+
+A promotion-sized rerun of the same campaign (`fm_frame_monte_carlo_rerun.json`,
+also 2026-08-29, commit `c553b94`, clean tree) confirms the fix at scale: all
+three CPFSK rungs now clear the Wilson-bound FER/acquisition gate at every RF
+C/N point, including the previously failing 1200-baud rung (591/600 overall,
+weakest point 91/100 at 5 dB). See
+`logs/mode_qualification/vhf-fm/cpfsk/2026-08-29/INDEX.md` for the full
+point-by-point breakdown. This clears the "Qualified frame Monte Carlo" gate
+for the CPFSK group in the assessment table above; the remaining gaps for
+default promotion are the hardware, throughput-overlap, and resource rows.
 
 No qualifying adjacent-rung overlap report or CPU/RSS artifact has yet been
 retained for any production mode, and no other mode has a retained Monte
