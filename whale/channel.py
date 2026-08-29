@@ -13,7 +13,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 from enum import StrEnum
 from fractions import Fraction
-from typing import Mapping, Protocol, runtime_checkable
+from typing import Mapping, Protocol, Sequence, runtime_checkable
 
 import numpy as np
 from scipy.signal import butter, hilbert, resample_poly, sosfilt
@@ -379,6 +379,171 @@ class SampleClockChannel:
         return {"type": "sample_clock", "sample_rate": self.sample_rate,
                 "error_ppm": self.error_ppm,
                 "resample_ratio": [self.up, self.down]}
+
+
+@dataclass(frozen=True)
+class WattersonPath:
+    """One Gaussian-scatter propagation mode in a Watterson channel.
+
+    ``frequency_spread_hz`` is the ITU-R F.1487 ``2 sigma`` width of the
+    Gaussian Doppler power spectrum, not its standard deviation.
+    """
+
+    delay_seconds: float
+    frequency_spread_hz: float
+    power: float = 1.0
+    doppler_shift_hz: float = 0.0
+
+    def __post_init__(self):
+        values = (self.delay_seconds, self.frequency_spread_hz, self.power,
+                  self.doppler_shift_hz)
+        if not all(np.isfinite(value) for value in values):
+            raise ValueError("Watterson path parameters must be finite")
+        if self.delay_seconds < 0:
+            raise ValueError("Watterson path delay must be non-negative")
+        if self.frequency_spread_hz <= 0:
+            raise ValueError("Watterson frequency spread must be positive")
+        if self.power <= 0:
+            raise ValueError("Watterson path power must be positive")
+
+
+@dataclass(frozen=True)
+class WattersonPreset:
+    name: str
+    differential_delay_seconds: float
+    frequency_spread_hz: float
+
+    def paths(self) -> tuple[WattersonPath, WattersonPath]:
+        return (WattersonPath(0.0, self.frequency_spread_hz),
+                WattersonPath(self.differential_delay_seconds,
+                              self.frequency_spread_hz))
+
+
+# Representative two-path, equal-power cases from ITU-R F.1487 Annex 3.
+WATTERSON_PRESETS = {
+    "low_latitude_quiet": WattersonPreset("low_latitude_quiet", 0.0005, 0.5),
+    "low_latitude_moderate": WattersonPreset("low_latitude_moderate", 0.002, 1.5),
+    "low_latitude_disturbed": WattersonPreset("low_latitude_disturbed", 0.006, 10.0),
+    "mid_latitude_quiet": WattersonPreset("mid_latitude_quiet", 0.0005, 0.1),
+    "mid_latitude_moderate": WattersonPreset("mid_latitude_moderate", 0.001, 0.5),
+    "mid_latitude_disturbed": WattersonPreset("mid_latitude_disturbed", 0.002, 1.0),
+    "mid_latitude_disturbed_nvis": WattersonPreset(
+        "mid_latitude_disturbed_nvis", 0.007, 1.0),
+    "high_latitude_quiet": WattersonPreset("high_latitude_quiet", 0.001, 0.5),
+    "high_latitude_moderate": WattersonPreset("high_latitude_moderate", 0.003, 10.0),
+    "high_latitude_disturbed": WattersonPreset("high_latitude_disturbed", 0.007, 30.0),
+}
+
+
+class WattersonChannel:
+    """Stationary Gaussian-scatter HF channel at the real-audio boundary.
+
+    Each path applies a zero-mean complex Gaussian fading gain with a Gaussian
+    Doppler power spectrum, a frequency shift, and a delay. Independent paths
+    are summed and normalized to preserve mean signal power. The fading is a
+    deterministic sum-of-sinusoids realization sampled on a low-rate control
+    grid and interpolated to audio rate; time and phase continue across calls.
+    """
+
+    def __init__(self, sample_rate: int, paths: Sequence[WattersonPath], seed: int,
+                 *, oscillators: int = 256, fading_sample_rate: float | None = None,
+                 preset_name: str | None = None):
+        _positive_rate(sample_rate)
+        self.paths = tuple(paths)
+        if not self.paths:
+            raise ValueError("Watterson channel requires at least one path")
+        if oscillators < 32:
+            raise ValueError("Watterson channel requires at least 32 oscillators")
+        self.sample_rate, self.seed = sample_rate, int(seed)
+        self.oscillators, self.preset_name = int(oscillators), preset_name
+        fastest = max(abs(path.doppler_shift_hz) + 4 * path.frequency_spread_hz / 2
+                      for path in self.paths)
+        requested_rate = max(200.0, 4.0 * fastest)
+        self.fading_sample_rate = (requested_rate if fading_sample_rate is None
+                                   else float(fading_sample_rate))
+        if not np.isfinite(self.fading_sample_rate) or self.fading_sample_rate <= 0:
+            raise ValueError("fading_sample_rate must be finite and positive")
+        if self.fading_sample_rate <= 2 * fastest:
+            raise ValueError("fading_sample_rate is too low for the Doppler spectra")
+        self._power_sum = sum(path.power for path in self.paths)
+        self._max_delay = max(round(path.delay_seconds * sample_rate)
+                              for path in self.paths)
+        self.reset()
+
+    @classmethod
+    def from_preset(cls, sample_rate: int, preset: str, seed: int, **kwargs):
+        try:
+            definition = WATTERSON_PRESETS[preset]
+        except KeyError:
+            raise ValueError(
+                f"unknown Watterson preset {preset!r}; have {sorted(WATTERSON_PRESETS)}"
+            ) from None
+        return cls(sample_rate, definition.paths(), seed,
+                   preset_name=definition.name, **kwargs)
+
+    def reset(self) -> None:
+        rng = np.random.default_rng(self.seed)
+        self._frequencies = []
+        self._phases = []
+        for path in self.paths:
+            sigma = path.frequency_spread_hz / 2.0
+            self._frequencies.append(rng.normal(
+                path.doppler_shift_hz, sigma, self.oscillators))
+            self._phases.append(rng.uniform(0.0, 2.0 * np.pi, self.oscillators))
+        self._elapsed_samples = 0
+
+    def _path_gain(self, path_index: int, sample_positions: np.ndarray) -> np.ndarray:
+        time = sample_positions / self.sample_rate
+        angles = (2.0 * np.pi * self._frequencies[path_index][:, None] * time
+                  + self._phases[path_index][:, None])
+        return np.sum(np.exp(1j * angles), axis=0) / np.sqrt(self.oscillators)
+
+    def _gain_at_audio_samples(self, path_index: int, count: int) -> np.ndarray:
+        if count == 0:
+            return np.zeros(0, dtype=np.complex128)
+        first, stop = self._elapsed_samples, self._elapsed_samples + count
+        step = self.sample_rate / self.fading_sample_rate
+        control = np.arange(first, stop + step, step)
+        control = np.append(control, stop) if control[-1] < stop else control
+        values = self._path_gain(path_index, control)
+        positions = np.arange(first, stop)
+        return (np.interp(positions, control, values.real)
+                + 1j * np.interp(positions, control, values.imag))
+
+    def process(self, audio: np.ndarray) -> ChannelResult:
+        samples = _mono(audio).astype(np.float64)
+        if not len(samples):
+            return ChannelResult(np.zeros(self._max_delay, np.float32), {
+                "paths": len(self.paths), "elapsed_seconds": self._elapsed_samples
+                / self.sample_rate})
+        analytic = hilbert(samples)
+        output = np.zeros(len(samples) + self._max_delay, dtype=np.complex128)
+        path_powers = []
+        for index, path in enumerate(self.paths):
+            delay = round(path.delay_seconds * self.sample_rate)
+            gain = self._gain_at_audio_samples(index, len(samples))
+            component = np.sqrt(path.power / self._power_sum) * gain * analytic
+            output[delay:delay + len(samples)] += component
+            path_powers.append(float(np.mean(np.abs(gain) ** 2) * path.power
+                                     / self._power_sum))
+        self._elapsed_samples += len(samples)
+        return ChannelResult(np.real(output).astype(np.float32), {
+            "paths": len(self.paths), "path_realized_mean_powers": path_powers,
+            "elapsed_seconds": self._elapsed_samples / self.sample_rate,
+            "max_delay_samples": self._max_delay,
+        })
+
+    def describe(self) -> Mapping[str, object]:
+        return {"type": "watterson", "sample_rate": self.sample_rate,
+                "seed": self.seed, "preset": self.preset_name,
+                "oscillators": self.oscillators,
+                "fading_sample_rate": self.fading_sample_rate,
+                "frequency_spread_convention": "2_sigma",
+                "paths": [{"delay_seconds": path.delay_seconds,
+                           "frequency_spread_hz": path.frequency_spread_hz,
+                           "power": path.power,
+                           "doppler_shift_hz": path.doppler_shift_hz}
+                          for path in self.paths]}
 
 
 def waveform_power(audio: np.ndarray, spec: SnrSpec) -> float:

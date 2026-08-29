@@ -41,6 +41,43 @@ retain state across calls and return to their initial state on `reset()`.
 The sample-clock implementation uses a documented rational approximation to
 the requested ratio and reports both values.
 
+## Watterson HF channel
+
+`WattersonChannel` implements the stationary Gaussian-scatter model described
+by Recommendation ITU-R F.1487 for narrowband HF modem testing. Each
+`WattersonPath` is a delayed copy of the analytic audio multiplied by an
+independent, zero-mean complex Gaussian fading process. Its Doppler power
+spectrum is Gaussian, may have a Doppler shift, and uses F.1487's frequency
+spread convention: the configured spread is **2 sigma**, not sigma. Path
+outputs are power-weighted, summed, and normalized so their expected total
+power is the input power.
+
+The fading process is synthesized as a deterministic sum of independently
+phased sinusoids whose frequencies are drawn from the requested Gaussian
+spectrum. Gains are evaluated on a low-rate control grid and interpolated at
+the audio samples. This preserves fade time and phase between keyings without
+performing hundreds of oscillators at 48 kHz. The seed, oscillator count,
+control rate, paths, and spread convention are included by `describe()`.
+
+`WATTERSON_PRESETS` contains the two-independent-path, equal-power cases from
+F.1487 Annex 3: quiet, moderate, and disturbed low-, mid-, and high-latitude
+conditions, plus disturbed mid-latitude NVIS. They intentionally retain the
+geographic names and exact delay/spread values from the Recommendation. The
+older labels “good”, “moderate”, and “poor” are not aliases because they hide
+which parameter combination was actually tested.
+
+This model represents multiplicative ionospheric distortion. AWGN and radio
+audio responses remain separate stages in a `ChannelChain`, making their
+ordering and SNR reference explicit. F.1487 describes the model as validated
+for 3 kHz channels and potentially applicable up to 12 kHz; it should not be
+presented as a general wideband-HF propagation model.
+
+Statistical tests validate zero mean, circular quadrature variance, unit mean
+power, the Rayleigh-envelope fourth moment, independent paths, Gaussian
+Doppler centroid and 2-sigma width, delay, and seeded replay. These validate
+the simulator process itself; modem performance sweeps still require test
+durations appropriate to the selected Doppler spread.
+
 The radio-free end-to-end harness in `tests/test_audio_e2e.py` applies this
 boundary at the 48 kHz capture rate. Its station-A transport owns the A-to-B
 channel and its station-B transport owns the B-to-A channel. Channel output is
