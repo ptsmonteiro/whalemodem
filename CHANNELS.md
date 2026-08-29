@@ -110,6 +110,68 @@ defaults to 100%. A small trial count is a smoke test rather than strong
 reliability evidence; the confidence interval in the output makes that
 uncertainty visible.
 
+## Complex-baseband VHF FM channel
+
+`whale.fm_channel.ComplexFmChannel` retains the real 48 kHz audio boundary
+used by the modem but simulates the radio path internally as complex IQ:
+
+```text
+TX audio -> FM phase modulator -> complex RF paths -> complex AWGN
+         -> receiver IF filter -> limiter -> phase discriminator
+         -> measured audio response -> ADC clock error / squelch mute
+         -> RX audio
+```
+
+This is materially different from adding noise to recovered audio. Complex
+RF noise passes through the limiter and discriminator, so output quality
+falls nonlinearly once carrier-to-noise approaches the FM threshold. Carrier
+frequency error interacts with the receiver IF filter, and static delayed RF
+paths combine before detection. Tests pin both threshold behavior and loss
+near the IF-filter edge.
+
+`carrier_to_noise_db` is carrier power divided by complex white-noise power
+across the simulator's complete IQ Nyquist band. It is deliberately named
+C/N rather than SNR and is not comparable to waveform-referenced audio AWGN
+without a stated bandwidth conversion. `deviation_hz`, `full_scale_audio`,
+IF bandwidth, frequency error, RF paths, and clipping are explicit inputs.
+The defaults of 2.5 kHz deviation at 0.6 audio amplitude and 7.5 kHz IF
+bandwidth are initial narrow-FM simulation assumptions, not bench
+measurements.
+
+### Measured VHF bench presets
+
+`FM_RADIO_PRESETS` initially contains:
+
+- `ic705_to_kg_uv9d`;
+- `kg_uv9d_to_ic705`;
+- `vhf_bench_conservative`, taking the more adverse measured value from
+  each direction.
+
+The directional audio magnitude anchors come from the middle 150 ms block of
+five trials in
+`experiments/ofdm/results/measurements/bandwidth.json`. They are represented
+by a minimum-phase filter passing through the measured -6 and -10 dB band
+edges; the measurement did not identify phase, so no claim is made that this
+reconstructs the radios' group delay. The directional sample-clock values are
+the -3.7/+3.1 ppm results from `scripts/measure_clock_offset.py`. The 110 ms
+mute on the IC-705-to-handheld leg is the Wouxun squelch-opening blackout
+documented in `README.md`. The measured 0.505/0.815 ms delay-spread values are
+retained as preset metadata but are not converted into invented discrete RF
+echoes; callers can provide measured or exploratory `FmRfPath` values.
+
+```python
+from whale.fm_channel import ComplexFmChannel
+
+channel_ab = ComplexFmChannel.from_preset(
+    48_000, "ic705_to_kg_uv9d", carrier_to_noise_db=15, seed=1)
+channel_ba = ComplexFmChannel.from_preset(
+    48_000, "kg_uv9d_to_ic705", carrier_to_noise_db=15, seed=2)
+```
+
+Those are separate directional instances suitable for the paired audio
+transport. The presets approximate this particular cabled audio/radio bench;
+they are not generic models of every IC-705 or KG-UV9D installation.
+
 The radio-free end-to-end harness in `tests/test_audio_e2e.py` applies this
 boundary at the 48 kHz capture rate. Its station-A transport owns the A-to-B
 channel and its station-B transport owns the B-to-A channel. Channel output is

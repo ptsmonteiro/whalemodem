@@ -28,6 +28,7 @@ from whale.channel import (AwgnChannel, ChannelChain, ChannelResult,
                            ClippingChannel, DelayChannel, FilterChannel,
                            FrequencyOffsetChannel, IdentityChannel,
                            SampleClockChannel, SnrSpec)
+from whale.fm_channel import ComplexFmChannel
 from whale.link import Link
 from whale.modes.hc0_mode import HC0
 from whale.modes.hc1_mode import HC1
@@ -244,6 +245,19 @@ def test_full_stack_session_over_composed_asymmetric_channels():
     assert ta.tx_channel is channel_ab
     assert tb.tx_channel is channel_ba
     assert ta.channel_results and tb.channel_results
+
+
+def test_full_stack_session_over_directional_complex_fm_presets():
+    channel_ab = ComplexFmChannel.from_preset(
+        48_000, "ic705_to_kg_uv9d", carrier_to_noise_db=25, seed=301)
+    channel_ba = ComplexFmChannel.from_preset(
+        48_000, "kg_uv9d_to_ic705", carrier_to_noise_db=25, seed=302)
+    _, _, ta, tb = _run_session(
+        _payload(20, 7, 11), _payload(20, 13, 5),
+        channel_ab=channel_ab, channel_ba=channel_ba)
+    assert ta.channel_results and tb.channel_results
+    assert ta.channel_results[0].measurements["rf_carrier_to_noise_db"] == 25
+    assert tb.channel_results[0].measurements["rf_carrier_to_noise_db"] == 25
 
 
 def test_vf3_carries_a_session_through_the_same_stack():

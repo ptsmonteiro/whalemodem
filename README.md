@@ -692,6 +692,7 @@ pytest tests/test_hc1_mode.py -q         # the same for HC1, plus offset/multipa
 pytest tests/test_hc0_mode.py -q         # the same for HC0, plus the low-SNR margin
 pytest tests/test_hc0_capture_replay.py -q   # HC0 against recorded on-air HF audio
 pytest tests/test_hc1_capture_replay.py -q   # and HC1 against its own
+pytest tests/test_fm_channel.py -q        # complex-IQ FM threshold and bench presets
 python tests/test_afsk_loopback.py
 python tests/test_link_recovery.py
 ```
