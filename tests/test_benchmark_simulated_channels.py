@@ -16,6 +16,7 @@ def test_one_point_benchmark_writes_versioned_replayable_result(tmp_path):
     result = benchmark.main([
         "--model", "awgn", "--policy", "vhf-fm", "--points", "40",
         "--trials", "1", "--modes", "300baud", "--seed", "17",
+        "--workers", "1",
         "--out", str(output),
     ])
     assert result == 0
@@ -24,6 +25,7 @@ def test_one_point_benchmark_writes_versioned_replayable_result(tmp_path):
     assert document["seed"] == 17
     assert document["summary"] == {"passed": 1, "total": 1}
     assert document["metadata"]["trials_per_point"] == 1
+    assert document["metadata"]["worker_processes"] == 1
     assert document["metadata"]["requested_payload_bytes"] is None
     assert document["metadata"]["data_payload_bytes_by_mode"] == {"0": 88}
     assert document["metadata"]["actual_payload_bytes_by_mode"] == {"0": 98}
@@ -44,6 +46,7 @@ def test_explicit_payload_records_requested_data_and_actual_frame_sizes(tmp_path
     assert benchmark.main([
         "--model", "awgn", "--policy", "vhf-fm", "--points", "40",
         "--trials", "1", "--modes", "1200baud", "--seed", "18",
+        "--workers", "1",
         "--payload-bytes", "88", "--out", str(output),
     ]) == 0
     document = json.loads(output.read_text())
@@ -78,3 +81,14 @@ def test_payload_must_fit_every_selected_mode(tmp_path, capsys):
     message = capsys.readouterr().err
     assert "exceeds the selected mode capacity" in message
     assert "300baud: 88" in message
+
+
+@pytest.mark.parametrize("value", ["0", "-1", "not-an-integer"])
+def test_workers_must_be_positive(value, tmp_path, capsys):
+    with pytest.raises(SystemExit):
+        benchmark.main([
+            "--model", "awgn", "--policy", "vhf-fm", "--points", "40",
+            "--trials", "1", "--modes", "300baud", "--workers", value,
+            "--out", str(tmp_path / "result.json"),
+        ])
+    assert "workers" in capsys.readouterr().err

@@ -314,6 +314,11 @@ Channel qualification is deliberately split by purpose:
   that must fit every selected mode. Artifacts record the requested DATA size,
   the per-mode DATA size actually used, and the complete encoded payload size,
   which is 10 bytes larger because it includes the shared air header.
+  Independent trials run in worker processes using every logical CPU available
+  to the benchmark process. Use `--workers N` to cap parallelism or
+  `--workers 1` for sequential debugging; the selected count is retained in
+  the artifact metadata. Parallel execution preserves deterministic seeds and
+  trial ordering.
 - `scripts/benchmark_sessions.py` is the separate full-stack Monte Carlo tool.
   It reuses the exact channel factories above, then drives connection,
   bidirectional ARQ transfer, adaptation, and disconnect through the radio-free
