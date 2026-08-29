@@ -283,6 +283,9 @@ def main():
                     help="which channel this station is on: its timeouts, its "
                          "retry budget and the waveforms it offers "
                          "(see whale/policy.py)")
+    ap.add_argument("--mode-level", choices=("default", "optional", "experimental"),
+                    default="default", help="qualification registry to advertise; "
+                    "optional/experimental require explicit operator selection")
     ap.add_argument("-v", "--verbose", action="store_true")
     args = ap.parse_args()
 
@@ -290,10 +293,15 @@ def main():
                          format="%(asctime)s %(levelname)s %(name)s: %(message)s")
 
     channel = policy.by_name(args.channel)
+    from whale.mode_qualification import registry
+    mode_registry = registry(args.channel, args.mode_level,
+                             channel.max_useful_frame_seconds)
     logger.info("channel: %s", channel.name)
+    logger.info("mode qualification level: %s; IDs: %s",
+                args.mode_level, mode_registry.supported_ids)
     service = ModemService.for_radio(args.radio, args.mycall,
                                      radio_config=args.radio_config,
-                                     policy=channel)
+                                     policy=channel, mode_registry=mode_registry)
     server = StationServer(service, args.mycall, args.cmd_port, args.data_port, args.host)
     server.serve_forever()
 

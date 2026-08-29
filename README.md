@@ -276,6 +276,14 @@ in both directions without ARQ retries. Mode negotiation keeps mixed-capability
 peers compatible: a peer that does not advertise mode 3 stays on the mutually
 supported CPFSK rungs.
 
+Mode availability is declared per channel in
+`whale.mode_qualification.MANIFEST`. The normal server advertises only the
+`default` registry. `--mode-level optional` cumulatively enables optional
+modes, and `--mode-level experimental` enables every declared mode for an
+explicit development or qualification run. The present entries preserve the
+historical provisional defaults; see `MODE_QUALIFICATION.md` for the evidence
+required to change a disposition.
+
 One consequence worth stating plainly: a VF3 keying is 5.2 s, against the
 3.0 s of useful audio the CPFSK profiles are sized to. That cap is CPFSK's
 own -- see "How long one keying may be" -- and the reasons behind it are

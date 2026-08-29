@@ -27,11 +27,20 @@ def default_registry(budget=None):
     rungs' chunks; None means afsk's own default. VF3 is unaffected -- its
     payload is fixed by its OFDM frame structure, not by a time budget.
     """
-    from .. import afsk
-    from .vf3_mode import registry_with_vf3
+    from ..mode_qualification import registry
+    return registry("vhf-fm", "default", budget)
 
-    base = None if budget is None else afsk.default_registry(budget)
-    return registry_with_vf3(base)
+
+def optional_registry(budget=None):
+    """VHF modes available after explicit operator opt-in."""
+    from ..mode_qualification import registry
+    return registry("vhf-fm", "optional", budget)
+
+
+def experimental_registry(budget=None):
+    """All declared VHF modes, for explicit development and qualification."""
+    from ..mode_qualification import registry
+    return registry("vhf-fm", "experimental", budget)
 
 
 def hf_registry(budget=None):
@@ -51,7 +60,15 @@ def hf_registry(budget=None):
     have a payload fixed by their frame structure rather than by a
     keying-time budget, in exactly the way VF3's is.
     """
-    del budget
-    from .hc0_mode import hf_registry as _hf_registry
+    from ..mode_qualification import registry
+    return registry("hf-ssb", "default", budget)
 
-    return _hf_registry()
+
+def hf_optional_registry(budget=None):
+    from ..mode_qualification import registry
+    return registry("hf-ssb", "optional", budget)
+
+
+def hf_experimental_registry(budget=None):
+    from ..mode_qualification import registry
+    return registry("hf-ssb", "experimental", budget)

@@ -22,16 +22,19 @@ pass.
 - **Default** means included by the policy's ordinary `mode_ladder` and safe
   to advertise without operator action.
 
-The code currently exposes policy default registries
-(`whale.modes.default_registry()` and `whale.modes.hf_registry()`) and permits
-callers to inject another `ModeRegistry`. It does **not** expose named
-experimental or optional registries, nor does it attach qualification state
-to a mode. The smallest practical implementation is a declarative manifest
-mapping `(channel policy, mode ID)` to `experimental`, `optional`, or
-`default`, with registry builders that filter that manifest and tests that
-default IDs are a subset of optional IDs and IDs remain globally unique.
-Until that exists, “experimental” means a manually constructed registry and
-“optional” is a documented target state, not an available product switch.
+`whale.mode_qualification.MANIFEST` maps `(channel policy, mode ID)` to
+`experimental`, `optional`, or `default`. Registry levels are cumulative:
+optional includes default modes and experimental includes both lower levels.
+`whale.mode_qualification.registry()` performs the filtering; compatibility
+builders remain in `whale.modes`. A normal station selects `default`, while
+the `--mode-level optional` and `--mode-level experimental` server switches
+are explicit operator/developer opt-ins. Tests enforce cumulative subsets,
+complete declarations, and globally unique mode IDs.
+
+The manifest initially preserves the historically shipped, provisional
+default ladders recorded in the assessment below. A `default` entry is a
+product-availability disposition, not proof that the evidence gates passed;
+promotion evidence retains the separate status words below.
 
 Evidence in the assessment table uses four words:
 
@@ -266,7 +269,7 @@ the group status.
 | --- | --- | --- | --- | --- | --- |
 | Unit, framing, malformed input | passed | passed | provisional | provisional |
 | Bounded policy channel CI | passed | passed | passed | passed |
-| Qualified frame Monte Carlo | unmeasured | unmeasured | unmeasured | unmeasured |
+| Qualified frame Monte Carlo | failed (retained 2026-08-29 FM campaign; 1200-baud rung missed the FER gate) | unmeasured | unmeasured | unmeasured |
 | Full-stack connection and bidirectional ARQ | passed | passed | passed | passed |
 | Scripted adaptation/fault recovery artifact | provisional | provisional | provisional | provisional |
 | Bidirectional hardware frame gate | unmeasured | provisional (6/6, 3 each way) | provisional (saved captures each way, below trial minimum) | failed (documented 0/10 weak direction; successful captures cover only the other leg) |
@@ -295,7 +298,22 @@ bidirectional frame gate; HC1 may remain a provisional fast rung because HC0
 is the control/fallback mode, but this evidence would block promoting HC1
 under this process.
 
-No checked-in Monte Carlo promotion result, qualifying adjacent-rung overlap
-report, or CPU/RSS artifact was found for any production mode. Existing
-default placement therefore records historical/provisional acceptance rather
-than retroactively declaring the new gates passed.
+The first retained CPFSK campaign is
+`logs/mode_qualification/vhf-fm/cpfsk/2026-08-29/fm_frame_monte_carlo.json`.
+It used the `vhf_bench_conservative` FM preset, 100 independent trials at
+each of 5, 10, 15, 20, 25, and 30 dB RF C/N, and full-capacity payloads.
+The 300-baud rung delivered 600/600 frames and the 600-baud rung delivered
+598/600. The 1200-baud rung delivered only 454/600 and missed the FER gate at
+every point (70--85 deliveries per 100); all captures acquired and there
+were no exception outcomes. The non-monotonic failure at high C/N is
+consistent with the known marginal 2200 Hz measured-response placement and
+requires investigation rather than a boundary follow-up run. The artifact
+was produced from commit `3946cbd6f84a34347f379382d011cfbfd0178861` with a
+dirty tree containing the qualification-manifest implementation, so it is
+retained initial evidence but cannot support default promotion.
+
+No qualifying adjacent-rung overlap report or CPU/RSS artifact has yet been
+retained for any production mode, and no other mode has a retained Monte
+Carlo promotion result. Existing default placement therefore records
+historical/provisional acceptance rather than retroactively declaring the
+new gates passed.
