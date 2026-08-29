@@ -269,7 +269,7 @@ the group status.
 | --- | --- | --- | --- | --- | --- |
 | Unit, framing, malformed input | passed | passed | provisional | provisional |
 | Bounded policy channel CI | passed | passed | passed | passed |
-| Qualified frame Monte Carlo | failed (retained 2026-08-29 FM campaign; 1200-baud rung missed the FER gate) | unmeasured | unmeasured | unmeasured |
+| Qualified frame Monte Carlo | failed (retained 2026-08-29 FM campaign missed the gate; diagnostics identify a frame-boundary artifact) | unmeasured | unmeasured | unmeasured |
 | Full-stack connection and bidirectional ARQ | passed | passed | passed | passed |
 | Scripted adaptation/fault recovery artifact | provisional | provisional | provisional | provisional |
 | Bidirectional hardware frame gate | unmeasured | provisional (6/6, 3 each way) | provisional (saved captures each way, below trial minimum) | failed (documented 0/10 weak direction; successful captures cover only the other leg) |
@@ -305,12 +305,74 @@ each of 5, 10, 15, 20, 25, and 30 dB RF C/N, and full-capacity payloads.
 The 300-baud rung delivered 600/600 frames and the 600-baud rung delivered
 598/600. The 1200-baud rung delivered only 454/600 and missed the FER gate at
 every point (70--85 deliveries per 100); all captures acquired and there
-were no exception outcomes. The non-monotonic failure at high C/N is
-consistent with the known marginal 2200 Hz measured-response placement and
-requires investigation rather than a boundary follow-up run. The artifact
-was produced from commit `3946cbd6f84a34347f379382d011cfbfd0178861` with a
+were no exception outcomes. The non-monotonic failure at high C/N required
+investigation rather than a boundary follow-up run; the diagnostics below now
+identify a finite channel-buffer tail artifact rather than the formerly
+suspected marginal 2200 Hz measured-response placement. The artifact was
+produced from commit `3946cbd6f84a34347f379382d011cfbfd0178861` with a
 dirty tree containing the qualification-manifest implementation, so it is
 retained initial evidence but cannot support default promotion.
+
+That simulated failure does not erase the earlier bench result. Mode 2 at
+1200/2200 Hz was selected by real-radio baud/placement sweeps that operated in
+both directions, and the historical payload sweep delivered every tested
+frame through 255 DATA bytes in both directions. Those runs established useful
+operation on this IC-705/KG-UV9D pair, but they predate this qualification
+process and do not constitute its minimum-trial hardware artifact. In
+particular, the current 402-byte DATA chunk (412 encoded bytes after the air
+header) still needs a retained bidirectional hardware qualification run.
+
+### 2026-08-29 mode-2 FM diagnostics
+
+The 18 artifacts under
+`logs/mode_qualification/vhf-fm/cpfsk/2026-08-29/diagnostics` used mode 2,
+master seed `20260829`, the three requested presets, RF C/N 10/20/30 dB, 20
+trials per point, and requested DATA sizes 88, 193, 255, 300, 350, and 402
+bytes. The complete encoded sizes were respectively 98, 203, 265, 310, 360,
+and 412 bytes. These small runs are diagnostic only and are not promotion
+evidence.
+
+Each cell below is exact frame deliveries at 10/20/30 dB RF C/N:
+
+| DATA bytes | IC-705 to KG-UV9D | KG-UV9D to IC-705 | Conservative combined |
+| ---: | --- | --- | --- |
+| 88 | 14/20, 16/20, 15/20 | 13/20, 18/20, 17/20 | 14/20, 16/20, 15/20 |
+| 193 | 16/20, 18/20, 16/20 | 14/20, 18/20, 17/20 | 16/20, 18/20, 16/20 |
+| 255 | 14/20, 16/20, 15/20 | 14/20, 17/20, 16/20 | 14/20, 16/20, 15/20 |
+| 300 | 14/20, 14/20, 15/20 | 13/20, 15/20, 17/20 | 14/20, 14/20, 15/20 |
+| 350 | 18/20, 15/20, 15/20 | 17/20, 17/20, 17/20 | 18/20, 15/20, 15/20 |
+| 402 | 17/20, 16/20, 16/20 | 17/20, 18/20, 16/20 | 17/20, 16/20, 16/20 |
+
+All 1,080 frames acquired; 851 delivered and all 229 failures were
+payload/CRC failures, with no acquisition or exception outcomes. Increasing
+C/N did not produce a reliable monotonic improvement: aggregate delivery was
+274/360 at 10 dB, 293/360 at 20 dB, and 284/360 at 30 dB. Failure probability
+also did not grow with DATA length: aggregate deliveries by increasing size
+were 138, 149, 137, 131, 147, and 149 out of 180. The conservative preset was
+trial-for-trial identical in outcome to the IC-705-to-KG-UV9D preset (280/360 for
+each) and only modestly below the reverse measured direction (291/360), so it
+was not materially worse than both directional models.
+
+The decoder evidence identifies the discrepancy. Every delivered frame had
+zero hard-decision errors. Every failed frame had exactly one error, no
+missing bits, and that error was the final body-CRC bit (positions 1086, 1926,
+2422, 2782, 3182, or 3598 from the sync start as size increased). No failure
+occurred when that expected terminal bit was one. `ComplexFmChannel.process()`
+returns a block the same length as its input, while its causal measured audio
+filter retains state; the direct-frame runner supplied no post-frame audio
+through the channel and appended downsampler padding only afterward. A
+targeted replay of one known failure for each preset changed all three to an
+exact decode when 10 ms of post-frame audio was processed through the FM
+channel. This is evidence of a shared simulated-channel/frame-boundary problem,
+not a conservative-preset problem, a direction-specific problem, payload
+length sensitivity, or random RF-noise weakness in the waveform.
+
+The smallest next experiment is to specify and regression-test a reusable
+channel-drain/tail contract at the direct-frame boundary, without changing the
+on-air waveform or decoder, and then rerun this matrix at promotion trial
+counts. A retained bidirectional hardware run at the current 402-byte DATA
+capacity is still required for formal qualification. Mode 2 remains in its
+existing registry disposition during this investigation.
 
 No qualifying adjacent-rung overlap report or CPU/RSS artifact has yet been
 retained for any production mode, and no other mode has a retained Monte

@@ -194,7 +194,7 @@ def test_every_keying_fits_the_budget_and_uses_it():
     A DATA frame is the long one, but the control plane rides the same air,
     so the smaller frame types are checked too rather than assumed."""
     for profile in afsk.PROFILES:
-        payload = production_payload_bytes(profile)
+        payload = profile.chunk_size
         useful = afsk.useful_data_seconds(payload, profile)
         assert useful <= afsk.MAX_USEFUL_FRAME_SECONDS + 1e-9, \
             (profile.name, payload, round(useful, 3))
@@ -210,7 +210,7 @@ def test_every_keying_fits_the_budget_and_uses_it():
 
     print("test_every_keying_fits_the_budget_and_uses_it OK "
           + ", ".join(f"{p.name} {p.chunk_size}B/"
-                      f"{afsk.useful_data_seconds(production_payload_bytes(p), p):.2f}s useful"
+                      f"{afsk.useful_data_seconds(p.chunk_size, p):.2f}s useful"
                       for p in afsk.PROFILES))
 
 
@@ -366,14 +366,14 @@ def test_afsk_noisy_delayed_loopback():
 # clear; it is not a measurement of this bench.
 ASSUMED_WORST_CASE_PPM = 500
 
-# The production frame: link.py sends chunk_size bytes of payload plus its
-# own type/seq header. This is per profile rather than one number now that
-# chunk_size is derived from the useful-frame budget -- 78, 161 and 326
-# bytes of AFSK payload at 300, 600 and 1200 baud, all three landing on a
-# useful frame of at most afsk.MAX_USEFUL_FRAME_SECONDS. Derived rather than restated so
+# The production frame: link.py sends chunk_size DATA bytes after the shared
+# air header. This is per profile rather than one number now that chunk_size
+# is derived from the useful-frame budget -- 98, 203 and 412 physical-layer
+# payload bytes at 300, 600 and 1200 baud, all three landing on a useful frame
+# of at most afsk.MAX_USEFUL_FRAME_SECONDS. Derived rather than restated so
 # these tests keep measuring what the link actually sends.
 def production_payload_bytes(profile):
-    return profile.chunk_size + afsk.DATA_FRAME_HEADER_BYTES
+    return framing.AIR_HEADER_BYTES + profile.chunk_size
 
 
 def resample_clock(audio, ppm):
@@ -536,9 +536,9 @@ def test_decodes_at_production_size_under_bench_clock_offset():
     decoder's half-symbol budget is 0.5/n_bits, so each profile's production
     frame has its own tolerance --
 
-        300 baud    78 bytes   1319 bits    ~379 ppm
-        600 baud   161 bytes   2647 bits    ~189 ppm
-       1200 baud   326 bytes   5295 bits     ~94 ppm
+        300 baud    98 bytes    895 bits    ~559 ppm
+        600 baud   203 bytes   1799 bits    ~278 ppm
+       1200 baud   412 bytes   3599 bits    ~139 ppm
 
     -- and the two faster profiles are the ones that cannot hold 500. Note
     the shape: the frames are sized by *airtime*, so a faster profile spends

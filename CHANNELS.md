@@ -286,7 +286,11 @@ Channel qualification is deliberately split by purpose:
   waveform decoder supplies bit-error evidence. Injected-channel measurements
   and decoder estimates remain separate in every trial. The tool writes all
   trials and configuration through `TrialRun` schema version 2 and is never
-  collected implicitly by pytest.
+  collected implicitly by pytest. By default it transmits each mode's full
+  DATA chunk. `--payload-bytes` instead selects a non-negative DATA-body size
+  that must fit every selected mode. Artifacts record the requested DATA size,
+  the per-mode DATA size actually used, and the complete encoded payload size,
+  which is 10 bytes larger because it includes the shared air header.
 - `scripts/benchmark_sessions.py` is the separate full-stack Monte Carlo tool.
   It reuses the exact channel factories above, then drives connection,
   bidirectional ARQ transfer, adaptation, and disconnect through the radio-free
@@ -302,6 +306,9 @@ Examples:
 ```powershell
 python scripts/benchmark_simulated_channels.py --model fm --policy vhf-fm `
     --points 5 10 15 20 25 30 --trials 100
+python scripts/benchmark_simulated_channels.py --model fm --policy vhf-fm `
+    --fm-preset ic705_to_kg_uv9d --points 10 20 30 --trials 20 `
+    --modes 2 --payload-bytes 193 --out logs/mode2_diagnostic.json
 python scripts/benchmark_simulated_channels.py --model watterson `
     --policy hf-ssb --watterson-preset mid_latitude_moderate `
     --points -5 0 5 10 15 --trials 100
@@ -314,6 +321,23 @@ The Monte Carlo seed for each frame is derived from the master seed, global
 mode ID, point index, and trial number. Selecting fewer modes therefore does
 not silently change the realizations of the modes that remain. A benchmark
 result should be retained whenever its performance claim is retained.
+
+The 2026-08-29 mode-2 diagnostic matrix under
+`logs/mode_qualification/vhf-fm/cpfsk/2026-08-29/diagnostics` is investigation
+evidence, not promotion evidence: it has only 20 trials per point. Its 1,080
+trials exposed a finite-buffer boundary in the direct-frame FM benchmark. The
+benchmark passes exactly the modulated frame to the stateful FM channel and
+adds receive-filter delay padding only after channel processing. The measured
+minimum-phase response returns one output block of the same length, so its
+response to the last input samples is not present unless later audio is also
+processed. Every one of the 229 failures acquired and differed in exactly the
+last body-CRC bit; a targeted replay of a known failure for each preset decoded
+when 10 ms of post-frame audio was processed through the channel. Do not read
+that campaign as evidence of RF C/N threshold behavior, a conservative-preset
+penalty, or a 1200-baud payload-length ceiling. The next simulator experiment
+is to define and test a model-independent channel-drain contract, then rerun a
+promotion-sized campaign; this investigation does not make that behavioral
+change.
 
 The repository-internal radio-free harness in `tests/support/audio_link.py`
 applies this boundary at the 48 kHz capture rate. `DirectionalAudioLink` owns
@@ -372,3 +396,6 @@ decoded; otherwise missing or below-threshold confidence is an acquisition
 failure; otherwise acquisition succeeded and the payload failed. Exceptions
 raised by the encoder, channel, transport, or decoder are recorded as errors.
 Non-finite unavailable diagnostics are serialized as JSON `null`.
+For CPFSK qualification trials, bounded hard-decision evidence adds BER, total
+and missing bit counts, and at most the first 128 error positions. Ordinary
+decoder calls do not retain the underlying hard-bit vector.

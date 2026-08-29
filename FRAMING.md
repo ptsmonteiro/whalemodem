@@ -55,7 +55,9 @@ changing connection management or ARQ.
 
 Transmitted audio is mono, 48 kHz, continuous-phase binary FSK. A zero or one selects the
 corresponding profile tone for one symbol. The complete waveform has a 5 ms
-amplitude ramp at each end and a nominal amplitude of 0.6.
+amplitude ramp at its start and a nominal amplitude of 0.6. There is no
+waveform tail guard; ordinary streaming capture and radio turnaround retain
+the receive-filter response after the final symbol.
 
 All current receive decoders consume the shared 12 kHz buffer. The sound card
 still captures at 48 kHz; `whale.rx_audio` low-pass filters it and decimates it

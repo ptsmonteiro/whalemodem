@@ -6,7 +6,7 @@ from typing import Callable
 
 import numpy as np
 
-from . import framing, rx_audio
+from . import afsk, framing, rx_audio
 from .channel import (AudioChannel, AwgnChannel, ChannelChain, SnrSpec,
                       WattersonChannel)
 from .fm_channel import ComplexFmChannel
@@ -57,12 +57,38 @@ def trial_seed(master_seed: int, mode_id: int, point_index: int, trial: int) -> 
     return int(sequence.generate_state(1, dtype=np.uint64)[0])
 
 
+def _add_bit_error_evidence(result, payload: bytes, mode) -> None:
+    """Add bounded CPFSK hard-decision evidence when the decoder provides it."""
+
+    hard_bits = result.pop("_hard_bits", None)
+    if hard_bits is None or not hasattr(mode, "baud"):
+        return
+    expected = framing.build_frame_bits(payload, baud=mode.baud,
+                                        include_head=False)
+    compared = min(len(hard_bits), len(expected))
+    positions = [index for index in range(compared)
+                 if hard_bits[index] != expected[index]]
+    missing = max(0, len(expected) - len(hard_bits))
+    total_errors = len(positions) + missing
+    result["ber"] = total_errors / len(expected)
+    result["total_bit_errors"] = total_errors
+    result["compared_bits"] = compared
+    result["missing_bits"] = missing
+    result["bit_error_positions"] = positions[:128]
+    result["bit_error_positions_truncated"] = len(positions) > 128
+
+
 def run_frame_trial(mode, channel: AudioChannel, seed: int, trial: int,
-                    direction: str) -> TrialResult:
-    """Encode, impair, downsample and decode one full-capacity mode packet."""
+                    direction: str, payload_bytes: int | None = None) -> TrialResult:
+    """Encode, impair, downsample and decode one mode packet.
+
+    ``payload_bytes`` is the complete physical-layer payload, including any
+    link header. Omitting it preserves the historical full-capacity run.
+    """
 
     rng = np.random.default_rng(seed)
-    payload_bytes = full_packet_bytes(mode)
+    payload_bytes = (full_packet_bytes(mode) if payload_bytes is None
+                     else payload_bytes)
     payload = rng.integers(0, 256, payload_bytes, dtype=np.uint8).tobytes()
     transmitted = np.zeros(0, np.float32)
     captured = np.zeros(0, np.float32)
@@ -78,7 +104,11 @@ def run_frame_trial(mode, channel: AudioChannel, seed: int, trial: int,
             capture_audio,
             np.zeros(rx_audio.FILTER_DELAY_CAPTURE_SAMPLES, dtype=np.float32),
         )))
-        result = mode.decode(captured)
+        if isinstance(getattr(mode, "codec", None), afsk.CpfskCodec):
+            result = mode.decode(captured, diagnostics=True)
+        else:
+            result = mode.decode(captured)
+        _add_bit_error_evidence(result, payload, mode)
         outcome = classify_decode(result, payload, mode.confidence_threshold)
     except Exception as exc:
         outcome = TrialOutcome.ERROR
@@ -94,12 +124,14 @@ def run_frame_trial(mode, channel: AudioChannel, seed: int, trial: int,
 
 
 def run_frame_trials(mode, channel_factory: ChannelFactory, trials: int,
-                     master_seed: int, point_index: int, direction: str):
+                     master_seed: int, point_index: int, direction: str,
+                     payload_bytes: int | None = None):
     if trials < 1:
         raise ValueError("trials must be positive")
     records = []
     for trial in range(1, trials + 1):
         seed = trial_seed(master_seed, mode.mode_id, point_index, trial)
         records.append(run_frame_trial(
-            mode, channel_factory(seed), seed, trial, direction))
+            mode, channel_factory(seed), seed, trial, direction,
+            payload_bytes=payload_bytes))
     return records

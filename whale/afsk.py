@@ -531,9 +531,9 @@ def modulate(payload: bytes, profile: Profile = PROFILE_300, sample_rate=SAMPLE_
     link-layer frames in a single keying. That was rolled back with the
     rest of the burst work; if it returns, note what the first hardware run
     established: the frames have to share one _cpfsk_tone call. Modulating
-    each separately and concatenating the audio puts a 10ms fade to silence
-    at every join, because _apply_ramp ramps each frame down and the next
-    back up -- inaudible on a clean channel, but with the receiver's
+    each separately and concatenating the audio put a 10ms fade to silence
+    at every join because that experiment's symmetric ramp faded each frame
+    down and the next back up -- inaudible on a clean channel, but with the receiver's
     AGC/limiter pumping through the gap the frame after each join decoded
     only about a third of the time.
     """
@@ -731,6 +731,7 @@ def _try_sync(diff, i_star, sps, confidence, max_credible_bits, n_sync, baud,
         return {
             "synced": False,
             "confidence": confidence,
+            "_hard_bits": decoded_bits,
             "start_index": i_star,
             "sync_end_index": i_star + sps * n_sync,
             "end_index": i_star + sps * min(
@@ -745,6 +746,7 @@ def _try_sync(diff, i_star, sps, confidence, max_credible_bits, n_sync, baud,
     result = {
         "synced": payload is not None,
         "confidence": confidence,
+        "_hard_bits": decoded_bits,
         "start_index": i_star,
         # Where the sync word itself ends. A caller giving up on this
         # position only has to step past the sync to guarantee the same
@@ -809,7 +811,7 @@ def _try_sync(diff, i_star, sps, confidence, max_credible_bits, n_sync, baud,
 
 
 def demodulate(audio, profile: Profile = PROFILE_300, sample_rate=SAMPLE_RATE, *,
-               head_seconds=framing.HEAD_PAD_SECONDS):
+               head_seconds=framing.HEAD_PAD_SECONDS, diagnostics=False):
     """Finds and decodes the *earliest* frame in `audio`. Returns a dict
     with at least 'synced' and 'payload' (None if nothing usable was found).
 
@@ -851,10 +853,15 @@ def demodulate(audio, profile: Profile = PROFILE_300, sample_rate=SAMPLE_RATE, *
                            n_sync, profile.baud, head_seconds)
         if result.get("payload") is not None:
             result["snr_db"] = _sync_snr_db(audio, i_star, profile, sample_rate)
+            if not diagnostics:
+                result.pop("_hard_bits", None)
             return result
         if "end_index" in result:
             if near_miss is None:
                 near_miss = result
         elif still_arriving is None:
             still_arriving = result
-    return still_arriving or near_miss
+    result = still_arriving or near_miss
+    if not diagnostics:
+        result.pop("_hard_bits", None)
+    return result

@@ -22,7 +22,7 @@ import sys
 from datetime import datetime, timezone
 from pathlib import Path
 
-from whale import policy
+from whale import framing, policy
 from whale.channel import WATTERSON_PRESETS
 from whale.fm_channel import FM_RADIO_PRESETS
 from whale.qualification import (channel_factory as make_channel_factory,
@@ -113,6 +113,10 @@ def main(argv=None):
     ap.add_argument("--trials", type=int, default=100)
     ap.add_argument("--seed", type=int, default=DEFAULT_SEED)
     ap.add_argument("--modes", nargs="+", help="mode names or IDs")
+    ap.add_argument(
+        "--payload-bytes", type=int,
+        help=("DATA-body bytes per frame; default: each mode's full chunk "
+              "capacity. The encoded payload also contains the air header."))
     ap.add_argument("--watterson-preset", choices=sorted(WATTERSON_PRESETS),
                     default="mid_latitude_moderate")
     ap.add_argument("--fm-preset", choices=sorted(FM_RADIO_PRESETS),
@@ -132,19 +136,36 @@ def main(argv=None):
         selected_modes = select_modes(registry, args.modes)
     except ValueError as exc:
         ap.error(str(exc))
+    if args.payload_bytes is not None:
+        if args.payload_bytes < 0:
+            ap.error("--payload-bytes must be non-negative")
+        oversized = [mode for mode in selected_modes
+                     if args.payload_bytes > mode.chunk_size]
+        if oversized:
+            limits = ", ".join(
+                f"{mode.name}: {mode.chunk_size}" for mode in oversized)
+            ap.error(
+                f"--payload-bytes {args.payload_bytes} exceeds the selected "
+                f"mode capacity ({limits})")
 
     records, summaries = [], []
     for mode in selected_modes:
+        data_payload_bytes = (mode.chunk_size if args.payload_bytes is None
+                              else args.payload_bytes)
+        actual_payload_bytes = framing.AIR_HEADER_BYTES + data_payload_bytes
         for point_index, point in enumerate(args.points):
             label = point_label(args, point)
             print(f"{mode.name}: {label}, {args.trials} trials")
             trials = run_frame_trials(
                 mode, channel_factory(args, point), args.trials, args.seed,
-                point_index, label)
+                point_index, label, payload_bytes=actual_payload_bytes)
             records.extend(trials)
             passed = sum(trial.decoded for trial in trials)
             low, high = wilson_interval(passed, len(trials))
             row = {"mode_id": mode.mode_id, "mode_name": mode.name,
+                   "requested_payload_bytes": args.payload_bytes,
+                   "data_payload_bytes": data_payload_bytes,
+                   "actual_payload_bytes": actual_payload_bytes,
                    "point_db": point, "passed": passed, "total": len(trials),
                    "rate": passed / len(trials), "wilson_95": [low, high],
                    **summarize_trials(trials)}
@@ -166,6 +187,17 @@ def main(argv=None):
                   "git_commit": commit, "git_dirty": dirty,
                   "trials_per_point": args.trials,
                   "selected_mode_ids": [mode.mode_id for mode in selected_modes],
+                  "requested_payload_bytes": args.payload_bytes,
+                  "data_payload_bytes_by_mode": {
+                      str(mode.mode_id): (mode.chunk_size
+                                          if args.payload_bytes is None
+                                          else args.payload_bytes)
+                      for mode in selected_modes},
+                  "actual_payload_bytes_by_mode": {
+                      str(mode.mode_id): framing.AIR_HEADER_BYTES + (
+                          mode.chunk_size if args.payload_bytes is None
+                          else args.payload_bytes)
+                      for mode in selected_modes},
                   "channel_descriptions_by_point": descriptions,
                   "summary_by_mode_point": summaries,
                   "completed_utc": datetime.now(timezone.utc).isoformat()})
