@@ -44,12 +44,13 @@ def test_trial_run_serializes_enum_and_summary():
     trial = TrialResult(
         trial=1, direction="A->B", mode_id=5, mode_name="hc0",
         payload_bytes=54, outcome=TrialOutcome.DECODED,
-        tx_samples=162_240, rx_samples=40_560, sample_rate=48_000,
+        tx_samples=162_240, tx_sample_rate=48_000,
+        rx_samples=40_560, rx_sample_rate=12_000,
         keyed_seconds=3.38, channel_measurements={"waveform_snr_db": -12.0},
         decoder_metrics={"tone_snr_db": np.float64(4.5),
                          "carriers": np.array([4.0, -np.inf])})
     document = TrialRun(channel={"type": "identity"}, trials=[trial], seed=7).to_dict()
-    assert document["schema_version"] == 1
+    assert document["schema_version"] == 2
     assert document["trials"][0]["outcome"] == "decoded"
     assert document["trials"][0]["decoded"] is True
     assert document["summary"] == {"passed": 1, "total": 1}

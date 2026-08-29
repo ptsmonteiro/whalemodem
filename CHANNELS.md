@@ -78,6 +78,38 @@ Doppler centroid and 2-sigma width, delay, and seeded replay. These validate
 the simulator process itself; modem performance sweeps still require test
 durations appropriate to the selected Doppler spread.
 
+## Hardware mode sweeps
+
+`scripts/sweep_modes.py` performs direct frame qualification over two radios.
+`--channel vhf-fm` or `--channel hf-ssb` selects the corresponding
+`ChannelPolicy` and obtains its complete ordered registry; mode names and IDs
+are never duplicated in the tool. Every selected mode sends deterministic
+random packets at its full link capacity (air header plus DATA chunk) in both
+directions unless narrowed explicitly.
+
+The sweep bypasses negotiation and ARQ so each result describes one physical
+frame. It records acquisition, verified-payload, and exception outcomes;
+keyed duration; separate TX/RX rates and sample counts; receive levels; and
+common decoder diagnostics. Failed captures are saved by default as `.npz`
+files containing both audio and expected payload. `result.json` uses the
+versioned `TrialRun` schema and includes per-mode/direction success rates,
+95% Wilson intervals, useful decoded throughput, radio names, registry IDs,
+seed, and Git commit.
+
+Examples:
+
+```powershell
+python scripts/sweep_modes.py --channel vhf-fm
+python scripts/sweep_modes.py --channel hf-ssb --trials 10
+python scripts/sweep_modes.py --channel hf-ssb --modes hc0 --direction ab
+```
+
+Results default to a timestamped directory under `logs/mode_sweeps`. A sweep
+returns failure unless every mode/direction reaches `--required-rate`, which
+defaults to 100%. A small trial count is a smoke test rather than strong
+reliability evidence; the confidence interval in the output makes that
+uncertainty visible.
+
 The radio-free end-to-end harness in `tests/test_audio_e2e.py` applies this
 boundary at the 48 kHz capture rate. Its station-A transport owns the A-to-B
 channel and its station-B transport owns the B-to-A channel. Channel output is
@@ -114,12 +146,12 @@ used as its replacement. Trial documents therefore store them under
 
 ## Trial result schema
 
-`whale.trials.TrialRun` is schema version 1. The run records channel
+`whale.trials.TrialRun` is schema version 2. The run records channel
 configuration, master seed, creation time, and caller metadata. Each
 `TrialResult` records:
 
 - trial number, direction, global mode ID, and mode name;
-- payload size, TX/RX sample counts, sample rate, and keyed duration;
+- payload size, separate TX/RX sample counts and rates, and keyed duration;
 - one of `decoded`, `acquisition_failed`, `payload_failed`, or `error`;
 - channel measurements and decoder metrics in separate namespaces;
 - optional capture path and error text.

@@ -10,7 +10,7 @@ from typing import Mapping, Sequence
 import numpy as np
 
 
-SCHEMA_VERSION = 1
+SCHEMA_VERSION = 2
 
 
 class TrialOutcome(StrEnum):
@@ -31,8 +31,9 @@ class TrialResult:
     payload_bytes: int
     outcome: TrialOutcome
     tx_samples: int
+    tx_sample_rate: int
     rx_samples: int
-    sample_rate: int
+    rx_sample_rate: int
     keyed_seconds: float
     channel_measurements: Mapping[str, object] = field(default_factory=dict)
     decoder_metrics: Mapping[str, object] = field(default_factory=dict)

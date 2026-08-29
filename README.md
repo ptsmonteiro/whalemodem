@@ -703,6 +703,8 @@ frequency):
 python scripts/hw_smoke_single_frame.py   # one frame each direction
 python scripts/hw_smoke_link.py           # full connect/send/verified clean disconnect
 python scripts/hw_hf_frames.py --mode hc0  # HF frames over an HF pair (ic7300/ic705)
+python scripts/sweep_modes.py --channel vhf-fm  # every VHF rung, both directions
+python scripts/sweep_modes.py --channel hf-ssb  # every HF rung, both directions
 ```
 
 On HF, start both stations on the HF channel -- which selects HF timeouts and
