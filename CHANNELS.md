@@ -180,24 +180,32 @@ uncertainty visible.
 used by the modem but simulates the radio path internally as complex IQ:
 
 ```text
-TX audio -> FM phase modulator -> complex RF paths -> complex AWGN
-         -> receiver IF filter -> limiter -> phase discriminator
-         -> measured audio response -> ADC clock error / squelch mute
-         -> RX audio
+TX filter -> pre-emphasis -> TX limiter -> FM modulation
+          -> time-varying RF multipath/flutter
+          -> RF noise and narrowband/co-channel interference
+          -> IF filter/limiter/discriminator -> de-emphasis -> RX filter
+          -> squelch state machine -> sample-clock mismatch
 ```
 
 This is materially different from adding noise to recovered audio. Complex
 RF noise passes through the limiter and discriminator, so output quality
 falls nonlinearly once carrier-to-noise approaches the FM threshold. Carrier
-frequency error interacts with the receiver IF filter, and static delayed RF
-paths combine before detection. Tests pin both threshold behavior and loss
+frequency error interacts with the receiver IF filter. Delayed RF paths can
+have independent amplitude flutter, phase drift, and phase flutter before
+detection. Tests pin both threshold behavior and loss
 near the IF-filter edge.
 
 `carrier_to_noise_db` is carrier power divided by complex white-noise power
 across the simulator's complete IQ Nyquist band. It is deliberately named
 C/N rather than SNR and is not comparable to waveform-referenced audio AWGN
 without a stated bandwidth conversion. `deviation_hz`, `full_scale_audio`,
-IF bandwidth, frequency error, RF paths, and clipping are explicit inputs.
+IF bandwidth, frequency error, RF paths, RF interference, and clipping are
+explicit inputs. TX and RX audio bands are separate. Pre-emphasis and
+de-emphasis use independently configurable time constants, and the TX limiter
+is explicitly before modulation. The squelch has open/close thresholds,
+hysteresis, attack, hang, and closing-ramp controls. Leading and trailing
+radio clipping are separate from that state machine. `describe()` records the
+ordered stage names and every parameter needed to replay the path.
 The defaults of 2.5 kHz deviation at 0.6 audio amplitude and 7.5 kHz IF
 bandwidth are initial narrow-FM simulation assumptions, not bench
 measurements.
@@ -235,6 +243,25 @@ channel_ba = ComplexFmChannel.from_preset(
 Those are separate directional instances suitable for the paired audio
 transport. The presets approximate this particular cabled audio/radio bench;
 they are not generic models of every IC-705 or KG-UV9D installation.
+
+For controlled experiments, `FM_SYNTHETIC_PROFILES` contains `flat_nbfm` and
+`handheld_nbfm`. These profiles use explicit TX/RX filters, 75 microsecond
+pre/de-emphasis, a pre-modulation limiter, and synthetic squelch parameters;
+they are project recipes rather than measurements:
+
+```python
+channel = ComplexFmChannel.from_profile(
+    48_000, "handheld_nbfm", carrier_to_noise_db=15, seed=3,
+    rf_paths=(FmRfPath(), FmRfPath(
+        delay_seconds=0.0005, amplitude=0.35,
+        gain_flutter_depth=0.2, gain_flutter_hz=6.0)),
+    rf_interference=(FmRfInterference(
+        kind="cochannel", offset_hz=1200, power_db_relative=-18),))
+```
+
+Measured presets intentionally continue to apply their historical combined
+post-discriminator magnitude response; it cannot be split honestly into TX
+and RX components from the available end-to-end measurement.
 
 ## Regression tests and Monte Carlo benchmarks
 

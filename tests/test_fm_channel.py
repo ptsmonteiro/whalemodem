@@ -8,7 +8,8 @@ import pytest
 from scipy.signal import freqz
 
 from whale import afsk, rx_audio
-from whale.fm_channel import (FM_RADIO_PRESETS, ComplexFmChannel, FmRfPath)
+from whale.fm_channel import (FM_RADIO_PRESETS, FM_SYNTHETIC_PROFILES,
+                              ComplexFmChannel, FmRfInterference, FmRfPath)
 
 
 ROOT = Path(__file__).parents[1]
@@ -136,3 +137,48 @@ def test_invalid_preset_and_rf_configuration_are_rejected():
         ComplexFmChannel.from_preset(SAMPLE_RATE, "generic_ht", 20, seed=1)
     with pytest.raises(ValueError, match="at least one RF path"):
         ComplexFmChannel(SAMPLE_RATE, 20, seed=1, rf_paths=())
+
+
+def test_synthetic_profile_exposes_explicit_ordered_radio_stages():
+    channel = ComplexFmChannel.from_profile(
+        SAMPLE_RATE, "flat_nbfm", 30, seed=5)
+    description = channel.describe()
+    assert set(FM_SYNTHETIC_PROFILES) == {"flat_nbfm", "handheld_nbfm"}
+    assert description["stages"] == list(ComplexFmChannel.STAGES)
+    assert description["tx_audio_band_hz"] != description["rx_audio_band_hz"] or \
+        description["synthetic_profile"] == "flat_nbfm"
+    assert description["pre_emphasis_tau_seconds"] == 75e-6
+    assert description["de_emphasis_tau_seconds"] == 75e-6
+    assert description["tx_limiter_limit"] == .8
+
+
+def test_time_varying_path_interference_limiter_and_trailing_clip_are_reported():
+    channel = ComplexFmChannel(
+        SAMPLE_RATE, 40, seed=7, tx_limiter_limit=.1,
+        trailing_mute_seconds=.01,
+        rf_paths=(FmRfPath(gain_flutter_depth=.2, gain_flutter_hz=5,
+                           phase_rate_hz=2),),
+        rf_interference=(FmRfInterference(
+            kind="cochannel", offset_hz=500, power_db_relative=-15),))
+    result = channel.process(_tone(.1, amplitude=.5))
+    assert result.measurements["tx_limited_samples"] > 0
+    assert result.measurements["rf_interference_power"] > 0
+    assert result.measurements["trailing_muted_samples"] == 480
+    assert np.all(result.audio[-480:] == 0)
+    assert channel.describe()["rf_paths"][0]["gain_flutter_hz"] == 5
+
+
+def test_squelch_hysteresis_attack_hang_and_close_are_stateful():
+    channel = ComplexFmChannel(
+        SAMPLE_RATE, 40, seed=10, squelch_open_db=-3,
+        squelch_close_db=-6, squelch_attack_seconds=.01,
+        squelch_hang_seconds=.01, squelch_close_seconds=.01)
+    opened = channel.process(_tone(.05)).audio
+    assert channel.describe()["squelch_open_db"] > channel.describe()["squelch_close_db"]
+    assert opened[0] == 0
+    # Force the next block below the closing threshold without resetting state.
+    channel.squelch_open_db = 20
+    channel.squelch_close_db = 10
+    closing = channel.process(_tone(.05)).audio
+    assert np.any(closing[:480] != 0)
+    assert np.all(closing[960:] == 0)
