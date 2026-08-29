@@ -5,6 +5,11 @@ to impair full modem sessions. It complements [`FRAMING.md`](FRAMING.md): a
 waveform owns modulation and decoding, while a channel owns everything that
 happens to its transmitted audio before it reaches the peer.
 
+The promotion gates, minimum trial counts, required hardware and resource
+evidence, and current production-mode assessment are defined in
+[`MODE_QUALIFICATION.md`](MODE_QUALIFICATION.md). The tools below produce
+evidence for that process; their existence alone does not qualify a mode.
+
 ## Channel contract
 
 `whale.channel.AudioChannel` consumes a finite mono waveform at its declared

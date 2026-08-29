@@ -1,0 +1,301 @@
+# Waveform mode qualification
+
+This document defines the evidence required to place a waveform in an
+experimental, optional, or default Whalemodem mode registry. It applies per
+channel policy: qualification on `vhf-fm` does not qualify a mode for
+`hf-ssb`. The objective is a reproducible decision about verified application
+delivery, acquisition, adaptation, and resource cost, not merely a successful
+codec loopback or a nominal bit rate.
+
+The requirements below are cross-checked against the repository as of
+2026-08-29. Items labelled **gap** are requirements for which Whalemodem does
+not yet provide complete automation. They must be measured manually and
+retained as an artifact; absence of that artifact is `unmeasured`, never a
+pass.
+
+## Registry levels and status words
+
+- **Experimental** means available only by explicit developer construction.
+  It must not be advertised by a normal station policy.
+- **Optional** means explicitly enabled by an operator for a named channel
+  policy. It may be negotiated only when both peers advertise it.
+- **Default** means included by the policy's ordinary `mode_ladder` and safe
+  to advertise without operator action.
+
+The code currently exposes policy default registries
+(`whale.modes.default_registry()` and `whale.modes.hf_registry()`) and permits
+callers to inject another `ModeRegistry`. It does **not** expose named
+experimental or optional registries, nor does it attach qualification state
+to a mode. The smallest practical implementation is a declarative manifest
+mapping `(channel policy, mode ID)` to `experimental`, `optional`, or
+`default`, with registry builders that filter that manifest and tests that
+default IDs are a subset of optional IDs and IDs remain globally unique.
+Until that exists, “experimental” means a manually constructed registry and
+“optional” is a documented target state, not an available product switch.
+
+Evidence in the assessment table uses four words:
+
+- `passed`: a retained result meets the gate exactly;
+- `failed`: a retained result was run and missed the gate;
+- `unmeasured`: no qualifying retained result exists;
+- `provisional`: useful older or smaller evidence exists, but it does not meet
+  the gate or lacks required metadata. A currently shipped mode may remain
+  provisionally accepted while its evidence is brought up to this process.
+
+## Reproducible test matrix
+
+### 1. Unit and malformed-input tests
+
+Every mode must have deterministic tests for:
+
+1. zero-, representative-, and maximum-length payload round trips, plus
+   refusal of an oversize payload without truncation;
+2. encoded duration, sample rate, payload capacity, mode ID, registry order,
+   control-mode choice, and adjacent `ModeRegistry.step()` behavior;
+3. acquisition with valid leading/trailing audio and the mode's supported
+   timing, frequency, clock, filter, noise, fading, clipping, and interference
+   ranges;
+4. rejection without an exception or unbounded work of silence, bounded white
+   noise, a bare carrier, truncated audio, corrupt header/length, corrupt
+   payload/CRC, impossible declared length, and non-finite or wrong-shaped
+   audio where the public decoder accepts arbitrary arrays;
+5. exact payload delivery only after integrity verification, and stable
+   acquisition/CRC/quality diagnostic fields expected by
+   `whale.qualification` and the link.
+
+Existing mode, framing, DSP, capture-replay, and link tests support most of
+this. Coverage is uneven: CPFSK explicitly exercises hostile length fields
+and partial frames; the non-CPFSK suites exercise oversize, corruption,
+noise, and tone rejection but do not share a single parameterized malformed
+input contract. **Gap:** add one parameterized public-codec conformance test
+for every registry mode, filling only the cases a mode does not already cover.
+
+**Gate:** all applicable tests pass, with no unexplained `xfail`. An expected
+failure may document future performance work but cannot satisfy a promotion
+gate.
+
+### 2. Bounded CI channel regression
+
+`tests/test_channel_regressions.py` is the bounded, fixed-seed smoke matrix.
+Each registry mode must have at least one policy-appropriate point. Keep CI to
+at most two full-capacity frames per `(mode, point)` and do not interpret this
+as a reliability estimate. VHF uses `ComplexFmChannel` with an explicitly
+named measured preset and RF C/N; HF uses an explicitly named Watterson preset
+plus waveform-referenced AWGN. Any threshold relaxation requires a written
+reason in the test.
+
+**Gate:** the mode meets its checked-in deterministic minimum on every CI run.
+A failure blocks all promotions until understood; passing only establishes a
+regression anchor.
+
+### 3. Frame Monte Carlo sweeps
+
+Use `scripts/benchmark_simulated_channels.py`, full-capacity deterministic
+random payloads, and a fresh output file for each model/preset. Use at least
+100 independent trials per `(mode, point)` for initial qualification and at
+least 300 at the two points used to claim a promotion boundary. Seeds are
+derived by the tool and each direction/model must use an independent channel
+instance. The point grid must bracket transition behavior: at least two
+near-clean points, two transition points, and two failing points. Use:
+
+- `fm` with the policy's measured radio preset for VHF FM;
+- `watterson` with quiet, moderate, and disturbed policy-relevant presets for
+  HF, with explicit waveform SNR;
+- `awgn` as a diagnostic baseline, not as the sole qualification channel.
+
+At every claimed operating point the 95% Wilson upper bound on FER must be at
+most 10%, the lower bound on acquisition probability at least 90%, and there
+must be no `error` outcomes. A lower robust/control rung must additionally
+have a point at which it meets those limits while the next faster rung does
+not, demonstrating that it adds coverage rather than only overhead.
+
+The script reports acquisition probability, FER, payload delivery, confidence
+intervals, channel/decoder measurements, seeds, expanded channel descriptions,
+Git state, and JSON trial records. BER is present only when a decoder exposes
+bit evidence. It currently runs one logical direction per frame; symmetric
+simulation is acceptable for waveform qualification, while asymmetry is
+covered at session and hardware levels.
+
+### 4. Full-stack sessions, ARQ, adaptation, and recovery
+
+Use `scripts/benchmark_sessions.py` for connection, simultaneous
+bidirectional verified transfer, ARQ, per-direction adaptation, and clean
+disconnect through the selected policy. Run at least 20 trials per smoke
+point and 100 per promotion point, with at least 10,000 application bytes in
+each direction so that every adjacent mode transition can occur. Include:
+
+- clean and transition points in both directions;
+- an asymmetric run using `--reverse-model`/`--reverse-points`;
+- lost DATA, lost ACK, corrupted DATA, and a transient transport failure;
+- fallback from every faster rung and a later climb after recovery;
+- connection and disconnect loss/retry cases.
+
+The benchmark currently records connection, directional delivery, ARQ-facing
+link metrics, adaptation effects, useful bytes per simulated second, channel
+measurements, seeds, and Git state. Tests in `test_link_recovery.py` exercise
+the individual drop/corruption cases. **Gap:** the command exposes neither
+its existing frame-drop/transport-fault hooks nor a scripted recovery schedule
+on the CLI, and it does not summarize time spent in each mode. The smallest
+implementation is repeatable `--fault direction:phase:index:action` arguments
+and per-direction mode-history fields in its JSON.
+
+**Gate:** 100% verified bidirectional delivery and clean disconnect, with the
+95% Wilson lower bound at least 95% at promotion points; every injected fault
+must be observed, recovered without duplicate application bytes, and followed
+by the expected fallback/re-climb. No deadlock or uncaught exception is
+allowed.
+
+### 5. Bidirectional hardware
+
+Use `scripts/sweep_modes.py` for direct full-capacity frames through two named
+radios, audio devices, PTT backends, settings, and cables. Test both directions
+with at least 40 frames per direction for optional promotion and 100 per
+direction on two materially different radio/audio pairs for default promotion.
+Retain all failed captures and at least one successful capture per direction.
+Then run the full hardware link with `scripts/run_acceptance_test.py` (and the
+focused hardware recovery scripts where applicable): connect, transfer at
+least 10,000 verified bytes each way, exercise ARQ and mode changes, recover
+from one induced lost frame and one lost ACK, and disconnect. Do not infer the
+reverse direction from one successful leg.
+
+The frame sweep already emits the versioned trial schema, Wilson intervals,
+throughput, levels, decoder metrics, radio names, registry IDs, Git commit,
+and failed captures. Hardware smoke/recovery scripts exist, but their result
+formats and fault controls are not unified. **Gap:** extend the hardware
+acceptance runner to emit a session artifact equivalent to
+`benchmark_sessions.py`, including radio/audio/PTT configuration and fault
+events.
+
+**Gate:** frame delivery satisfies the same FER/acquisition bounds as the
+Monte Carlo gate in each direction, and every hardware session completes
+exactly and recovers. A known failed direction is a failed gate even if a
+lower rung makes the overall ladder usable.
+
+### 6. Useful throughput and adjacent-rung overlap
+
+Use decoded application bytes divided by total keyed/channel time, including
+control frames, ACKs, retries, turnaround, and adaptive head/tail. Nominal
+codec rate is not evidence. For every adjacent pair, retain at least two
+channel points where both modes satisfy the frame reliability gate. At each
+of those points the faster mode's frame useful throughput must exceed the
+lower mode's by 10% or more. In full sessions, enabling the faster rung must
+improve median useful application throughput by at least 5% without reducing
+completion reliability. The lower rung must also retain the distinct robust
+point required above.
+
+`benchmark_simulated_channels.py`, `benchmark_sessions.py`, and
+`sweep_modes.py` calculate the needed useful-throughput quantities. **Gap:**
+none produces an automatic adjacent-rung comparison report. The smallest
+addition is a summary function that joins mode/point rows, checks confidence
+bounds, and emits ratios and pass/fail fields.
+
+### 7. CPU and memory
+
+Measure on both a named development machine and the documented minimum
+low-end target. Record OS, Python/NumPy/SciPy versions, CPU model/core count,
+RAM, power/performance governor, sample rate, commit, command, and whether the
+tree was dirty. Measure idle receive search for every default mode, worst-case
+successful decode, failed acquisition, a 30-minute bidirectional session with
+retries and adaptation, peak resident set size, final resident set size, and
+audio overruns/dropouts.
+
+`scripts/benchmark_rx.py` provides deterministic bounded idle-noise timing,
+and the link records per-decode thread CPU. It prints text only and does not
+measure memory, sustained real-time load, or dropouts. **Gap:** add JSON output
+and environment metadata to `benchmark_rx.py`, plus a small `psutil`-based
+session sampler (or platform RSS fallback) that records process CPU, RSS peak
+and end, and transport overruns. Avoid adding a heavyweight profiler to the
+runtime path.
+
+**Gate:** on the minimum target, every decoder's p95 work for one receive
+window is below the window's real-time duration, the sustained session has
+zero audio overruns, peak RSS stays within 256 MiB, and end RSS grows by no
+more than 16 MiB or 5% (whichever is larger) from the post-warm-up baseline.
+These are project qualification limits, not currently measured guarantees.
+
+## Required artifacts and metadata
+
+Store promotion evidence under `logs/mode_qualification/<policy>/<mode>/<date>/`
+or a reviewed `experiments/<mode>/results/` directory. A qualification index
+must list every gate and link its immutable artifact. JSON artifacts must use
+the existing `TrialRun` schema where applicable and otherwise a documented,
+versioned schema. Retain:
+
+- exact command, UTC start/end, trial counts, master and derived seeds;
+- mode name/ID, registry order/control ID, policy and payload size;
+- Git commit and dirty state (default promotion requires a clean tree);
+- Python, dependency, OS, architecture, and hardware metadata;
+- complete expanded channel description and SNR reference/measurement window;
+- per-trial outcome separated into acquisition, payload, and error, decoder
+  metrics separate from injected channel measurements, durations and useful
+  bytes;
+- Wilson intervals and explicit gate calculations;
+- radio, audio device, PTT backend, levels, filters, frequencies, firmware,
+  direction, and operator notes for hardware runs;
+- failed captures with expected payload and replay command, plus representative
+  successful captures; and
+- CPU/RSS samples, overruns, and warm-up definition for resource runs.
+
+The frame tools already provide most waveform/channel fields. Dependency and
+host metadata, successful hardware captures, uniform hardware session JSON,
+and resource JSON are the principal missing pieces.
+
+## Promotion decision
+
+Promotion is monotonic in evidence, not in implementation maturity:
+
+| Destination | Mandatory gates |
+| --- | --- |
+| Experimental | Unit/malformed-input suite and a bounded clean loopback pass; unique stable mode ID; decoder resource use is bounded by construction/test. |
+| Optional | All experimental gates; bounded CI; frame Monte Carlo; one bidirectional radio pair; full simulated sessions and recovery; adjacent-rung value/overlap; development-host CPU/RSS. |
+| Default | All optional gates; 100-trial promotion session points; two bidirectional hardware pairs and hardware recovery; minimum-target CPU/RSS and no dropouts; complete clean-commit artifacts and documentation. |
+
+Every mandatory row must be `passed`. `failed`, `unmeasured`, or `provisional`
+blocks a new promotion. A regression in a default mode removes it from the
+default registry unless a documented compatibility/security reason requires
+a time-bounded exception. Mode IDs are never reused after on-air publication.
+
+## Assessment of the current modes
+
+This is a documentary audit of checked-in tests, capture files, and result
+notes, not a new statistical or real-radio run. “CPFSK” covers the 300, 600,
+and 1200 baud VHF rungs; where the evidence differs, the weakest rung controls
+the group status.
+
+| Requirement | CPFSK | VF3 | HC0 | HC1 |
+| --- | --- | --- | --- | --- | --- |
+| Unit, framing, malformed input | passed | passed | provisional | provisional |
+| Bounded policy channel CI | passed | passed | passed | passed |
+| Qualified frame Monte Carlo | unmeasured | unmeasured | unmeasured | unmeasured |
+| Full-stack connection and bidirectional ARQ | passed | passed | passed | passed |
+| Scripted adaptation/fault recovery artifact | provisional | provisional | provisional | provisional |
+| Bidirectional hardware frame gate | unmeasured | provisional (6/6, 3 each way) | provisional (saved captures each way, below trial minimum) | failed (documented 0/10 weak direction; successful captures cover only the other leg) |
+| Full hardware link/recovery gate | provisional | unmeasured | unmeasured | unmeasured |
+| Useful throughput and adjacent overlap | provisional | provisional | provisional | failed/unmeasured (the weak hardware leg failed; no qualifying overlap sweep) |
+| Development CPU and RSS | unmeasured | unmeasured | unmeasured | unmeasured |
+| Minimum-target CPU, RSS, and dropouts | unmeasured | unmeasured | unmeasured | unmeasured |
+| Complete promotion artifact/metadata | unmeasured | provisional | provisional | provisional |
+| Present registry disposition | provisional default VHF | provisional default VHF | provisional default HF control | provisional default HF fast rung |
+
+The full-stack passes come from `tests/test_audio_e2e.py`, which exercises the
+ordinary VHF ladder through VF3 and the HF ladder from HC0 through HC1 with
+bidirectional payloads, negotiation, ARQ, adaptation, and disconnect. Recovery
+behaviors also have focused tests, but not yet the unified promotion artifact
+required above. The bounded CI points are exactly those in
+`tests/test_channel_regressions.py` and make no statistical claim.
+
+VF3 has the strongest retained direct-radio result:
+`experiments/vf3/RESULTS.md` and
+`results/final_dqpsk_both_3.json` report six exact full-capacity frames and
+offline replay, but six trials do not meet the new minimum. HC0 has exact
+saved-capture replay in both directions, including the weak HF leg. HC1's
+saved captures establish one useful direction and its frequency-offset
+handling, while the documented 0/10 reverse leg is a real failure of the
+bidirectional frame gate; HC1 may remain a provisional fast rung because HC0
+is the control/fallback mode, but this evidence would block promoting HC1
+under this process.
+
+No checked-in Monte Carlo promotion result, qualifying adjacent-rung overlap
+report, or CPU/RSS artifact was found for any production mode. Existing
+default placement therefore records historical/provisional acceptance rather
+than retroactively declaring the new gates passed.

@@ -5,7 +5,9 @@ current `whale` package. It defines how a link packet becomes an over-the-air
 audio waveform. See [`LINK.md`](LINK.md) for connection management,
 mode negotiation, ARQ, and the local TCP interface. See
 [`CHANNELS.md`](CHANNELS.md) for the simulated-channel boundary, trial result
-schema, and SNR conventions used to qualify these waveforms.
+schema, and SNR conventions used to qualify these waveforms, and
+[`MODE_QUALIFICATION.md`](MODE_QUALIFICATION.md) for registry promotion gates
+and the status of the current modes.
 
 The checked header and connection envelope contain explicit version fields.
 The current connection protocol is version 4 and checked air-header version is
