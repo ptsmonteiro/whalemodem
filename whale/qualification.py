@@ -7,12 +7,43 @@ from typing import Callable
 import numpy as np
 
 from . import framing, rx_audio
-from .channel import AudioChannel
+from .channel import (AudioChannel, AwgnChannel, ChannelChain, SnrSpec,
+                      WattersonChannel)
+from .fm_channel import ComplexFmChannel
 from .trials import (TrialOutcome, TrialResult, classify_decode,
                      common_decoder_metrics)
 
 
 ChannelFactory = Callable[[int], AudioChannel]
+
+
+def channel_factory(model: str, point_db: float, *,
+                    watterson_preset: str = "mid_latitude_moderate",
+                    fm_preset: str = "vhf_bench_conservative") -> ChannelFactory:
+    """Build the canonical seeded channel factory used by qualification tools."""
+    if model == "awgn":
+        return lambda seed: AwgnChannel(48_000, SnrSpec(point_db), seed)
+    if model == "fm":
+        return lambda seed: ComplexFmChannel.from_preset(
+            48_000, fm_preset, point_db, seed)
+    if model == "watterson":
+        return lambda seed: ChannelChain((
+            WattersonChannel.from_preset(48_000, watterson_preset, seed),
+            AwgnChannel(48_000, SnrSpec(point_db), seed ^ 0x5A5A),
+        ))
+    raise ValueError(f"unknown channel model {model!r}")
+
+
+def channel_point_label(model: str, point_db: float, *,
+                        watterson_preset: str = "mid_latitude_moderate",
+                        fm_preset: str = "vhf_bench_conservative") -> str:
+    if model == "fm":
+        return f"{fm_preset}, RF C/N {point_db:g} dB"
+    if model == "watterson":
+        return f"{watterson_preset}, waveform SNR {point_db:g} dB"
+    if model == "awgn":
+        return f"AWGN waveform SNR {point_db:g} dB"
+    raise ValueError(f"unknown channel model {model!r}")
 
 
 def full_packet_bytes(mode) -> int:

@@ -185,6 +185,9 @@ class AudioSessionResult:
     link_a: Link
     link_b: Link
     audio_link: DirectionalAudioLink
+    setup_airtime: float = 0.0
+    transfer_airtime: float = 0.0
+    disconnect_airtime: float = 0.0
 
 
 def _server(transport, callsign, mode_registry, policy):
@@ -211,7 +214,9 @@ def run_audio_session(payload_ab: bytes, payload_ba: bytes, mode_registry=None,
                       policy: ChannelPolicy = VHF_FM,
                       audio_link: DirectionalAudioLink | None = None,
                       channel_ab: AudioChannel | None = None,
-                      channel_ba: AudioChannel | None = None) -> AudioSessionResult:
+                      channel_ba: AudioChannel | None = None,
+                      on_phase: Callable[[str, float], None] | None = None
+                      ) -> AudioSessionResult:
     """Connect, transfer both ways, and disconnect through the full TCP stack."""
     if audio_link is not None and (channel_ab is not None or channel_ba is not None):
         raise ValueError("pass audio_link or directional channels, not both")
@@ -238,16 +243,27 @@ def run_audio_session(payload_ab: bytes, payload_ba: bytes, mode_registry=None,
         client_a.send_cmd("CONNECT STA1 STA2")
         client_a.wait_for("CONNECTED", 15)
         client_b.wait_for("CONNECTED", 15)
+        setup_airtime = pair.airtime
+        if on_phase is not None:
+            on_phase("connected", setup_airtime)
         client_a.open_data()
         client_b.open_data()
         client_a.send_data(payload_ab)
         assert client_b.recv_data(len(payload_ab), 120) == payload_ab
         client_b.send_data(payload_ba)
         assert client_a.recv_data(len(payload_ba), 120) == payload_ba
+        transfer_done_airtime = pair.airtime
+        if on_phase is not None:
+            on_phase("transferred", transfer_done_airtime)
         client_a.send_cmd("DISCONNECT")
         client_a.wait_for("DISCONNECTED", 15)
         client_b.wait_for("DISCONNECTED", 15)
-        return AudioSessionResult(link_a, link_b, pair)
+        if on_phase is not None:
+            on_phase("disconnected", pair.airtime)
+        return AudioSessionResult(
+            link_a, link_b, pair, setup_airtime,
+            transfer_done_airtime - setup_airtime,
+            pair.airtime - transfer_done_airtime)
     finally:
         for client in clients:
             _close_client(client)

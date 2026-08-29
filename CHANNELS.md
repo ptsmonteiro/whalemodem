@@ -275,9 +275,21 @@ Channel qualification is deliberately split by purpose:
   tiny sample counts are not reliability estimates.
 - `scripts/benchmark_simulated_channels.py` is the explicit Monte Carlo tool.
   It sweeps waveform SNR for AWGN/Watterson or RF C/N for complex FM, defaults
-  to 100 trials per mode and point, prints 95% Wilson intervals, and writes all
-  trials and configuration through `TrialRun` schema version 2. It is never
+  to 100 trials per mode and point, and reports acquisition probability, FER,
+  payload delivery rate, and 95% Wilson intervals. BER is present only when a
+  waveform decoder supplies bit-error evidence. Injected-channel measurements
+  and decoder estimates remain separate in every trial. The tool writes all
+  trials and configuration through `TrialRun` schema version 2 and is never
   collected implicitly by pytest.
+- `scripts/benchmark_sessions.py` is the separate full-stack Monte Carlo tool.
+  It reuses the exact channel factories above, then drives connection,
+  bidirectional ARQ transfer, adaptation, and disconnect through the radio-free
+  TCP/session harness. It reports setup, transfer, and teardown in simulated
+  keyed-audio seconds; connection/transfer/disconnect outcomes; retransmissions,
+  ACK timeouts, duplicate DATA evidence of a lost ACK, mode changes, and useful
+  bytes per simulated second. `--reverse-model` and `--reverse-points` create an
+  explicitly asymmetric path and results retain distinct A-to-B and B-to-A
+  records. Host wall-clock time is deliberately not a performance metric.
 
 Examples:
 
@@ -287,6 +299,8 @@ python scripts/benchmark_simulated_channels.py --model fm --policy vhf-fm `
 python scripts/benchmark_simulated_channels.py --model watterson `
     --policy hf-ssb --watterson-preset mid_latitude_moderate `
     --points -5 0 5 10 15 --trials 100
+python scripts/benchmark_sessions.py --model fm --policy vhf-fm `
+    --points 15 20 25 --trials 20 --bytes 4000
 python -m pytest -m channel_regression -q
 ```
 

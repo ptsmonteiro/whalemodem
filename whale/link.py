@@ -627,6 +627,10 @@ class Link:
         self._tx_seq = 0
         self._rx_expect_seq = 0
         self._acked_chunks = 0
+        # Qualification counters are observational and do not affect protocol state.
+        self.qualification_metrics = {
+            "data_attempts": 0, "retransmissions": 0,
+            "ack_timeouts": 0, "duplicate_data": 0, "mode_changes": []}
         # Session identity, and the ack that established it. Both are what
         # make a retried PT_CONNECT answerable after listen_once has
         # returned -- see _answer_duplicate_connect.
@@ -691,7 +695,11 @@ class Link:
         the sender, DATA_ACK when it's replying -- both reflect the same
         outbound RF path to the peer). Control-plane frames are unaffected
         -- they always use afsk.CONTROL_PROFILE regardless of this."""
+        old = self.tx_profile
         self.tx_profile = profile
+        if old is not profile and self.state == "CONNECTED":
+            self.qualification_metrics["mode_changes"].append({
+                "direction": "tx", "from": old.name, "to": profile.name})
         self._recompute_timings()
 
     def _apply_rx_profile(self, profile, fallback=None):
@@ -1512,6 +1520,9 @@ class Link:
         chunk; receivers search every mutually supported mode."""
         max_retries = self._channel("max_retries")
         for attempt in range(1, max_retries + 1):
+            self.qualification_metrics["data_attempts"] += 1
+            if attempt > 1:
+                self.qualification_metrics["retransmissions"] += 1
             advertised_head = _encode_head_duration(self._tx_head_seconds)
             body = bytes([seq | (EOF_BIT if is_eof else 0), advertised_head]) + chunk
             self.on_event("PTT", on=True)
@@ -1564,6 +1575,7 @@ class Link:
                 logger.warning("[%s] peer answered seq 0x%02x but expects 0x%02x -- sequence desync",
                                self.mycall, answered, expects)
             logger.warning("DATA seq=0x%02x: no ACK, retry %d/%d", seq, attempt, max_retries)
+            self.qualification_metrics["ack_timeouts"] += 1
             if attempt == self._channel("step_down_after_attempts"):
                 self._step_tx_mode(-1)
                 if len(chunk) > self.tx_profile.chunk_size:
@@ -1708,6 +1720,7 @@ class Link:
                 self._partial_rx_buf = bytearray()
         else:
             # A duplicate retransmit: the sender missed our ACK. Already
+            self.qualification_metrics["duplicate_data"] += 1
             # delivered, so drop the payload -- but still ack below.
             logger.info("[%s] DATA seq=0x%02x already have (expecting 0x%02x) -- dropping",
                         self.mycall, seq, self._rx_expect_seq)

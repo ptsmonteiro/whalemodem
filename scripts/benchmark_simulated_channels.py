@@ -23,10 +23,10 @@ from datetime import datetime, timezone
 from pathlib import Path
 
 from whale import policy
-from whale.channel import (AwgnChannel, ChannelChain, SnrSpec,
-                           WATTERSON_PRESETS, WattersonChannel)
-from whale.fm_channel import FM_RADIO_PRESETS, ComplexFmChannel
-from whale.qualification import run_frame_trials
+from whale.channel import WATTERSON_PRESETS
+from whale.fm_channel import FM_RADIO_PRESETS
+from whale.qualification import (channel_factory as make_channel_factory,
+                                 channel_point_label, run_frame_trials)
 from whale.trials import TrialRun
 
 
@@ -43,24 +43,40 @@ def wilson_interval(passed, total, z=1.959963984540054):
 
 
 def channel_factory(args, point):
-    if args.model == "awgn":
-        return lambda seed: AwgnChannel(48_000, SnrSpec(point), seed)
-    if args.model == "fm":
-        return lambda seed: ComplexFmChannel.from_preset(
-            48_000, args.fm_preset, point, seed)
-    return lambda seed: ChannelChain((
-        WattersonChannel.from_preset(
-            48_000, args.watterson_preset, seed),
-        AwgnChannel(48_000, SnrSpec(point), seed ^ 0x5A5A),
-    ))
+    return make_channel_factory(args.model, point,
+                                watterson_preset=args.watterson_preset,
+                                fm_preset=args.fm_preset)
 
 
 def point_label(args, point):
-    if args.model == "fm":
-        return f"{args.fm_preset}, RF C/N {point:g} dB"
-    if args.model == "watterson":
-        return f"{args.watterson_preset}, waveform SNR {point:g} dB"
-    return f"AWGN waveform SNR {point:g} dB"
+    return channel_point_label(args.model, point,
+                               watterson_preset=args.watterson_preset,
+                               fm_preset=args.fm_preset)
+
+
+def summarize_trials(trials):
+    total = len(trials)
+    acquired = sum(t.outcome.value in ("decoded", "payload_failed") for t in trials)
+    delivered = sum(t.decoded for t in trials)
+    payload_total = sum(t.payload_bytes for t in trials)
+    payload_delivered = sum(t.payload_bytes for t in trials if t.decoded)
+    ber_values = [float(t.decoder_metrics["ber"]) for t in trials
+                  if t.decoder_metrics.get("ber") is not None]
+    def rate(count, denominator=total):
+        low, high = wilson_interval(count, denominator)
+        return {"count": count, "total": denominator, "rate": count / denominator,
+                "wilson_95": [low, high]}
+    return {
+        "acquisition_probability": rate(acquired),
+        "frame_error_rate": rate(total - delivered),
+        "payload_delivery_rate": {
+            **rate(payload_delivered, payload_total),
+            "delivered_bytes": payload_delivered, "offered_bytes": payload_total,
+        },
+        # BER is only reported when a decoder actually exposes bit evidence.
+        "ber": ({"mean": sum(ber_values) / len(ber_values),
+                 "evidence_frames": len(ber_values)} if ber_values else None),
+    }
 
 
 def select_modes(registry, requested):
@@ -130,7 +146,8 @@ def main(argv=None):
             low, high = wilson_interval(passed, len(trials))
             row = {"mode_id": mode.mode_id, "mode_name": mode.name,
                    "point_db": point, "passed": passed, "total": len(trials),
-                   "rate": passed / len(trials), "wilson_95": [low, high]}
+                   "rate": passed / len(trials), "wilson_95": [low, high],
+                   **summarize_trials(trials)}
             summaries.append(row)
             print(f"  {passed}/{len(trials)} ({row['rate'] * 100:.1f}%), "
                   f"95% CI {low * 100:.1f}-{high * 100:.1f}%")
