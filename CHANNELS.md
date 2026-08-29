@@ -18,6 +18,29 @@ change the sample count and retain state between calls. Consequently each
 direction has its own instance; A-to-B and B-to-A never share fading state or
 a random generator.
 
+One-shot callers finish a finite keying with `drain(final_input=None)`. The
+optional mono `final_input` is continuation audio emitted by an earlier stage,
+not a new keying. The result contains that continuation after this stage plus
+the stage's finite retained response. Draining never resets the channel.
+Ordinary `process()` remains the streaming operation: state carries between
+calls unchanged, and no tail is emitted unless requested. `ChannelChain`
+folds drain continuation through every stage in order, so an early filter tail
+passes through all later filters, clock conversion, and random stages without
+repeating a per-keying delay or radio mute.
+
+Identity, gain, clipping, frequency conversion, AWGN, impulse/noise,
+interference, and sample-clock stages have no intrinsic tail; they transform
+only supplied continuation. A delay already emits its complete per-keying
+delay in `process()` and does not add it again during drain. Watterson's finite
+block path delay is likewise already present in its ordinary result. FIR
+responses drain their remaining finite support. Stable IIR responses use the
+zero-input length needed for the largest pole magnitude to fall below `1e-6`
+of its initial envelope, capped at one second of input. Combined models add
+finite FIR and path delay and use the same cap. This is a bounded engineering
+criterion, not a claim that an IIR has an exact finite response. Seeded random
+generators advance only for finite samples actually processed, and `reset()`
+replays ordinary and drained output deterministically.
+
 Random channels own an explicitly seeded generator. `reset()` restores the
 initial seeded realization, and `describe()` supplies JSON-compatible
 configuration including the seed. This makes a failed trial replayable from
@@ -334,10 +357,12 @@ processed. Every one of the 229 failures acquired and differed in exactly the
 last body-CRC bit; a targeted replay of a known failure for each preset decoded
 when 10 ms of post-frame audio was processed through the channel. Do not read
 that campaign as evidence of RF C/N threshold behavior, a conservative-preset
-penalty, or a 1200-baud payload-length ceiling. The next simulator experiment
-is to define and test a model-independent channel-drain contract, then rerun a
-promotion-sized campaign; this investigation does not make that behavioral
-change.
+penalty, or a 1200-baud payload-length ceiling. The reusable drain contract now
+fixes that boundary: the runner processes the frame, drains the same channel,
+concatenates both outputs, and only then adds receive-decimator padding.
+Fixed-seed replays of a previously failing frame decode exactly for all three
+FM presets. The retained matrix remains diagnostic evidence; a promotion-sized
+campaign still must be run and retained before the Monte Carlo gate can pass.
 
 The repository-internal radio-free harness in `tests/support/audio_link.py`
 applies this boundary at the 48 kHz capture rate. `DirectionalAudioLink` owns

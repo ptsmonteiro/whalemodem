@@ -5,13 +5,14 @@ operating points with at most two frames each; large confidence-building runs
 belong to scripts/benchmark_simulated_channels.py.
 """
 
+import numpy as np
 import pytest
 
-from whale import modes
+from whale import framing, modes
 from whale.channel import (AwgnChannel, ChannelChain, SnrSpec,
                            WattersonChannel)
 from whale.fm_channel import ComplexFmChannel
-from whale.qualification import run_frame_trials
+from whale.qualification import run_frame_trial, run_frame_trials, trial_seed
 
 
 MASTER_SEED = 20260829
@@ -56,3 +57,24 @@ def test_hf_modes_on_moderate_watterson_with_awgn(mode_name):
         mode, channel, 2, MASTER_SEED, point_index=1,
         direction="mid-latitude moderate, waveform SNR 5 dB")
     assert all(record.decoded for record in records)
+
+
+@pytest.mark.channel_regression
+@pytest.mark.parametrize("preset", [
+    "ic705_to_kg_uv9d", "kg_uv9d_to_ic705", "vhf_bench_conservative"])
+@pytest.mark.parametrize("trial,terminal_bit", [(1, 0), (2, 1)])
+def test_mode2_recorded_frame_boundary_replays_exactly(preset, trial,
+                                                        terminal_bit):
+    """Pin both terminal-bit values, including the recorded trial-1 failure."""
+    mode = next(mode for mode in modes.default_registry().modes
+                if mode.mode_id == 2)
+    seed = trial_seed(MASTER_SEED, mode.mode_id, 0, trial)
+    payload = np.random.default_rng(seed).integers(
+        0, 256, 412, dtype=np.uint8).tobytes()
+    assert framing.build_frame_bits(
+        payload, baud=mode.baud, include_head=False)[-1] == terminal_bit
+    record = run_frame_trial(
+        mode, ComplexFmChannel.from_preset(48_000, preset, 10, seed),
+        seed, trial, preset, payload_bytes=412)
+    assert record.decoded
+    assert record.decoder_metrics["total_bit_errors"] == 0

@@ -55,6 +55,10 @@ def test_paired_transports_apply_independent_directional_channels():
         def process(self, audio):
             return ChannelResult(np.asarray(audio) * self.gain, {"path": self.tag})
 
+        def drain(self, audio=None):
+            samples = np.zeros(0, np.float32) if audio is None else np.asarray(audio)
+            return ChannelResult(samples * self.gain, {"path": self.tag})
+
         def reset(self):
             pass
 

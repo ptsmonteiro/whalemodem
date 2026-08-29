@@ -25,6 +25,7 @@ def test_identity_channel_satisfies_contract_and_does_not_alias_input():
     result.audio[0] = 0
     assert original[0] == 0.25
     assert channel.describe() == {"type": "identity", "sample_rate": 48_000}
+    assert channel.drain().audio.size == 0
 
 
 def test_waveform_snr_reference_interval_has_explicit_power():
@@ -194,3 +195,40 @@ def test_notch_rejects_center_and_tracks_drift_across_calls():
     assert second.measurements["center_start_hz"] == 1_005
     notch.reset()
     assert np.array_equal(notch.process(tone).audio, first.audio)
+
+
+def test_filter_drain_is_the_exact_bounded_continuation_after_process():
+    rate = 8_000
+    source = np.r_[np.zeros(31), 1.0].astype(np.float32)
+    channel = FilterChannel(rate, high_hz=1_000, order=3)
+    ordinary = channel.process(source).audio
+    drained = channel.drain()
+    assert 0 < len(drained.audio) <= rate
+    reference = FilterChannel(rate, high_hz=1_000, order=3)
+    together = reference.process(np.concatenate((
+        source, np.zeros(len(drained.audio), np.float32)))).audio
+    assert np.array_equal(np.concatenate((ordinary, drained.audio)), together)
+
+
+def test_delay_and_chain_drain_do_not_duplicate_the_keying_boundary():
+    chain = ChannelChain((FilterChannel(8_000, high_hz=1_000, order=2),
+                          DelayChannel(8_000, .001),
+                          GainChannel(8_000, gain=2)))
+    ordinary = chain.process(np.array([1.0], np.float32))
+    drained = chain.drain()
+    assert len(ordinary.audio) == 9
+    assert drained.measurements["stage_1"]["delay_samples"] == 0
+    assert drained.audio[0] != 0
+
+
+def test_drain_reset_replays_and_process_streaming_is_unchanged_until_requested():
+    source = np.linspace(-1, 1, 257, dtype=np.float32)
+    channel = FilterChannel(8_000, low_hz=300, high_hz=2_000, order=3)
+    first_parts = (channel.process(source[:73]).audio,
+                   channel.process(source[73:]).audio)
+    first_tail = channel.drain().audio
+    channel.reset()
+    joined = channel.process(source).audio
+    joined_tail = channel.drain().audio
+    assert np.allclose(np.concatenate(first_parts), joined, atol=2e-7)
+    assert np.array_equal(first_tail, joined_tail)

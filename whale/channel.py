@@ -16,7 +16,12 @@ from fractions import Fraction
 from typing import Mapping, Protocol, Sequence, runtime_checkable
 
 import numpy as np
-from scipy.signal import butter, hilbert, iirnotch, lfilter, resample_poly, sosfilt
+from scipy.signal import (butter, hilbert, iirnotch, lfilter, resample_poly,
+                          sos2zpk, sosfilt)
+
+
+TAIL_RELATIVE_TOLERANCE = 1e-6
+TAIL_MAX_SECONDS = 1.0
 
 
 class SnrKind(StrEnum):
@@ -99,6 +104,8 @@ class AudioChannel(Protocol):
 
     def process(self, audio: np.ndarray) -> ChannelResult: ...
 
+    def drain(self, audio: np.ndarray | None = None) -> ChannelResult: ...
+
     def reset(self) -> None: ...
 
     def describe(self) -> Mapping[str, object]: ...
@@ -119,6 +126,11 @@ class IdentityChannel:
         if samples.ndim != 1:
             raise ValueError("channel audio must be a mono one-dimensional array")
         return ChannelResult(samples.astype(np.float32, copy=True), {})
+
+    def drain(self, audio: np.ndarray | None = None) -> ChannelResult:
+        samples = _drain_input(audio)
+        return (self.process(samples) if len(samples) else
+                ChannelResult(np.zeros(0, np.float32), {}))
 
     def reset(self) -> None:
         pass
@@ -144,6 +156,15 @@ class ChannelChain:
         measurements = {}
         for index, stage in enumerate(self.stages):
             result = stage.process(samples)
+            samples = _mono(result.audio)
+            measurements[f"stage_{index}"] = dict(result.measurements)
+        return ChannelResult(samples.astype(np.float32, copy=False), measurements)
+
+    def drain(self, audio: np.ndarray | None = None) -> ChannelResult:
+        samples = _drain_input(audio)
+        measurements = {}
+        for index, stage in enumerate(self.stages):
+            result = stage.drain(samples)
             samples = _mono(result.audio)
             measurements[f"stage_{index}"] = dict(result.measurements)
         return ChannelResult(samples.astype(np.float32, copy=False), measurements)
@@ -187,6 +208,11 @@ class AwgnChannel:
     def reset(self) -> None:
         self._rng = np.random.default_rng(self.seed)
 
+    def drain(self, audio: np.ndarray | None = None) -> ChannelResult:
+        samples = _drain_input(audio)
+        return (self.process(samples) if len(samples) else
+                ChannelResult(np.zeros(0, np.float32), {}))
+
     def describe(self) -> Mapping[str, object]:
         return {"type": "awgn", "sample_rate": self.sample_rate,
                 "seed": self.seed, "snr": _snr_description(self.snr)}
@@ -229,6 +255,11 @@ class FrequencyOffsetChannel:
     def reset(self) -> None:
         self._elapsed_seconds = 0.0
 
+    def drain(self, audio: np.ndarray | None = None) -> ChannelResult:
+        samples = _drain_input(audio)
+        return (self.process(samples) if len(samples) else
+                ChannelResult(np.zeros(0, np.float32), {}))
+
     def describe(self) -> Mapping[str, object]:
         return {"type": "frequency_offset", "sample_rate": self.sample_rate,
                 "offset_hz": self.offset_hz,
@@ -258,6 +289,13 @@ class DelayChannel:
 
     def reset(self) -> None:
         pass
+
+    def drain(self, audio: np.ndarray | None = None) -> ChannelResult:
+        # The keying delay was emitted by process(); continuation from an
+        # upstream stage must not start another keying delay.
+        samples = _drain_input(audio)
+        return ChannelResult(samples.astype(np.float32, copy=True), {
+            "delay_samples": 0, "continuation": True})
 
     def describe(self) -> Mapping[str, object]:
         return {"type": "delay", "sample_rate": self.sample_rate,
@@ -293,6 +331,7 @@ class FilterChannel:
         self._kind = kind
         self._sos = butter(self.order, cutoff, btype=kind, fs=sample_rate,
                            output="sos")
+        self._tail_samples = _sos_tail_samples(self._sos, sample_rate)
         self.reset()
 
     def process(self, audio: np.ndarray) -> ChannelResult:
@@ -305,6 +344,18 @@ class FilterChannel:
 
     def reset(self) -> None:
         self._zi = np.zeros((self._sos.shape[0], 2), dtype=np.float64)
+
+    def drain(self, audio: np.ndarray | None = None) -> ChannelResult:
+        samples = _drain_input(audio)
+        final = self.process(samples) if len(samples) else None
+        tail = self.process(np.zeros(self._tail_samples, np.float32))
+        audio_out = np.concatenate((
+            np.zeros(0, np.float32) if final is None else final.audio,
+            tail.audio))
+        return ChannelResult(audio_out, {
+            "input_samples": len(samples), "tail_samples": self._tail_samples,
+            "relative_tolerance": TAIL_RELATIVE_TOLERANCE,
+            "max_tail_seconds": TAIL_MAX_SECONDS})
 
     def describe(self) -> Mapping[str, object]:
         return {"type": "filter", "sample_rate": self.sample_rate,
@@ -336,6 +387,11 @@ class ClippingChannel:
 
     def reset(self) -> None:
         pass
+
+    def drain(self, audio: np.ndarray | None = None) -> ChannelResult:
+        samples = _drain_input(audio)
+        return (self.process(samples) if len(samples) else
+                ChannelResult(np.zeros(0, np.float32), {}))
 
     def describe(self) -> Mapping[str, object]:
         return {"type": "clipping", "sample_rate": self.sample_rate,
@@ -374,6 +430,11 @@ class SampleClockChannel:
 
     def reset(self) -> None:
         pass
+
+    def drain(self, audio: np.ndarray | None = None) -> ChannelResult:
+        samples = _drain_input(audio)
+        return (self.process(samples) if len(samples) else
+                ChannelResult(np.zeros(0, np.float32), {}))
 
     def describe(self) -> Mapping[str, object]:
         return {"type": "sample_clock", "sample_rate": self.sample_rate,
@@ -414,6 +475,11 @@ class GainChannel:
 
     def reset(self) -> None:
         pass
+
+    def drain(self, audio: np.ndarray | None = None) -> ChannelResult:
+        samples = _drain_input(audio)
+        return (self.process(samples) if len(samples) else
+                ChannelResult(np.zeros(0, np.float32), {}))
 
     def describe(self) -> Mapping[str, object]:
         return {"type": "gain", "sample_rate": self.sample_rate,
@@ -514,6 +580,11 @@ class ImpulseNoiseChannel:
                 "amplitude": self.amplitude,
                 "amplitude_distribution": self.amplitude_distribution,
                 "burst_shape": self.burst_shape, "seed": self.seed}
+
+    def drain(self, audio: np.ndarray | None = None) -> ChannelResult:
+        samples = _drain_input(audio)
+        return (self.process(samples) if len(samples) else
+                ChannelResult(np.zeros(0, np.float32), {}))
 
 
 @dataclass(frozen=True)
@@ -625,6 +696,11 @@ class NarrowbandInterferenceChannel:
                     "drift_hz_per_second": s.drift_hz_per_second,
                     "duty_cycle": s.duty_cycle} for s in self.sources]}
 
+    def drain(self, audio: np.ndarray | None = None) -> ChannelResult:
+        samples = _drain_input(audio)
+        return (self.process(samples) if len(samples) else
+                ChannelResult(np.zeros(0, np.float32), {}))
+
 
 class NotchChannel:
     """Apply a finite-depth IIR notch with an optionally drifting center."""
@@ -644,6 +720,9 @@ class NotchChannel:
         self.width_hz, self.depth_db = float(width_hz), float(depth_db)
         self.drift_hz_per_second = float(drift_hz_per_second)
         self.update_samples = int(update_samples)
+        b, a = iirnotch(self.center_hz, self.center_hz / self.width_hz,
+                        fs=self.sample_rate)
+        self._tail_samples = _pole_tail_samples(np.roots(a), sample_rate)
         self.reset()
 
     def reset(self) -> None:
@@ -678,6 +757,17 @@ class NotchChannel:
                 "depth_db": self.depth_db,
                 "drift_hz_per_second": self.drift_hz_per_second,
                 "update_samples": self.update_samples}
+
+    def drain(self, audio: np.ndarray | None = None) -> ChannelResult:
+        samples = _drain_input(audio)
+        final = self.process(samples) if len(samples) else None
+        tail = self.process(np.zeros(self._tail_samples, np.float32))
+        return ChannelResult(np.concatenate((
+            np.zeros(0, np.float32) if final is None else final.audio,
+            tail.audio)), {"input_samples": len(samples),
+                           "tail_samples": self._tail_samples,
+                           "relative_tolerance": TAIL_RELATIVE_TOLERANCE,
+                           "max_tail_seconds": TAIL_MAX_SECONDS})
 
 
 @dataclass(frozen=True)
@@ -844,6 +934,11 @@ class WattersonChannel:
                            "doppler_shift_hz": path.doppler_shift_hz}
                           for path in self.paths]}
 
+    def drain(self, audio: np.ndarray | None = None) -> ChannelResult:
+        samples = _drain_input(audio)
+        return (self.process(samples) if len(samples) else
+                ChannelResult(np.zeros(0, np.float32), {}))
+
 
 def waveform_power(audio: np.ndarray, spec: SnrSpec) -> float:
     """Mean-square power for a ``WAVEFORM`` SNR reference interval."""
@@ -862,6 +957,26 @@ def _mono(audio: np.ndarray) -> np.ndarray:
     if samples.ndim != 1:
         raise ValueError("channel audio must be a mono one-dimensional array")
     return samples
+
+
+def _drain_input(audio: np.ndarray | None) -> np.ndarray:
+    return np.zeros(0, np.float32) if audio is None else _mono(audio)
+
+
+def _pole_tail_samples(poles: np.ndarray, sample_rate: int) -> int:
+    radius = float(np.max(np.abs(poles))) if len(poles) else 0.0
+    maximum = round(TAIL_MAX_SECONDS * sample_rate)
+    if radius <= 0.0:
+        return 0
+    if radius >= 1.0:
+        return maximum
+    return min(maximum, max(1, int(np.ceil(
+        np.log(TAIL_RELATIVE_TOLERANCE) / np.log(radius)))))
+
+
+def _sos_tail_samples(sos: np.ndarray, sample_rate: int) -> int:
+    _, poles, _ = sos2zpk(sos)
+    return _pole_tail_samples(poles, sample_rate)
 
 
 def _positive_rate(sample_rate: int) -> None:

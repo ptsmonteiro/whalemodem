@@ -6,7 +6,8 @@ from fractions import Fraction
 from typing import Mapping, Sequence
 import numpy as np
 from scipy.signal import bilinear, butter, fftconvolve, firwin2, lfilter, minimum_phase, resample_poly, sosfilt
-from .channel import ChannelResult
+from .channel import (TAIL_MAX_SECONDS, TAIL_RELATIVE_TOLERANCE, ChannelResult,
+                      _pole_tail_samples, _sos_tail_samples)
 
 @dataclass(frozen=True)
 class FmRfPath:
@@ -80,6 +81,10 @@ class ComplexFmChannel:
         self.pre_emphasis_tau_seconds=float(pre_emphasis_tau_seconds); self.de_emphasis_tau_seconds=float(de_emphasis_tau_seconds); self.tx_limiter_limit=tx_limiter_limit; self.audio_clip_limit=audio_clip_limit; self.sample_clock_error_ppm=float(sample_clock_error_ppm); self.leading_mute_seconds=float(leading_mute_seconds); self.trailing_mute_seconds=float(trailing_mute_seconds); self.squelch_open_db=squelch_open_db; self.squelch_close_db=squelch_close_db; self.squelch_attack_seconds=float(squelch_attack_seconds); self.squelch_hang_seconds=float(squelch_hang_seconds); self.squelch_close_seconds=float(squelch_close_seconds)
         self._rf_sos=butter(6,self.rf_bandwidth_hz,btype="lowpass",fs=sample_rate,output="sos"); self._tx_sos=self._band(tx_audio_band_hz); self._rx_sos=self._band(rx_audio_band_hz); self._audio_fir=self._measured_fir(); self._pre_ba=self._emphasis(self.pre_emphasis_tau_seconds,False); self._de_ba=self._emphasis(self.de_emphasis_tau_seconds,True)
         ratio=Fraction(1+self.sample_clock_error_ppm/1e6).limit_denominator(1_000_000); self._clock_up,self._clock_down=ratio.numerator,ratio.denominator; self._max_path_delay=max(round(p.delay_seconds*sample_rate) for p in self.rf_paths); self.reset()
+        iir_tails=[_sos_tail_samples(self._rf_sos,self.sample_rate)]
+        iir_tails += [_sos_tail_samples(s,self.sample_rate) for s in (self._tx_sos,self._rx_sos) if s is not None]
+        iir_tails += [_pole_tail_samples(np.roots(a),self.sample_rate) for _,a in (self._pre_ba,self._de_ba)]
+        self._tail_input_samples=min(round(TAIL_MAX_SECONDS*self.sample_rate),self._max_path_delay+len(self._audio_fir)-1+sum(iir_tails))
     @classmethod
     def from_preset(cls,sample_rate,preset,carrier_to_noise_db,seed,**kw):
         try:p=FM_RADIO_PRESETS[preset]
@@ -116,7 +121,7 @@ class ComplexFmChannel:
             h=min(len(a),round(self.squelch_hang_seconds*self.sample_rate));c=min(len(a)-h,round(self.squelch_close_seconds*self.sample_rate));mask[:h]=1
             if c:mask[h:h+c]=np.linspace(1,0,c,endpoint=False)
         self._squelch_open=opened;return a*mask,int(np.count_nonzero(mask==0))
-    def process(self,audio):
+    def _process(self,audio,continuation=False):
         x=np.asarray(audio,dtype=float)
         if x.ndim!=1:raise ValueError("channel audio must be a mono one-dimensional array")
         if not len(x):return ChannelResult(np.zeros(0,np.float32),{})
@@ -137,7 +142,7 @@ class ComplexFmChannel:
             e=np.concatenate((self._audio_history,y));z=fftconvolve(e,self._audio_fir,mode="full");h=len(self._audio_fir)-1;y=z[h:h+len(y)];self._audio_history=e[-h:]
         rxclip=0
         if self.audio_clip_limit is not None:rxclip=int(np.count_nonzero(abs(y)>self.audio_clip_limit));y=np.clip(y,-self.audio_clip_limit,self.audio_clip_limit)
-        y,sqmuted=self._squelch(y,level);lead=min(round(self.leading_mute_seconds*self.sample_rate),len(y));trail=min(round(self.trailing_mute_seconds*self.sample_rate),len(y)-lead);y[:lead]=0
+        y,sqmuted=self._squelch(y,level);lead=0 if continuation else min(round(self.leading_mute_seconds*self.sample_rate),len(y));trail=0 if continuation else min(round(self.trailing_mute_seconds*self.sample_rate),len(y)-lead);y[:lead]=0
         if trail:y[-trail:]=0
         if self._clock_up!=self._clock_down:
             y=resample_poly(y,self._clock_up,self._clock_down)
@@ -148,5 +153,14 @@ class ComplexFmChannel:
             if out_trail:y[-out_trail:]=0
         self._sample_index+=len(tx);cn=float("inf") if npow==0 else 10*np.log10(cp/npow)
         return ChannelResult(y.astype(np.float32),{"rf_carrier_to_noise_db":self.carrier_to_noise_db,"realized_rf_carrier_to_noise_db":float(cn),"rf_carrier_power":cp,"rf_noise_power":npow,"rf_interference_power":ip,"rf_frequency_error_hz":self.rf_frequency_error_hz,"deviation_hz":self.deviation_hz,"if_level_db":float(level),"squelch_open":self._squelch_open,"muted_samples":lead+trail+sqmuted,"leading_muted_samples":lead,"trailing_muted_samples":trail,"sample_clock_error_ppm":self.sample_clock_error_ppm,"tx_limited_samples":txclip,"clipped_audio_samples":rxclip})
+    def process(self,audio):
+        return self._process(audio)
+    def drain(self,audio=None):
+        x=np.zeros(0,np.float32) if audio is None else np.asarray(audio,dtype=np.float32)
+        if x.ndim!=1:raise ValueError("channel audio must be a mono one-dimensional array")
+        parts=[]
+        if len(x):parts.append(self._process(x,continuation=True).audio)
+        parts.append(self._process(np.zeros(self._tail_input_samples,np.float32),continuation=True).audio)
+        return ChannelResult(np.concatenate(parts) if parts else np.zeros(0,np.float32),{"input_samples":len(x),"tail_input_samples":self._tail_input_samples,"relative_tolerance":TAIL_RELATIVE_TOLERANCE,"max_tail_seconds":TAIL_MAX_SECONDS})
     def describe(self)->Mapping[str,object]:
         return {"type":"complex_fm","sample_rate":self.sample_rate,"seed":self.seed,"preset":None if self.preset is None else self.preset.name,"synthetic_profile":None if self.synthetic_profile is None else self.synthetic_profile.name,"stages":list(self.STAGES),"carrier_to_noise_db":self.carrier_to_noise_db,"carrier_to_noise_reference":"complex_iq_full_nyquist","deviation_hz":self.deviation_hz,"full_scale_audio":self.full_scale_audio,"rf_bandwidth_hz":self.rf_bandwidth_hz,"rf_frequency_error_hz":self.rf_frequency_error_hz,"tx_audio_band_hz":self.tx_audio_band_hz,"rx_audio_band_hz":self.rx_audio_band_hz,"audio_band_6db_hz":self.audio_band_6db_hz,"audio_band_10db_hz":self.audio_band_10db_hz,"pre_emphasis_tau_seconds":self.pre_emphasis_tau_seconds,"de_emphasis_tau_seconds":self.de_emphasis_tau_seconds,"tx_limiter_limit":self.tx_limiter_limit,"sample_clock_error_ppm":self.sample_clock_error_ppm,"leading_mute_seconds":self.leading_mute_seconds,"trailing_mute_seconds":self.trailing_mute_seconds,"squelch_open_db":self.squelch_open_db,"squelch_close_db":self.squelch_close_db,"squelch_attack_seconds":self.squelch_attack_seconds,"squelch_hang_seconds":self.squelch_hang_seconds,"squelch_close_seconds":self.squelch_close_seconds,"measured_delay_spread_ms":None if self.preset is None else self.preset.measured_delay_spread_ms,"measurement_source":None if self.preset is None else self.preset.measurement_source,"rf_paths":[asdict(p) for p in self.rf_paths],"rf_interference":[asdict(i) for i in self.rf_interference]}

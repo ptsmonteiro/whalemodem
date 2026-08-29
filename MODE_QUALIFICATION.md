@@ -367,12 +367,23 @@ channel. This is evidence of a shared simulated-channel/frame-boundary problem,
 not a conservative-preset problem, a direction-specific problem, payload
 length sensitivity, or random RF-noise weakness in the waveform.
 
-The smallest next experiment is to specify and regression-test a reusable
-channel-drain/tail contract at the direct-frame boundary, without changing the
-on-air waveform or decoder, and then rerun this matrix at promotion trial
-counts. A retained bidirectional hardware run at the current 402-byte DATA
+The reusable channel-drain/tail contract is now implemented at the
+direct-frame boundary without changing the on-air waveform or decoder. The
+runner drains the same channel before receive decimation, and fixed-seed
+replays of a previously failing frame decode exactly for all three FM presets.
+A promotion-sized rerun of this matrix is still required; these focused
+replays do not pass the Monte Carlo gate. A retained bidirectional hardware
+run at the current 402-byte DATA
 capacity is still required for formal qualification. Mode 2 remains in its
 existing registry disposition during this investigation.
+
+Regression replay on 2026-08-29 used master seed `20260829`, point index 0,
+trial 1 (derived seed `5957953403229853794`), 10 dB RF C/N, and the 412-byte
+physical payload. The command
+`python -m pytest tests/test_channel_regressions.py -q` replayed that formerly
+failing terminal-zero frame for all three presets, plus terminal-one trial 2;
+all six cases decoded exactly. The complete focused file also includes the
+ordinary VHF/HF fixed-seed regressions.
 
 No qualifying adjacent-rung overlap report or CPU/RSS artifact has yet been
 retained for any production mode, and no other mode has a retained Monte

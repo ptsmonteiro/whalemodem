@@ -98,8 +98,12 @@ def run_frame_trial(mode, channel: AudioChannel, seed: int, trial: int,
     try:
         transmitted = np.asarray(mode.encode(payload), dtype=np.float32)
         impaired = channel.process(transmitted)
-        channel_measurements = impaired.measurements
-        capture_audio = np.asarray(impaired.audio, dtype=np.float32)
+        drained = channel.drain()
+        channel_measurements = dict(impaired.measurements)
+        channel_measurements["drain"] = dict(drained.measurements)
+        capture_audio = np.concatenate((
+            np.asarray(impaired.audio, dtype=np.float32),
+            np.asarray(drained.audio, dtype=np.float32)))
         captured = rx_audio.downsample(np.concatenate((
             capture_audio,
             np.zeros(rx_audio.FILTER_DELAY_CAPTURE_SAMPLES, dtype=np.float32),
