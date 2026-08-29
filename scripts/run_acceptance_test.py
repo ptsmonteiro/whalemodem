@@ -20,7 +20,7 @@ Run:
     python scripts/run_acceptance_test.py --a-radio ic705 --b-radio ht --size 8192
 
     # the HF bench: both radios on one SSB frequency in data mode, both
-    # stations on the HC1 waveform (whale/modes/hc1.py)
+    # stations on the HC0/HC1 ladder selected by the hf-ssb channel
     python scripts/run_acceptance_test.py --channel hf-ssb \
         --a-radio ic7300 --b-radio ic705 --size 1024
 
