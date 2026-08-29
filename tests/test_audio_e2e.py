@@ -17,167 +17,23 @@ station actually transmitted -- which is the quantity a radio would spend and
 the one GOALS.md asks to be competitive on.
 """
 
-import socket
-import threading
-
 import numpy as np
 
-from acceptance_test import StationClient
-from whale import afsk, link, rx_audio
+from support.audio_link import DirectionalAudioLink, run_audio_session
+from whale import afsk, rx_audio
 from whale.channel import (AwgnChannel, ChannelChain, ChannelResult,
                            ClippingChannel, DelayChannel, FilterChannel,
-                           FrequencyOffsetChannel, IdentityChannel,
-                           SampleClockChannel, SnrSpec)
+                           FrequencyOffsetChannel, SampleClockChannel, SnrSpec)
 from whale.fm_channel import ComplexFmChannel
-from whale.link import Link
 from whale.modes.hc0_mode import HC0
 from whale.modes.hc1_mode import HC1
 from whale.modes.vf3_mode import VF3
 from whale.policy import HF_SSB, VHF_FM
-from whale.service import ModemService
-from whale.vara_server import StationServer
 
 
-class PairedAudioTransport:
-    """A radio-shaped endpoint connected through its outbound audio channel.
-
-    Each endpoint owns the channel applied to what it transmits.  Thus the
-    transport at station A holds A->B and the transport at station B holds
-    B->A; asymmetric paths never share channel state or randomness.
-    """
-
-    def __init__(self, tx_channel=None):
-        self.peer = None
-        self.tx_channel = (IdentityChannel(rx_audio.CAPTURE_SAMPLE_RATE)
-                           if tx_channel is None else tx_channel)
-        if self.tx_channel.sample_rate != rx_audio.CAPTURE_SAMPLE_RATE:
-            raise ValueError(
-                "paired-audio channels must operate at the 48000 Hz capture rate")
-        self._audio = np.zeros(0, dtype=np.float32)
-        self._lock = threading.Lock()
-        self._transmitting = threading.Event()
-        #: Results are retained for later trial reporting and channel
-        #: diagnostics. One entry corresponds to each call to send().
-        self.channel_results = []
-        #: Seconds of audio this station has transmitted.  A real radio would
-        #: be keyed for this long; wall-clock time here would not be.
-        self.airtime = 0.0
-
-    def start_receiving(self):
-        pass
-
-    def stop_receiving(self):
-        pass
-
-    def is_transmitting(self):
-        return self._transmitting.is_set()
-
-    def snapshot_rx(self):
-        with self._lock:
-            return self._audio.copy()
-
-    def consume_rx(self, upto_sample):
-        with self._lock:
-            self._audio = self._audio[upto_sample:]
-
-    def send(self, tx_audio, **kwargs):
-        self._transmitting.set()
-        try:
-            waveform = np.asarray(tx_audio, dtype=np.float32)
-            channel_result = self.tx_channel.process(waveform)
-            channel_audio = np.asarray(channel_result.audio, dtype=np.float32)
-            if channel_audio.ndim != 1:
-                raise ValueError("channel returned non-mono audio")
-            self.channel_results.append(channel_result)
-            received = rx_audio.downsample(np.concatenate((
-                channel_audio,
-                np.zeros(rx_audio.FILTER_DELAY_CAPTURE_SAMPLES, dtype=np.float32),
-            )))
-            with self.peer._lock:
-                self.peer._audio = np.concatenate((self.peer._audio, received))
-            keyed = len(waveform) / afsk.SAMPLE_RATE
-            self.airtime += keyed
-            return keyed
-        finally:
-            self._transmitting.clear()
-
-
-def _server(transport, callsign, mode_registry=None, policy=VHF_FM):
-    station = Link(transport, callsign, mode_registry=mode_registry, policy=policy)
-    service = ModemService(station, poll_interval=0.01)
-    server = StationServer(service, callsign, 0, 0)
-    thread = threading.Thread(target=server.serve_forever, daemon=True)
-    thread.start()
-    assert server.ready.wait(5), f"{callsign} server did not become ready"
-    return server, thread, station
-
-
-def _close_client(client):
-    if client.data is not None:
-        client.data.close()
-    try:
-        client.cmd.shutdown(socket.SHUT_RDWR)
-    except OSError:
-        pass
-    client.cmd.close()
-
-
-def _run_session(payload_ab, payload_ba, mode_registry=None, policy=VHF_FM,
-                 channel_ab=None, channel_ba=None):
-    """One complete session -- connect, both transfers, disconnect.
-
-    Returns the two Links and the two transports so a caller can assert on
-    the modes the session settled at and the airtime it spent.  Both are
-    only meaningful after the session has finished, which is why they come
-    back rather than being asserted here.
-    """
-    saved_turnaround = link.TX_TURNAROUND_DELAY
-    saved_poll = link.DECODE_POLL_INTERVAL
-    link.TX_TURNAROUND_DELAY = 0.02
-    link.DECODE_POLL_INTERVAL = 0.01
-
-    ta = PairedAudioTransport(channel_ab)
-    tb = PairedAudioTransport(channel_ba)
-    ta.peer, tb.peer = tb, ta
-    server_a = server_b = client_a = client_b = None
-    link_a = link_b = None
-    threads = []
-    try:
-        server_a, thread_a, link_a = _server(ta, "STA1", mode_registry, policy)
-        server_b, thread_b, link_b = _server(tb, "STA2", mode_registry, policy)
-        threads = [thread_a, thread_b]
-        client_a = StationClient("A", "127.0.0.1", server_a.cmd_port, server_a.data_port)
-        client_b = StationClient("B", "127.0.0.1", server_b.cmd_port, server_b.data_port)
-
-        client_b.send_cmd("MYCALL STA2")
-        client_b.send_cmd("LISTEN ON")
-        client_a.send_cmd("CONNECT STA1 STA2")
-        client_a.wait_for("CONNECTED", 15)
-        client_b.wait_for("CONNECTED", 15)
-
-        client_a.open_data()
-        client_b.open_data()
-
-        client_a.send_data(payload_ab)
-        assert client_b.recv_data(len(payload_ab), 120) == payload_ab
-        client_b.send_data(payload_ba)
-        assert client_a.recv_data(len(payload_ba), 120) == payload_ba
-
-        client_a.send_cmd("DISCONNECT")
-        client_a.wait_for("DISCONNECTED", 15)
-        client_b.wait_for("DISCONNECTED", 15)
-    finally:
-        for client in (client_a, client_b):
-            if client is not None:
-                _close_client(client)
-        for server in (server_a, server_b):
-            if server is not None:
-                server.stop()
-        for thread in threads:
-            thread.join(timeout=3)
-        link.TX_TURNAROUND_DELAY = saved_turnaround
-        link.DECODE_POLL_INTERVAL = saved_poll
-    return link_a, link_b, ta, tb
+def _run_session(*args, **kwargs):
+    result = run_audio_session(*args, **kwargs)
+    return result.link_a, result.link_b, result.audio_link.a, result.audio_link.b
 
 
 def _payload(length, step, offset):
@@ -207,9 +63,8 @@ def test_paired_transports_apply_independent_directional_channels():
 
     channel_ab = TaggedChannel(0.5, "A->B")
     channel_ba = TaggedChannel(-0.25, "B->A")
-    ta = PairedAudioTransport(channel_ab)
-    tb = PairedAudioTransport(channel_ba)
-    ta.peer, tb.peer = tb, ta
+    pair = DirectionalAudioLink(channel_ab, channel_ba)
+    ta, tb = pair.a, pair.b
     waveform = np.ones(400, dtype=np.float32)
 
     ta.send(waveform)
@@ -223,6 +78,50 @@ def test_paired_transports_apply_independent_directional_channels():
     assert np.allclose(ta.snapshot_rx(), expected_ba)
     assert ta.channel_results[0].measurements == {"path": "A->B"}
     assert tb.channel_results[0].measurements == {"path": "B->A"}
+
+
+def test_directional_audio_link_resets_and_replays_seeded_channels():
+    pair = DirectionalAudioLink(
+        AwgnChannel(48_000, SnrSpec(20.0), seed=41),
+        AwgnChannel(48_000, SnrSpec(20.0), seed=42),
+    )
+    pair.a.send(np.ones(480, dtype=np.float32))
+    pair.b.send(np.full(240, 0.5, dtype=np.float32))
+    first = tuple(record.result.audio.copy() for record in pair.records)
+    first_airtime = pair.airtime
+
+    replayed = pair.replay()
+
+    assert [record.direction for record in replayed] == ["A->B", "B->A"]
+    assert all(np.array_equal(record.result.audio, expected)
+               for record, expected in zip(replayed, first))
+    assert pair.airtime == first_airtime
+    assert pair.a.channel_results == [replayed[0].result]
+    assert pair.b.channel_results == [replayed[1].result]
+
+
+def test_directional_audio_link_drop_and_transport_fault_hooks():
+    def drop(direction, index, waveform):
+        return direction == "A->B" and index == 0
+
+    def invert(direction, index, waveform):
+        assert direction == "B->A" and index == 0
+        return -waveform
+
+    pair = DirectionalAudioLink(frame_drop=drop, transport_fault=invert)
+    waveform = np.ones(400, dtype=np.float32)
+
+    pair.a.send(waveform)
+    pair.b.send(waveform)
+
+    assert pair.records[0].dropped
+    assert pair.records[0].result.measurements == {"transport_dropped": True}
+    assert pair.b.snapshot_rx().size == rx_audio.downsample(np.zeros(
+        rx_audio.FILTER_DELAY_CAPTURE_SAMPLES, dtype=np.float32)).size
+    expected = rx_audio.downsample(np.concatenate((
+        -waveform, np.zeros(rx_audio.FILTER_DELAY_CAPTURE_SAMPLES))))
+    assert np.allclose(pair.a.snapshot_rx(), expected)
+    assert pair.airtime == 2 * len(waveform) / afsk.SAMPLE_RATE
 
 
 def test_full_stack_session_over_composed_asymmetric_channels():

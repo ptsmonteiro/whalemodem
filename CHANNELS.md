@@ -204,11 +204,14 @@ mode ID, point index, and trial number. Selecting fewer modes therefore does
 not silently change the realizations of the modes that remain. A benchmark
 result should be retained whenever its performance claim is retained.
 
-The radio-free end-to-end harness in `tests/test_audio_e2e.py` applies this
-boundary at the 48 kHz capture rate. Its station-A transport owns the A-to-B
-channel and its station-B transport owns the B-to-A channel. Channel output is
-then passed through the same anti-aliased 48-to-12 kHz receive conversion used
-by the modem. With no channel supplied, each direction gets a distinct
+The repository-internal radio-free harness in `tests/support/audio_link.py`
+applies this boundary at the 48 kHz capture rate. `DirectionalAudioLink` owns
+distinct A-to-B and B-to-A channels, captures every `ChannelResult`, records
+simulated keyed airtime, and supports deterministic reset and replay. Optional
+frame-drop and pre-channel transport-fault hooks support full-session recovery
+tests without adding simulation behavior to production `RadioTransport`.
+Channel output passes through the modem's normal anti-aliased 48-to-12 kHz
+receive conversion. With no channel supplied, each direction gets a distinct
 `IdentityChannel`, preserving the lossless acceptance-test behavior.
 
 ## SNR conventions
