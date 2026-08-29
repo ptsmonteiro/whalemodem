@@ -9,9 +9,9 @@ that decoded **0 of 10** HC1 frames on 2026-08-28, and HC0 carries it with
 2 raw bit errors in 1,132 that the convolutional code absorbs without
 noticing.
 
-The captures came from `scripts/hw_hf_frames.py --mode hc0` that day
-(see README.md, "HC0: the rung that gets through"), trimmed to the frame
-plus a quarter second either side.
+The captures came from `scripts/hw_hf_frames.py --mode hc0` that day; see the
+"HF mode split" section of `docs/PERFORMANCE.md`. They were trimmed to the
+frame plus a quarter second either side.
 
 Nothing here is a golden digest.  The assertion is the one that matters --
 the bytes that went in came out -- plus the measurements that say why, so

@@ -165,7 +165,7 @@ def test_a_carrier_offset_inside_the_estimator_range_is_measured_and_removed(hz)
     """The property no CPFSK profile has.
 
     +-8 Hz is what the IC-7300/IC-705 pair actually measured on 10.145 MHz
-    (see logs and README); +-45 Hz is just inside
+    (see logs and docs/PERFORMANCE.md); +-45 Hz is just inside
     `hc1.COARSE_OFFSET_LIMIT_HZ` and is there so the documented limit is a
     tested one rather than an arithmetic claim.
     """

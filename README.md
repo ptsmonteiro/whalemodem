@@ -1,168 +1,74 @@
 # whalemodem
 
-`whalemodem` is a from-scratch amateur-radio data modem with a
-**VARA-API-shaped** TCP interface: one command port and one data port. It
-exchanges bytes between two stations over an analog radio link using its own
-physical layer and stop-and-wait ARQ link layer.
+Whalemodem is an experimental, open amateur-radio data modem for VHF and HF.
+It has a VARA-shaped command/data interface, but its on-air protocol is native
+and the local interface is not yet fully VARA-compatible. Detailed references
+live in the [documentation index](docs/README.md).
 
-The project is correctness-first. It does not drive VARA software and is not
-wire-compatible with VARA. The familiar connect/data-stream/disconnect shape
-is the application interface; everything on air is native to whalemodem.
+## Project goals
 
-## Status
+The goal is a practical open alternative to VARA FM and VARA HF: competitive
+useful throughput and reliability, compatibility with existing applications,
+and operation on inexpensive low-power hardware. Application adapters, link
+behavior, waveforms, audio transport, and radio control should remain modular
+and independently testable, with performance demonstrated by reproducible
+simulation and radio measurements. The full criteria are in
+[GOALS.md](GOALS.md).
 
-The v1 acceptance target is implemented: connect two stations, send 1 KiB in
-each direction, and disconnect at either station's request, with the received
-payload verified byte-for-byte. The complete path is exercised by
-`acceptance_test.py` and by software-only end-to-end tests.
+## Setup and run
 
-This is experimental amateur-radio software, not a finished VARA replacement.
-Its emphasis is a testable modem architecture, measured behavior on real
-hardware, and waveform evolution without rewriting the link layer.
-
-## Features
-
-- VARA-shaped local command and byte-stream TCP ports
-- Stop-and-wait ARQ with retransmission and session-scoped sequence numbers
-- Independent mode negotiation and adaptation in each direction
-- Adaptive leading-audio protection for radio turnaround and squelch recovery
-- VHF FM and HF SSB channel policies
-- Software channel simulation, capture replay, and real-radio test tools
-- Extensible waveform and PTT backend interfaces
-
-## Channels and modes
-
-Mode availability is selected by channel policy and qualification level. The
-normal `default` level currently preserves the historically shipped ladders.
-
-| Channel | Control mode | Data modes |
-| --- | --- | --- |
-| `vhf-fm` | CPFSK 300 baud (mode 0) | CPFSK 300/600/1200 baud (0-2), VF3 DQPSK OFDM (3) |
-| `hf-ssb` | HC0 non-coherent 16-FSK (5) | HC0 (5), HC1 DQPSK OFDM (4) |
-
-Control traffic always uses the channel's robust control mode. DATA uses the
-mode negotiated for that direction and steps down after trouble or up after a
-clean streak. See [FRAMING.md](FRAMING.md) for waveform details and
-[MODE_QUALIFICATION.md](MODE_QUALIFICATION.md) for the evidence required to
-change a mode's availability.
-
-## Requirements and installation
-
-- Python 3.11 or newer
-- NumPy, SciPy, sounddevice, and pyserial
-- Two radios and suitable PTT/audio interfaces for on-air operation
-
-Install the package and its dependencies in an isolated environment:
+Python 3.11 or newer is required:
 
 ```console
 python -m venv .venv
-# Activate .venv using the command for your shell, then:
-python -m pip install -e .
+# Activate .venv using the command for your shell.
+python -m pip install -e ".[test]"
 ```
 
-No radio hardware is needed to run the software test suite.
-
-## Quick start without radios
-
-Run the full TCP stack over paired in-memory audio transports:
+Run the full-stack software test or the complete automated suite without
+radios:
 
 ```console
 python -m pytest tests/test_audio_e2e.py -q
-```
-
-Run the complete automated suite:
-
-```console
 python -m pytest -q
 ```
 
-Channel regressions are marked separately because they run a bounded matrix
-of simulated channel points:
+For radio operation, copy `radios.example.toml` to `radios.toml`, configure
+both stations, and start one server per radio:
 
 ```console
-python -m pytest -m channel_regression -q
+python -m whale.vara_server --radio-config radios.toml --radio station-a --mycall STA1 --cmd-port 8300 --data-port 8301
+python -m whale.vara_server --radio-config radios.toml --radio station-b --mycall STA2 --cmd-port 8310 --data-port 8311
 ```
 
-See [docs/TESTING.md](docs/TESTING.md) for capture replay, simulation,
-benchmarking, and hardware procedures.
-
-## Running two radio stations
-
-Copy `radios.example.toml`, describe each station's audio device and PTT
-backend, and start one server per radio:
+Exercise both directions with:
 
 ```console
-python -m whale.vara_server --radio-config radios.toml --radio station-a \
-  --mycall STA1 --cmd-port 8300 --data-port 8301
-
-python -m whale.vara_server --radio-config radios.toml --radio station-b \
-  --mycall STA2 --cmd-port 8310 --data-port 8311
+python acceptance_test.py --a-cmd 8300 --a-data 8301 --b-cmd 8310 --b-data 8311 --a-call STA1 --b-call STA2
 ```
 
-Then drive the acceptance scenario:
+Read the [hardware and safety guide](docs/HARDWARE.md) before transmitting;
+the [testing guide](docs/TESTING.md) covers the other test workflows.
 
-```console
-python acceptance_test.py \
-  --a-cmd 8300 --a-data 8301 --b-cmd 8310 --b-data 8311 \
-  --a-call STA1 --b-call STA2
-```
+## Current status
 
-Use `--channel hf-ssb` at both stations for the HF ladder. Use
-`--mode-level optional` or `--mode-level experimental` only for an explicit
-qualification run; those levels cumulatively enable less-qualified modes.
+- The end-to-end connect, bidirectional byte transfer, verification, and
+  disconnect path is implemented. Software full-stack tests cover VHF FM and
+  HF SSB; retained captures and bench runs cover parts of both radio paths.
+- Every shipped mode remains provisionally qualified. Evidence gaps include
+  additional radio pairs and low-end resource measurements, and the retained
+  1200-baud CPFSK Monte Carlo campaign failed its frame-error-rate gate.
+- The local API is only the subset needed by the acceptance scenario, ARQ is
+  stop-and-wait, and HF clear-channel assessment is missing. HF operation is
+  therefore for controlled bench tests, not unattended use on a shared band.
 
-Radio configuration, supported PTT backends, safety expectations, and
-hardware commands are documented in [docs/HARDWARE.md](docs/HARDWARE.md).
+See [MODE_QUALIFICATION.md](MODE_QUALIFICATION.md) for the evidence audit.
 
-## Local TCP interface
+## Next steps
 
-The command port is line-oriented and uses carriage-return-terminated
-commands:
-
-```text
-MYCALL <call>
-LISTEN ON | OFF
-CONNECT <mycall> <dstcall>
-DISCONNECT | ABORT
-```
-
-The server reports `PTT ON`, `PTT OFF`, `CONNECTED`, `CONNECT FAILED`, and
-`DISCONNECTED` status lines. Once connected, bytes written to the data port
-are transmitted; received bytes are written back to the same TCP stream.
-
-Compression modes, bandwidth selection, and Winlink-specific extensions are
-not implemented. [LINK.md](LINK.md) is the complete protocol and local API
-reference.
-
-## Repository guide
-
-| Path | Purpose |
-| --- | --- |
-| `whale/` | Modem, link, transport, channel policy, DSP, modes, and hardware integration |
-| `tests/` | Unit, full-stack, simulated-channel, and capture-replay tests |
-| `scripts/` | Benchmarks, qualification sweeps, hardware smoke tests, and diagnostics |
-| `experiments/` | Candidate waveform implementations, measurements, and retained results |
-
-The main documentation is:
-
-- [GOALS.md](GOALS.md) — vision, success criteria, and architectural direction
-- [LINK.md](LINK.md) — on-air link protocol, ARQ, negotiation, and local TCP API
-- [FRAMING.md](FRAMING.md) — waveform contracts, modulation, coding, and framing
-- [ADAPTIVE_TIMING.md](ADAPTIVE_TIMING.md) — calibrated radio-turnaround protection
-- [CHANNELS.md](CHANNELS.md) — simulated channels, trial records, and SNR conventions
-- [MODE_QUALIFICATION.md](MODE_QUALIFICATION.md) — mode evidence gates and availability
-- [docs/PERFORMANCE.md](docs/PERFORMANCE.md) — measurements, design history, and open performance work
-- [docs/TESTING.md](docs/TESTING.md) — test and qualification workflows
-- [docs/HARDWARE.md](docs/HARDWARE.md) — radio, audio, and PTT setup
-
-## Known limitations
-
-- Only one frame is in flight at a time; the link is stop-and-wait rather
-  than sliding-window.
-- Lost DATA costs a complete chunk retransmission.
-- An idle connected station sends no keepalive and is eventually timed out.
-- HF clear-channel assessment is represented in policy but not implemented.
-- Performance and hardware compatibility are still being characterized.
-
-The intended end state and the reasons behind these tradeoffs are recorded in
-[GOALS.md](GOALS.md).
+- Close mode-qualification gaps, starting with the CPFSK failure and
+  reproducible bidirectional hardware campaigns.
+- Add HF clear-channel assessment.
+- Measure CPU, memory, latency, and audio dropouts on a low-end target.
+- Expand and test VARA API compatibility, then improve throughput and radio
+  turnaround against the reference targets in [GOALS.md](GOALS.md).

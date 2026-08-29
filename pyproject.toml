@@ -14,6 +14,9 @@ dependencies = [
     "pyserial",
 ]
 
+[project.optional-dependencies]
+test = ["pytest"]
+
 [tool.setuptools]
 packages = ["whale", "whale.hw", "whale.modes"]
 # acceptance_test.py lives at the repo root and is both run directly

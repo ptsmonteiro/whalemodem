@@ -5,6 +5,13 @@ tests, full-stack paired audio, simulated channels, recorded radio captures,
 and finally bidirectional hardware trials. A mode is not promoted solely
 because it passes a clean software loopback.
 
+Install the test extra in the project's virtual environment before running
+these commands:
+
+```console
+python -m pip install -e ".[test]"
+```
+
 ## Automated suite
 
 Run all ordinary tests:

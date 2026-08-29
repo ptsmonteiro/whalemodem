@@ -46,7 +46,7 @@ class FmSyntheticProfile:
 
 _BS="experiments/ofdm/results/measurements/bandwidth.json"; _CS="scripts/measure_clock_offset.py (measurements in module docstring)"
 FM_RADIO_PRESETS={
- "ic705_to_kg_uv9d":FmRadioPreset("ic705_to_kg_uv9d",(430.9,1905.5),(384.8,2453.2),-3.7,.110,.505,f"{_BS}; {_CS}; README.md squelch measurement"),
+ "ic705_to_kg_uv9d":FmRadioPreset("ic705_to_kg_uv9d",(430.9,1905.5),(384.8,2453.2),-3.7,.110,.505,f"{_BS}; {_CS}; experiments/ofdm/screen_ofdm.py squelch measurement"),
  "kg_uv9d_to_ic705":FmRadioPreset("kg_uv9d_to_ic705",(425.1,1746.4),(363.,2372.3),3.1,0.,.815,f"{_BS}; {_CS}"),
  "vhf_bench_conservative":FmRadioPreset("vhf_bench_conservative",(430.9,1746.4),(384.8,2372.3),-3.7,.110,.815,"worst directional values from both VHF bench presets")}
 FM_SYNTHETIC_PROFILES={

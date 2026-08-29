@@ -232,7 +232,8 @@ edges; the measurement did not identify phase, so no claim is made that this
 reconstructs the radios' group delay. The directional sample-clock values are
 the -3.7/+3.1 ppm results from `scripts/measure_clock_offset.py`. The 110 ms
 mute on the IC-705-to-handheld leg is the Wouxun squelch-opening blackout
-documented in `README.md`. The measured 0.505/0.815 ms delay-spread values are
+measured and described in `experiments/ofdm/screen_ofdm.py`. The measured
+0.505/0.815 ms delay-spread values are
 retained as preset metadata but are not converted into invented discrete RF
 echoes; callers can provide measured or exploratory `FmRfPath` values.
 

@@ -31,7 +31,7 @@ extracting:
     always tested because the two legs of this bench have materially
     different SNR (see whale/afsk.py) -- a limit that holds one way and not
     the other is not a limit, and taking the better direction would have
-    quietly overstated every number in the README.
+    quietly overstated the performance record in docs/PERFORMANCE.md.
 
 Nothing here imports whale.link. That is the point: these scripts measure
 the layer underneath it.

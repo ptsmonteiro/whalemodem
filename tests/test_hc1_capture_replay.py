@@ -6,9 +6,10 @@ This file proves it against one it did not have to: two Icom radios on
 8 Hz -- through the IC-7300's transmit chain, the ionosphere-free few metres
 between them, the IC-705's receiver, its AGC and its USB codec.
 
-The captures came from `scripts/hw_hc1_frames.py` on 2026-08-28 (see
-README.md, "HC1 on the HF bench"), trimmed to the frame plus a quarter
-second either side.  Two of them, deliberately different sizes: a
+The captures came from `scripts/hw_hc1_frames.py` on 2026-08-28; see the
+"HF mode split" section of `docs/PERFORMANCE.md`. They were trimmed to the
+frame plus a quarter second either side. Two of them, deliberately different
+sizes: a
 full 74-byte payload and a 12-byte one the size of a DATA_ACK, because HC1
 is the control mode and the small frame is the one the link sends most.
 
