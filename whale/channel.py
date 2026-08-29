@@ -16,7 +16,7 @@ from fractions import Fraction
 from typing import Mapping, Protocol, Sequence, runtime_checkable
 
 import numpy as np
-from scipy.signal import butter, hilbert, resample_poly, sosfilt
+from scipy.signal import butter, hilbert, iirnotch, lfilter, resample_poly, sosfilt
 
 
 class SnrKind(StrEnum):
@@ -381,6 +381,305 @@ class SampleClockChannel:
                 "resample_ratio": [self.up, self.down]}
 
 
+@dataclass
+class GainChannel:
+    """Apply an explicit voltage gain, expressed linearly or in decibels."""
+
+    sample_rate: int
+    gain: float | None = None
+    gain_db: float | None = None
+
+    def __post_init__(self):
+        _positive_rate(self.sample_rate)
+        if (self.gain is None) == (self.gain_db is None):
+            raise ValueError("specify exactly one of gain or gain_db")
+        if self.gain is not None:
+            if not np.isfinite(self.gain) or self.gain <= 0:
+                raise ValueError("gain must be finite and positive")
+            self._gain = float(self.gain)
+            self.gain_db = 20.0 * np.log10(self._gain)
+        else:
+            if not np.isfinite(self.gain_db):
+                raise ValueError("gain_db must be finite")
+            self._gain = float(10.0 ** (self.gain_db / 20.0))
+            self.gain = self._gain
+
+    def process(self, audio: np.ndarray) -> ChannelResult:
+        samples = _mono(audio)
+        return ChannelResult((samples * self._gain).astype(np.float32), {
+            "voltage_gain": self._gain, "gain_db": self.gain_db,
+            "input_power": _mean_power(samples),
+            "output_power": _mean_power(samples * self._gain),
+        })
+
+    def reset(self) -> None:
+        pass
+
+    def describe(self) -> Mapping[str, object]:
+        return {"type": "gain", "sample_rate": self.sample_rate,
+                "gain": self._gain, "gain_db": self.gain_db}
+
+
+class ImpulseNoiseChannel:
+    """Add a seeded Poisson stream of finite-duration noise impulses.
+
+    ``amplitude`` is peak amplitude for ``fixed`` and ``uniform`` events and
+    standard deviation for ``normal`` events. Fixed events receive a seeded
+    random sign. Shapes are ``rectangular``, ``hann``, or ``exponential``.
+    """
+
+    def __init__(self, sample_rate: int, event_rate_hz: float,
+                 duration_seconds: float, amplitude: float, seed: int, *,
+                 amplitude_distribution: str = "fixed",
+                 burst_shape: str = "rectangular"):
+        _positive_rate(sample_rate)
+        values = (event_rate_hz, duration_seconds, amplitude)
+        if not all(np.isfinite(value) for value in values):
+            raise ValueError("impulse parameters must be finite")
+        if event_rate_hz < 0 or duration_seconds <= 0 or amplitude < 0:
+            raise ValueError("event rate/amplitude must be non-negative and duration positive")
+        if amplitude_distribution not in {"fixed", "uniform", "normal"}:
+            raise ValueError("unknown amplitude distribution")
+        if burst_shape not in {"rectangular", "hann", "exponential"}:
+            raise ValueError("unknown burst shape")
+        self.sample_rate, self.event_rate_hz = sample_rate, float(event_rate_hz)
+        self.duration_seconds, self.amplitude = float(duration_seconds), float(amplitude)
+        self.seed, self.amplitude_distribution = int(seed), amplitude_distribution
+        self.burst_shape = burst_shape
+        self._duration_samples = max(1, round(duration_seconds * sample_rate))
+        self.reset()
+
+    def reset(self) -> None:
+        self._rng = np.random.default_rng(self.seed)
+        self._position = 0
+        self._events: list[tuple[int, float]] = []
+        self._next_event = self._draw_interval()
+
+    def _draw_interval(self) -> int | None:
+        if self.event_rate_hz == 0:
+            return None
+        return max(1, int(np.ceil(self._rng.exponential(
+            self.sample_rate / self.event_rate_hz))))
+
+    def _draw_amplitude(self) -> float:
+        if self.amplitude_distribution == "fixed":
+            return self.amplitude * (-1.0 if self._rng.random() < .5 else 1.0)
+        if self.amplitude_distribution == "uniform":
+            return float(self._rng.uniform(-self.amplitude, self.amplitude))
+        return float(self._rng.normal(0.0, self.amplitude))
+
+    def _shape(self) -> np.ndarray:
+        if self.burst_shape == "rectangular":
+            return np.ones(self._duration_samples)
+        if self.burst_shape == "hann":
+            return np.hanning(self._duration_samples + 2)[1:-1]
+        return np.exp(-5.0 * np.arange(self._duration_samples)
+                      / self._duration_samples)
+
+    def process(self, audio: np.ndarray) -> ChannelResult:
+        samples = _mono(audio).astype(np.float64)
+        start, stop = self._position, self._position + len(samples)
+        new_events = 0
+        while self._next_event is not None and self._position + self._next_event < stop:
+            event_at = self._position + self._next_event
+            self._events.append((event_at, self._draw_amplitude()))
+            new_events += 1
+            interval = self._draw_interval()
+            self._next_event = None if interval is None else event_at + interval - self._position
+        if self._next_event is not None:
+            self._next_event -= len(samples)
+        injected = np.zeros(len(samples), dtype=np.float64)
+        shape = self._shape()
+        for event_at, amplitude in self._events:
+            left, right = max(start, event_at), min(stop, event_at + self._duration_samples)
+            if left < right:
+                injected[left - start:right - start] += amplitude * shape[
+                    left - event_at:right - event_at]
+        self._events = [(at, amp) for at, amp in self._events
+                        if at + self._duration_samples > stop]
+        self._position = stop
+        return ChannelResult((samples + injected).astype(np.float32), {
+            "events_started": new_events,
+            "active_samples": int(np.count_nonzero(injected)),
+            "injected_power": _mean_power(injected),
+            "peak_injected_amplitude": (float(np.max(np.abs(injected)))
+                                         if len(injected) else 0.0),
+        })
+
+    def describe(self) -> Mapping[str, object]:
+        return {"type": "impulse_noise", "sample_rate": self.sample_rate,
+                "event_rate_hz": self.event_rate_hz,
+                "duration_seconds": self.duration_seconds,
+                "duration_samples": self._duration_samples,
+                "amplitude": self.amplitude,
+                "amplitude_distribution": self.amplitude_distribution,
+                "burst_shape": self.burst_shape, "seed": self.seed}
+
+
+@dataclass(frozen=True)
+class NarrowbandInterference:
+    """One tone or narrow Gaussian-noise interferer."""
+
+    frequency_hz: float
+    power_db: float
+    kind: str = "tone"
+    width_hz: float = 0.0
+    power_reference: str = "absolute"
+    drift_hz_per_second: float = 0.0
+    duty_cycle: float = 1.0
+
+    def __post_init__(self):
+        if not all(np.isfinite(value) for value in (
+                self.frequency_hz, self.power_db, self.width_hz,
+                self.drift_hz_per_second, self.duty_cycle)):
+            raise ValueError("interference parameters must be finite")
+        if self.kind not in {"tone", "noise"}:
+            raise ValueError("interference kind must be tone or noise")
+        if self.power_reference not in {"absolute", "relative"}:
+            raise ValueError("power_reference must be absolute or relative")
+        if not 0 <= self.duty_cycle <= 1:
+            raise ValueError("duty_cycle must lie between zero and one")
+        if self.kind == "noise" and self.width_hz <= 0:
+            raise ValueError("narrow noise requires a positive width_hz")
+        if self.kind == "tone" and self.width_hz != 0:
+            raise ValueError("tone width_hz must be zero")
+
+
+class NarrowbandInterferenceChannel:
+    """Add independently specified tones or narrow noise bands."""
+
+    def __init__(self, sample_rate: int,
+                 sources: Sequence[NarrowbandInterference], seed: int,
+                 *, duty_period_seconds: float = 1.0):
+        _positive_rate(sample_rate)
+        self.sample_rate, self.sources, self.seed = sample_rate, tuple(sources), int(seed)
+        if not self.sources:
+            raise ValueError("at least one interference source is required")
+        if not np.isfinite(duty_period_seconds) or duty_period_seconds <= 0:
+            raise ValueError("duty_period_seconds must be finite and positive")
+        self.duty_period_seconds = float(duty_period_seconds)
+        nyquist = sample_rate / 2
+        for source in self.sources:
+            if not 0 < source.frequency_hz < nyquist:
+                raise ValueError("interference frequency must lie between zero and Nyquist")
+            if source.kind == "noise" and source.width_hz >= 2 * min(
+                    source.frequency_hz, nyquist - source.frequency_hz):
+                raise ValueError("noise band must remain within Nyquist")
+        self.reset()
+
+    def reset(self) -> None:
+        self._rng = np.random.default_rng(self.seed)
+        self._elapsed_samples = 0
+        self._noise_zi = [np.zeros(1) for _ in self.sources]
+
+    def process(self, audio: np.ndarray) -> ChannelResult:
+        samples = _mono(audio).astype(np.float64)
+        count = len(samples)
+        t = (self._elapsed_samples + np.arange(count)) / self.sample_rate
+        signal_power = _mean_power(samples)
+        total = np.zeros(count)
+        realized = []
+        for index, source in enumerate(self.sources):
+            target = 10.0 ** (source.power_db / 10.0)
+            if source.power_reference == "relative":
+                target *= signal_power
+            gate = ((t % self.duty_period_seconds) <
+                    source.duty_cycle * self.duty_period_seconds)
+            phase = 2 * np.pi * (source.frequency_hz * t
+                    + .5 * source.drift_hz_per_second * t * t)
+            if source.kind == "tone":
+                component = np.sqrt(2 * target) * np.cos(phase)
+            else:
+                cutoff = source.width_hz / 2
+                b, a = butter(1, cutoff, fs=self.sample_rate)
+                if count:
+                    base, self._noise_zi[index] = lfilter(
+                        b, a, self._rng.normal(size=count), zi=self._noise_zi[index])
+                else:
+                    base = np.zeros(0)
+                base_power = _mean_power(base)
+                component = (base * np.sqrt(target / base_power) * np.sqrt(2)
+                             * np.cos(phase)) if base_power else base
+            component *= gate
+            total += component
+            realized.append({"kind": source.kind,
+                             "injected_power": _mean_power(component),
+                             "active_fraction": float(np.mean(gate)) if count else 0.0,
+                             "frequency_start_hz": (source.frequency_hz
+                                 + source.drift_hz_per_second * (t[0] if count else
+                                   self._elapsed_samples / self.sample_rate)),
+                             "frequency_stop_hz": (source.frequency_hz
+                                 + source.drift_hz_per_second * ((self._elapsed_samples + count)
+                                                                / self.sample_rate))})
+        self._elapsed_samples += count
+        return ChannelResult((samples + total).astype(np.float32), {
+            "signal_power": signal_power, "injected_power": _mean_power(total),
+            "sources": realized})
+
+    def describe(self) -> Mapping[str, object]:
+        return {"type": "narrowband_interference", "sample_rate": self.sample_rate,
+                "seed": self.seed, "duty_period_seconds": self.duty_period_seconds,
+                "sources": [{"kind": s.kind, "frequency_hz": s.frequency_hz,
+                    "width_hz": s.width_hz, "power_db": s.power_db,
+                    "power_reference": s.power_reference,
+                    "drift_hz_per_second": s.drift_hz_per_second,
+                    "duty_cycle": s.duty_cycle} for s in self.sources]}
+
+
+class NotchChannel:
+    """Apply a finite-depth IIR notch with an optionally drifting center."""
+
+    def __init__(self, sample_rate: int, center_hz: float, width_hz: float,
+                 depth_db: float, drift_hz_per_second: float = 0.0, *,
+                 update_samples: int = 128):
+        _positive_rate(sample_rate)
+        if not all(np.isfinite(v) for v in
+                   (center_hz, width_hz, depth_db, drift_hz_per_second)):
+            raise ValueError("notch parameters must be finite")
+        if not 0 < center_hz < sample_rate / 2 or width_hz <= 0 or depth_db < 0:
+            raise ValueError("notch center/width/depth are outside their valid range")
+        if update_samples < 1:
+            raise ValueError("update_samples must be positive")
+        self.sample_rate, self.center_hz = sample_rate, float(center_hz)
+        self.width_hz, self.depth_db = float(width_hz), float(depth_db)
+        self.drift_hz_per_second = float(drift_hz_per_second)
+        self.update_samples = int(update_samples)
+        self.reset()
+
+    def reset(self) -> None:
+        self._elapsed_samples = 0
+        self._zi = np.zeros(2)
+
+    def process(self, audio: np.ndarray) -> ChannelResult:
+        samples = _mono(audio).astype(np.float64)
+        wet = np.empty_like(samples)
+        for start in range(0, len(samples), self.update_samples):
+            stop = min(len(samples), start + self.update_samples)
+            absolute_mid = self._elapsed_samples + (start + stop) / 2
+            center = self.center_hz + self.drift_hz_per_second * absolute_mid / self.sample_rate
+            if not 0 < center < self.sample_rate / 2:
+                raise ValueError("drifting notch center moved outside Nyquist")
+            b, a = iirnotch(center, center / self.width_hz, fs=self.sample_rate)
+            wet[start:stop], self._zi = lfilter(b, a, samples[start:stop], zi=self._zi)
+        mix = 1.0 - 10.0 ** (-self.depth_db / 20.0)
+        output = samples + mix * (wet - samples)
+        start_hz = self.center_hz + self.drift_hz_per_second * self._elapsed_samples / self.sample_rate
+        self._elapsed_samples += len(samples)
+        stop_hz = self.center_hz + self.drift_hz_per_second * self._elapsed_samples / self.sample_rate
+        return ChannelResult(output.astype(np.float32), {
+            "center_start_hz": start_hz, "center_stop_hz": stop_hz,
+            "width_hz": self.width_hz, "depth_db": self.depth_db,
+            "input_power": _mean_power(samples), "output_power": _mean_power(output),
+        })
+
+    def describe(self) -> Mapping[str, object]:
+        return {"type": "notch", "sample_rate": self.sample_rate,
+                "center_hz": self.center_hz, "width_hz": self.width_hz,
+                "depth_db": self.depth_db,
+                "drift_hz_per_second": self.drift_hz_per_second,
+                "update_samples": self.update_samples}
+
+
 @dataclass(frozen=True)
 class WattersonPath:
     """One Gaussian-scatter propagation mode in a Watterson channel.
@@ -568,6 +867,11 @@ def _mono(audio: np.ndarray) -> np.ndarray:
 def _positive_rate(sample_rate: int) -> None:
     if sample_rate <= 0:
         raise ValueError("sample_rate must be positive")
+
+
+def _mean_power(samples: np.ndarray) -> float:
+    values = np.asarray(samples, dtype=np.float64)
+    return float(np.mean(values * values)) if len(values) else 0.0
 
 
 def _snr_description(spec: SnrSpec) -> dict:

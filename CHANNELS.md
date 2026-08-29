@@ -30,6 +30,15 @@ The common stages in `whale.channel` are:
 - `ClippingChannel`, symmetric hard clipping at an absolute amplitude;
 - `SampleClockChannel`, receiver-clock error in ppm, where positive error
   produces more captured samples for the same physical waveform;
+- `GainChannel`, an explicit linear or dB voltage gain with measured input and
+  output power;
+- `ImpulseNoiseChannel`, seeded Poisson events with fixed, uniform, or normal
+  amplitudes and rectangular, Hann, or exponential burst envelopes;
+- `NarrowbandInterferenceChannel`, one or more seeded tones or narrow Gaussian
+  noise bands with absolute or waveform-relative power, linear drift, and a
+  periodic duty cycle;
+- `NotchChannel`, a finite-depth notch with configurable center, width, and
+  optional linear drift;
 - `ChannelChain`, which applies stages in their listed order and namespaces
   their measurements by stage.
 
@@ -40,6 +49,18 @@ filtering. `describe()` retains that order. The frequency and filter stages
 retain state across calls and return to their initial state on `reset()`.
 The sample-clock implementation uses a documented rational approximation to
 the requested ratio and reports both values.
+
+Interference power is mean-square audio power. An absolute `power_db` uses
+`10 ** (power_db / 10)` directly; a relative value multiplies that ratio by
+the input waveform's mean-square power for the current call. Tone amplitude
+is chosen to produce that power while active. Narrow noise is generated as
+seeded low-pass Gaussian noise translated to its configured center. Duty
+cycle uses a one-second period by default and remains continuous across calls.
+Measurements record the realized injected power, active fraction, and actual
+start/stop frequencies. Impulse events likewise continue across call
+boundaries and report event counts, active samples, realized power, and peak
+amplitude. The drifting notch updates its coefficients in short blocks and
+reports the actual center-frequency interval used.
 
 ## Watterson HF channel
 

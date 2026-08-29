@@ -6,6 +6,9 @@ import pytest
 from whale.channel import (AudioChannel, AwgnChannel, ChannelChain,
                            ClippingChannel, DelayChannel, FilterChannel,
                            FrequencyOffsetChannel, IdentityChannel,
+                           GainChannel, ImpulseNoiseChannel,
+                           NarrowbandInterference,
+                           NarrowbandInterferenceChannel, NotchChannel,
                            SampleClockChannel, SnrKind, SnrSpec,
                            waveform_power)
 from whale.trials import (TrialOutcome, TrialResult, TrialRun,
@@ -136,3 +139,58 @@ def test_chain_preserves_stage_order_and_namespaces_measurements():
     assert result.measurements["stage_1"]["clipped_samples"] == 1
     assert [stage["type"] for stage in chain.describe()["stages"]] == [
         "delay", "clipping"]
+
+
+def test_gain_accepts_db_and_reports_actual_levels():
+    result = GainChannel(8_000, gain_db=-6.020599913).process(np.ones(32))
+    assert result.audio == pytest.approx(0.5)
+    assert result.measurements["input_power"] == 1.0
+    assert result.measurements["output_power"] == pytest.approx(0.25)
+
+
+def test_impulses_replay_and_continue_across_process_boundaries():
+    channel = ImpulseNoiseChannel(1_000, 100, .01, 2, seed=4,
+                                  burst_shape="hann")
+    first_parts = [channel.process(np.zeros(73)).audio,
+                   channel.process(np.zeros(127)).audio]
+    joined = np.concatenate(first_parts)
+    assert np.count_nonzero(joined) > 0
+    channel.reset()
+    assert np.array_equal(channel.process(np.zeros(200)).audio, joined)
+    assert channel.describe()["seed"] == 4
+
+
+def test_tone_interference_has_requested_relative_power_drift_and_duty():
+    source = NarrowbandInterference(
+        1_000, -10, power_reference="relative", drift_hz_per_second=10,
+        duty_cycle=.5)
+    channel = NarrowbandInterferenceChannel(
+        8_000, [source], seed=8, duty_period_seconds=1)
+    result = channel.process(np.ones(8_000))
+    assert result.measurements["sources"][0]["active_fraction"] == .5
+    assert result.measurements["injected_power"] == pytest.approx(.05, rel=.02)
+    assert result.measurements["sources"][0]["frequency_stop_hz"] == 1_010
+    channel.reset()
+    assert np.array_equal(channel.process(np.ones(8_000)).audio, result.audio)
+
+
+def test_narrow_noise_is_seeded_and_reports_realized_power():
+    source = NarrowbandInterference(1_500, -20, kind="noise", width_hz=100)
+    channel = NarrowbandInterferenceChannel(8_000, [source], seed=19)
+    result = channel.process(np.zeros(16_000))
+    assert result.measurements["injected_power"] == pytest.approx(.01, rel=.08)
+    channel.reset()
+    assert np.array_equal(channel.process(np.zeros(16_000)).audio, result.audio)
+
+
+def test_notch_rejects_center_and_tracks_drift_across_calls():
+    rate = 8_000
+    time = np.arange(rate) / rate
+    tone = np.sin(2 * np.pi * 1_000 * time)
+    notch = NotchChannel(rate, 1_000, 100, 40, drift_hz_per_second=5)
+    first = notch.process(tone)
+    assert np.sqrt(np.mean(first.audio[2_000:] ** 2)) < .06
+    second = notch.process(tone)
+    assert second.measurements["center_start_hz"] == 1_005
+    notch.reset()
+    assert np.array_equal(notch.process(tone).audio, first.audio)
