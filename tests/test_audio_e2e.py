@@ -24,6 +24,10 @@ import numpy as np
 
 from acceptance_test import StationClient
 from whale import afsk, link, rx_audio
+from whale.channel import (AwgnChannel, ChannelChain, ChannelResult,
+                           ClippingChannel, DelayChannel, FilterChannel,
+                           FrequencyOffsetChannel, IdentityChannel,
+                           SampleClockChannel, SnrSpec)
 from whale.link import Link
 from whale.modes.hc0_mode import HC0
 from whale.modes.hc1_mode import HC1
@@ -34,13 +38,26 @@ from whale.vara_server import StationServer
 
 
 class PairedAudioTransport:
-    """A radio-shaped endpoint connected to its peer by raw audio samples."""
+    """A radio-shaped endpoint connected through its outbound audio channel.
 
-    def __init__(self):
+    Each endpoint owns the channel applied to what it transmits.  Thus the
+    transport at station A holds A->B and the transport at station B holds
+    B->A; asymmetric paths never share channel state or randomness.
+    """
+
+    def __init__(self, tx_channel=None):
         self.peer = None
+        self.tx_channel = (IdentityChannel(rx_audio.CAPTURE_SAMPLE_RATE)
+                           if tx_channel is None else tx_channel)
+        if self.tx_channel.sample_rate != rx_audio.CAPTURE_SAMPLE_RATE:
+            raise ValueError(
+                "paired-audio channels must operate at the 48000 Hz capture rate")
         self._audio = np.zeros(0, dtype=np.float32)
         self._lock = threading.Lock()
         self._transmitting = threading.Event()
+        #: Results are retained for later trial reporting and channel
+        #: diagnostics. One entry corresponds to each call to send().
+        self.channel_results = []
         #: Seconds of audio this station has transmitted.  A real radio would
         #: be keyed for this long; wall-clock time here would not be.
         self.airtime = 0.0
@@ -66,8 +83,13 @@ class PairedAudioTransport:
         self._transmitting.set()
         try:
             waveform = np.asarray(tx_audio, dtype=np.float32)
+            channel_result = self.tx_channel.process(waveform)
+            channel_audio = np.asarray(channel_result.audio, dtype=np.float32)
+            if channel_audio.ndim != 1:
+                raise ValueError("channel returned non-mono audio")
+            self.channel_results.append(channel_result)
             received = rx_audio.downsample(np.concatenate((
-                waveform,
+                channel_audio,
                 np.zeros(rx_audio.FILTER_DELAY_CAPTURE_SAMPLES, dtype=np.float32),
             )))
             with self.peer._lock:
@@ -99,7 +121,8 @@ def _close_client(client):
     client.cmd.close()
 
 
-def _run_session(payload_ab, payload_ba, mode_registry=None, policy=VHF_FM):
+def _run_session(payload_ab, payload_ba, mode_registry=None, policy=VHF_FM,
+                 channel_ab=None, channel_ba=None):
     """One complete session -- connect, both transfers, disconnect.
 
     Returns the two Links and the two transports so a caller can assert on
@@ -112,7 +135,8 @@ def _run_session(payload_ab, payload_ba, mode_registry=None, policy=VHF_FM):
     link.TX_TURNAROUND_DELAY = 0.02
     link.DECODE_POLL_INTERVAL = 0.01
 
-    ta, tb = PairedAudioTransport(), PairedAudioTransport()
+    ta = PairedAudioTransport(channel_ab)
+    tb = PairedAudioTransport(channel_ba)
     ta.peer, tb.peer = tb, ta
     server_a = server_b = client_a = client_b = None
     link_a = link_b = None
@@ -162,6 +186,64 @@ def _payload(length, step, offset):
 def test_full_tcp_stack_over_paired_audio():
     """Transfer bytes both ways through every layer except physical radios."""
     _run_session(_payload(180, 7, 11), _payload(190, 13, 5))
+
+
+def test_paired_transports_apply_independent_directional_channels():
+    class TaggedChannel:
+        sample_rate = rx_audio.CAPTURE_SAMPLE_RATE
+
+        def __init__(self, gain, tag):
+            self.gain, self.tag = gain, tag
+
+        def process(self, audio):
+            return ChannelResult(np.asarray(audio) * self.gain, {"path": self.tag})
+
+        def reset(self):
+            pass
+
+        def describe(self):
+            return {"type": "tagged", "path": self.tag}
+
+    channel_ab = TaggedChannel(0.5, "A->B")
+    channel_ba = TaggedChannel(-0.25, "B->A")
+    ta = PairedAudioTransport(channel_ab)
+    tb = PairedAudioTransport(channel_ba)
+    ta.peer, tb.peer = tb, ta
+    waveform = np.ones(400, dtype=np.float32)
+
+    ta.send(waveform)
+    tb.send(waveform)
+
+    expected_ab = rx_audio.downsample(np.concatenate((
+        waveform * 0.5, np.zeros(rx_audio.FILTER_DELAY_CAPTURE_SAMPLES))))
+    expected_ba = rx_audio.downsample(np.concatenate((
+        waveform * -0.25, np.zeros(rx_audio.FILTER_DELAY_CAPTURE_SAMPLES))))
+    assert np.allclose(tb.snapshot_rx(), expected_ab)
+    assert np.allclose(ta.snapshot_rx(), expected_ba)
+    assert ta.channel_results[0].measurements == {"path": "A->B"}
+    assert tb.channel_results[0].measurements == {"path": "B->A"}
+
+
+def test_full_stack_session_over_composed_asymmetric_channels():
+    def path(offset, drift, delay, clock, seed):
+        return ChannelChain((
+            FrequencyOffsetChannel(48_000, offset, drift),
+            DelayChannel(48_000, delay),
+            FilterChannel(48_000, low_hz=500, high_hz=3_500, order=4),
+            ClippingChannel(48_000, 0.55),
+            SampleClockChannel(48_000, clock),
+            AwgnChannel(48_000, SnrSpec(25.0), seed),
+        ))
+
+    channel_ab = path(+4.0, +0.05, 0.008, +20.0, 101)
+    channel_ba = path(-7.0, -0.03, 0.013, -15.0, 202)
+    _, _, ta, tb = _run_session(
+        _payload(180, 7, 11), _payload(190, 13, 5),
+        channel_ab=channel_ab, channel_ba=channel_ba)
+
+    assert ta.tx_channel is channel_ab
+    assert tb.tx_channel is channel_ba
+    assert ta.channel_results and tb.channel_results
 
 
 def test_vf3_carries_a_session_through_the_same_stack():
