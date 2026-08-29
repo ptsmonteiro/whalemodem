@@ -693,6 +693,7 @@ pytest tests/test_hc0_mode.py -q         # the same for HC0, plus the low-SNR ma
 pytest tests/test_hc0_capture_replay.py -q   # HC0 against recorded on-air HF audio
 pytest tests/test_hc1_capture_replay.py -q   # and HC1 against its own
 pytest tests/test_fm_channel.py -q        # complex-IQ FM threshold and bench presets
+pytest -m channel_regression -q        # bounded fixed-seed channel matrix
 python tests/test_afsk_loopback.py
 python tests/test_link_recovery.py
 ```
@@ -706,6 +707,7 @@ python scripts/hw_smoke_link.py           # full connect/send/verified clean dis
 python scripts/hw_hf_frames.py --mode hc0  # HF frames over an HF pair (ic7300/ic705)
 python scripts/sweep_modes.py --channel vhf-fm  # every VHF rung, both directions
 python scripts/sweep_modes.py --channel hf-ssb  # every HF rung, both directions
+python scripts/benchmark_simulated_channels.py --model fm --policy vhf-fm --points 5 10 15 20 25 30 --trials 100
 ```
 
 On HF, start both stations on the HF channel -- which selects HF timeouts and

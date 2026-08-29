@@ -25,3 +25,6 @@ py-modules = ["acceptance_test"]
 [tool.pytest.ini_options]
 testpaths = ["tests"]
 pythonpath = ["."]
+markers = [
+    "channel_regression: bounded fixed-seed simulated-channel regression points",
+]

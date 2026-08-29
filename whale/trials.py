@@ -82,6 +82,25 @@ def classify_decode(result: Mapping[str, object], expected_payload: bytes,
     return TrialOutcome.PAYLOAD_FAILED
 
 
+def common_decoder_metrics(result: Mapping[str, object], audio) -> dict:
+    """Bounded cross-waveform diagnostics suitable for a trial document."""
+
+    keys = (
+        "confidence", "failure", "cfo_hz", "clock_offset_ppm", "ber",
+        "raw_errors", "total_bit_errors", "crc_ok", "present_carriers",
+        "carrier_snr_db", "tone_snr_db", "snr_db", "symbol_evm_db",
+        "start_index", "end_index", "head_seconds_received",
+        "head_cores_observed", "head_blocks_observed",
+    )
+    metrics = {key: result[key] for key in keys if key in result}
+    samples = np.asarray(audio, dtype=np.float64)
+    metrics["capture_rms"] = (float(np.sqrt(np.mean(samples ** 2)))
+                              if len(samples) else 0.0)
+    metrics["capture_peak"] = (float(np.max(np.abs(samples)))
+                               if len(samples) else 0.0)
+    return metrics
+
+
 def _jsonable(value):
     """Return strict-JSON data; unavailable non-finite diagnostics become null."""
 

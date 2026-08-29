@@ -27,7 +27,7 @@ import numpy as np
 import bench
 from whale import framing, policy
 from whale.trials import (TrialOutcome, TrialResult, TrialRun,
-                          classify_decode)
+                          classify_decode, common_decoder_metrics)
 
 
 DEFAULT_SEED = 20260829
@@ -65,23 +65,6 @@ def select_modes(registry, requested):
 def full_packet_bytes(mode):
     """Largest link packet this mode carries: air header plus DATA chunk."""
     return framing.AIR_HEADER_BYTES + mode.chunk_size
-
-
-def _decoder_metrics(result, captured):
-    keys = (
-        "confidence", "failure", "cfo_hz", "clock_offset_ppm", "ber",
-        "raw_errors", "total_bit_errors", "crc_ok", "present_carriers",
-        "carrier_snr_db", "tone_snr_db", "snr_db", "symbol_evm_db",
-        "start_index", "end_index", "head_seconds_received",
-        "head_cores_observed", "head_blocks_observed",
-    )
-    metrics = {key: result[key] for key in keys if key in result}
-    samples = np.asarray(captured, dtype=np.float64)
-    metrics["capture_rms"] = (float(np.sqrt(np.mean(samples ** 2)))
-                              if len(samples) else 0.0)
-    metrics["capture_peak"] = (float(np.max(np.abs(samples)))
-                               if len(samples) else 0.0)
-    return metrics
 
 
 def _capture_path(capture_dir, mode, direction, trial, captured, payload):
@@ -131,7 +114,8 @@ def run_direction(tx, rx, mode, direction, trials, seed, *, capture_dir=None,
             mode_name=mode.name, payload_bytes=payload_bytes, outcome=outcome,
             tx_samples=len(audio), tx_sample_rate=mode.tx_sample_rate,
             rx_samples=len(captured), rx_sample_rate=mode.rx_sample_rate,
-            keyed_seconds=keyed, decoder_metrics=_decoder_metrics(result, captured),
+            keyed_seconds=keyed,
+            decoder_metrics=common_decoder_metrics(result, captured),
             capture=capture_path, error=error)
         records.append(record)
         confidence = result.get("confidence")

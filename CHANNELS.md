@@ -172,6 +172,38 @@ Those are separate directional instances suitable for the paired audio
 transport. The presets approximate this particular cabled audio/radio bench;
 they are not generic models of every IC-705 or KG-UV9D installation.
 
+## Regression tests and Monte Carlo benchmarks
+
+Channel qualification is deliberately split by purpose:
+
+- `tests/test_channel_regressions.py` is the bounded CI matrix. It uses fixed,
+  independently derived seeds and one or two full-capacity frames per point.
+  The selected points cover the VHF ladder through the conservative measured
+  FM preset and both HF modes through moderate mid-latitude Watterson fading
+  plus AWGN. These tests catch deterministic performance regressions; their
+  tiny sample counts are not reliability estimates.
+- `scripts/benchmark_simulated_channels.py` is the explicit Monte Carlo tool.
+  It sweeps waveform SNR for AWGN/Watterson or RF C/N for complex FM, defaults
+  to 100 trials per mode and point, prints 95% Wilson intervals, and writes all
+  trials and configuration through `TrialRun` schema version 2. It is never
+  collected implicitly by pytest.
+
+Examples:
+
+```powershell
+python scripts/benchmark_simulated_channels.py --model fm --policy vhf-fm `
+    --points 5 10 15 20 25 30 --trials 100
+python scripts/benchmark_simulated_channels.py --model watterson `
+    --policy hf-ssb --watterson-preset mid_latitude_moderate `
+    --points -5 0 5 10 15 --trials 100
+python -m pytest -m channel_regression -q
+```
+
+The Monte Carlo seed for each frame is derived from the master seed, global
+mode ID, point index, and trial number. Selecting fewer modes therefore does
+not silently change the realizations of the modes that remain. A benchmark
+result should be retained whenever its performance claim is retained.
+
 The radio-free end-to-end harness in `tests/test_audio_e2e.py` applies this
 boundary at the 48 kHz capture rate. Its station-A transport owns the A-to-B
 channel and its station-B transport owns the B-to-A channel. Channel output is
