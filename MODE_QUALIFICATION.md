@@ -583,10 +583,20 @@ records historical/provisional acceptance rather than retroactively
 declaring the new gates passed.
 
 `experiments/hc2_32qam/` is not a declared mode and therefore has no manifest
-entry or mode ID. Its deterministic clean-channel, oracle-aligned test is a
-rate-feasibility milestone only. Acquisition, channel tracking, simulated
-channel trials, hardware evidence, negotiation, and application-throughput
-work remain prerequisites before it can enter this qualification process. As
-a candidate HF top rung it would be evaluated against the section 6 speed
-gate on a good channel, with a narrow declared envelope, rather than against
-disturbed-preset robustness.
+entry or mode ID. It now has a deterministic clean-channel oracle round trip,
+a real acquisition/CFO/equalization/phase-tracking receiver, and a
+2026-08-30 AWGN frame sweep (`experiments/hc2_32qam/RESULTS.md`): 7,800
+full-capacity trials, waveform-referenced SNR, Wilson intervals, and per-frame
+EVM. None of that is qualification evidence. The AWGN sweep is a diagnostic
+baseline, which section 3 explicitly does not accept as a qualification
+channel; the artifacts are scratch, produced from a dirty tree with the
+experiment package untracked, and no `logs/mode_qualification/` campaign
+directory exists for HC2. Watterson trials, hardware evidence, negotiation,
+and application-throughput work all remain prerequisites before it can enter
+this process. As a candidate HF top rung it would be evaluated against the
+section 6 speed gate on a good channel, with a narrow declared envelope,
+rather than against disturbed-preset robustness. The AWGN result is
+consistent with that shape -- delivery collapses below about 12 dB waveform
+SNR and realized payload exceeds the 7,050 bit/s reference row from 12.5 dB
+up -- but a declared envelope requires the fading evidence it does not yet
+have.
