@@ -171,3 +171,15 @@ class ConvolutionalCode:
 
 
 K7 = ConvolutionalCode()
+
+#: Rate-1/2, K=9 (561, 753) -- standard octal generators, one more bit of
+#: constraint length than K7.  Free distance 12 against K7's 10, roughly
+#: 0.6-1 dB more coding gain in the regime these modes operate in, at 4x the
+#: trellis states (256 vs 64) and therefore roughly 4x the decode work per
+#: coded bit.  Built for HC2 (`experiments/hc2/hc2.py`), which spends that
+#: extra margin buying back some of what 8-PSK costs against QPSK; see that
+#: module's docstring for the decode-time measurement that justifies paying
+#: for it.
+K9_POLYNOMIALS = (0o561, 0o753)
+K9_CONSTRAINT = 9
+K9 = ConvolutionalCode(polynomials=K9_POLYNOMIALS, constraint=K9_CONSTRAINT)

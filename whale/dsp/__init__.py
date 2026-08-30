@@ -28,7 +28,7 @@ definitions, not a tidy-up: changing one changes what a station transmits.
 
 from . import (acquire, bits, differential, equalize, fec, framing, freq,
                head, interleave, mfsk, ofdm, timing)
-from .fec import K7, ConvolutionalCode
+from .fec import K7, K9, ConvolutionalCode
 from .framing import PacketCodec
 from .interleave import Interleaver
 from .mfsk import ToneBank
@@ -38,6 +38,6 @@ from .timing import TimingFit
 __all__ = [
     "acquire", "bits", "differential", "equalize", "fec", "framing", "freq",
     "head", "interleave", "mfsk", "ofdm", "timing",
-    "ConvolutionalCode", "Geometry", "Interleaver", "K7", "PacketCodec",
+    "ConvolutionalCode", "Geometry", "Interleaver", "K7", "K9", "PacketCodec",
     "TimingFit", "ToneBank",
 ]

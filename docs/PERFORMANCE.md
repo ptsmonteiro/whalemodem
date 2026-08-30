@@ -107,6 +107,23 @@ peak-limited transmitter. HC1 remains the fast rung when the path supports it;
 HC0 is the control mode and fallback. Detailed geometry, synchronization, and
 SNR definitions are in [FRAMING.md](../FRAMING.md).
 
+A 2026-08-30 qualification campaign
+(`logs/mode_qualification/hf-ssb/hc0-hc1/2026-08-30/INDEX.md`) found HC1's
+disturbed-preset (CCIR-Poor, 2 ms delay spread, 1.0 Hz Doppler) ceiling stuck
+around 45-60% frame delivery even at 20 dB SNR: several adjacent carriers,
+spaced close to the path's coherence bandwidth, fade together for the life of
+a frame, costing the rate-1/2 K=7 code more coded bits at once than it
+reliably recovers. `experiments/hc2/` explored a faster rung -- differential
+8-PSK plus a rate-1/2 K=9 code, same carrier geometry -- to see whether a
+stronger code could buy back the extra bits/symbol's SNR penalty. It could
+not: HC2 wins throughput (+54% payload bytes at the same frame duration) in
+AWGN and CCIR-Good/quiet conditions but loses badly under moderate/disturbed
+conditions, because raising bits/carrier raises the cost of exactly the
+correlated-carrier-fade loss HC1 already struggles with. See
+`experiments/hc2/RESULTS.md` for the numbers and what a next attempt (outer
+burst coding or frequency diversity, not a higher modulation order) should
+try instead. Not qualified, not on any registry, no on-air mode ID.
+
 ## Control-frame loss
 
 Lost control traffic is tested because a clean DATA loop does not exercise
