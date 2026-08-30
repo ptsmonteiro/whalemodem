@@ -271,7 +271,7 @@ the group status.
 | --- | --- | --- | --- | --- | --- |
 | Unit, framing, malformed input | passed | passed | provisional | provisional |
 | Bounded policy channel CI | passed | passed | passed | passed |
-| Qualified frame Monte Carlo | passed (2026-08-29 clean-tree rerun after the channel-drain fix; 300 and 600 baud delivered 600/600 and 598/600, 1200 baud delivered 591/600, all within the FER/acquisition gate) | failed (2026-08-30 clean-tree run; hard acquisition cliff at 5 dB RF C/N, 0/100, though 10-30 dB pass 99-100/100) | passed (2026-08-30 clean-tree run; 100/100 at every SNR point across quiet, moderate, and disturbed Watterson presets) | failed (2026-08-30 clean-tree run; passes quiet above -5 dB and moderate at 10 dB+, but never clears the gate under the disturbed preset at any tested point, 20-61/100) |
+| Qualified frame Monte Carlo | passed (2026-08-29 clean-tree rerun after the channel-drain fix; 300 and 600 baud delivered 600/600 and 598/600, 1200 baud delivered 591/600, all within the FER/acquisition gate) | failed (2026-08-30 clean-tree run; 0/100 at 5 dB RF C/N, 99-100/100 from 10 dB up; root-caused to a genuine carrier-SNR floor, not an acquisition or threshold bug -- see campaign notes below) | passed (2026-08-30 clean-tree run; 100/100 at every SNR point across quiet, moderate, and disturbed Watterson presets) | failed (2026-08-30 clean-tree run; passes quiet above -5 dB and moderate at 10 dB+, but never clears the gate under the disturbed preset at any tested point, 20-61/100) |
 | Full-stack connection and bidirectional ARQ | passed | passed | passed | passed |
 | Scripted adaptation/fault recovery artifact | provisional | provisional | provisional | provisional |
 | Bidirectional hardware frame gate | unmeasured | provisional (6/6, 3 each way) | provisional (2026-08-28 captures, 11/11 and 5/5 each way, below trial minimum) | failed (2026-08-28 captures, 17/17 one direction, 0/3 the other; see `logs/mode_qualification/hf-ssb/hc0-hc1/2026-08-28-hardware/INDEX.md`) |
@@ -414,11 +414,31 @@ with a clean tree. See
 `logs/mode_qualification/hf-ssb/hc0-hc1/2026-08-30/INDEX.md` for full
 point-by-point results and commands.
 
-VF3 delivered 0/100 at 5 dB RF C/N -- every trial failed at acquisition, not
-payload/CRC -- then cleared the gate at every point from 10 dB up (99-100/100).
-This is a hard acquisition cliff rather than a gradual FER slope, and it has
-not been root-caused further; it blocks "Qualified frame Monte Carlo" for VF3
-as currently written unless 5 dB is dropped from its claimed operating range.
+VF3 delivered 0/100 at 5 dB RF C/N -- every trial was classified as an
+acquisition failure by `ACQUISITION_THRESHOLD` (0.70) -- then cleared the
+gate at every point from 10 dB up (99-100/100). This is a hard cliff rather
+than a gradual FER slope, and it blocks "Qualified frame Monte Carlo" for
+VF3 as currently written unless 5 dB is dropped from its claimed operating
+range.
+
+This was root-caused on 2026-08-30 by replaying trial seeds from the same
+campaign directly against `whale/modes/vf3.py` with `ACQUISITION_THRESHOLD`
+forced to 0.0. Acquisition itself is not failing: `start_index` lands within
+a few samples of the same offset on every trial, and all 58 header carriers
+are present after equalization. Every forced-through frame still fails CRC,
+so the 0.70 gate is correctly rejecting frames that are not decodable, not
+misclassifying good ones. The measured per-carrier SNR at this point averages
+about 4.7 dB with a minimum around -1 dB across VF3's 58 subcarriers --
+insufficient margin for differential OFDM decode, unlike CPFSK's single
+wideband tone, which cleared 91/100 at the same 5 dB RF C/N point in the
+2026-08-29 campaign. This is a genuine carrier-SNR floor intrinsic to VF3's
+58-carrier design under this preset, not an acquisition bug, a threshold
+miscalibration, or a channel-drain artifact; no code change is indicated.
+The finding is the same shape as HC1's disturbed-preset result below: a fast
+rung with a real operating-range boundary that a more robust mode (CPFSK
+here) is expected to cover. VF3's claimed operating range should exclude
+5 dB RF C/N under `vhf_bench_conservative` unless a future waveform or
+coding change adds carrier-SNR margin.
 
 HC0 passed cleanly at 100/100 across every SNR point in every preset,
 including disturbed, clearing the gate outright.
