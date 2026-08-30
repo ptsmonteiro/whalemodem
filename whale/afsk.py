@@ -828,6 +828,8 @@ def demodulate(audio, profile: Profile = PROFILE_300, sample_rate=SAMPLE_RATE, *
     """
     sps = round(sample_rate / profile.baud)
     audio = np.asarray(audio, dtype=np.float64)
+    if audio.ndim != 1 or len(audio) < sps:
+        return {"synced": False, "payload": None}
 
     diff = _tone_energy_diff(audio, sample_rate, sps, profile.freq0, profile.freq1)
     template = _sync_template(profile.baud, sps, sample_rate, profile.freq0, profile.freq1)

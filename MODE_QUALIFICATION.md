@@ -69,11 +69,21 @@ Every mode must have deterministic tests for:
    `whale.qualification` and the link.
 
 Existing mode, framing, DSP, capture-replay, and link tests support most of
-this. Coverage is uneven: CPFSK explicitly exercises hostile length fields
-and partial frames; the non-CPFSK suites exercise oversize, corruption,
-noise, and tone rejection but do not share a single parameterized malformed
-input contract. **Gap:** add one parameterized public-codec conformance test
-for every registry mode, filling only the cases a mode does not already cover.
+this. CPFSK explicitly exercises hostile length fields and partial frames
+(`test_afsk_loopback.py`); VF3, HC0, and HC1 each exercise oversize,
+truncated-frame, corruption, noise, and tone rejection in their own mode
+test files. Corrupt header/length and impossible declared length are
+CPFSK-specific hazards -- VF3/HC0/HC1 frames are fixed length with no
+declared-length field to corrupt, so those two cases do not apply to them.
+
+`tests/test_mode_conformance.py` now runs one parameterized contract test
+against every registry mode's public `decode()` for the cases that were not
+already covered per mode: silence, bounded white noise, a bare carrier, and
+non-finite or wrong-shaped (including empty) audio. Adding it surfaced a
+real gap it closed: `afsk.demodulate` raised `ValueError` on empty or
+non-1-D audio instead of reporting a clean non-decode; it now returns
+`{"synced": False, "payload": None}` for both, matching VF3/HC0/HC1's
+existing behavior.
 
 **Gate:** all applicable tests pass, with no unexplained `xfail`. An expected
 failure may document future performance work but cannot satisfy a promotion
