@@ -6,8 +6,8 @@ it, and a DATA transfer falls back to it when nothing faster holds.  HC1
 sits above it for a channel that can carry an OFDM frame.
 
     rung   waveform                        payload  keying  works to
-    hc0    16-FSK, non-coherent               64 B  3.38 s    -16 dB
-    hc1    19-carrier differential-QPSK OFDM  74 B  0.69 s   +3.5 dB
+    hc0    16-FSK, non-coherent               64 B  3.42 s    -16 dB
+    hc1    19-carrier differential-QPSK OFDM  74 B  0.77 s   +3.5 dB
 
 Those two numbers are the reason the ladder is this way round rather than
 HC1 being the only HF mode.  19.5 dB is not a refinement; it is the
@@ -21,15 +21,14 @@ things it has to reconcile are the same three:
     acquisition rather than a PN correlation.  `whale/framing.py` is
     bypassed; the link's 10-byte air header is the first ten bytes of the
     HC0 payload.
-  - **The frame is fixed-length** -- 3.38 s whether it carries a 12-byte
+  - **The frame is fixed-length** -- 3.42 s whether it carries a 12-byte
     ACK or a 54-byte chunk.  Accepted for the reason `hc1_mode` sets out:
     a variable-length frame needs the receiver to learn the length before
     it can decode, and what a fixed one buys is that every frame on the
     link gets the full coding.  The cost is real and it is the price of
     the rung working at all.
-  - **Head feedback is in seconds**, measured in whole four-symbol head
-    blocks.  The tolerance is one block, the resolution of the
-    measurement.
+  - **The lead is shared across HF modes**: a six-symbol HC0-grid signature
+    block repeated at least twice. Head feedback is measured in those blocks.
 """
 
 from __future__ import annotations
@@ -39,7 +38,7 @@ from dataclasses import dataclass, field
 import numpy as np
 
 from .. import framing
-from . import hc0
+from . import hc0, hf_lead
 
 #: On-air identifier.  0, 1 and 2 are the CPFSK profiles in whale/afsk.py,
 #: 3 is VF3 and 4 is HC1.  The *name* orders the HF ladder -- hc0 is the
@@ -70,23 +69,30 @@ class Hc0Codec:
                 f"{hc0.MAX_PAYLOAD_BYTES}")
         if not include_head:
             head_seconds = hc0.DEFAULT_HEAD_SECONDS
-        return hc0.modulate(bytes(payload), head_seconds=head_seconds)
+        body = hc0.modulate(bytes(payload))[hc0.lead_in_samples():]
+        return np.concatenate((hf_lead.modulate(hf_lead.HC0_LABEL,
+                                                head_seconds), body))
 
     def decode(self, audio, mode: "Hc0Mode", *,
                head_seconds=hc0.DEFAULT_HEAD_SECONDS, **kwargs) -> dict:
         result = hc0.demodulate(audio, head_seconds=head_seconds, **kwargs)
-        observed = result.pop("head_blocks_received", None)
-        if observed is not None:
+        result.pop("head_blocks_received", None)
+        if (result.get("payload") is not None
+                and result.get("start_index") is not None):
+            observed, score = hf_lead.measure(
+                audio, result["start_index"], hf_lead.HC0_LABEL, head_seconds)
             # The block count is the diagnostic; the seconds are what the
             # link's head feedback and connect-time calibration read.
             result["head_blocks_observed"] = observed
             result["head_seconds_received"] = (
-                observed * hc0.HEAD_BLOCK_SAMPLES / hc0.SAMPLE_RATE)
+                hf_lead.seconds_received(observed))
+            result["head_match"] = score
         return result
 
     def airtime(self, payload_len: int, mode: "Hc0Mode") -> float:
         del payload_len  # an HC0 frame is the same length whatever it carries
-        return hc0.frame_seconds()
+        return ((hf_lead.MIN_SAMPLES + hc0.TOTAL_SYMBOLS * hc0.SYMBOL_SAMPLES
+                 + hc0.TAIL_SAMPLES) / hc0.SAMPLE_RATE)
 
 
 HC0_CODEC = Hc0Codec()
@@ -100,6 +106,7 @@ class Hc0Mode:
     mode_id: int = HC0_MODE_ID
     chunk_size: int = CHUNK_SIZE
     confidence_threshold: float = CONFIDENCE_THRESHOLD
+    lead_label: int = hf_lead.HC0_LABEL
     codec: Hc0Codec = field(default=HC0_CODEC, compare=False, repr=False)
 
     @property
@@ -117,8 +124,8 @@ class Hc0Mode:
 
     @property
     def head_match_allowance_seconds(self) -> float:
-        """One head block (42.7 ms) -- the resolution of the measurement."""
-        return hc0.HEAD_BLOCK_SAMPLES / hc0.SAMPLE_RATE
+        """One common HF lead block (64 ms), the measurement resolution."""
+        return hf_lead.BLOCK_SAMPLES / hc0.SAMPLE_RATE
 
     def encode(self, payload: bytes, *, include_head=True,
                head_seconds=hc0.DEFAULT_HEAD_SECONDS):

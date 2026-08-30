@@ -16,7 +16,7 @@ import pytest
 from scipy.signal import hilbert
 
 from whale import afsk, framing, rx_audio, waveform
-from whale.modes import hc1
+from whale.modes import hc1, hf_lead
 from whale.modes.hc1_mode import HC1, hf_registry
 
 RNG = np.random.default_rng(20260828)
@@ -86,7 +86,7 @@ def test_hc1_carries_the_largest_control_packet_the_link_builds():
 
 
 def test_an_hc1_keying_is_fixed_length_whatever_it_carries():
-    assert HC1.airtime(1) == HC1.airtime(HC1.chunk_size) == pytest.approx(0.6947,
+    assert HC1.airtime(1) == HC1.airtime(HC1.chunk_size) == pytest.approx(0.7747,
                                                                           abs=1e-4)
 
 
@@ -128,7 +128,7 @@ def test_a_partial_frame_reports_a_lock_but_no_end_index():
     """Confidence over threshold with no end_index is how the link is told to
     keep waiting instead of consuming a half-arrived frame."""
     audio = HC1.encode(_packet())
-    arrived = hc1.lead_in_samples() + 20 * hc1.SYMBOL_SAMPLES
+    arrived = hf_lead.MIN_SAMPLES + 20 * hc1.SYMBOL_SAMPLES
     arrived_rx = ((3_000 + arrived) // rx_audio.DECIMATION
                   + rx_audio.FILTER_DELAY_DECODE_SAMPLES)
     result = HC1.decode(_snapshot(audio)[:arrived_rx])
@@ -140,7 +140,7 @@ def test_a_partial_frame_reports_a_lock_but_no_end_index():
 
 def test_a_corrupted_frame_is_a_near_miss_the_link_can_skip_past():
     audio = np.asarray(HC1.encode(_packet()), np.float64)
-    start = hc1.lead_in_samples() + hc1.HEADER_SYMBOLS * hc1.SYMBOL_SAMPLES
+    start = hf_lead.MIN_SAMPLES + hc1.HEADER_SYMBOLS * hc1.SYMBOL_SAMPLES
     audio[start:] += RNG.normal(0.0, 0.6, len(audio) - start)
     result = HC1.decode(_snapshot(audio))
 
@@ -219,27 +219,22 @@ def test_a_sample_clock_mismatch_the_cyclic_prefix_absorbs():
 
 # -- the adaptive head ----------------------------------------------------
 
-def test_the_head_never_ends_on_a_core_boundary():
-    """`hc1.HEAD_PHASE_SAMPLES`, as an invariant rather than a comment.
-
-    A head ending on a core boundary reproduces a sync symbol in its own
-    last 640 samples and widens acquisition's correlation plateau to 640,
-    which cost a clean frame 329 samples of start-index error before it was
-    fixed.
-    """
+def test_the_common_head_is_whole_mfsk_blocks():
+    """Every HF duration is rounded up in the common lead's own unit."""
     for seconds in (None, 0.0, 0.048, 0.1, 0.2, 1 / 3, 0.5, 1.0):
-        lead = hc1.lead_in_samples(seconds)
-        assert lead % hc1.CORE_SAMPLES == hc1.HEAD_PHASE_SAMPLES
-        assert lead >= hc1.LEAD_IN_SAMPLES
+        lead = hf_lead.lead_samples(seconds)
+        assert lead % hf_lead.BLOCK_SAMPLES == 0
+        assert lead >= hf_lead.MIN_SAMPLES
 
 
 @pytest.mark.parametrize("head_seconds", [0.048, 0.3, 1.0])
 def test_a_negotiated_head_only_lengthens_the_lead_in(head_seconds):
     packet = _packet()
     audio = HC1.encode(packet, head_seconds=head_seconds)
-    lead = hc1.lead_in_samples(head_seconds)
+    lead = hf_lead.lead_samples(head_seconds)
 
-    assert len(audio) == hc1.frame_samples(head_seconds)
+    expected = lead + hc1.TOTAL_SYMBOLS * hc1.SYMBOL_SAMPLES + hc1.TAIL_SAMPLES
+    assert len(audio) == expected
     # Everything after the head is the frame the default head produces.
     assert np.array_equal(audio[lead:], hc1.modulate(packet)[hc1.LEAD_IN_SAMPLES:])
     assert HC1.decode(_snapshot(audio), head_seconds=head_seconds)["payload"] == packet
@@ -249,11 +244,12 @@ def test_the_surviving_head_is_reported_in_cores_and_in_seconds():
     audio = HC1.encode(_packet(), head_seconds=0.5)
     result = HC1.decode(_snapshot(audio))
 
-    cores = hc1.lead_in_samples(0.5) // hc1.CORE_SAMPLES
-    assert result["head_cores_observed"] == cores
+    blocks = hf_lead.lead_samples(0.5) // hf_lead.BLOCK_SAMPLES
+    assert result["head_blocks_observed"] == blocks
     # The seconds are what link._head_feedback_request and link._encode_timing
-    # consume; the core count stays as the diagnostic.
-    assert result["head_seconds_received"] == cores * hc1.CORE_SAMPLES / hc1.SAMPLE_RATE
+    # consume; the block count stays as the diagnostic.
+    assert result["head_seconds_received"] == pytest.approx(
+        blocks * hf_lead.BLOCK_SAMPLES / hc1.SAMPLE_RATE)
     assert "head_symbols_received" not in result
 
 
@@ -262,10 +258,10 @@ def test_a_clipped_head_measures_short_and_the_frame_still_decodes():
     audio = HC1.encode(packet, head_seconds=0.5)
     blackout = int(0.3 * hc1.SAMPLE_RATE)
     clipped = np.concatenate((np.zeros(blackout, np.float32), audio[blackout:]))
-    full = HC1.decode(_snapshot(audio))["head_cores_observed"]
+    full = HC1.decode(_snapshot(audio))["head_blocks_observed"]
     result = HC1.decode(_snapshot(clipped))
 
-    assert 0 < result["head_cores_observed"] < full
+    assert 0 < result["head_blocks_observed"] < full
     assert result["payload"] == packet
 
 
@@ -274,8 +270,8 @@ def test_the_head_is_measured_through_a_carrier_offset():
     offset would decorrelate it and report a perfectly received head as
     lost -- which the link would answer by lengthening it forever."""
     audio = HC1.encode(_packet(), head_seconds=0.5)
-    clean = HC1.decode(_snapshot(audio))["head_cores_observed"]
-    shifted = HC1.decode(_snapshot(_offset(audio, 30.0)))["head_cores_observed"]
+    clean = HC1.decode(_snapshot(audio))["head_blocks_observed"]
+    shifted = HC1.decode(_snapshot(_offset(audio, 30.0)))["head_blocks_observed"]
 
     assert shifted == clean
 

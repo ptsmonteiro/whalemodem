@@ -3,7 +3,7 @@
 ## Purpose and scope
 
 Whalemodem measures leading loss independently in each radio direction and
-uses a protocol-fixed head PN sequence to protect sync acquisition. The
+uses a channel-specific repeated lead to protect sync acquisition. The
 measurement includes transmitter startup, audio buffering, receiver recovery,
 squelch, and AGC settling because audio starts immediately after PTT assertion.
 
@@ -14,14 +14,11 @@ keying ends at the final CRC and PTT is released when those samples finish.
 
 ## Head sequence and measurement
 
-The head is an order-15 maximal-length PN sequence defined in `FRAMING.md`.
-Calibration uses one second; ordinary frames use a suffix of that sequence at
-the current connection duration. All durations therefore have the same PN
-phase adjacent to sync. A receiver can locate sync and walk backward through
-the head length it expected even when feedback changed the transmitted length.
-A 16-symbol sliding window tolerates two hard-decision errors. The complete
-first window with three errors is excluded, making the observation
-conservative.
+On VHF/FM, CPFSK retains the order-15 PN head defined in `FRAMING.md`; VF3
+retains its sync-core lead. On HF, every HC0 and HC1 frame uses the common
+93.75-baud 16-FSK lead: a six-symbol mode-identifying block repeated at least
+twice. Calibration repeats it for one second and ordinary frames repeat it for
+the current adaptive duration, rounded upward to a complete block.
 
 The decoder reports:
 
@@ -31,12 +28,11 @@ head_seconds_received
 
 Seconds, because the head measurement crosses layers that do not share a
 symbol. The CPFSK profiles count matched pad symbols and divide by their baud;
-mode 3 (VF3) and mode 4 (HC1) count 12 kHz receive-rate sync cores and divide
-by 12 kHz; mode 5 (HC0) does the same with four-symbol receive-rate reference
-blocks. These durations are identical to dividing the corresponding on-air
-counts by 48 kHz. Each also
+mode 3 (VF3) counts 12 kHz receive-rate sync cores and divides by 12 kHz;
+both HF modes count common six-symbol MFSK blocks. These durations are
+identical to dividing the corresponding on-air counts by 48 kHz. Each also
 reports its native count as a diagnostic -- `head_symbols_received` for
-CPFSK, `head_cores_observed` for VF3/HC1, and `head_blocks_observed` for HC0 --
+CPFSK, `head_cores_observed` for VF3, and `head_blocks_observed` for HC0/HC1 --
 but nothing in the link reads those.
 
 Only a frame whose checked header, optional body, and CRC validate can produce
@@ -51,16 +47,12 @@ separate detector from both of them. A frame can therefore acquire and pass
 FEC/CRC while noise or distortion makes the adjacent head detector stop
 early.
 
-This matters especially for HC0. HC0 acquires from its known 24-symbol tone
-pattern and decodes its coded payload from non-coherent tone energies. Its
-head measurement instead correlates repeated four-symbol reference waveforms
-backward from the acquired preamble. Counting stops at the first block that
-falls below the correlation threshold, the relative-energy gate, or the
-allowed phase continuity. At low SNR that can yield a short or zero count even
-when the head audio was physically present. HC1 can fail acquisition on the
-same weak direction because its acquisition threshold is much higher; that
-failure does not cause the HC0 head result, although both can have the same
-weak-signal cause.
+This matters especially on HF. Both modes measure the common MFSK lead by
+walking its repeated identity block backward from a body that has already
+passed CRC. Counting stops at the first block that falls below the pattern or
+relative-energy gate. At low SNR that can yield a short or zero count even
+when the lead audio was physically present. HC1 can independently fail its
+OFDM acquisition on the same weak direction.
 
 The 2026-08-28 HF end-to-end radio run showed this unresolved ambiguity on the
 STA2-to-STA1 direction: validated HC0 frames reported head observations from
@@ -98,8 +90,8 @@ session_id head_time_received
 calibration_seconds)`. Values 1 through 255 represent the observed fraction of
 the protocol-fixed one-second calibration head; zero is invalid. An
 observation above the calibration head is clamped to 255 rather than rejected,
-because a mode whose head is quantized -- HC1 rounds its head up to whole sync
-cores -- can legitimately measure a little more than was asked for. The sender
+because a mode whose head is quantized -- HF rounds its head up to whole MFSK
+blocks -- can legitimately measure a little more than was asked for. The sender
 derives:
 
 ```text
@@ -119,8 +111,7 @@ piggybacks an absolute requested duration in the same units.
 
 No increase is requested when the apparent deficit is no larger than the
 mode's own measurement resolution: one 16-symbol matcher window at the DATA
-baud for CPFSK, one 512-sample sync core (10.67 ms) for HC1, whose head is
-deliberately half a core longer than a whole number of them. A zero
+baud for CPFSK, or one six-symbol MFSK block (64 ms) for either HF mode. A zero
 observation is a lower bound and requests a bounded 100 ms increase. Requests
 are capped at the documented one-second maximum.
 
@@ -129,9 +120,9 @@ sequence- and mode-valid ACK for the outstanding DATA frame, then applies
 `max(current, requested)`. Consequently retries and duplicates are idempotent,
 stale or smaller feedback cannot decrease padding, and floor or mode changes
 do not reset it. Durations are stored in seconds and converted upward to the
-active mode's own head granularity -- whole symbols at the active baud for
-CPFSK, whole sync cores for HC1 -- so protection remains constant across mode
-changes.
+active channel's head granularity -- whole symbols at the active baud for
+CPFSK, or whole common-lead blocks on HF -- so protection remains constant
+across mode changes.
 Each endpoint owns only its transmit direction's value.
 
 ## Packet summary

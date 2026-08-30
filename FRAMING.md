@@ -51,6 +51,21 @@ the generic link-facing contract through `encode()`, `decode()`, and
 or FEC can implement the same contract and be installed in a registry without
 changing connection management or ARQ.
 
+### Experimental HC2 coherent-32QAM rate proof
+
+`experiments/hc2_32qam/` is a speed-first, oracle-aligned prototype rather
+than a `WaveformMode`. It uses 49 carriers, a 1,024-sample FFT, 128-sample
+cyclic prefix, 41.667 transmitted symbols/s, coherent rectangular 32QAM, and
+rate-3/4 punctured convolutional coding. Its full 2,749-byte payload occupies
+2.928 seconds including two known training symbols, for 7,510.93 bit/s of
+user payload in the clean identity-channel proof.
+
+It is intentionally absent from every registry and from HF negotiation. The
+prototype has oracle timing and no acquisition, channel/CFO/clock tracking,
+AWGN/Watterson qualification, radio-linearity evidence, link air header, ARQ,
+or PTT accounting. Its result establishes codec and waveform rate feasibility
+only; it is not evidence that the mode works over an HF path.
+
 ## Modulation profiles
 
 Transmitted audio is mono, 48 kHz, continuous-phase binary FSK. A zero or one selects the
@@ -131,7 +146,7 @@ above HC0 rather than replacing it.
 | FEC | Interleaved rate-1/2, K=7 convolutional code, soft-decision Viterbi |
 | Error detection | 16-bit length + CRC32, inside the coded payload |
 | User payload | 74 bytes, of which 64 are a DATA chunk after the air header |
-| Frame | 2,304 lead-in + 47 x 640 + 960 tail = 33,344 samples = 0.695 s |
+| Frame | 6,144 common HF lead + 47 x 640 + 960 tail = 37,184 samples = 0.775 s |
 | Offset tolerance | +-46.875 Hz (half a carrier spacing) |
 
 Like VF3 it brings its own framing: acquisition is the OFDM header rather than
@@ -150,7 +165,7 @@ header, which is removed as one phase per symbol on the analyzed carriers. Both
 estimators are `whale.dsp.freq`, which existed as a VF3 diagnostic before HC1
 had a use for it.
 
-A consequence worth stating: an HC1 keying is 0.695 s whatever it carries, so
+A consequence worth stating: an HC1 keying is 0.775 s whatever it carries, so
 a 12-byte packet costs the same air as a 64-byte chunk. Both HF modes are
 fixed-length for the same reason: a variable-length frame needs the receiver
 to learn the length before it can decode, which means a separately coded
@@ -166,11 +181,18 @@ the correlation's variance and not its mean. Handed the true frame start,
 HC1's payload decodes down to -4 dB. As actually decoded it needs +3.5 dB. On
 the bench's weak leg -- about -8 dB -- it decoded 0 frames out of 10.
 
-The head is a repeat of the 512-sample sync core, quantized to a whole number
-of cores plus half a core. The half core is not decoration: a head ending on a
-core boundary reproduces a complete sync symbol in its own last 640 samples,
-which widens the acquisition correlation's plateau to 640 samples and leaves
-the start index to numerical noise.
+The link wrapper replaces HC1's original sync-core guard with the common HF
+lead described below. HC1 acquisition still locks on its own OFDM header, so a
+clipped or uncertain lead hint cannot prevent checked-frame recovery.
+
+The receiver ranks at most 32 distinct lead boundary hypotheses. At each
+boundary it offers both HC0 and HC1 interpretations in correlation-score
+order; neither the label nor the boundary is authoritative. A result is used
+only when the waveform's FEC/CRC succeeds and the checked air header names the
+same mode and a valid packet shape. After the ranked attempts, the receiver
+always performs one ordinary whole-buffer acquisition per eligible HF mode,
+so an erased, wrong, or sub-threshold lead cannot hide a valid body. This also
+bounds one poll to 64 hinted attempts plus one fallback attempt per mode.
 
 ### Mode 5: HC0, the HF control mode
 
@@ -196,7 +218,7 @@ estimator, which measures the offset but is never gated on it.
 | FEC | Interleaved rate-1/2, K=7 convolutional code, soft-decision Viterbi |
 | Error detection | 16-bit length + CRC32, inside the coded payload |
 | User payload | 64 bytes, of which 54 are a DATA chunk after the air header |
-| Frame | 4,096 head + 307 x 512 + 960 tail = 162,240 samples = 3.380 s |
+| Frame | 6,144 common HF lead + 307 x 512 + 960 tail = 164,288 samples = 3.423 s |
 | Offset tolerance | +-46.875 Hz (half a tone spacing) |
 
 Measured against HC1 at equal transmitted RMS, white noise across the whole
@@ -228,16 +250,28 @@ Three details follow from being non-coherent:
   reads its ceiling whatever the timing, flat to within 1e-9 across +-48
   samples.
 
-The head is a repeat of a fixed four-symbol tone block. Unlike VF3's and
-HC1's, it does not have to avoid resembling the preamble -- those modes
-acquire by correlating the capture against itself, so any repeat near the
-header widens the peak into a plateau, while a pattern correlator simply does
-not score a different pattern. After a checked frame decode, the receiver
-counts these blocks backward using waveform correlation. This head detector
-is distinct from both HC0's known-pattern acquisition and its non-coherent,
-FEC-protected payload decoder. On a weak path it can stop early even though
-the preamble and payload decode and the head audio was present; see
-[`ADAPTIVE_TIMING.md`](ADAPTIVE_TIMING.md#weak-signal-ambiguity).
+### Common HF lead and frame signature
+
+Every HC0 and HC1 keying begins with the same lead modulation and symbol rate:
+HC0's constant-envelope non-coherent 16-FSK bank at 93.75 baud. The minimum
+lead is a six-symbol identity block repeated twice, or 12 symbols / 6,144
+samples / 128 ms. Adaptive protection extends it in complete six-symbol
+blocks, repeating the same identity block throughout.
+
+| Following mode | Tone indices |
+| --- | --- |
+| HC0 | `9 6 12 15 0 3` |
+| HC1 | `12 3 15 6 9 0` |
+
+The detected label may order decoder attempts, but is not authenticated.
+Leading clipping can erase it and noise can produce a wrong candidate, so all
+eligible decoders remain fallbacks and only the following checked payload
+selects the frame. After a checked decode, the receiver counts matching blocks
+backward from the waveform body to measure surviving lead duration.
+
+This lead is HF-specific. VHF/FM CPFSK and VF3 leads remain unchanged; a
+future FM-optimized common lead belongs at the same channel-level composition
+boundary rather than changing this HF geometry.
 
 For the CPFSK profiles, the receiver detects the known sync word using
 normalized correlation. The current confidence threshold is 0.7. This is a

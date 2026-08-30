@@ -21,7 +21,7 @@ import pytest
 from scipy.signal import hilbert
 
 from whale import afsk, framing, rx_audio, waveform
-from whale.modes import hc0
+from whale.modes import hc0, hf_lead
 from whale.modes.hc0_mode import HC0, hf_registry
 from whale.modes.hc1_mode import HC1
 
@@ -94,7 +94,8 @@ def test_hc0_carries_the_largest_control_packet_the_link_builds():
 
 
 def test_an_hc0_keying_is_fixed_length_whatever_it_carries():
-    assert HC0.airtime(1) == HC0.airtime(HC0.chunk_size) == pytest.approx(3.38)
+    assert HC0.airtime(1) == HC0.airtime(HC0.chunk_size) == pytest.approx(3.4227,
+                                                                         abs=1e-4)
 
 
 def test_an_oversize_packet_is_refused_rather_than_truncated():
@@ -111,7 +112,7 @@ def test_the_transmitted_waveform_is_constant_envelope():
     everything measured below, which is all at equal RMS.
     """
     audio = np.asarray(HC0.encode(_packet()), np.float64)
-    body = audio[hc0.lead_in_samples():-hc0.TAIL_SAMPLES]
+    body = audio[hf_lead.MIN_SAMPLES:-hc0.TAIL_SAMPLES]
     crest = np.max(np.abs(body)) / np.sqrt(np.mean(body ** 2))
     assert crest == pytest.approx(np.sqrt(2.0), abs=0.02)
 
@@ -147,7 +148,7 @@ def test_a_partial_frame_reports_a_lock_but_no_end_index():
     """Confidence over threshold with no end_index is how the link is told
     to keep waiting instead of consuming a half-arrived frame."""
     audio = HC0.encode(_packet())
-    arrived = hc0.lead_in_samples() + 100 * hc0.SYMBOL_SAMPLES
+    arrived = hf_lead.MIN_SAMPLES + 100 * hc0.SYMBOL_SAMPLES
     arrived_rx = ((4_000 + arrived) // rx_audio.DECIMATION
                   + rx_audio.FILTER_DELAY_DECODE_SAMPLES)
     result = HC0.decode(_snapshot(audio)[:arrived_rx])
@@ -159,7 +160,7 @@ def test_a_partial_frame_reports_a_lock_but_no_end_index():
 
 def test_a_corrupted_frame_is_a_near_miss_the_link_can_skip_past():
     audio = np.asarray(HC0.encode(_packet()), np.float64)
-    start = hc0.lead_in_samples() + hc0.SYNC_SYMBOLS * hc0.SYMBOL_SAMPLES
+    start = hf_lead.MIN_SAMPLES + hc0.SYNC_SYMBOLS * hc0.SYMBOL_SAMPLES
     audio[start:] = RNG.normal(0.0, 0.2, len(audio) - start)
     result = HC0.decode(_snapshot(audio))
 
@@ -232,7 +233,7 @@ def test_the_offset_estimate_survives_a_timing_error():
 
     assert len(mfsk.repeated_pairs(hc0.SYNC_PATTERN)) == hc0.SYNC_SYMBOLS // 2
     audio = np.asarray(HC0.encode(_packet()), np.float64)
-    start = hc0.lead_in_samples()
+    start = hf_lead.MIN_SAMPLES
     for error in (-48, 0, 48):
         estimate = mfsk.offset_hz(hc0.BANK, audio, start + error,
                                   hc0.SYNC_PATTERN)
@@ -268,18 +269,19 @@ def test_nothing_that_is_not_a_frame_clears_the_threshold():
 
 def test_the_head_is_whole_blocks_at_every_requested_duration():
     for seconds in (None, 0.0, 0.0853, 0.2, 1 / 3, 0.5, 1.0):
-        lead = hc0.lead_in_samples(seconds)
-        assert lead % hc0.HEAD_BLOCK_SAMPLES == 0
-        assert lead >= hc0.LEAD_IN_SAMPLES
+        lead = hf_lead.lead_samples(seconds)
+        assert lead % hf_lead.BLOCK_SAMPLES == 0
+        assert lead >= hf_lead.MIN_SAMPLES
 
 
 @pytest.mark.parametrize("head_seconds", [0.0853, 0.3, 1.0])
 def test_a_negotiated_head_only_lengthens_the_lead_in(head_seconds):
     packet = _packet()
     audio = HC0.encode(packet, head_seconds=head_seconds)
-    lead = hc0.lead_in_samples(head_seconds)
+    lead = hf_lead.lead_samples(head_seconds)
 
-    assert len(audio) == hc0.frame_samples(head_seconds)
+    expected = lead + hc0.TOTAL_SYMBOLS * hc0.SYMBOL_SAMPLES + hc0.TAIL_SAMPLES
+    assert len(audio) == expected
     assert np.array_equal(audio[lead:], hc0.modulate(packet)[hc0.LEAD_IN_SAMPLES:])
     assert HC0.decode(_snapshot(audio), head_seconds=head_seconds)["payload"] == packet
 
@@ -295,12 +297,12 @@ def test_the_head_is_measured_through_a_carrier_offset():
     full second of padding for the rest of the session.
     """
     audio = HC0.encode(_packet(), head_seconds=1.0)
-    blocks = hc0.lead_in_samples(1.0) // hc0.HEAD_BLOCK_SAMPLES
+    blocks = hf_lead.lead_samples(1.0) // hf_lead.BLOCK_SAMPLES
     for hz in (0.0, 8.0, -30.0):
         result = HC0.decode(_snapshot(_offset(audio, hz)))
         assert result["head_blocks_observed"] == blocks, f"{hz} Hz"
         assert result["head_seconds_received"] == pytest.approx(
-            blocks * hc0.HEAD_BLOCK_SAMPLES / hc0.SAMPLE_RATE)
+            blocks * hf_lead.BLOCK_SAMPLES / hc0.SAMPLE_RATE)
     assert "head_symbols_received" not in HC0.decode(_snapshot(audio))
 
 

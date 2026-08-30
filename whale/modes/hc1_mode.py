@@ -23,9 +23,8 @@ about.
     instead is that *every* frame on the link, control included, gets the
     full FEC, CRC32 and frequency correction -- which is the property the
     control plane most needs when the channel is bad.
-  - **Head feedback is in seconds**, measured in whole 512-sample sync
-    cores.  Same shape as VF3's; the tolerance is one core, the resolution
-    of the measurement.
+  - **The lead is shared across HF modes**: a six-symbol HC0-grid signature
+    block repeated at least twice. Head feedback is measured in those blocks.
 
 `hf_registry()` at the bottom is the ladder a station on HF runs.  It has
 one rung deliberately: HC1 is both the control mode and the only data mode,
@@ -42,7 +41,7 @@ from dataclasses import dataclass, field
 import numpy as np
 
 from .. import framing
-from . import hc1
+from . import hc1, hf_lead
 
 #: On-air identifier.  0, 1 and 2 are the CPFSK profiles in whale/afsk.py
 #: and 3 is VF3; this must stay stable once anything has shipped with it.
@@ -79,23 +78,30 @@ class Hc1Codec:
         # go below it.
         if not include_head:
             head_seconds = hc1.DEFAULT_HEAD_SECONDS
-        return hc1.modulate(bytes(payload), head_seconds=head_seconds)
+        body = hc1.modulate(bytes(payload))[hc1.lead_in_samples():]
+        return np.concatenate((hf_lead.modulate(hf_lead.HC1_LABEL,
+                                                head_seconds), body))
 
     def decode(self, audio, mode: "Hc1Mode", *,
                head_seconds=hc1.DEFAULT_HEAD_SECONDS, **kwargs) -> dict:
         result = hc1.demodulate(audio, head_seconds=head_seconds, **kwargs)
-        observed = result.pop("head_cores_received", None)
-        if observed is not None:
-            # The core count is the diagnostic; the seconds are what the
+        result.pop("head_cores_received", None)
+        if (result.get("payload") is not None
+                and result.get("start_index") is not None):
+            observed, score = hf_lead.measure(
+                audio, result["start_index"], hf_lead.HC1_LABEL, head_seconds)
+            # The block count is the diagnostic; the seconds are what the
             # link's head feedback reads.
-            result["head_cores_observed"] = observed
+            result["head_blocks_observed"] = observed
             result["head_seconds_received"] = (
-                observed * hc1.CORE_SAMPLES / hc1.SAMPLE_RATE)
+                hf_lead.seconds_received(observed))
+            result["head_match"] = score
         return result
 
     def airtime(self, payload_len: int, mode: "Hc1Mode") -> float:
         del payload_len  # an HC1 frame is the same length whatever it carries
-        return hc1.frame_seconds()
+        return ((hf_lead.MIN_SAMPLES + hc1.TOTAL_SYMBOLS * hc1.SYMBOL_SAMPLES
+                 + hc1.TAIL_SAMPLES) / hc1.SAMPLE_RATE)
 
 
 HC1_CODEC = Hc1Codec()
@@ -116,6 +122,7 @@ class Hc1Mode:
     mode_id: int = HC1_MODE_ID
     chunk_size: int = CHUNK_SIZE
     confidence_threshold: float = CONFIDENCE_THRESHOLD
+    lead_label: int = hf_lead.HC1_LABEL
     codec: Hc1Codec = field(default=HC1_CODEC, compare=False, repr=False)
 
     @property
@@ -133,15 +140,8 @@ class Hc1Mode:
 
     @property
     def head_match_allowance_seconds(self) -> float:
-        """One core (10.67 ms) -- the resolution of `hc1._measure_head`.
-
-        The head measurement counts whole cores and the transmitted head is
-        deliberately half a core longer than a whole number of them (see
-        `hc1.HEAD_PHASE_SAMPLES`), so an observation is short by up to one
-        core even on a perfectly received head.  A deficit inside that is
-        measurement quantization, not a head that needs lengthening.
-        """
-        return hc1.CORE_SAMPLES / hc1.SAMPLE_RATE
+        """One common HF lead block (64 ms), the measurement resolution."""
+        return hf_lead.BLOCK_SAMPLES / hc1.SAMPLE_RATE
 
     def encode(self, payload: bytes, *, include_head=True,
                head_seconds=hc1.DEFAULT_HEAD_SECONDS):

@@ -760,7 +760,7 @@ class Link:
         self._rx_keep_seconds = (max(
             p.airtime(_AIR_HEADER_LEN + p.chunk_size) for p in self.modes.modes) + 1.0)
 
-    def _candidate_decode_profiles(self):
+    def _candidate_decode_profiles(self, snap=None):
         """Which afsk.Profile(s) an incoming frame might be using right
         now: control-plane traffic always uses CONTROL_PROFILE, and DATA
         traffic uses whatever self.rx_profile currently is (the peer's own
@@ -777,6 +777,23 @@ class Link:
             if profile is not None and profile not in candidates:
                 candidates.append(profile)
         return tuple(candidates)
+
+    @staticmethod
+    def _offset_decode_result(result, offset):
+        """Translate a decoder result from a sliced capture to the RX buffer."""
+        for key in ("start_index", "sync_end_index", "end_index"):
+            if result.get(key) is not None:
+                result[key] += offset
+        return result
+
+    def _decode_attempt(self, profile, audio, offset=0):
+        cpu0, wall0 = time.thread_time(), time.perf_counter()
+        result = profile.decode(audio, head_seconds=self._rx_head_seconds)
+        cpu = time.thread_time() - cpu0
+        self._decode_cost.setdefault(profile.name, _DecodeCost()).add(
+            cpu, time.perf_counter() - wall0)
+        result["decode_cpu_seconds"] = cpu
+        return self._offset_decode_result(result, offset)
 
     # -- decode loop (background) ---------------------------------------
 
@@ -834,38 +851,57 @@ class Link:
         its own threshold) but hasn't seen enough samples yet for a verdict,
         this poll holds off consuming anything and just waits for more
         audio, rather than letting a different candidate's near-miss win."""
+        profiles = self._candidate_decode_profiles(snap)
         results = []
-        for profile in self._candidate_decode_profiles():
-            cpu0, wall0 = time.thread_time(), time.perf_counter()
-            result = profile.decode(snap, head_seconds=self._rx_head_seconds)
-            cpu = time.thread_time() - cpu0
-            self._decode_cost.setdefault(profile.name, _DecodeCost()).add(
-                cpu, time.perf_counter() - wall0)
-            # Carried on the result so _finish_air_packet can report what the
-            # decode that actually produced a frame cost, as opposed to the
-            # running average over mostly-empty polls.
-            result["decode_cpu_seconds"] = cpu
-            results.append((profile, result))
-        for profile, result in results:
+
+        def accept_checked(profile, result):
             payload = result.get("payload")
             if payload is None:
-                continue
+                return False
             decoded = _decode_air_header(payload[:_AIR_HEADER_LEN])
             if decoded is None:
-                continue
+                return False
             ptype, mode_id, body_len, inline = decoded
             body_profile = self.modes.by_id.get(mode_id)
             remainder = payload[_AIR_HEADER_LEN:]
             if (body_profile is not profile or len(remainder) != body_len
                     or not _valid_air_shape(ptype, body_profile, body_len, inline,
                                             self.modes.control.mode_id)):
-                continue
+                return False
             end = result.get("end_index", len(snap))
             self.transport.consume_rx(end)
             self._finish_air_packet(ptype, inline + remainder, profile, snap, end,
                                     result)
             return True
 
+        # A common HF lead proposes ranked body boundaries. Decode both mode
+        # interpretations at each boundary, but accept none until the mode's
+        # payload CRC and the checked air header below agree. Cropping keeps a
+        # false early boundary from changing which later acquisition wins.
+        if profiles and all(hasattr(p, "lead_label") for p in profiles):
+            from .modes import hf_lead
+            by_label = {p.lead_label: p for p in profiles}
+            tolerance = hf_lead.RX_BLOCK_SAMPLES // hf_lead.BLOCK_SYMBOLS
+            for candidate in hf_lead.candidates(snap):
+                profile = by_label.get(candidate.label)
+                if profile is None:
+                    continue
+                offset = max(0, candidate.body_start - tolerance)
+                result = self._decode_attempt(profile, snap[offset:], offset)
+                start = result.get("start_index")
+                if start is not None and abs(start - candidate.body_start) <= tolerance:
+                    results.append((profile, result))
+                    if accept_checked(profile, result):
+                        return True
+
+        # Mandatory body-acquisition fallback: erased, wrong, or low-scoring
+        # lead audio cannot suppress either eligible checked decoder. One
+        # whole-buffer attempt per profile also bounds fallback work.
+        for profile in profiles:
+            result = self._decode_attempt(profile, snap)
+            results.append((profile, result))
+            if accept_checked(profile, result):
+                return True
         pending = [result for candidate, result in results
                    if result.get("confidence", 0) >= candidate.confidence_threshold
                    and "end_index" not in result]
@@ -905,7 +941,8 @@ class Link:
                         head_seconds * 1000.0,
                         "".join(f" ({key}={decode_result[key]})"
                                 for key in ("head_symbols_received",
-                                            "head_cores_observed")
+                                            "head_cores_observed",
+                                            "head_blocks_observed")
                                 if key in decode_result))
         # Seconds, whatever the mode measured in: both the connect-time
         # calibration (_encode_timing) and the per-frame head feedback
