@@ -1,0 +1,141 @@
+{
+  "mode": "hc0: 16-FSK 750.0-2156.2 Hz, 93.75 baud, 307 symbols, 64 B + CRC32 in 3.380 s, offset tolerance +-46.88 Hz",
+  "payload_bytes": 64,
+  "trials": 5,
+  "a": "ic7300",
+  "b": "ic705",
+  "ic7300->ic705": [
+    {
+      "trial": 1,
+      "decoded": true,
+      "confidence": 0.4955133050598982,
+      "cfo_hz": -7.9698461458962875,
+      "clock_offset_ppm": 0.0,
+      "present_carriers": 0,
+      "tone_snr_db": 36.88,
+      "raw_ber": 0.0,
+      "carrier_snr_db": null,
+      "head": 1,
+      "failure": null
+    },
+    {
+      "trial": 2,
+      "decoded": true,
+      "confidence": 0.4961053711962353,
+      "cfo_hz": -7.895440324999755,
+      "clock_offset_ppm": 0.0,
+      "present_carriers": 0,
+      "tone_snr_db": 36.83,
+      "raw_ber": 0.0,
+      "carrier_snr_db": null,
+      "head": 1,
+      "failure": null
+    },
+    {
+      "trial": 3,
+      "decoded": true,
+      "confidence": 0.4961041102895354,
+      "cfo_hz": -7.894725595209392,
+      "clock_offset_ppm": 0.0,
+      "present_carriers": 0,
+      "tone_snr_db": 36.8,
+      "raw_ber": 0.0,
+      "carrier_snr_db": null,
+      "head": 1,
+      "failure": null
+    },
+    {
+      "trial": 4,
+      "decoded": true,
+      "confidence": 0.49505954939842145,
+      "cfo_hz": -8.009593074636548,
+      "clock_offset_ppm": 0.0,
+      "present_carriers": 0,
+      "tone_snr_db": 36.82,
+      "raw_ber": 0.0,
+      "carrier_snr_db": null,
+      "head": 1,
+      "failure": null
+    },
+    {
+      "trial": 5,
+      "decoded": true,
+      "confidence": 0.4947802727757398,
+      "cfo_hz": -8.066417882929695,
+      "clock_offset_ppm": 0.0,
+      "present_carriers": 0,
+      "tone_snr_db": 37.02,
+      "raw_ber": 0.0,
+      "carrier_snr_db": null,
+      "head": 1,
+      "failure": null
+    }
+  ],
+  "ic705->ic7300": [
+    {
+      "trial": 1,
+      "decoded": true,
+      "confidence": 0.37936855660348684,
+      "cfo_hz": 8.452988137783832,
+      "clock_offset_ppm": 0.0,
+      "present_carriers": 0,
+      "tone_snr_db": 13.94,
+      "raw_ber": 0.0017667844522968198,
+      "carrier_snr_db": null,
+      "head": 0,
+      "failure": null
+    },
+    {
+      "trial": 2,
+      "decoded": true,
+      "confidence": 0.3865406565905992,
+      "cfo_hz": 8.855854234799493,
+      "clock_offset_ppm": 0.0,
+      "present_carriers": 0,
+      "tone_snr_db": 14.49,
+      "raw_ber": 0.0017667844522968198,
+      "carrier_snr_db": null,
+      "head": 1,
+      "failure": null
+    },
+    {
+      "trial": 3,
+      "decoded": true,
+      "confidence": 0.4152187012062467,
+      "cfo_hz": 8.668110081393985,
+      "clock_offset_ppm": 0.0,
+      "present_carriers": 0,
+      "tone_snr_db": 14.48,
+      "raw_ber": 0.00265017667844523,
+      "carrier_snr_db": null,
+      "head": 1,
+      "failure": null
+    },
+    {
+      "trial": 4,
+      "decoded": true,
+      "confidence": 0.41125306421761254,
+      "cfo_hz": 8.553440930713844,
+      "clock_offset_ppm": 0.0,
+      "present_carriers": 0,
+      "tone_snr_db": 15.01,
+      "raw_ber": 0.0,
+      "carrier_snr_db": null,
+      "head": 1,
+      "failure": null
+    },
+    {
+      "trial": 5,
+      "decoded": true,
+      "confidence": 0.40923558694876816,
+      "cfo_hz": 8.370944652866257,
+      "clock_offset_ppm": 0.0,
+      "present_carriers": 0,
+      "tone_snr_db": 15.08,
+      "raw_ber": 0.0,
+      "carrier_snr_db": null,
+      "head": 1,
+      "failure": null
+    }
+  ]
+}

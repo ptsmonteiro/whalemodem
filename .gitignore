@@ -1,6 +1,8 @@
 __pycache__/
 *.pyc
-logs/
+logs/*
+!logs/mode_qualification/
+!logs/mode_qualification/**
 *.wav
 scratch_captures*/
 experiments/ofdm/results/captures/

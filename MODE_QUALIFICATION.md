@@ -11,7 +11,9 @@ The requirements below are cross-checked against the repository as of
 2026-08-29. Items labelled **gap** are requirements for which Whalemodem does
 not yet provide complete automation. They must be measured manually and
 retained as an artifact; absence of that artifact is `unmeasured`, never a
-pass.
+pass. See [LOGS.md](LOGS.md) for where that evidence is retained and what a
+qualifying artifact directory must contain -- only evidence retained under
+`logs/mode_qualification/` may be cited here.
 
 ## Registry levels and status words
 
@@ -269,10 +271,10 @@ the group status.
 | --- | --- | --- | --- | --- | --- |
 | Unit, framing, malformed input | passed | passed | provisional | provisional |
 | Bounded policy channel CI | passed | passed | passed | passed |
-| Qualified frame Monte Carlo | passed (2026-08-29 clean-tree rerun after the channel-drain fix; 300 and 600 baud delivered 600/600 and 598/600, 1200 baud delivered 591/600, all within the FER/acquisition gate) | unmeasured | unmeasured | unmeasured |
+| Qualified frame Monte Carlo | passed (2026-08-29 clean-tree rerun after the channel-drain fix; 300 and 600 baud delivered 600/600 and 598/600, 1200 baud delivered 591/600, all within the FER/acquisition gate) | failed (2026-08-30 clean-tree run; hard acquisition cliff at 5 dB RF C/N, 0/100, though 10-30 dB pass 99-100/100) | passed (2026-08-30 clean-tree run; 100/100 at every SNR point across quiet, moderate, and disturbed Watterson presets) | failed (2026-08-30 clean-tree run; passes quiet above -5 dB and moderate at 10 dB+, but never clears the gate under the disturbed preset at any tested point, 20-61/100) |
 | Full-stack connection and bidirectional ARQ | passed | passed | passed | passed |
 | Scripted adaptation/fault recovery artifact | provisional | provisional | provisional | provisional |
-| Bidirectional hardware frame gate | unmeasured | provisional (6/6, 3 each way) | provisional (saved captures each way, below trial minimum) | failed (documented 0/10 weak direction; successful captures cover only the other leg) |
+| Bidirectional hardware frame gate | unmeasured | provisional (6/6, 3 each way) | provisional (2026-08-28 captures, 11/11 and 5/5 each way, below trial minimum) | failed (2026-08-28 captures, 17/17 one direction, 0/3 the other; see `logs/mode_qualification/hf-ssb/hc0-hc1/2026-08-28-hardware/INDEX.md`) |
 | Full hardware link/recovery gate | provisional | unmeasured | unmeasured | unmeasured |
 | Useful throughput and adjacent overlap | provisional | provisional | provisional | failed/unmeasured (the weak hardware leg failed; no qualifying overlap sweep) |
 | Development CPU and RSS | unmeasured | unmeasured | unmeasured | unmeasured |
@@ -289,14 +291,19 @@ required above. The bounded CI points are exactly those in
 
 VF3 has the strongest retained direct-radio result:
 `experiments/vf3/RESULTS.md` and
-`results/final_dqpsk_both_3.json` report six exact full-capacity frames and
-offline replay, but six trials do not meet the new minimum. HC0 has exact
-saved-capture replay in both directions, including the weak HF leg. HC1's
-saved captures establish one useful direction and its frequency-offset
-handling, while the documented 0/10 reverse leg is a real failure of the
-bidirectional frame gate; HC1 may remain a provisional fast rung because HC0
-is the control/fallback mode, but this evidence would block promoting HC1
-under this process.
+`experiments/vf3/results/final_dqpsk_both_3.json` report six exact
+full-capacity frames and offline replay, but six trials do not meet the new
+minimum. HC0 and HC1's saved captures are retained at
+`logs/mode_qualification/hf-ssb/hc0-hc1/2026-08-28-hardware/` (see that
+directory's `INDEX.md`): HC0 has exact saved-capture replay in both
+directions (11/11 and 5/5), including the weak HF leg, though its largest
+single batch (6 trials) is below the 100-trial minimum. HC1's saved captures
+establish one useful direction at 17/17 and its frequency-offset handling,
+while the reverse leg failed all 3 attempted trials at acquisition -- a real
+failure of the bidirectional frame gate, smaller than the "0/10" figure this
+document previously cited from memory rather than from a retained artifact.
+HC1 may remain a provisional fast rung because HC0 is the control/fallback
+mode, but this evidence would block promoting HC1 under this process.
 
 The first retained CPFSK campaign is
 `logs/mode_qualification/vhf-fm/cpfsk/2026-08-29/fm_frame_monte_carlo.json`.
@@ -395,8 +402,44 @@ point-by-point breakdown. This clears the "Qualified frame Monte Carlo" gate
 for the CPFSK group in the assessment table above; the remaining gaps for
 default promotion are the hardware, throughput-overlap, and resource rows.
 
+### 2026-08-30 VF3, HC0, and HC1 frame Monte Carlo campaigns
+
+With the CPFSK campaign complete, the same promotion-sized methodology was
+run against the three modes still `unmeasured` on this gate: VF3 over the
+`fm` model (`vhf_bench_conservative` preset, matching CPFSK), and HC0/HC1
+over the `watterson` model across all three standard mid-latitude presets
+(quiet/moderate/disturbed). All three artifacts are from commit `c553b94`
+with a clean tree. See
+`logs/mode_qualification/vhf-fm/vf3/2026-08-30/INDEX.md` and
+`logs/mode_qualification/hf-ssb/hc0-hc1/2026-08-30/INDEX.md` for full
+point-by-point results and commands.
+
+VF3 delivered 0/100 at 5 dB RF C/N -- every trial failed at acquisition, not
+payload/CRC -- then cleared the gate at every point from 10 dB up (99-100/100).
+This is a hard acquisition cliff rather than a gradual FER slope, and it has
+not been root-caused further; it blocks "Qualified frame Monte Carlo" for VF3
+as currently written unless 5 dB is dropped from its claimed operating range.
+
+HC0 passed cleanly at 100/100 across every SNR point in every preset,
+including disturbed, clearing the gate outright.
+
+HC1 passed in quiet conditions above -5 dB and in moderate conditions from
+10 dB up, but never cleared the gate under the disturbed preset (CCIR Poor:
+2 ms delay spread, 1.0 Hz Doppler spread), topping out at 61/100 even at
+20 dB. This was investigated as a possible repeat of the CPFSK channel-drain
+artifact and ruled out: every disturbed-preset trial from 10-20 dB acquired
+successfully, and all failures were payload/CRC mismatches correlated with
+roughly double the sub-0 dB subcarriers (2.6 vs 1.2 of 19) in failed frames
+versus decoded ones at the same SNR point. This is frequency-selective fading
+against HC1's 93.75 Hz carrier spacing, not a harness or thermal-noise
+problem, and it does not respond to added SNR -- consistent with HC0's
+`whale/modes/hc0.py` redundancy margin passing the identical trials at
+100/100. HC1's fast-rung disposition already assumes HC0 is the fallback for
+conditions it cannot cover; this campaign is evidence that disturbed HF
+conditions are one of them.
+
 No qualifying adjacent-rung overlap report or CPU/RSS artifact has yet been
-retained for any production mode, and no other mode has a retained Monte
-Carlo promotion result. Existing default placement therefore records
-historical/provisional acceptance rather than retroactively declaring the
-new gates passed.
+retained for any production mode, and CPFSK remains the only mode with a
+fully passing Monte Carlo result. Existing default placement therefore
+records historical/provisional acceptance rather than retroactively
+declaring the new gates passed.

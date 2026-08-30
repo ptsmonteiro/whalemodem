@@ -1,0 +1,88 @@
+{
+  "mode": "hc0: 16-FSK 750.0-2156.2 Hz, 93.75 baud, 307 symbols, 64 B + CRC32 in 3.380 s, offset tolerance +-46.88 Hz",
+  "payload_bytes": 64,
+  "trials": 6,
+  "a": "ic7300",
+  "b": "ic705",
+  "ic7300->ic705": [],
+  "ic705->ic7300": [
+    {
+      "trial": 1,
+      "decoded": true,
+      "confidence": 0.48881509496315023,
+      "cfo_hz": 7.944440718456724,
+      "clock_offset_ppm": 0.0,
+      "present_carriers": 0,
+      "tone_snr_db": 20.73,
+      "raw_ber": 0.0,
+      "carrier_snr_db": null,
+      "head": 1,
+      "failure": null
+    },
+    {
+      "trial": 2,
+      "decoded": true,
+      "confidence": 0.4935022119696469,
+      "cfo_hz": 7.763736295936927,
+      "clock_offset_ppm": 0.0,
+      "present_carriers": 0,
+      "tone_snr_db": 22.96,
+      "raw_ber": 0.0,
+      "carrier_snr_db": null,
+      "head": 1,
+      "failure": null
+    },
+    {
+      "trial": 3,
+      "decoded": true,
+      "confidence": 0.4713525650006721,
+      "cfo_hz": 8.212739004338284,
+      "clock_offset_ppm": 0.0,
+      "present_carriers": 0,
+      "tone_snr_db": 22.7,
+      "raw_ber": 0.0,
+      "carrier_snr_db": null,
+      "head": 1,
+      "failure": null
+    },
+    {
+      "trial": 4,
+      "decoded": true,
+      "confidence": 0.4902115910752955,
+      "cfo_hz": 7.78773506997742,
+      "clock_offset_ppm": 0.0,
+      "present_carriers": 0,
+      "tone_snr_db": 21.43,
+      "raw_ber": 0.0,
+      "carrier_snr_db": null,
+      "head": 1,
+      "failure": null
+    },
+    {
+      "trial": 5,
+      "decoded": true,
+      "confidence": 0.4773565558632594,
+      "cfo_hz": 7.82872308386189,
+      "clock_offset_ppm": 0.0,
+      "present_carriers": 0,
+      "tone_snr_db": 22.18,
+      "raw_ber": 0.0,
+      "carrier_snr_db": null,
+      "head": 1,
+      "failure": null
+    },
+    {
+      "trial": 6,
+      "decoded": true,
+      "confidence": 0.48199848391185496,
+      "cfo_hz": 8.096160149081493,
+      "clock_offset_ppm": 0.0,
+      "present_carriers": 0,
+      "tone_snr_db": 21.86,
+      "raw_ber": 0.0,
+      "carrier_snr_db": null,
+      "head": 1,
+      "failure": null
+    }
+  ]
+}

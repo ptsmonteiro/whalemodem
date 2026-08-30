@@ -26,6 +26,9 @@ history.
   models, presets, SNR conventions, and retained-result schemas.
 - [Waveform mode qualification](../MODE_QUALIFICATION.md) defines evidence
   gates and audits the current modes.
+- [Log retention and tracking policy](../LOGS.md) defines what qualification
+  evidence is retained under `logs/mode_qualification/`, how it is laid out,
+  and what is disposable scratch.
 
 ## Measurements and experiments
 
