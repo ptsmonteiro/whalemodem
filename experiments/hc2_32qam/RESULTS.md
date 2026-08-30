@@ -1,64 +1,146 @@
-# HC2 milestone 3: AWGN SNR threshold and EVM health metric
+# HC2 AWGN SNR threshold and EVM health metric
 
-## Conclusion
+## Two sweeps, two receivers
 
-HC2's existing receiver delivers full-capacity 2,749-byte frames over AWGN
-from about **12 dB waveform SNR** upward, and its realized net payload rate
-beats the 7,050 bit/s VARA HF 32QAM reference row from **12.5 dB** upward.
-Against the three criteria worth stating separately, over 7,800 pooled
-frame trials:
+This file reports **two** AWGN campaigns against two different HC2 designs.
+They are not interchangeable and are never pooled:
 
-| Criterion | Lowest qualifying point | Evidence |
-| --- | ---: | --- |
-| `MODE_QUALIFICATION.md` section 3 gate (Wilson 95% **upper** bound on FER at most 10%) | **12.0 dB** | 375/400, FER 6.3% [4.3%, 9.1%] |
-| FER at most 1e-2 by the same upper bound | **16.0 dB** | 1,099/1,100, FER 0.09% [0.02%, 0.51%] |
-| No failure observed at all | **20.0 dB** | 1,100/1,100, FER 0% [0%, 0.35%] |
+| | Milestone-3 sweep (superseded) | Post-fix sweep (current) |
+| --- | --- | --- |
+| Waveform | two **identical** training symbols | two **distinct** training symbols |
+| Acquisition | earliest lag within 0.5% of the correlation peak | plain matched-filter maximum |
+| CFO refinement | phase of `sum(T[1] * conj(T[0]))` | same, after dividing out the known training values |
+| Trials | 7,800 | 8,300 |
+| Section reporting it | "Superseded results" below | "Results" below |
 
-The waterfall is sharp, as expected for rate-3/4 32QAM: FER falls from 0.88
-at 9.5 dB to 0.11 at 11.5 dB, a 2 dB knee. Below 9 dB the
-mode does not work at all.
+The milestone-3 sweep found that every failure above 12.5 dB was one
+acquisition defect, and per its own milestone constraint it did not fix it.
+The fix landed afterwards and the sweep was re-run. Everything in "Results"
+describes the current receiver; everything in "Superseded results" describes
+the milestone-3 one and is kept because it is the evidence that motivated the
+change.
 
-Two findings dominate everything else.
+## Conclusion (current receiver)
 
-**The residual FER above 11.5 dB is not a noise limit. It is a single
-acquisition bug.** Every one of the 84 failures at 12.5 dB and above is the
-receiver locking onto the *second* of HC2's two identical training symbols,
-recorded as `start_error_samples == 1152` (exactly one OFDM symbol). All 54
-such frames at 13 and 14 dB decode exactly when the frame start is forced to
-the true offset. `demodulate` selects the earliest correlation lag within
-0.5% of the peak; at 14 dB the true peak measures 99.36-99.44% of the second
-one, just outside that window. This costs 4.1% FER at 13 dB and 1.5% at
-14 dB, and it is why the 1e-2 criterion needs 16 dB rather than roughly 12.5.
-Per the milestone constraint the receiver was **not** modified; see
-"Recommendations" below.
+HC2 delivers full-capacity 2,749-byte frames over AWGN from about **11.5 dB
+waveform SNR** upward. Against the three criteria worth stating separately,
+over 8,300 pooled frame trials:
 
-**Decision-directed EVM is a clean in-frame health metric.** In none of the
-7,800 trials did a frame below **9.91%** post-equalization EVM fail, and no
-frame above 12.83% ever decoded. A fallback trigger at **EVM > 10%** admits 5,484
-frames of which 5,482 decode (P(decode | accept) = 0.9996). The catastrophic
-mis-acquisition case is trivially separable: those frames measure 91% to
-1,915% EVM.
+| Criterion | Lowest qualifying point | Was (milestone 3) | Evidence |
+| --- | ---: | ---: | --- |
+| `MODE_QUALIFICATION.md` section 3 gate (Wilson 95% **upper** bound on FER at most 10%) | **11.5 dB** | 12.0 dB | 288/300, FER 4.0% [2.3%, 6.9%] |
+| FER at most 1e-2 by the same upper bound | **13.0 dB** | 16.0 dB | 1,400/1,400, FER 0% [0%, 0.27%] |
+| No failure observed at all | **13.0 dB** | 20.0 dB | 1,400/1,400 |
+
+Realized net payload beats the 7,050 bit/s VARA HF 32QAM reference row from
+**11.5 dB** (7,210 bit/s), previously 12.5 dB.
+
+12.5 dB just misses the 1e-2 criterion rather than clearing it: 1,294/1,300,
+FER 0.46%, Wilson 95% upper bound **1.0033%**. The point estimate is under
+1e-2 and the upper bound is three parts in ten thousand over it. Calling the
+criterion at 13.0 dB is the conservative reading of the same data.
+
+Three findings dominate.
+
+**The one-symbol mis-acquisition is gone, not merely rarer.** Across all
+8,300 trials there is not one `start_error_samples == 1152` frame, and not one
+frame whose acquired start missed the true one by more than **1 sample** at
+any SNR, 0 dB included. Under the identical-training receiver the same defect
+consumed 48% of frames at 0 dB and still 1.5% at 14 dB. Every failure that
+remains is a genuine noise-limited payload failure with a correct frame start
+and a carrier-offset estimate inside 0.65 Hz.
+
+**Removing the defect moved the whole curve, not just its tail.** FER at
+12 dB falls from 6.3% to 0.75%, at 11.5 dB from 11.0% to 4.0%, and at 11 dB
+from 25.8% to 13.8%. That is roughly 0.5 dB of apparent sensitivity through
+the knee and about 3 dB at the 1e-2 criterion.
+
+**Decision-directed EVM remains a usable in-frame health metric, but its
+separation is now honest rather than flattering.** The milestone-3 data
+separated cleanly above 12.5 dB only because the failures there were
+mis-acquisitions reading 91% to 1,915% EVM -- a pathology, not a channel
+verdict. With those gone, the surviving failures sit inside the normal EVM
+range: the worst decoding frame measures 13.14% and the best failing frame
+9.34%. A trigger at **EVM > 10%** still admits 6,025 frames of which 6,017
+decode (P(decode | accept) = 0.9987).
 
 This is a benign-channel screen of a top-rung candidate, not qualification
 evidence. AWGN says nothing about the frequency-selective fading that is the
 actual reason HC1 fails the disturbed Watterson preset; milestone 4 covers
 that.
 
+## The fix
+
+### What was wrong
+
+`demodulate` correlates the capture against a template of training symbol 1.
+HC2 transmitted the *same* QPSK sequence as training symbol 2, so the metric
+had two near-equal peaks 1,152 samples (one OFDM symbol) apart. The receiver
+resolved the tie by taking the earliest lag scoring at least 99.5% of the
+maximum. At 14 dB the true peak measured 99.36-99.44% of the false one, just
+outside that window, so noise decided which peak won. A frame acquired one
+symbol late loses its first payload symbol, estimates the channel from a
+training symbol and a payload symbol, and never decodes.
+
+### What changed
+
+1. **Training symbol 2 is a different sequence.** `_TRAINING_SEEDS =
+   (0x0C531, 0x00C3A)`. Symbol 1 keeps the original seed so the acquisition
+   template is bit-identical to before. Seed `0x00C3A` was chosen by scanning
+   order-17 LFSR seeds 1..4095 for a symbol that is simultaneously
+   low-PAPR and unlike the template: it gives **7.39 dB** PAPR (2.50 dB
+   *below* symbol 1's 9.89 dB) and a normalized matched-filter score of
+   **3.4e-4 (-34.7 dB)** against the symbol-1 template, versus 1.0 for the old
+   repeat. Both sequences are QPSK on all 49 carriers, so both stay
+   constant-modulus and full-band and the per-carrier channel estimate stays
+   equally well conditioned. The choice is a fixed seed, not a runtime draw.
+2. **The 0.995 tie-break is deleted.** It existed only to arbitrate between
+   two identical training symbols; with one unambiguous peak, taking the
+   earliest lag within half a percent of the maximum can only bias the
+   estimator toward earlier, noisier lags. The receiver now takes
+   `np.argmax`. Measured consequence: zero frames off by more than 1 sample
+   in 8,300 trials, at every SNR from 0 to 25 dB.
+3. **CFO refinement divides out the known training values first.** The old
+   `angle(sum(T[1] * conj(T[0])))` is only the inter-symbol phase advance when
+   both symbols carry the same constellation. It now forms
+   `(grid[k] * conj(_TRAINING[k]))` per carrier before taking the product, so
+   the data cancels and the channel -- common to both symbols -- still cancels
+   with it. The unambiguous range is unchanged at one symbol period,
+   +/-48000/(2*1152) = +/-20.83 Hz, which comfortably covers the residual left
+   by the 1 Hz coarse search.
+
+### What did not change
+
+Airtime, frame structure, and capacity are untouched: still 2 training + 120
+payload symbols, 140,544 samples, 2.928 s keyed, 2,749-byte maximum payload,
+**7,510.93 bit/s** sustained. `rate_accounting()` is byte-identical before and
+after, the payload half of the frame is sample-identical, and frame PAPR is
+12.50 dB either way. Only 1,152 samples of the transmitted waveform differ.
+`demodulate_oracle` and the milestone-1 rate proof are unaffected.
+
+The one measurable cost: the receiver's noise-free implementation floor rose
+from **~1.74% to ~2.12% EVM** (full-capacity frames, six payload seeds). The
+`scipy.signal.hilbert` analytic front end leaks across the per-symbol FFT, and
+with identical training symbols the two leakage patterns were similar enough
+that averaging them cancelled part of the error; two different symbols leak
+differently. The floor is still nearly five times below the 10% trigger and
+below every conclusion drawn here, but it is a real, if small, regression, and
+recommendation 3 below would remove it.
+
 ## Method
 
 ### Waveform and receiver
 
-Unmodified `experiments/hc2_32qam/hc2_32qam.py`: 49 carriers, 1,024-sample
-FFT at 48 kHz, 128-sample cyclic prefix, 41.667 symbol/s, coherent
-rectangular 32QAM, punctured K=7 rate-3/4 FEC, 2 training + 120 payload
-symbols, 2.928 s keyed, 2,749-byte maximum payload, 7,510.93 bit/s sustained
-full-frame user rate. Every trial used the full 2,749-byte capacity.
+`experiments/hc2_32qam/hc2_32qam.py`: 49 carriers, 1,024-sample FFT at 48 kHz,
+128-sample cyclic prefix, 41.667 symbol/s, coherent rectangular 32QAM,
+punctured K=7 rate-3/4 FEC, 2 training + 120 payload symbols, 2.928 s keyed,
+2,749-byte maximum payload, 7,510.93 bit/s sustained full-frame user rate.
+Every trial used the full 2,749-byte capacity.
 
-The receiver under test is `demodulate` as it stands after milestone 2:
-matched-filter acquisition over +/-20 Hz in 1 Hz steps, training-pair CFO
-refinement, per-carrier complex equalization from the two training symbols,
-and decision-directed common-phase tracking, with hard 32QAM slicing before
-the soft Viterbi decoder.
+The receiver is `demodulate`: matched-filter acquisition over +/-20 Hz in
+1 Hz steps, training-pair CFO refinement, per-carrier complex equalization
+from the two training symbols, and decision-directed common-phase tracking,
+with hard 32QAM slicing before the soft Viterbi decoder.
 
 ### Capture and SNR reference
 
@@ -78,8 +160,8 @@ references:
 - as Eb/N0 against the 7,656.25 bit/s coded information rate, add
   `10*log10(24000/7656.25) = 4.96 dB`.
 
-So 12 dB waveform SNR is 22.2 dB in 2.3 kHz, or Eb/N0 17.0 dB; 16 dB is
-26.2 dB and 21.0 dB respectively.
+So 11.5 dB waveform SNR is 21.7 dB in 2.3 kHz, or Eb/N0 16.5 dB; 13 dB is
+23.2 dB and 18.0 dB respectively.
 
 ### Trials and seeding
 
@@ -94,17 +176,23 @@ return.
 Because `trial_seed` does not take the SNR, two runs that give the same SNR
 different point indices are independent; runs that share a point index at
 different SNRs are paired (same payload, same noise draws, rescaled). No
-`(SNR, point index)` pair is repeated in this campaign, so the per-SNR pools
-below are pools of independent trials.
+`(SNR, point index)` pair is repeated within either campaign, so each per-SNR
+pool below is a pool of independent trials.
+
+The post-fix runs reproduce the milestone-3 `--points` lists verbatim, so
+matching `(SNR, point index)` pairs across the two campaigns are the same
+payload against the same noise realization. That makes the before/after
+comparison a paired one wherever both campaigns cover a point, which is why
+mis-acquisition counts can be quoted as eliminated rather than merely absent.
 
 ### EVM measurement
 
-`demodulate` exposes no constellation, and the milestone forbids changing it,
-so `benchmark_hc2_snr.frame_metrics` recomputes the payload constellation
-outside the receiver from the receiver's own `start_sample` and
-`frequency_offset_hz` diagnostics, repeating its equalization and
-decision-directed phase track step for step. A test asserts the replica
-re-derives the receiver's exact decode, and 54 replayed failures agreed.
+`demodulate` exposes no constellation, so `benchmark_hc2_snr.frame_metrics`
+recomputes the payload constellation outside the receiver from the receiver's
+own `start_sample` and `frequency_offset_hz` diagnostics, repeating its
+equalization and decision-directed phase track step for step. Measuring
+therefore cannot perturb what the receiver decided, and a test asserts the
+replica re-derives the receiver's exact decode.
 
 Two figures are recorded per frame:
 
@@ -114,14 +202,13 @@ Two figures are recorded per frame:
 - **true (data-aided) EVM** -- error against the transmitted constellation.
   An oracle reference only.
 
-They agree within 1% relative above 12 dB and diverge below it (at 0 dB the
-decision-directed figure reads 32% against a true 57%), because slicing
-errors drag the reference toward the received point. A trigger built on the
-decision-directed figure is therefore **optimistic** at low SNR, which is
-acceptable here only because the useful threshold sits at 10%, where the two
-still agree closely.
+They agree within 1% relative above 12 dB and diverge below it, because
+slicing errors drag the reference toward the received point. A trigger built
+on the decision-directed figure is therefore **optimistic** at low SNR, which
+is acceptable here only because the useful threshold sits at 10%, where the
+two still agree closely.
 
-The noise-free implementation floor is **1.81% EVM**, and it is a receiver
+The noise-free implementation floor is **~2.12% EVM**, and it is a receiver
 property, not a channel one: the oracle real-FFT path measures ~1e-6%, while
 the `scipy.signal.hilbert` analytic front end used by `demodulate` leaks
 across the per-symbol FFT. It is far below the useful threshold and does not
@@ -129,37 +216,162 @@ affect any conclusion here.
 
 ### Commands
 
-Five runs, all with master seed 20260830, all writing to gitignored scratch:
+Six runs, all with master seed 20260830, all writing to gitignored scratch:
 
 ```sh
 python -m experiments.hc2_32qam.benchmark_hc2_snr --trials 100 \
   --points 0 2 4 6 8 9 10 11 12 13 14 16 20 25 \
-  --out logs/scratch/hc2_awgn_coarse.json
+  --out logs/scratch/hc2_awgn_coarse_fixed.json
 python -m experiments.hc2_32qam.benchmark_hc2_snr --trials 300 \
   --points 9.5 10 10.5 11 11.5 12 12.5 13 \
-  --out logs/scratch/hc2_awgn_knee.json
+  --out logs/scratch/hc2_awgn_knee_fixed.json
 python -m experiments.hc2_32qam.benchmark_hc2_snr --trials 1000 --points 13 14 \
-  --out logs/scratch/hc2_awgn_operating.json
+  --out logs/scratch/hc2_awgn_operating_fixed.json
+python -m experiments.hc2_32qam.benchmark_hc2_snr --trials 1000 --points 12.5 \
+  --out logs/scratch/hc2_awgn_low125_fixed.json
 python -m experiments.hc2_32qam.benchmark_hc2_snr --trials 1000 --points 16 \
-  --out logs/scratch/hc2_awgn_high16.json
-python -m experiments.hc2_32qam.benchmark_hc2_snr --trials 1000 --points 20 \
-  --out logs/scratch/hc2_awgn_high20.json
+  --out logs/scratch/hc2_awgn_high16_fixed.json
+python -m experiments.hc2_32qam.benchmark_hc2_snr --trials 500 --points 20 \
+  --out logs/scratch/hc2_awgn_high20_fixed.json
 ```
 
-7,800 frame trials, about 2.5 CPU-hours on an 8-core 2026 development host,
-Python 3.11.15 / NumPy 2.4.6 / SciPy 1.17.1. The tree was dirty and the HC2
-experiment package untracked at commit `8bcf5b6`, so these are scratch
-results by `LOGS.md`'s rules and are cited by command, not by path.
+8,300 frame trials, six processes in parallel on an 8-core 2026 development
+host, Python 3.11.15 / NumPy 2.4.6 / SciPy 1.17.1. The first five commands are
+the milestone-3 commands with identical `--points` lists (the 12.5 dB
+1,000-trial run is new, and the 20 dB run is the first 500 trials of the
+milestone-3 1,000). HC2 is not a declared mode and has no
+`logs/mode_qualification/` campaign directory, so by `LOGS.md`'s rules these
+are scratch artifacts and are cited by command, not by path.
 
 ## Results
 
 ### FER against waveform SNR
 
-Pooled across the runs above. "Mis-acq" counts frames whose acquired start
-was one full OFDM symbol late. "Other" is every remaining failure: at 12.5 dB
-and above there are none, and below the knee it mixes noise-limited payload
-failures with coarse-frequency acquisition errors (a correct start with a
-double-digit Hz CFO estimate).
+Pooled across the six runs above. "Mis-acq" counts frames whose acquired
+start was one full OFDM symbol late -- the defect the fix removes. "Acq" is
+any other acquisition failure (start outside the cyclic prefix or carrier
+offset estimate beyond 2 Hz). "Payload" is a correctly acquired frame the
+decoder could not recover.
+
+| Waveform SNR (dB) | Trials | Delivered | FER | FER Wilson 95% | Mis-acq | Acq | Payload | Realized bit/s |
+| ---: | ---: | ---: | ---: | --- | ---: | ---: | ---: | ---: |
+| 0 | 100 | 0 | 1.000 | [0.963, 1.000] | 0 | 0 | 100 | 0 |
+| 2 | 100 | 0 | 1.000 | [0.963, 1.000] | 0 | 0 | 100 | 0 |
+| 4 | 100 | 0 | 1.000 | [0.963, 1.000] | 0 | 0 | 100 | 0 |
+| 6 | 100 | 0 | 1.000 | [0.963, 1.000] | 0 | 0 | 100 | 0 |
+| 8 | 100 | 0 | 1.000 | [0.963, 1.000] | 0 | 0 | 100 | 0 |
+| 9 | 100 | 3 | 0.970 | [0.916, 0.990] | 0 | 0 | 97 | 225 |
+| 9.5 | 300 | 25 | 0.917 | [0.880, 0.943] | 0 | 0 | 275 | 626 |
+| 10 | 400 | 157 | 0.608 | [0.559, 0.654] | 0 | 0 | 243 | 2,948 |
+| 10.5 | 300 | 209 | 0.303 | [0.254, 0.358] | 0 | 0 | 91 | 5,233 |
+| 11 | 400 | 345 | 0.138 | [0.107, 0.175] | 0 | 0 | 55 | 6,478 |
+| **11.5** | 300 | 288 | 0.040 | [0.023, 0.069] | 0 | 0 | 12 | 7,210 |
+| 12 | 400 | 397 | 0.0075 | [0.0026, 0.0218] | 0 | 0 | 3 | 7,455 |
+| 12.5 | 1,300 | 1,294 | 0.0046 | [0.0021, 0.0100] | 0 | 0 | 6 | 7,476 |
+| **13** | 1,400 | 1,400 | 0.000 | [0.000, 0.0027] | 0 | 0 | 0 | 7,511 |
+| 14 | 1,100 | 1,100 | 0.000 | [0.000, 0.0035] | 0 | 0 | 0 | 7,511 |
+| 16 | 1,100 | 1,100 | 0.000 | [0.000, 0.0035] | 0 | 0 | 0 | 7,511 |
+| 20 | 600 | 600 | 0.000 | [0.000, 0.0064] | 0 | 0 | 0 | 7,511 |
+| 25 | 100 | 100 | 0.000 | [0.000, 0.037] | 0 | 0 | 0 | 7,511 |
+
+Realized bit/s is `7,510.93 * delivered / trials`, matching how HC2b and
+HC2c report observed goodput. Like the nominal figure it excludes acquisition
+preamble, PTT and turnaround, ARQ, and link air headers, so it is a
+frame-layer rate, not application throughput.
+
+The waterfall is sharp, as expected for rate-3/4 32QAM: FER falls from 0.92
+at 9.5 dB to 0.04 at 11.5 dB, and the curve now keeps falling instead of
+flattening -- the flat shelf in the milestone-3 data was the tie-break, not
+the channel. Below 9 dB the mode does not work at all.
+
+### Acquisition
+
+Every one of the 8,300 trials acquired correctly:
+
+| Statistic | Value |
+| --- | ---: |
+| Frames with `start_error_samples == 1152` | **0** |
+| Frames with any start error beyond the cyclic prefix | 0 |
+| Frames with a start error beyond +/-1 sample | 0 |
+| Distribution of non-zero start errors | -1: 16, +1: 14 |
+| Largest carrier-offset estimate error (true offset 0 Hz) | 0.65 Hz, at 0 dB |
+| Largest at 12 dB and above | 0.22 Hz |
+
+The milestone-3 campaign, for contrast, mis-acquired 48/100 frames at 0 dB,
+23/400 at 12 dB and 16/1,100 at 14 dB. Acquisition is no longer a failure
+mode of this receiver at any SNR in the swept range; the waveform simply stops
+decoding when the noise wins.
+
+### EVM against decode success
+
+Pooled over all 8,300 trials, binned by decision-directed EVM:
+
+| EVM bin (%) | Frames | Decoded | P(decode) |
+| --- | ---: | ---: | ---: |
+| 0-6 | 705 | 705 | 1.000 |
+| 6-8 | 1,868 | 1,868 | 1.000 |
+| 8-9 | 1,782 | 1,782 | 1.000 |
+| 9-9.5 | 1,196 | 1,192 | 0.997 |
+| 9.5-10 | 474 | 470 | 0.992 |
+| 10-10.5 | 310 | 298 | 0.961 |
+| 10.5-11 | 342 | 299 | 0.874 |
+| 11-11.5 | 303 | 219 | 0.723 |
+| 11.5-12 | 334 | 147 | 0.440 |
+| 12-12.5 | 270 | 33 | 0.122 |
+| 12.5-13 | 157 | 4 | 0.025 |
+| above 13 | 559 | 1 | 0.002 |
+
+Candidate thresholds, accepting a frame when EVM is at or below the value:
+
+| Threshold | Accepted | P(decode &#124; accept) | Failing frames admitted | Good frames rejected |
+| ---: | ---: | ---: | ---: | ---: |
+| 9.33% | 5,201 | 1.00000 | 0 | 1,817 |
+| 9.5% | 5,551 | 0.99928 | 4 | 1,471 |
+| **10.0%** | 6,025 | 0.99867 | 8 | 1,001 |
+| 10.5% | 6,335 | 0.99684 | 20 | 703 |
+| 11.0% | 6,677 | 0.99056 | 63 | 404 |
+| 11.63% | 7,056 | 0.97520 | 175 | 137 |
+| 12.0% | 7,314 | 0.95433 | 334 | 38 |
+
+11.63% again maximizes raw accuracy (96.25% of all 8,300 trials classified
+correctly) and again admits far too many failing frames; 10% remains the right
+choice for a fallback trigger, which should be biased against admitting them.
+
+The overlap region is **9.34% to 13.14%**: the worst decoding frame measured
+13.14% and the best failing frame 9.34%, and 2,527 trials fall between them.
+It is wider than the milestone-3 figure of 9.91%-12.83%, and that is a more
+honest number rather than a worse receiver -- the old sweep's failures above
+12.5 dB were mis-acquisitions reading 91% and up, which no threshold has to
+work to separate. Restricted to 12.5 dB and above the two populations still
+nearly separate, but they now touch: decoded frames reach 10.28% and the six
+failing frames start at 9.34%.
+
+**Recommended trigger: fall back when decision-directed EVM exceeds 10%.**
+Justification: it admits 8 failing frames in 6,025 accepted, and at 12 dB and
+above -- where HC2 clears the FER gate with room -- every decoded frame
+measured at or below 10.48% and the median was 9.66% or lower. A frame reading
+above 10% is by construction in or below the waterfall. Note that the
+distinctive "EVM near 100%" mis-acquisition signature the milestone-3 write-up
+described no longer occurs, because the mis-acquisition no longer occurs; a
+link should no longer expect to see it.
+
+Median EVM by point, for calibration:
+
+| SNR (dB) | 9 | 10 | 11 | 11.5 | 12 | 12.5 | 13 | 14 | 16 | 20 | 25 |
+| --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: |
+| Median EVM (%) | 12.94 | 11.83 | 10.75 | 10.21 | 9.66 | 9.21 | 8.74 | 7.87 | 6.42 | 4.43 | 3.15 |
+
+## Superseded results (milestone-3 receiver, identical training symbols)
+
+Everything in this section describes the **previous** waveform and receiver
+and is retained as the evidence for the fix. Do not quote it as HC2's current
+performance.
+
+Over 7,800 pooled trials that receiver cleared the section 3 FER gate at
+**12.0 dB** (375/400, FER 6.3% [4.3%, 9.1%]), reached FER at most 1e-2 only at
+**16.0 dB** (1,099/1,100, FER 0.09% [0.02%, 0.51%]), and first showed no
+failure at all at **20.0 dB** (1,100/1,100). Realized payload passed
+7,050 bit/s from 12.5 dB.
 
 | Waveform SNR (dB) | Trials | Delivered | FER | FER Wilson 95% | Mis-acq | Other | Realized bit/s |
 | ---: | ---: | ---: | ---: | --- | ---: | ---: | ---: |
@@ -182,22 +394,7 @@ double-digit Hz CFO estimate).
 | **20** | 1,100 | 1,100 | 0.000 | [0.000, 0.0035] | 0 | 0 | 7,511 |
 | 25 | 100 | 100 | 0.000 | [0.000, 0.037] | 0 | 0 | 7,511 |
 
-Realized bit/s is `7,510.93 * delivered / trials`, matching how HC2b and
-HC2c report observed goodput. Like the nominal figure it excludes acquisition
-preamble, PTT and turnaround, ARQ, and link air headers, so it is a
-frame-layer rate, not application throughput.
-
-The noise-limited failure population is gone by 12.5 dB. From there upward
-FER is entirely the acquisition tie-break, which is why the curve flattens
-instead of continuing to fall steeply.
-
-### The one-symbol mis-acquisition
-
-`demodulate` correlates against one training symbol, and HC2 transmits two
-identical ones, so the correlation metric has two near-equal peaks 1,152
-samples apart. The receiver resolves the ambiguity by taking the earliest lag
-whose metric is at least 99.5% of the maximum. Replaying three failing 14 dB
-trials:
+Replaying three failing 14 dB trials showed how narrowly the tie-break lost:
 
 | Trial | Best coarse offset | Peak metric | Metric at true start | Ratio | Chosen offset |
 | ---: | ---: | ---: | ---: | ---: | ---: |
@@ -205,97 +402,45 @@ trials:
 | 188 | 0 Hz | 0.961511 | 0.956166 | 0.99444 | +1,152 |
 | 212 | 0 Hz | 0.962135 | 0.956648 | 0.99430 | +1,152 |
 
-The ratio sits a few parts per thousand under the 0.995 tolerance, so noise
-decides which peak wins. Forcing the true start and re-deriving CFO from the
-correct training pair recovers **38/38** failures at 13 dB and **16/16** at
-14 dB, exactly.
+Forcing the true start and re-deriving CFO from the correct training pair
+recovered **38/38** failures at 13 dB and **16/16** at 14 dB, exactly, which is
+what predicted that fixing acquisition alone would move the 1e-2 criterion from
+16 dB down toward 12.5 dB. The measured move was to 13.0 dB, with 12.5 dB
+missing by three parts in ten thousand of Wilson upper bound.
 
-### EVM against decode success
-
-Pooled over all 7,800 trials, binned by decision-directed EVM:
-
-| EVM bin (%) | Frames | Decoded | P(decode) |
-| --- | ---: | ---: | ---: |
-| 0-6 | 1,293 | 1,293 | 1.000 |
-| 6-8 | 2,023 | 2,023 | 1.000 |
-| 8-9 | 1,470 | 1,470 | 1.000 |
-| 9-9.5 | 392 | 392 | 1.000 |
-| 9.5-10 | 306 | 304 | 0.993 |
-| 10-10.5 | 305 | 281 | 0.921 |
-| 10.5-11 | 279 | 248 | 0.889 |
-| 11-11.5 | 233 | 158 | 0.678 |
-| 11.5-12 | 278 | 126 | 0.453 |
-| 12-12.5 | 215 | 38 | 0.177 |
-| 12.5-13 | 112 | 4 | 0.036 |
-| above 13 | 894 | 0 | 0.000 |
-
-Candidate thresholds, accepting a frame when EVM is at or below the value:
-
-| Threshold | Accepted | P(decode &#124; accept) | Failing frames admitted | Good frames rejected |
-| ---: | ---: | ---: | ---: | ---: |
-| 9.5% | 5,178 | 1.00000 | 0 | 1,159 |
-| 9.74% | 5,327 | 1.00000 | 0 | 1,010 |
-| **10.0%** | 5,484 | 0.99964 | 2 | 855 |
-| 11.0% | 6,068 | 0.99061 | 57 | 326 |
-| 11.63% | 6,368 | 0.97535 | 157 | 126 |
-| 12.0% | 6,579 | 0.95683 | 284 | 42 |
-
-11.63% is the threshold with the best raw accuracy (96.4% of all 7,800 trials
-classified correctly), but it admits 157 failing frames; 10% is the right
-choice for a fallback trigger, which should be biased against admitting them.
-
-The overlap region is **9.91% to 12.83%**: the worst decoding frame measured
-12.83% and the best failing frame 9.91%, and 1,441 trials fall between them.
-No single threshold can be right inside that band. It is not spread across
-the whole sweep -- it occurs only at 9 to 12.5 dB, inside the waterfall.
-Restricted to 12.5 dB and above, the two populations are completely disjoint:
-decoded frames peak at 9.74% and the mis-acquired ones start at 90.98%.
-
-**Recommended trigger: fall back when decision-directed EVM exceeds 10%.**
-Justification: it admits no failing frame in 5,327 accepted trials at 9.74%
-and only 2 in 5,484 at 10.0%; at 12 dB and above, where HC2 clears the
-existing FER gate, every decoded frame measured at or below 10.40% and the
-median was 9.54% or lower. A frame reading above 10% is by construction in
-or below the waterfall, where FER exceeds 5%. EVM near 100% or higher is a
-distinct signal -- mis-acquisition, not a channel verdict -- and a link should
-retry rather than immediately demote the mode on it.
-
-Median EVM by point, for calibration:
-
-| SNR (dB) | 9 | 10 | 11 | 12 | 13 | 14 | 16 | 20 | 25 |
-| --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: |
-| Median EVM (%) | 12.93 | 11.80 | 10.64 | 9.54 | 8.59 | 7.70 | 6.21 | 4.13 | 2.73 |
+That campaign's EVM analysis reported a 9.91%-12.83% overlap region, a 10%
+trigger admitting 2 failing frames in 5,484 accepted, and a noise-free
+implementation floor of 1.81%. Its commands were the five listed in the
+milestone-3 write-up, differing from the current ones only in the output paths
+and in not including the 1,000-trial 12.5 dB run.
 
 ## Honest limits
 
-**Trial counts.** 1,000 trials with zero failures bounds FER only at
-0.35% with 95% confidence. This campaign can establish "FER at or below 1e-2"
-at 16 dB and "no failure observed" at 20 dB. It **cannot** establish a
-1e-3 or 1e-4 frame error rate anywhere; that needs 10^4-10^5 trials per
-point, roughly 3-30 CPU-hours each at the current 1 s/trial. The 100-trial
-coarse points are screening resolution only -- the coarse run recorded
-100/100 at 14 dB where 1,100 pooled trials show 1.5% FER, which is exactly
-the kind of small-sample illusion the larger runs exist to correct.
+**Trial counts.** 1,400 trials with zero failures bounds FER only at 0.27%
+with 95% confidence. This campaign can establish "FER at or below 1e-2" from
+13 dB. It **cannot** establish a 1e-3 or 1e-4 frame error rate anywhere; that
+needs 10^4-10^5 trials per point, roughly 3-30 CPU-hours each at the current
+~1 s/trial. The 100-trial coarse points are screening resolution only.
+
+**12.5 dB is a coin-toss call.** Its Wilson upper bound is 1.0033% against a
+1% criterion. A different 1,300-trial draw could put it on either side. The
+conservative reading -- 13.0 dB -- is the one quoted in the conclusion, but a
+reader who cares about the real threshold should read it as "between 12.5 and
+13 dB".
 
 **Hard-decision demapping penalty (estimate, not implemented).**
 `demodulate` hard-slices 32QAM through `bits_from_qam32` before the soft
 Viterbi decoder, discarding the reliability information Gray-mapped 32QAM
-makes available. A scratch comparison -- same captures, same acquisition,
-equalization and phase track, replacing only the slicer with a max-log LLR
-demapper into the same `fec.K7.decode_soft` -- gave, at 100 trials per point:
-
-| SNR (dB) | 8 | 9 | 10 | 11 | 12 | 13 | 14 |
-| --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: |
-| Hard (as shipped) | 0 | 3 | 40 | 87 | 93 | 97 | 98 |
-| Soft LLR (scratch) | 58 | 72 | 84 | 93 | 95 | 97 | 97 |
-
-The 50%-delivery point moves from about 10.2 dB to about 7.8 dB, so the
+makes available. A milestone-3 scratch comparison -- same captures, same
+acquisition, equalization and phase track, replacing only the slicer with a
+max-log LLR demapper into the same `fec.K7.decode_soft` -- moved the
+50%-delivery point from about 10.2 dB to about 7.8 dB, so the
 **hard-decision penalty is roughly 2.4 dB**, consistent with the 2 dB rule of
-thumb. The gain shrinks to under 1 dB at the 90% point only because the
-acquisition tie-break above is demapping-independent and caps both curves.
-This measurement is a 100-trial scratch estimate and is **not** part of the
-delivered harness; soft 32QAM metrics were explicitly out of scope for this
-milestone.
+thumb. That comparison was made against the identical-training receiver, where
+the acquisition tie-break capped both curves at the top and disguised most of
+the gain; it has **not** been repeated against the current receiver, and the
+gain above the knee should now be larger, not smaller. Soft 32QAM metrics
+remain explicitly out of scope.
 
 **What AWGN does and does not predict.** It fixes the thermal-noise floor and
 nothing else. HC2's 46.875 Hz carrier spacing is half HC1's, so it is *more*
@@ -304,7 +449,7 @@ holds HC1 to 61/100 under the disturbed Watterson preset regardless of SNR.
 Its 2.928 s frame is also nearly four times HC1's, so a given Doppler spread
 has four times as long to decorrelate the channel from the two front-loaded
 training symbols, which HC2 never refreshes. Neither effect appears anywhere
-in this data. An AWGN threshold of 12 dB is a lower bound on the SNR any
+in this data. An AWGN threshold of 11.5 dB is a lower bound on the SNR any
 real HF path will need, not a prediction of one.
 
 **Scope.** One logical direction, no sample-clock offset, no CFO beyond the
@@ -313,32 +458,31 @@ link. HC2 remains outside the qualification process entirely.
 
 ## Recommendations for future work
 
-Ordered by measured value, none implemented here:
+Ordered by measured value. Item 1 of the milestone-3 list -- fix the
+acquisition ambiguity -- is done and is what this document's "Results" section
+measures.
 
-1. **Widen the acquisition peak tie-break, or stop making the two training
-   symbols identical.** This is the single largest win available and is
-   independent of the waveform: it is worth 4.1% FER at 13 dB and 1.5% at
-   14 dB, all of it recoverable (54/54 replays). Either relax the 0.995
-   tolerance to roughly 0.98 -- verifying that it does not start selecting
-   spurious earlier lags at low SNR -- or make training symbol 2 a distinct
-   known sequence so the correlation has one unambiguous peak. The second is
-   preferable and costs no airtime. Re-run this sweep afterward; the 1e-2
-   criterion should move from 16 dB down toward 12.5 dB.
-2. **Soft 32QAM LLR demapping.** About 2.4 dB at the 50% point per the
-   scratch estimate above. Worth doing after (1), since (1) currently masks
-   most of its benefit at the top of the curve.
-3. **Refresh the channel estimate mid-frame.** Not measurable on AWGN, but
+1. **Soft 32QAM LLR demapping.** About 2.4 dB at the 50% point per the
+   milestone-3 scratch estimate, and probably more above the knee now that
+   the acquisition tie-break is no longer capping the top of the curve.
+   The largest remaining win on AWGN.
+2. **Refresh the channel estimate mid-frame.** Not measurable on AWGN, but
    two training symbols at the head of a 2.928 s frame is the design most
    exposed to the fading milestone 4 will introduce. HC2c's pilot work is the
    obvious precedent.
-4. **Replace the analytic front end's per-symbol leakage.** The 1.81% EVM
-   floor is harmless at present but is a real 1.8% error budget the receiver
-   spends before the channel does anything.
+3. **Replace the analytic front end's per-symbol leakage.** The ~2.12% EVM
+   floor is harmless at present but is a real error budget the receiver spends
+   before the channel does anything, and it grew slightly with the distinct
+   training symbols.
+4. **Re-measure the EVM trigger once (1) lands.** The 10% threshold was
+   calibrated against a hard-slicing receiver. Soft demapping moves the
+   decodable region without moving the EVM of the received constellation, so
+   the threshold will need to rise.
 
 ## Next experiment (milestone 4)
 
 Repeat this sweep against `watterson` with the `mid_latitude_quiet` preset
-first, at 12 to 25 dB, and establish HC2's benign-fading boundary before
+first, at 11 to 25 dB, and establish HC2's benign-fading boundary before
 touching moderate. Reuse the same seeding and EVM instrumentation so the
 AWGN curve here is the control. Expect the boundary to be set by the 2.928 s
 frame's channel-tracking span rather than by SNR, and be prepared for the

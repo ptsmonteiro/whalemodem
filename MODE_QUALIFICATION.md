@@ -584,19 +584,24 @@ declaring the new gates passed.
 
 `experiments/hc2_32qam/` is not a declared mode and therefore has no manifest
 entry or mode ID. It now has a deterministic clean-channel oracle round trip,
-a real acquisition/CFO/equalization/phase-tracking receiver, and a
-2026-08-30 AWGN frame sweep (`experiments/hc2_32qam/RESULTS.md`): 7,800
-full-capacity trials, waveform-referenced SNR, Wilson intervals, and per-frame
-EVM. None of that is qualification evidence. The AWGN sweep is a diagnostic
-baseline, which section 3 explicitly does not accept as a qualification
-channel; the artifacts are scratch, produced from a dirty tree with the
-experiment package untracked, and no `logs/mode_qualification/` campaign
-directory exists for HC2. Watterson trials, hardware evidence, negotiation,
-and application-throughput work all remain prerequisites before it can enter
-this process. As a candidate HF top rung it would be evaluated against the
-section 6 speed gate on a good channel, with a narrow declared envelope,
-rather than against disturbed-preset robustness. The AWGN result is
-consistent with that shape -- delivery collapses below about 12 dB waveform
-SNR and realized payload exceeds the 7,050 bit/s reference row from 12.5 dB
-up -- but a declared envelope requires the fading evidence it does not yet
-have.
+a real acquisition/CFO/equalization/phase-tracking receiver, and two
+2026-08-30 AWGN frame sweeps (`experiments/hc2_32qam/RESULTS.md`): 7,800
+full-capacity trials against the original receiver and 8,300 against the
+current one, both waveform-referenced with Wilson intervals and per-frame EVM.
+The first sweep found that every failure above 12.5 dB was one acquisition
+defect -- two identical training symbols giving the matched filter a near-tied
+second peak -- and the second sweep re-measured the mode after the training
+symbols were made distinct. None of that is qualification evidence. The AWGN
+sweep is a diagnostic baseline, which section 3 explicitly does not accept as a
+qualification channel; the artifacts are scratch, produced from a dirty tree
+with the experiment package untracked, and no `logs/mode_qualification/`
+campaign directory exists for HC2. Watterson trials, hardware evidence,
+negotiation, and application-throughput work all remain prerequisites before it
+can enter this process. As a candidate HF top rung it would be evaluated
+against the section 6 speed gate on a good channel, with a narrow declared
+envelope, rather than against disturbed-preset robustness. The AWGN result is
+consistent with that shape -- with the fix in place, delivery collapses below
+about 11.5 dB waveform SNR, realized payload exceeds the 7,050 bit/s reference
+row from 11.5 dB up, and frame error rate reaches 1e-2 by 13 dB (superseding
+the 12 dB / 12.5 dB / 16 dB figures the first sweep produced) -- but a declared
+envelope requires the fading evidence it does not yet have.

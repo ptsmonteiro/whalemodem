@@ -1,9 +1,16 @@
 """AWGN FER/EVM sweep for the HC2 coherent-32QAM top-rung candidate.
 
 This is milestone 3 of the isolated HC2 experiment: establish the AWGN SNR
-the *existing* ``hc2_32qam.demodulate`` receiver needs, and measure whether a
-cheap in-frame error-vector magnitude reading separates decoding frames from
-failing ones well enough to drive a future fallback trigger.
+``hc2_32qam.demodulate`` needs, and measure whether a cheap in-frame
+error-vector magnitude reading separates decoding frames from failing ones
+well enough to drive a future fallback trigger.
+
+The milestone-3 campaign ran against the identical-training receiver and is
+reported in ``RESULTS.md``; that sweep found that every failure above 12.5 dB
+was the receiver acquiring the second of two identical training symbols.  The
+waveform now sends two *distinct* training sequences and the receiver takes
+the plain matched-filter maximum, and the sweep was re-run.  Both sets of
+numbers are in ``RESULTS.md``, kept apart.
 
 It is a candidate screen, not mode qualification.  HC2 is not a registered
 ``WaveformMode``, so ``whale.qualification.run_frame_trial`` cannot drive it;
@@ -22,7 +29,7 @@ Conventions worth stating explicitly:
   padding length changes.
 * EVM is recomputed outside the receiver from the receiver's own acquisition
   diagnostics, repeating its equalization and decision-directed phase track
-  bit-for-bit.  The receiver itself is deliberately left untouched.
+  bit-for-bit, so measuring it cannot perturb what the receiver decided.
 """
 
 from __future__ import annotations
@@ -51,13 +58,17 @@ MODE_NAME = "hc2_32qam"
 
 # Wide enough to bracket the waterfall, dense enough through it to place the
 # knee.  Refine or extend with --points; the milestone-3 campaign ran this
-# grid at 100 trials and then re-ran subsets at 300 and 1,000.
+# grid at 100 trials and then re-ran subsets at 300 and 1,000.  Note that
+# ``trial_seed`` keys on the *index* of a point within --points, so re-running
+# a subset only stays paired with an earlier run when the --points list is
+# reproduced verbatim.
 DEFAULT_POINTS = (0.0, 4.0, 8.0, 9.0, 9.5, 10.0, 10.5, 11.0, 11.5,
                   12.0, 12.5, 13.0, 14.0, 16.0, 20.0)
 
 # Acquisition is called successful when the receiver lands inside the cyclic
 # prefix of the true frame start and resolves the (zero) carrier offset to
-# better than the training-symbol ambiguity.
+# within 2 Hz.  A start error of exactly +SYMBOL_SAMPLES is the retired
+# identical-training mis-acquisition and is what this tolerance excludes.
 START_TOLERANCE_SAMPLES = hc2.GUARD_SAMPLES
 FREQUENCY_TOLERANCE_HZ = 2.0
 
@@ -342,7 +353,8 @@ def run(args) -> dict:
     artifact = {
         "schema": "whalemodem.hc2-awgn-snr-evm.v1",
         "qualification_evidence": False,
-        "experiment": "hc2_32qam milestone 3 AWGN SNR/EVM sweep",
+        "experiment": "hc2_32qam AWGN SNR/EVM sweep",
+        "receiver": "distinct training symbols, matched-filter argmax",
         "started_utc": started.isoformat(),
         "completed_utc": datetime.now(timezone.utc).isoformat(),
         "elapsed_seconds": time.monotonic() - clock,

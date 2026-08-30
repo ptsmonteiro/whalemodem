@@ -67,10 +67,29 @@ GEOMETRY = ofdm.Geometry(
 ).scaled_to_rms(0.13)
 
 _WHITENER = bits.pn_bits(PACKET_BYTES * 8, 0x12A6D)
-_TRAINING = np.tile(
-    bits.qpsk_from_bits(bits.pn_bits(2 * N_CARRIERS, 0x0C531)),
-    (TRAINING_SYMBOLS, 1),
-)
+
+# The two training symbols carry *different* full-band QPSK sequences.  An
+# earlier revision repeated one sequence twice, which gave the acquisition
+# matched filter two near-equal correlation peaks 1,152 samples apart and made
+# the receiver acquire training symbol 2 instead of training symbol 1 on a few
+# percent of frames above 12.5 dB SNR (`RESULTS.md`).  Distinct sequences
+# remove the ambiguity at the source and cost no airtime.
+#
+# Seed 0x0C531 is the original training sequence and is kept as symbol 1 so the
+# acquisition template is unchanged.  Seed 0x00C3A was chosen by scanning
+# order-17 LFSR seeds 1..4095: it is the seed whose symbol has both a low
+# peak-to-average ratio (7.39 dB, 2.50 dB below symbol 1's 9.89 dB) and an
+# essentially vanishing normalized cross-correlation against the symbol-1
+# template (3.4e-4, i.e. -34.7 dB), so a symbol-2 arrival cannot masquerade as
+# a symbol-1 arrival.  Both sequences are QPSK on every one of the 49 carriers,
+# so both remain constant-modulus and full-band, which is what makes the
+# per-carrier channel estimate well conditioned.
+_TRAINING_SEEDS = (0x0C531, 0x00C3A)
+assert len(_TRAINING_SEEDS) == TRAINING_SYMBOLS
+_TRAINING = np.vstack([
+    bits.qpsk_from_bits(bits.pn_bits(2 * N_CARRIERS, seed))
+    for seed in _TRAINING_SEEDS
+])
 
 
 def _gray_to_binary(gray: np.ndarray) -> np.ndarray:
@@ -189,17 +208,25 @@ def demodulate(audio: np.ndarray, *, max_frequency_offset_hz: float = 20.0,
         energy = signal.convolve(np.abs(corrected) ** 2, np.ones(len(template)),
                                  mode="valid", method="fft")
         metric = np.abs(correlation) ** 2 / np.maximum(energy * template_energy, 1e-30)
-        # A complete frame must remain after the candidate.  The two training
-        # symbols are intentionally identical, so select the earliest member
-        # of the near-equal correlation peak rather than acquiring training 2.
+        # A complete frame must remain after the candidate.  The training
+        # symbols are distinct, so the matched filter has a single unambiguous
+        # maximum and the lag is taken straight from it; the earliest-lag
+        # tie-break the identical-training design needed is gone with it.
         metric = metric[:len(samples) - FRAME_SAMPLES + 1]
-        peak = float(np.max(metric))
-        at = int(np.flatnonzero(metric >= peak * 0.995)[0])
+        at = int(np.argmax(metric))
+        peak = float(metric[at])
         if peak > best_metric:
             best_metric, best_start, best_coarse = peak, at, float(frequency)
     coarse = analytic * np.exp(-2j * np.pi * best_coarse * sample_index / SAMPLE_RATE)
     training = _analytic_carriers(coarse, best_start)[:TRAINING_SYMBOLS]
-    residual = np.angle(np.sum(training[1] * np.conj(training[0]))) / (
+    # Residual carrier offset from the phase advance between the two training
+    # symbols.  They carry different constellations, so the known transmitted
+    # values must be divided out per carrier first; the channel itself cancels
+    # in the product because it is common to both symbols.  The unambiguous
+    # range is one symbol period, +/-SAMPLE_RATE/(2*SYMBOL_SAMPLES) = +/-20.83 Hz,
+    # which covers the residual left by the 1 Hz coarse search.
+    known = training * np.conj(_TRAINING)
+    residual = np.angle(np.sum(known[1] * np.conj(known[0]))) / (
         2 * np.pi * SYMBOL_SAMPLES / SAMPLE_RATE)
     frequency = best_coarse + residual
     corrected = analytic * np.exp(-2j * np.pi * frequency * sample_index / SAMPLE_RATE)

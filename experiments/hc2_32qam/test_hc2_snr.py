@@ -48,10 +48,14 @@ def test_clean_capture_has_negligible_evm_and_no_raw_bit_errors():
     assert metrics["equalizer_rejected"] is False
     assert metrics["raw_ber"] == 0.0
     assert metrics["symbol_error_rate"] == 0.0
-    # ~1.8% is the receiver's noise-free implementation floor: the analytic
+    # ~2% is the receiver's noise-free implementation floor: the analytic
     # (``scipy.signal.hilbert``) front end leaks across the per-symbol FFT,
-    # unlike the real-FFT oracle path, whose EVM is ~1e-6%.
-    assert metrics["evm_percent"] == pytest.approx(1.81, abs=0.15)
+    # unlike the real-FFT oracle path, whose EVM is ~1e-6%.  It rose from
+    # ~1.74% to ~2.12% (full-capacity frames) when the two training symbols
+    # stopped being identical: the channel estimate now averages two
+    # different leakage patterns instead of two matching ones, so less of the
+    # front end's own error cancels.  Still four times below the 10% trigger.
+    assert metrics["evm_percent"] == pytest.approx(1.99, abs=0.15)
     assert metrics["evm_percent"] == pytest.approx(
         metrics["true_evm_percent"], abs=1e-9)
 

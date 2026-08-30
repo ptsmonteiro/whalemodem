@@ -53,18 +53,21 @@ changing connection management or ARQ.
 
 ### Experimental HC2 coherent-32QAM rate proof
 
-`experiments/hc2_32qam/` is a speed-first, oracle-aligned prototype rather
-than a `WaveformMode`. It uses 49 carriers, a 1,024-sample FFT, 128-sample
-cyclic prefix, 41.667 transmitted symbols/s, coherent rectangular 32QAM, and
-rate-3/4 punctured convolutional coding. Its full 2,749-byte payload occupies
-2.928 seconds including two known training symbols, for 7,510.93 bit/s of
-user payload in the clean identity-channel proof.
+`experiments/hc2_32qam/` is a speed-first prototype rather than a
+`WaveformMode`. It uses 49 carriers, a 1,024-sample FFT, 128-sample cyclic
+prefix, 41.667 transmitted symbols/s, coherent rectangular 32QAM, and rate-3/4
+punctured convolutional coding. Its full 2,749-byte payload occupies 2.928
+seconds including two known training symbols -- two *different* full-band QPSK
+sequences, so frame acquisition has one unambiguous correlation peak -- for
+7,510.93 bit/s of user payload.
 
-It is intentionally absent from every registry and from HF negotiation. The
-prototype has oracle timing and no acquisition, channel/CFO/clock tracking,
-AWGN/Watterson qualification, radio-linearity evidence, link air header, ARQ,
-or PTT accounting. Its result establishes codec and waveform rate feasibility
-only; it is not evidence that the mode works over an HF path.
+It is intentionally absent from every registry and from HF negotiation. It has
+an oracle-aligned receiver and a real acquisition/CFO/equalization/phase-tracking
+one, and an AWGN FER/EVM screen (`experiments/hc2_32qam/RESULTS.md`), but no
+sample-clock tracking, no Watterson evidence, no radio-linearity evidence, and
+no link air header, ARQ, or PTT accounting. Its result establishes codec and
+waveform rate feasibility plus a benign-channel SNR floor; it is not evidence
+that the mode works over an HF path.
 
 ## Modulation profiles
 

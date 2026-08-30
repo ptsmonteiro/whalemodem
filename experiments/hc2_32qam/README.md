@@ -20,12 +20,16 @@ Geometry and rate accounting:
 | Complete oracle frame | 2.928 s |
 | Sustained full-frame user-payload rate | 7,510.93 bit/s |
 
+The two training symbols carry different known full-band QPSK sequences, so
+the acquisition correlation has a single unambiguous peak.
+
 The net figure includes the two training symbols, length, CRC32, trellis tail,
 byte rounding, and padding. It excludes acquisition preamble, PTT/turnaround,
-ARQ, and link air headers. The receiver assumes the exact frame start and an
-identity channel; it has no CFO, sample-clock, phase, amplitude, fading, or
-noise recovery. Moderate/disturbed Watterson performance is deliberately not
-a gate for this top-mode rate milestone.
+ARQ, and link air headers. The milestone-1 oracle receiver
+(`demodulate_oracle`) assumes the exact frame start and an identity channel; it
+has no CFO, sample-clock, phase, amplitude, fading, or noise recovery.
+Moderate/disturbed Watterson performance is deliberately not a gate for this
+top-mode rate milestone.
 
 Run the deterministic proof with:
 
@@ -34,28 +38,44 @@ pytest -q experiments/hc2_32qam/test_hc2_32qam.py
 ```
 
 Milestone 2 adds `demodulate`: bounded matched-filter carrier-offset and frame
-acquisition, repeated-training CFO refinement, per-carrier complex
-equalization, and decision-directed common-phase tracking. It adds no airtime,
-so the full-frame net rate remains 7,510.93 bit/s. Deterministic tests cover
-carrier offsets through +/-15 Hz, leading samples, static frequency-selective
-complex gain, and smooth phase wobble. This is benign-channel evidence, not
-Watterson qualification; sample-clock/multipath tracking and soft 32QAM
-metrics remain future work.
+acquisition, training-pair CFO refinement, per-carrier complex equalization,
+and decision-directed common-phase tracking. It adds no airtime, so the
+full-frame net rate remains 7,510.93 bit/s. Deterministic tests cover carrier
+offsets through +/-15 Hz, leading samples, static frequency-selective complex
+gain, and smooth phase wobble. This is benign-channel evidence, not Watterson
+qualification; sample-clock/multipath tracking and soft 32QAM metrics remain
+future work.
 
-Milestone 3 adds `benchmark_hc2_snr.py`, an AWGN FER/EVM sweep against the
-milestone-2 receiver as it stands, and `test_hc2_snr.py` for the harness
-itself. Over 7,800 full-capacity frame trials the mode clears the project's
-existing FER gate (Wilson 95% upper bound at most 10%) from 12 dB
-waveform-referenced SNR, reaches FER at most 1e-2 at 16 dB, and delivered
-1,100/1,100 frames at 20 dB. Realized net payload passes the 7,050 bit/s
-reference at 12.5 dB and reaches 7,504 bit/s at 16 dB. Post-equalization
-decision-directed EVM separates decoding from failing frames well enough to
-drive a fallback trigger at 10%. The sweep also found that every failure
-above 12.5 dB is one acquisition defect -- locking onto the second of the two
-identical training symbols -- not a noise limit; the receiver was
-deliberately left unchanged, and `RESULTS.md` records the full curve, the EVM
-overlap region, the estimated ~2.4 dB hard-decision demapping penalty, and
-the recommended fixes. AWGN only; Watterson is milestone 4.
+Milestone 3 adds `benchmark_hc2_snr.py`, an AWGN FER/EVM sweep, and
+`test_hc2_snr.py` for the harness itself. Its 7,800-trial campaign found that
+every failure above 12.5 dB was a single acquisition defect rather than a
+noise limit: the two training symbols were identical, so the acquisition
+matched filter had two near-tied peaks one OFDM symbol apart and the receiver
+sometimes locked onto the second one. Per the milestone constraint the
+receiver was left unchanged and the defect was written up instead.
+
+The fix followed and is what the package now ships. Training symbol 2 carries
+a **different** full-band QPSK sequence (LFSR seed `0x00C3A`, picked by a scan
+of seeds 1..4095 for low PAPR and near-zero correlation against the
+acquisition template), the earliest-lag tie-break is gone in favour of the
+plain matched-filter maximum, and CFO refinement divides the known training
+values out before taking the inter-symbol phase advance. This changes 1,152
+samples of the waveform and nothing else: frame structure, airtime, capacity,
+frame PAPR and the 7,510.93 bit/s net rate are unchanged, and the payload half
+of the frame is sample-identical.
+
+Re-running the sweep over 8,300 full-capacity trials, the mode clears the
+project's existing FER gate (Wilson 95% upper bound at most 10%) from
+**11.5 dB** waveform-referenced SNR and reaches FER at most 1e-2 at **13 dB**
+(12.5 dB misses only on the Wilson upper bound, 1.0033% against a 1%
+criterion). No frame failed anywhere at 13 dB or above, over 4,300 trials from
+13 to 25 dB. Realized net payload passes the 7,050 bit/s reference at
+11.5 dB. Not one trial in 8,300 mis-acquired: no start error exceeded one
+sample at any SNR down to 0 dB. Post-equalization decision-directed EVM still
+supports a fallback trigger at 10%. `RESULTS.md` records both campaigns side
+by side -- current and superseded -- with the full curves, the EVM overlap
+regions, the estimated ~2.4 dB hard-decision demapping penalty that remains
+out of scope, and what is left to do. AWGN only; Watterson is milestone 4.
 
 Run the harness tests with:
 
