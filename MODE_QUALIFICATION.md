@@ -7,6 +7,15 @@ channel policy: qualification on `vhf-fm` does not qualify a mode for
 delivery, acquisition, adaptation, and resource cost, not merely a successful
 codec loopback or a nominal bit rate.
 
+Qualification is scoped to a mode's rung role and declared operating
+envelope, per [GOALS.md](GOALS.md). A level-0 control/fallback mode is
+qualified against the worst conditions its policy claims to serve; a top
+rung is qualified against peak useful throughput on a good channel and is
+expected to fail outside a narrow envelope. Every gate below that references
+channel conditions applies **inside the mode's declared envelope only**.
+Failing outside it is expected behaviour and never a gate failure, provided
+a lower rung covers those conditions and the link demonstrably falls back.
+
 The requirements below are cross-checked against the repository as of
 2026-08-29. Items labelled **gap** are requirements for which Whalemodem does
 not yet provide complete automation. They must be measured manually and
@@ -22,7 +31,10 @@ qualifying artifact directory must contain -- only evidence retained under
 - **Optional** means explicitly enabled by an operator for a named channel
   policy. It may be negotiated only when both peers advertise it.
 - **Default** means included by the policy's ordinary `mode_ladder` and safe
-  to advertise without operator action.
+  for the ladder to advertise without operator action. For a level-0 rung
+  this means safe to key on any channel the policy serves; for a faster rung
+  it means safe for the ladder to *negotiate* when conditions warrant, not
+  that the mode itself works everywhere.
 
 `whale.mode_qualification.MANIFEST` maps `(channel policy, mode ID)` to
 `experimental`, `optional`, or `default`. Registry levels are cumulative:
@@ -37,6 +49,33 @@ The manifest initially preserves the historically shipped, provisional
 default ladders recorded in the assessment below. A `default` entry is a
 product-availability disposition, not proof that the evidence gates passed;
 promotion evidence retains the separate status words below.
+
+## Rung roles and operating envelopes
+
+Each mode declares, as part of qualification, a **rung role** and an
+**operating envelope**.
+
+The rung role is one of:
+
+- **level-0** -- the policy's control and fallback mode (HC0 on `hf-ssb`,
+  the lowest CPFSK rung on `vhf-fm`). Optimized for maximum robustness.
+- **intermediate** -- covers the gap between its neighbours.
+- **top** -- the policy's fastest rung. Optimized for maximum useful
+  application throughput on a good channel.
+
+The operating envelope is the explicit set of channel conditions the mode
+claims to deliver on: for `vhf-fm`, the named preset(s) and the minimum RF
+C/N; for `hf-ssb`, the named Watterson preset(s) and the minimum waveform
+SNR in each. It is retained with the mode's qualification artifacts and is
+the scope against which every channel-conditioned gate below is evaluated.
+
+An envelope is a design statement, not a wish. Narrowing it in response to a
+measured result is a legitimate, expected outcome for an intermediate or top
+rung, and is preferred over trading away peak rate for margin. Narrowing a
+**level-0** envelope is not: a level-0 rung that cannot cover its policy's
+worst claimed conditions is a genuine failure, because nothing below it
+provides coverage. Widening an envelope requires new evidence at the added
+points.
 
 Evidence in the assessment table uses four words:
 
@@ -110,19 +149,44 @@ random payloads, and a fresh output file for each model/preset. Use at least
 100 independent trials per `(mode, point)` for initial qualification and at
 least 300 at the two points used to claim a promotion boundary. Seeds are
 derived by the tool and each direction/model must use an independent channel
-instance. The point grid must bracket transition behavior: at least two
-near-clean points, two transition points, and two failing points. Use:
+instance. The point grid must bracket the edge of the declared envelope: at
+least two points well inside it, two near its boundary, and two outside it.
+The outside points are there to locate the boundary, not to be passed. Use:
 
 - `fm` with the policy's measured radio preset for VHF FM;
-- `watterson` with quiet, moderate, and disturbed policy-relevant presets for
-  HF, with explicit waveform SNR;
+- `watterson` with the policy-relevant presets spanned by the mode's
+  envelope, with explicit waveform SNR;
 - `awgn` as a diagnostic baseline, not as the sole qualification channel.
 
-At every claimed operating point the 95% Wilson upper bound on FER must be at
-most 10%, the lower bound on acquisition probability at least 90%, and there
-must be no `error` outcomes. A lower robust/control rung must additionally
-have a point at which it meets those limits while the next faster rung does
-not, demonstrating that it adds coverage rather than only overhead.
+A **level-0** mode's envelope must span the worst conditions its policy
+claims to serve, and its grid must therefore include the disturbed HF preset
+(`hf-ssb`) or the conservative measured preset at the policy's minimum RF
+C/N (`vhf-fm`). Intermediate and top rungs sweep only the presets their own
+envelopes claim; a top rung is not required to sweep disturbed HF at all,
+beyond enough points to show where its boundary lies.
+
+At every point **inside the declared envelope** the 95% Wilson upper bound on
+FER must be at most 10%, the lower bound on acquisition probability at least
+90%, and there must be no `error` outcomes. Results at points outside the
+envelope are recorded to locate the boundary and do not affect the gate,
+except that an `error` outcome -- an exception or unbounded work -- is a
+failure anywhere, envelope or not.
+
+Two asymmetric requirements make the ladder's shape explicit, one in each
+direction:
+
+- A lower rung must have a point at which it meets those limits while the
+  next faster rung does not, demonstrating that it adds coverage rather than
+  only overhead.
+- A faster rung must have a point inside both envelopes at which it meets
+  those limits and beats the rung below on useful throughput by the margin
+  in section 6, demonstrating that it adds speed rather than only risk.
+
+**Gate:** both requirements hold, and the mode meets the FER/acquisition
+limits across its declared envelope. A mode that misses the limits inside
+its envelope may either be fixed or have its envelope narrowed to the
+measured boundary and re-run -- except a level-0 mode, whose envelope is
+fixed by its policy and which must therefore be fixed.
 
 The script reports acquisition probability, FER, payload delivery, confidence
 intervals, channel/decoder measurements, seeds, expanded channel descriptions,
@@ -183,8 +247,19 @@ events.
 
 **Gate:** frame delivery satisfies the same FER/acquisition bounds as the
 Monte Carlo gate in each direction, and every hardware session completes
-exactly and recovers. A known failed direction is a failed gate even if a
-lower rung makes the overall ladder usable.
+exactly and recovers, with the hardware pair's conditions inside the mode's
+declared envelope. A run in which the bench was misconfigured -- a dummy load
+in place of an antenna, a muted or mis-levelled audio path, the wrong
+filter -- did not place the mode inside its envelope and is an **invalid
+run**, recorded as `unmeasured` with the diagnosis retained, not as a
+failure. Such a diagnosis must be supported by the captured metrics and, once
+this document's configuration metadata is retained, by the recorded setup.
+A known failed direction on a valid run is a failed gate for a level-0
+mode unconditionally. For an intermediate or top rung it is a failed gate
+unless the failure is shown to be a property of that radio pair's conditions
+rather than of the direction -- in which case the envelope is narrowed to
+exclude those conditions and the ladder must be shown to fall back on that
+leg. An unexplained directional asymmetry is always a failure.
 
 ### 6. Useful throughput and adjacent-rung overlap
 
@@ -197,6 +272,18 @@ lower mode's by 10% or more. In full sessions, enabling the faster rung must
 improve median useful application throughput by at least 5% without reducing
 completion reliability. The lower rung must also retain the distinct robust
 point required above.
+
+These margins are a floor for a rung's existence, not a target. The **top**
+rung of each policy carries an additional speed gate: on a clean channel
+inside its envelope it must reach at least 60% of its policy's GOALS.md
+reference peak -- 7,050 bit/s useful application throughput in a 2300 Hz HF
+channel, 12,750 bit/s in VARA FM Narrow -- measured as useful application
+bytes per keyed second in a full session. A top rung that clears every
+reliability gate but does not approach the reference rate has not met its
+purpose, and closing that gap takes priority over widening its envelope.
+Where no existing rung reaches the threshold, the fastest one holds the top
+role provisionally and the shortfall is recorded as a `failed` speed row
+rather than being redefined away.
 
 `benchmark_simulated_channels.py`, `benchmark_sessions.py`, and
 `sweep_modes.py` calculate the needed useful-throughput quantities. **Gap:**
@@ -236,6 +323,8 @@ must list every gate and link its immutable artifact. JSON artifacts must use
 the existing `TrialRun` schema where applicable and otherwise a documented,
 versioned schema. Retain:
 
+- the mode's declared rung role and operating envelope, and any change to
+  that envelope with the measurement that motivated it;
 - exact command, UTC start/end, trial counts, master and derived seeds;
 - mode name/ID, registry order/control ID, policy and payload size;
 - Git commit and dirty state (default promotion requires a clean tree);
@@ -261,9 +350,9 @@ Promotion is monotonic in evidence, not in implementation maturity:
 
 | Destination | Mandatory gates |
 | --- | --- |
-| Experimental | Unit/malformed-input suite and a bounded clean loopback pass; unique stable mode ID; decoder resource use is bounded by construction/test. |
-| Optional | All experimental gates; bounded CI; frame Monte Carlo; one bidirectional radio pair; full simulated sessions and recovery; adjacent-rung value/overlap; development-host CPU/RSS. |
-| Default | All optional gates; 100-trial promotion session points; two bidirectional hardware pairs and hardware recovery; minimum-target CPU/RSS and no dropouts; complete clean-commit artifacts and documentation. |
+| Experimental | Unit/malformed-input suite and a bounded clean loopback pass; unique stable mode ID; declared rung role and provisional envelope; decoder resource use is bounded by construction/test. |
+| Optional | All experimental gates; bounded CI; frame Monte Carlo across the declared envelope; one bidirectional radio pair; full simulated sessions and recovery; adjacent-rung value/overlap; development-host CPU/RSS. |
+| Default | All optional gates; envelope confirmed by the promotion-sized runs (level-0 spanning its policy's worst claimed conditions; top rung meeting the section 6 speed gate); 100-trial promotion session points; two bidirectional hardware pairs and hardware recovery; minimum-target CPU/RSS and no dropouts; complete clean-commit artifacts and documentation. |
 
 Every mandatory row must be `passed`. `failed`, `unmeasured`, or `provisional`
 blocks a new promotion. A regression in a default mode removes it from the
@@ -279,17 +368,20 @@ the group status.
 
 | Requirement | CPFSK | VF3 | HC0 | HC1 |
 | --- | --- | --- | --- | --- | --- |
+| Rung role | level-0 (300 baud) through top (1200 baud) VHF | top VHF | level-0 HF control | top HF |
+| Declared operating envelope | `vhf_bench_conservative`, 5 dB RF C/N and above (all three rungs) | `vhf_bench_conservative`, 10 dB RF C/N and above | all three mid-latitude Watterson presets including disturbed, across the tested SNR range | Watterson quiet above -5 dB and moderate at 10 dB and above; disturbed excluded |
 | Unit, framing, malformed input | passed | passed | provisional | provisional |
 | Bounded policy channel CI | passed | passed | passed | passed |
-| Qualified frame Monte Carlo | passed (2026-08-29 clean-tree rerun after the channel-drain fix; 300 and 600 baud delivered 600/600 and 598/600, 1200 baud delivered 591/600, all within the FER/acquisition gate) | failed (2026-08-30 clean-tree run; 0/100 at 5 dB RF C/N, 99-100/100 from 10 dB up; root-caused to a genuine carrier-SNR floor, not an acquisition or threshold bug -- see campaign notes below) | passed (2026-08-30 clean-tree run; 100/100 at every SNR point across quiet, moderate, and disturbed Watterson presets) | failed (2026-08-30 clean-tree run; passes quiet above -5 dB and moderate at 10 dB+, but never clears the gate under the disturbed preset at any tested point, 20-61/100) |
+| Qualified frame Monte Carlo | passed (2026-08-29 clean-tree rerun after the channel-drain fix; 300 and 600 baud delivered 600/600 and 598/600, 1200 baud delivered 591/600, all within the FER/acquisition gate)  | passed within the declared envelope (2026-08-30 clean-tree run; 99-100/100 at every point from 10 dB RF C/N up). 0/100 at 5 dB is outside the envelope and root-caused to a genuine carrier-SNR floor, not an acquisition or threshold bug; the 300/600 baud rungs cover that region -- see campaign notes below | passed (2026-08-30 clean-tree run; 100/100 at every SNR point across quiet, moderate, and disturbed Watterson presets) | passed within the declared envelope (2026-08-30 clean-tree run; clears quiet above -5 dB and moderate at 10 dB+). The disturbed preset is outside the envelope by design and is covered by HC0, which passed the identical trials 100/100 |
 | Full-stack connection and bidirectional ARQ | passed | passed | passed | passed |
 | Scripted adaptation/fault recovery artifact | provisional | provisional | provisional | provisional |
-| Bidirectional hardware frame gate | unmeasured | provisional (6/6, 3 each way) | provisional (2026-08-28 captures, 11/11 and 5/5 each way, below trial minimum) | failed (2026-08-28 captures, 17/17 one direction, 0/3 the other; see `logs/mode_qualification/hf-ssb/hc0-hc1/2026-08-28-hardware/INDEX.md`) |
+| Bidirectional hardware frame gate | unmeasured | provisional (6/6, 3 each way) | provisional (2026-08-28 captures, 11/11 and 5/5 each way, below trial minimum) | unmeasured (2026-08-28 captures, 17/17 one direction, 0/3 the other; the weak leg is attributed to the IC-705 transmitting into a dummy load, so the session does not measure HC1's envelope and the 0/3 is an invalid run rather than a failed direction -- see `logs/mode_qualification/hf-ssb/hc0-hc1/2026-08-28-hardware/INDEX.md`. Re-run required with both stations on antennas and the transmit configuration recorded) |
 | Full hardware link/recovery gate | provisional | unmeasured | unmeasured | unmeasured |
-| Useful throughput and adjacent overlap | provisional | provisional | provisional | failed/unmeasured (the weak hardware leg failed; no qualifying overlap sweep) |
+| Useful throughput and adjacent overlap | provisional | provisional | provisional | unmeasured (no qualifying overlap sweep; the top-rung speed gate against the 7,050 bit/s reference is also unmeasured) |
 | Development CPU and RSS | unmeasured | unmeasured | unmeasured | unmeasured |
 | Minimum-target CPU, RSS, and dropouts | unmeasured | unmeasured | unmeasured | unmeasured |
 | Complete promotion artifact/metadata | unmeasured | provisional | provisional | provisional |
+| Top-rung speed gate (>=60% of the GOALS reference peak) | n/a below the top rung; unmeasured for 1200 baud | unmeasured | n/a (level-0) | unmeasured |
 | Present registry disposition | provisional default VHF | provisional default VHF | provisional default HF control | provisional default HF fast rung |
 
 The full-stack passes come from `tests/test_audio_e2e.py`, which exercises the
@@ -309,11 +401,19 @@ directory's `INDEX.md`): HC0 has exact saved-capture replay in both
 directions (11/11 and 5/5), including the weak HF leg, though its largest
 single batch (6 trials) is below the 100-trial minimum. HC1's saved captures
 establish one useful direction at 17/17 and its frequency-offset handling,
-while the reverse leg failed all 3 attempted trials at acquisition -- a real
-failure of the bidirectional frame gate, smaller than the "0/10" figure this
-document previously cited from memory rather than from a retained artifact.
-HC1 may remain a provisional fast rung because HC0 is the control/fallback
-mode, but this evidence would block promoting HC1 under this process.
+while the reverse leg failed all 3 attempted trials at acquisition, detecting
+no carriers at all. That leg is attributed to the IC-705 transmitting into a
+dummy load rather than an antenna: HC0 decoded 11/11 over the same leg in the
+same session but with visibly degraded metrics in that direction only
+(confidence 0.38-0.42 and nonzero raw BER, against 0.49-0.50 and zero BER the
+other way), which is the signature of a large one-directional path loss that
+HC0's margin absorbs and HC1 cannot. The attribution rests on operator
+recollection because no antenna or power configuration was retained with the
+run -- precisely the metadata this document now requires. The session
+therefore does not measure HC1's declared envelope, and its hardware frame
+gate is `unmeasured` pending a re-run with both stations on antennas, rather
+than a failed direction. HC1 remains a provisional fast rung with HC0 as its
+control/fallback mode.
 
 The first retained CPFSK campaign is
 `logs/mode_qualification/vhf-fm/cpfsk/2026-08-29/fm_frame_monte_carlo.json`.
@@ -427,9 +527,8 @@ point-by-point results and commands.
 VF3 delivered 0/100 at 5 dB RF C/N -- every trial was classified as an
 acquisition failure by `ACQUISITION_THRESHOLD` (0.70) -- then cleared the
 gate at every point from 10 dB up (99-100/100). This is a hard cliff rather
-than a gradual FER slope, and it blocks "Qualified frame Monte Carlo" for
-VF3 as currently written unless 5 dB is dropped from its claimed operating
-range.
+than a gradual FER slope, and it fixes the lower edge of VF3's operating
+envelope at 10 dB RF C/N under `vhf_bench_conservative`.
 
 This was root-caused on 2026-08-30 by replaying trial seeds from the same
 campaign directly against `whale/modes/vf3.py` with `ACQUISITION_THRESHOLD`
@@ -446,9 +545,12 @@ wideband tone, which cleared 91/100 at the same 5 dB RF C/N point in the
 miscalibration, or a channel-drain artifact; no code change is indicated.
 The finding is the same shape as HC1's disturbed-preset result below: a fast
 rung with a real operating-range boundary that a more robust mode (CPFSK
-here) is expected to cover. VF3's claimed operating range should exclude
-5 dB RF C/N under `vhf_bench_conservative` unless a future waveform or
-coding change adds carrier-SNR margin.
+here) is expected to cover. VF3's declared envelope therefore starts at
+10 dB RF C/N under `vhf_bench_conservative`. This is the intended shape for
+a top rung: the correct response is to keep VF3's rate and let the CPFSK
+rungs own the region below, not to add carrier-SNR margin at the cost of
+speed. A future waveform or coding change may widen the envelope only if it
+does not reduce peak useful throughput.
 
 HC0 passed cleanly at 100/100 across every SNR point in every preset,
 including disturbed, clearing the gate outright.
@@ -466,10 +568,25 @@ problem, and it does not respond to added SNR -- consistent with HC0's
 `whale/modes/hc0.py` redundancy margin passing the identical trials at
 100/100. HC1's fast-rung disposition already assumes HC0 is the fallback for
 conditions it cannot cover; this campaign is evidence that disturbed HF
-conditions are one of them.
+conditions are one of them, and the disturbed preset is accordingly excluded
+from HC1's declared envelope rather than treated as a defect. Adding
+frequency-selective-fading margin to HC1 -- wider carrier spacing, heavier
+coding -- would cost the peak rate that is HC1's reason to exist, and is not
+indicated. The open work on HC1 is speed against the 7,050 bit/s reference
+and a valid bidirectional hardware run, not disturbed-channel robustness.
 
-No qualifying adjacent-rung overlap report or CPU/RSS artifact has yet been
-retained for any production mode, and CPFSK remains the only mode with a
-fully passing Monte Carlo result. Existing default placement therefore
+No qualifying adjacent-rung overlap report, top-rung speed measurement, or
+CPU/RSS artifact has yet been retained for any production mode. CPFSK and
+HC0 pass the Monte Carlo gate outright; VF3 and HC1 pass it within the
+declared envelopes recorded above. Existing default placement therefore
 records historical/provisional acceptance rather than retroactively
 declaring the new gates passed.
+
+`experiments/hc2_32qam/` is not a declared mode and therefore has no manifest
+entry or mode ID. Its deterministic clean-channel, oracle-aligned test is a
+rate-feasibility milestone only. Acquisition, channel tracking, simulated
+channel trials, hardware evidence, negotiation, and application-throughput
+work remain prerequisites before it can enter this qualification process. As
+a candidate HF top rung it would be evaluated against the section 6 speed
+gate on a good channel, with a narrow declared envelope, rather than against
+disturbed-preset robustness.

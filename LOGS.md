@@ -25,7 +25,12 @@ artifacts (`.json` result files, and `.bin`/`.npy` capture pairs for hardware
 runs). `INDEX.md` states, at minimum:
 
 - the exact command run (or, for a hardware session, how the capture was
-  taken and with what radios/config);
+  taken and with what radios/config). For hardware runs this must include the
+  RF path on **each** station -- antenna or dummy load, power setting, and
+  audio levels -- because a one-directional path deficit is otherwise
+  indistinguishable from a waveform failure once the session is over. The
+  2026-08-28 HC0/HC1 run is the cautionary case: its weak leg was a dummy
+  load, but nothing in the artifact recorded that;
 - the git commit and whether the tree was clean or dirty;
 - per-point or per-trial results, in enough detail to recompute the verdict;
 - which qualification gate(s) this evidence does or does not clear, and why.

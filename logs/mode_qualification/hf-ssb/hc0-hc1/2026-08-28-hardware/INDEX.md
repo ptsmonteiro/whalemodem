@@ -35,8 +35,42 @@ trial at acquisition. This is the hardware evidence behind
 `MODE_QUALIFICATION.md`'s "documented weak-direction failure" note for HC1's
 bidirectional hardware frame gate -- it fails that gate as currently written.
 
+## 2026-08-30 operator note on the weak ic705->ic7300 leg
+
+The operator recalls that during this session the IC-705 was connected to a
+dummy load rather than an antenna, so it radiated very little power into the
+ic705->ic7300 path. This is recollection, not a recorded configuration
+field -- no antenna/power setting was retained with the run (see below) --
+but the captured metrics are consistent with it and with nothing else
+obvious:
+
+- HC1 ic705->ic7300: `present_carriers` 0 on all 3 trials, confidence
+  0.20-0.29, failure `header not found`. No signal detected at all, rather
+  than a marginal or partially-acquired one.
+- HC0 ic705->ic7300: decoded 11/11, but with confidence 0.38-0.42 and
+  nonzero raw BER (0.0018-0.0027) in `hc0_both.json`, against confidence
+  0.49-0.50 and zero raw BER on ic7300->ic705 in the same batch.
+
+A one-directional level deficit that HC0's redundancy margin absorbs while
+HC1 does not acquire is the expected ladder behaviour under a large path
+loss, and matches the simulated finding that HC0 covers conditions HC1's
+envelope excludes.
+
+The consequence for qualification is that this session does not measure
+HC1's declared envelope at all: the weak leg was not a channel condition
+under test but a bench misconfiguration. The 0/3 result is therefore treated
+as an invalid run rather than a failed direction, and HC1's bidirectional
+hardware frame gate is `unmeasured` pending a re-run with both stations on
+antennas and the transmit configuration recorded. HC0's 11/11 on that leg
+remains valid evidence and is, if anything, strengthened by it.
+
+## Missing configuration metadata
+
 Neither mode has a retained artifact recording the transmit/receive
 configuration (radio settings, audio levels, antenna/path) beyond what each
 JSON's per-trial fields capture, so this evidence cannot yet support a
 complete promotion record on its own; see `LOGS.md` for what a full
-qualification artifact requires going forward.
+qualification artifact requires going forward. This session is the concrete
+case for that requirement: had the antenna/dummy-load state been recorded,
+the weak leg would have been identifiable from the artifact instead of from
+recollection two days later.

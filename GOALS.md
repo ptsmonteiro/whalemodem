@@ -17,6 +17,30 @@ and VARA HF while remaining easy to inspect, test, extend, and integrate.
 Whalemodem should be competitive with VARA FM and VARA HF in both speed and
 robustness under comparable channel conditions.
 
+That is a property of the whole mode ladder, not of any single mode. The
+objective is deliberately different at each end of the ladder, and a mode
+should be designed and judged against the objective for its own rung:
+
+- **Level 0 (the HF and FM control and fallback modes) is optimized for
+  maximum robustness.** These rungs must keep a link alive in the worst
+  conditions the policy claims to serve, including disturbed HF paths and
+  low signal-to-noise ratios. Speed is secondary; paying throughput for
+  margin is the correct trade here.
+- **Top rungs are optimized for maximum speed.** They are *expected* to
+  require good channel conditions and to stop working outside them. A fast
+  mode that fails on a poor channel is behaving as designed, provided a
+  lower rung covers that channel and the link falls back to it. Widening a
+  fast mode's operating range at the cost of its peak rate defeats its
+  purpose.
+- **Intermediate rungs** trade the two off, each covering the gap between
+  its neighbours.
+
+Every mode therefore declares an **operating envelope**: the channel
+conditions under which it is expected to deliver. Robustness work belongs
+inside a mode's declared envelope; outside it, the ladder — not the mode —
+is responsible for coverage. Narrowing a fast rung's envelope in response to
+measurement is a legitimate outcome, not a defect to be fixed.
+
 Performance work should consider more than nominal bit rate. Measurements
 should include:
 
@@ -83,6 +107,14 @@ A valid comparison must measure useful application throughput and delivery
 reliability at stated channel conditions, including SNR and impairments; a
 nominal or codec rate alone does not demonstrate parity with a row in these
 tables.
+
+The two ends of each ladder are held to different targets. The level-0 rung
+is judged by how poor a channel it still delivers on, and should aim to
+remain usable at or below the conditions where the corresponding VARA
+fallback mode operates. The top rung is judged by peak useful application
+throughput on a good channel, and should aim at the 7,050 bit/s and
+12,750 bit/s reference rows above; it is not required to work anywhere near
+the level-0 rung's conditions.
 
 ### Adaptive radio timing
 
@@ -232,6 +264,9 @@ Design decisions should favor:
   application API
 - Resource efficiency and predictable real-time behavior on low-end hardware
 - Correctness and observability before optimization
+- Robustness per rung as declared, rather than as much robustness as
+  possible in every mode: maximum margin at level 0, maximum speed at the
+  top, and an explicit operating envelope for each
 
 ## Definition of the end state
 
