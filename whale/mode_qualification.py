@@ -46,6 +46,7 @@ MANIFEST = (
     QualificationEntry("vhf-fm", 1, QualificationLevel.DEFAULT),
     QualificationEntry("vhf-fm", 2, QualificationLevel.DEFAULT),
     QualificationEntry("vhf-fm", 3, QualificationLevel.DEFAULT),
+    QualificationEntry("vhf-fm", 6, QualificationLevel.EXPERIMENTAL),
     QualificationEntry("hf-ssb", 5, QualificationLevel.DEFAULT),
     QualificationEntry("hf-ssb", 4, QualificationLevel.DEFAULT),
 )
@@ -68,8 +69,9 @@ def registry(policy: str, level: QualificationLevel | str =
     if policy == "vhf-fm":
         from . import afsk
         from .modes.vf3_mode import VF3
+        from .modes.vf6_mode import VF6
         base = afsk.default_registry() if budget is None else afsk.default_registry(budget)
-        candidates, control = tuple(base.modes) + (VF3,), base.control
+        candidates, control = tuple(base.modes) + (VF3, VF6), base.control
     elif policy == "hf-ssb":
         from .modes.hc0_mode import HC0
         from .modes.hc1_mode import HC1

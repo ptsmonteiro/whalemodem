@@ -77,6 +77,15 @@ worst claimed conditions is a genuine failure, because nothing below it
 provides coverage. Widening an envelope requires new evidence at the added
 points.
 
+VF6 (VHF FM mode ID `6`) is the first declared experimental top rung. Its
+codec, clean audio path, and bounded synthetic `flat_nbfm` channel point have
+focused conformance tests. A retained 20-trial-per-point smoke sweep passes
+20/20 full-capacity frames at 35 and 40 dB RF C/N and fails 20/20 at 30 dB;
+this is provisional because it is below the Monte Carlo trial count and is a
+synthetic recipe rather than the required measured preset. Session,
+interoperability, hardware, and resource gates remain unmeasured; its manifest
+entry must not be read as a promotion or application-throughput claim.
+
 Evidence in the assessment table uses four words:
 
 - `passed`: a retained result meets the gate exactly;

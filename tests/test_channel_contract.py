@@ -12,7 +12,7 @@ from whale.channel import (AudioChannel, AwgnChannel, ChannelChain,
                            SampleClockChannel, SnrKind, SnrSpec,
                            waveform_power)
 from whale.trials import (TrialOutcome, TrialResult, TrialRun,
-                          classify_decode)
+                          classify_decode, common_decoder_metrics)
 
 
 def test_identity_channel_satisfies_contract_and_does_not_alias_input():
@@ -69,6 +69,20 @@ def test_decode_classification_separates_acquisition_and_payload_failures():
         is TrialOutcome.ACQUISITION_FAILED
     assert classify_decode({"payload": None, "confidence": 0.8}, expected, 0.7) \
         is TrialOutcome.PAYLOAD_FAILED
+
+
+def test_common_decoder_metrics_retains_bounded_fec_diagnostics():
+    metrics = common_decoder_metrics({
+        "rs_ok": True, "rs_corrected_bytes": 12,
+        "rs_block_corrections": np.array([2, 4, 6]),
+        "rs_max_block_corrections": 6, "decoded_length": 100,
+        "private_debug_buffer": np.ones(10_000),
+    }, np.zeros(4))
+    assert metrics["rs_block_corrections"].tolist() == [2, 4, 6]
+    assert metrics["rs_corrected_bytes"] == 12
+    assert metrics["rs_max_block_corrections"] == 6
+    assert metrics["decoded_length"] == 100
+    assert "private_debug_buffer" not in metrics
 
 
 def test_awgn_has_requested_power_and_reset_replays_exact_realization():

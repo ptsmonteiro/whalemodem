@@ -91,6 +91,8 @@ def common_decoder_metrics(result: Mapping[str, object], audio) -> dict:
         "bit_error_positions", "bit_error_positions_truncated", "crc_ok",
         "present_carriers",
         "carrier_snr_db", "tone_snr_db", "snr_db", "symbol_evm_db",
+        "rs_ok", "rs_corrected_bytes", "rs_block_corrections",
+        "rs_max_block_corrections", "decoded_length",
         "start_index", "end_index", "head_seconds_received",
         "head_cores_observed", "head_blocks_observed",
     )

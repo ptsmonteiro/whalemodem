@@ -68,6 +68,7 @@ historical ranking was:
 | VF3 58-carrier DQPSK | ~2,200 | 6/6 each direction |
 | VF4 star-8-QAM + RS | ~2,945 | 6/6 each direction |
 | VF5 16-QAM + pilots + RS | ~3,663 | 6/6 each direction |
+| VF6 256-QAM + pilots + RS-only | 15,720 frame-useful | full-capacity `flat_nbfm`: 0/20 at 30 dB, 20/20 at 35 and 40 dB RF C/N; experimental |
 
 The evidence is retained in each `experiments/*/RESULTS.md`. VF3 was the first
 candidate admitted through the generic `WaveformMode` boundary and carried

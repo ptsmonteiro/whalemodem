@@ -24,9 +24,9 @@ import sys
 from datetime import datetime, timezone
 from pathlib import Path
 
-from whale import framing, policy
+from whale import framing, mode_qualification, policy
 from whale.channel import WATTERSON_PRESETS
-from whale.fm_channel import FM_RADIO_PRESETS
+from whale.fm_channel import FM_RADIO_PRESETS, FM_SYNTHETIC_PROFILES
 from whale.qualification import (channel_factory as make_channel_factory,
                                  channel_point_label, run_frame_trial,
                                  run_frame_trials, trial_seed)
@@ -47,14 +47,17 @@ def available_cpu_count():
 def _run_trial_worker(task):
     """Run one independently seeded trial in a worker process."""
 
-    (policy_name, mode_id, model, point, watterson_preset, fm_preset,
+    (policy_name, mode_level, mode_id, model, point, watterson_preset,
+     fm_preset, fm_profile,
      master_seed, point_index, trial, direction, payload_bytes) = task
     selected_policy = policy.by_name(policy_name)
-    registry = selected_policy.mode_ladder(selected_policy.max_useful_frame_seconds)
+    registry = mode_qualification.registry(
+        policy_name, mode_level, selected_policy.max_useful_frame_seconds)
     mode = next(mode for mode in registry.modes if mode.mode_id == mode_id)
     seed = trial_seed(master_seed, mode_id, point_index, trial)
     factory = make_channel_factory(
-        model, point, watterson_preset=watterson_preset, fm_preset=fm_preset)
+        model, point, watterson_preset=watterson_preset, fm_preset=fm_preset,
+        fm_profile=fm_profile)
     return run_frame_trial(mode, factory(seed), seed, trial, direction,
                            payload_bytes=payload_bytes)
 
@@ -66,8 +69,9 @@ def run_parallel_trials(executor, args, mode, point, point_index, direction,
             mode, channel_factory(args, point), args.trials, args.seed,
             point_index, direction, payload_bytes=payload_bytes)
     tasks = [
-        (args.policy, mode.mode_id, args.model, point, args.watterson_preset,
-         args.fm_preset, args.seed, point_index, trial, direction, payload_bytes)
+        (args.policy, args.mode_level, mode.mode_id, args.model, point,
+         args.watterson_preset, args.fm_preset, args.fm_profile, args.seed,
+         point_index, trial, direction, payload_bytes)
         for trial in range(1, args.trials + 1)
     ]
     # executor.map preserves input order, keeping artifacts byte-for-byte stable
@@ -87,13 +91,15 @@ def wilson_interval(passed, total, z=1.959963984540054):
 def channel_factory(args, point):
     return make_channel_factory(args.model, point,
                                 watterson_preset=args.watterson_preset,
-                                fm_preset=args.fm_preset)
+                                fm_preset=args.fm_preset,
+                                fm_profile=args.fm_profile)
 
 
 def point_label(args, point):
     return channel_point_label(args.model, point,
                                watterson_preset=args.watterson_preset,
-                               fm_preset=args.fm_preset)
+                               fm_preset=args.fm_preset,
+                               fm_profile=args.fm_profile)
 
 
 def summarize_trials(trials):
@@ -150,6 +156,8 @@ def main(argv=None):
                                  formatter_class=argparse.RawDescriptionHelpFormatter)
     ap.add_argument("--model", choices=("awgn", "watterson", "fm"), required=True)
     ap.add_argument("--policy", choices=sorted(policy.CHANNELS), required=True)
+    ap.add_argument("--mode-level", choices=("default", "optional", "experimental"),
+                    default="default")
     ap.add_argument("--points", type=float, nargs="+", required=True,
                     help="waveform SNR dB, or RF C/N dB for FM")
     ap.add_argument("--trials", type=int, default=100)
@@ -167,6 +175,8 @@ def main(argv=None):
                     default="mid_latitude_moderate")
     ap.add_argument("--fm-preset", choices=sorted(FM_RADIO_PRESETS),
                     default="vhf_bench_conservative")
+    ap.add_argument("--fm-profile", choices=sorted(FM_SYNTHETIC_PROFILES),
+                    help="use a project synthetic FM recipe instead of --fm-preset")
     ap.add_argument("--out", type=Path,
                     default=Path("logs") / "simulated_channel_benchmark.json")
     args = ap.parse_args(argv)
@@ -180,7 +190,8 @@ def main(argv=None):
     if args.model == "fm" and args.policy != "vhf-fm":
         ap.error("the FM benchmark requires --policy vhf-fm")
     selected_policy = policy.by_name(args.policy)
-    registry = selected_policy.mode_ladder(selected_policy.max_useful_frame_seconds)
+    registry = mode_qualification.registry(
+        args.policy, args.mode_level, selected_policy.max_useful_frame_seconds)
     try:
         selected_modes = select_modes(registry, args.modes)
     except ValueError as exc:
@@ -237,6 +248,7 @@ def main(argv=None):
                  "watterson_preset": (args.watterson_preset
                                        if args.model == "watterson" else None),
                  "fm_preset": args.fm_preset if args.model == "fm" else None,
+                 "fm_profile": args.fm_profile if args.model == "fm" else None,
                  "points_db": args.points},
         trials=records, seed=args.seed,
         metadata={"benchmark": "simulated_channel_monte_carlo",
