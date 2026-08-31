@@ -1,9 +1,10 @@
-# HC2 AWGN SNR threshold and EVM health metric
+# HC2 AWGN threshold, EVM health metric, and fading boundary
 
-## Two sweeps, two receivers
+## Campaigns in this file
 
-This file reports **two** AWGN campaigns against two different HC2 designs.
-They are not interchangeable and are never pooled:
+This file reports **two** AWGN campaigns against two different HC2 designs,
+plus a fading campaign against the current one. The two AWGN campaigns are
+not interchangeable and are never pooled:
 
 | | Milestone-3 sweep (superseded) | Post-fix sweep (current) |
 | --- | --- | --- |
@@ -11,16 +12,22 @@ They are not interchangeable and are never pooled:
 | Acquisition | earliest lag within 0.5% of the correlation peak | plain matched-filter maximum |
 | CFO refinement | phase of `sum(T[1] * conj(T[0]))` | same, after dividing out the known training values |
 | Trials | 7,800 | 8,300 |
-| Section reporting it | "Superseded results" below | "Results" below |
+| Section reporting it | "Superseded results" below | "Results (AWGN)" below |
 
 The milestone-3 sweep found that every failure above 12.5 dB was one
 acquisition defect, and per its own milestone constraint it did not fix it.
-The fix landed afterwards and the sweep was re-run. Everything in "Results"
-describes the current receiver; everything in "Superseded results" describes
+The fix landed afterwards and the sweep was re-run. Everything in "Results
+(AWGN)" describes the current receiver; everything in "Superseded results" describes
 the milestone-3 one and is kept because it is the evidence that motivated the
 change.
 
-## Conclusion (current receiver)
+A third campaign, "Milestone 4: the Watterson fading boundary" at the end of
+this file, runs the current receiver against fading rather than noise. It is
+also never pooled with the AWGN results: AWGN fixes the thermal-noise floor
+and fading fixes the operating envelope, and for HC2 those two numbers turn
+out to have almost nothing to do with each other.
+
+## Conclusion (AWGN, current receiver)
 
 HC2 delivers full-capacity 2,749-byte frames over AWGN from about **11.5 dB
 waveform SNR** upward. Against the three criteria worth stating separately,
@@ -243,7 +250,7 @@ milestone-3 1,000). HC2 is not a declared mode and has no
 `logs/mode_qualification/` campaign directory, so by `LOGS.md`'s rules these
 are scratch artifacts and are cited by command, not by path.
 
-## Results
+## Results (AWGN)
 
 ### FER against waveform SNR
 
@@ -414,7 +421,7 @@ implementation floor of 1.81%. Its commands were the five listed in the
 milestone-3 write-up, differing from the current ones only in the output paths
 and in not including the 1,000-trial 12.5 dB run.
 
-## Honest limits
+## Honest limits (AWGN)
 
 **Trial counts.** 1,400 trials with zero failures bounds FER only at 0.27%
 with 95% confidence. This campaign can establish "FER at or below 1e-2" from
@@ -456,11 +463,12 @@ real HF path will need, not a prediction of one.
 +/-20 Hz search (all trials here were at zero offset), no radio, no ARQ, no
 link. HC2 remains outside the qualification process entirely.
 
-## Recommendations for future work
+## Recommendations (milestone 3)
 
 Ordered by measured value. Item 1 of the milestone-3 list -- fix the
 acquisition ambiguity -- is done and is what this document's "Results" section
-measures.
+measures. The fading campaign has its own recommendations at the end of the
+file, and where the two disagree the fading ones are the later evidence.
 
 1. **Soft 32QAM LLR demapping.** About 2.4 dB at the 50% point per the
    milestone-3 scratch estimate, and probably more above the knee now that
@@ -479,11 +487,237 @@ measures.
    decodable region without moving the EVM of the received constellation, so
    the threshold will need to rise.
 
-## Next experiment (milestone 4)
+## Milestone 4: the Watterson fading boundary
 
-Repeat this sweep against `watterson` with the `mid_latitude_quiet` preset
-first, at 11 to 25 dB, and establish HC2's benign-fading boundary before
-touching moderate. Reuse the same seeding and EVM instrumentation so the
-AWGN curve here is the control. Expect the boundary to be set by the 2.928 s
-frame's channel-tracking span rather than by SNR, and be prepared for the
-correct outcome to be a narrow declared envelope rather than a slower mode.
+### Conclusion
+
+**HC2's operating envelope is narrower than the mildest standard HF fading
+preset.** Against `mid_latitude_quiet` -- ITU-R F.1487's most benign
+mid-latitude case, 0.5 ms differential delay and 0.1 Hz frequency spread --
+HC2 delivered **0 of 300 frames at every SNR from 11.5 dB to 40 dB**. That is
+1,800 consecutive failures with no SNR trend. The mode does not have a quiet
+-preset threshold; it has none at all.
+
+This is the expected shape of the answer for a speed-first top rung, and it
+is not a defect. The useful result is the parametric boundary underneath it,
+which says *how* favourable a path has to be:
+
+| Channel parameter | HC2 still works | HC2 is broken |
+| --- | --- | --- |
+| Differential delay (near-static channel) | below ~0.1 ms | 0.25 ms and beyond |
+| Frequency spread (flat channel) | up to ~0.005 Hz | 0.0075 Hz and beyond |
+| `mid_latitude_quiet` | -- | 0/1,800 at any SNR |
+
+**Differential delay binds first, and by a wide margin.** At an essentially
+static 0.001 Hz spread and a generous 25 dB SNR, a flat channel delivers
+599/600, but only 0.25 ms of differential delay -- one tenth of the 2.67 ms
+cyclic prefix -- already costs 35.5% FER, and 0.5 ms costs 57.3%. The cyclic
+prefix is not the binding constraint and this is not inter-symbol
+interference: it is two-path frequency-selective fading putting nulls in a
+2,250 Hz band that one front-loaded channel estimate and a rate-3/4 code
+cannot ride out. Only past 4 ms, where the delay exceeds the prefix, does
+performance collapse the rest of the way to ~96%.
+
+Both of `mid_latitude_quiet`'s parameters break HC2 *independently*: its
+0.5 ms delay alone gives 57.3% FER on an otherwise static channel, and its
+0.1 Hz spread alone gives 89.0% on an otherwise flat one. Together they give
+100%. Nothing about the preset is marginal for this waveform.
+
+### The result that matters most: failure is not always loud
+
+Milestone 3 recommended EVM > 10% as the fallback trigger. Under fading that
+trigger is **only reliable where the channel is violently bad, and it is
+unreliable exactly where a link controller most needs it.**
+
+| Regime | FER | Failed frames the trigger caught | Median EVM of failed frames |
+| --- | ---: | ---: | ---: |
+| `mid_latitude_moderate`, 15-30 dB | 1.000 | **100%** | 78-93% |
+| `mid_latitude_disturbed`, 15-30 dB | 1.000 | **100%** | 95-104% |
+| `mid_latitude_quiet`, 11.5-40 dB | 1.000 | **99.7-100%** | 34-38% |
+| Delay 0.1 ms, 15-30 dB | 0.055-0.195 | **45-57%** | 9.4-10.6% |
+| Delay 0.5 ms, spread 0.001-0.005 Hz | 0.573-0.670 | **66-71%** | 12.1-12.6% |
+
+In the delay-dominated regime the failing frames look almost healthy: their
+median EVM sits within a point or two of the 10% trigger, and single points
+carried up to 45 silent failures out of 200 trials -- frames that were
+corrupt and passed the health check. A controller trusting EVM alone would
+sit at 57% FER believing the link was fine.
+
+The trigger also mis-fires in the other direction as the channel degrades:
+at 0.03-0.1 Hz spread, 10-27% of frames that **did** decode correctly would
+have been flagged. A single global EVM threshold cannot separate these
+populations.
+
+What *is* reliable is the CRC. Across all **10,400 fading trials there was
+not one false accept** -- never once did a corrupt frame pass CRC32 and get
+delivered as good (95% upper bound 0.037%). Frame-level integrity holds
+completely, which means a fallback design can be built on decode outcome
+even though it cannot be built on EVM.
+
+Acquisition also held: zero mis-acquisitions of the retired
+one-symbol-late class at any point, and start error stayed within one cyclic
+prefix everywhere, including the 1,800 quiet-preset frames that never
+decoded. The frames are found; they cannot be read.
+
+### Results
+
+10,400 trials. Parametric points use the same F.1487 two-path equal-power
+geometry as the presets, with delay and spread moved one at a time.
+
+**Frequency spread, flat channel (0 ms delay), 25 dB, 200 trials/point:**
+
+| Spread (Hz) | Delivered | FER | Realized bit/s |
+| ---: | ---: | ---: | ---: |
+| 0.001 | 200/200 | 0.000 | 7,510.9 |
+| 0.0025 | 197/200 | 0.015 | 7,398.3 |
+| 0.005 | 194/200 | 0.030 | 7,285.6 |
+| 0.0075 | 179/200 | 0.105 | 6,722.3 |
+| 0.01 | 174/200 | 0.130 | 6,534.5 |
+| 0.02 | 129/200 | 0.355 | 4,844.5 |
+| 0.05 | 62/200 | 0.690 | 2,328.4 |
+| 0.1 | 22/200 | 0.890 | 826.2 |
+
+**Differential delay, near-static channel (0.001 Hz spread), 25 dB:**
+
+| Delay (ms) | Delivered | FER | Realized bit/s |
+| ---: | ---: | ---: | ---: |
+| 0 | 599/600 | 0.002 | 7,498.4 |
+| 0.1 | 368/400 | 0.080 | 6,910.1 |
+| 0.25 | 129/200 | 0.355 | 4,844.5 |
+| 0.5 | 171/400 | 0.573 | 3,211.0 |
+| 1 | 89/200 | 0.555 | 3,342.4 |
+| 2.667 (= cyclic prefix) | 84/200 | 0.580 | 3,154.6 |
+| 4 | 7/200 | 0.965 | 262.9 |
+| 8 | 6/200 | 0.970 | 225.3 |
+
+Between 0.5 ms and the 2.67 ms prefix the curve is flat at 53-59%: once the
+band is selectively faded, more delay does not make it materially worse until
+the prefix is actually exceeded.
+
+**No SNR escape.** At 0.1 ms delay the FER is 19.5% / 5.5% / 11.5% / 9.0% at
+15 / 20 / 25 / 30 dB -- an irreducible floor with no trend, scattered by
+realization draw rather than by noise. `mid_latitude_quiet` is 0/300 at
+11.5, 15, 20, 25, 30 **and 40 dB**. Beyond about 15 dB, adding transmit
+power buys HC2 nothing on a fading path.
+
+### Method
+
+`benchmark_hc2_watterson.py` is a sibling of the AWGN sweep rather than an
+extension of it: the AWGN point space is a one-dimensional SNR list and
+`trial_seed` keys on the index within that list, so folding a three
+-dimensional (delay, spread, SNR) space into the same `--points` list would
+have renumbered the AWGN indices and silently broken the paired milestone-3
+comparison. It imports `frame_metrics`, `wilson`, `_quantiles` and
+`evm_separation` from `benchmark_hc2_snr`, so the EVM figures here have
+exactly the definition the AWGN campaign calibrated the trigger against, and
+the AWGN curve remains a valid control.
+
+Each trial chains `WattersonChannel` into `AwgnChannel` in that order,
+matching `whale.qualification.channel_factory("watterson", ...)` including its
+`seed ^ 0x5A5A` noise seed. The SNR reference stays the signal-bearing span
+of the transmitted capture. Under fading that is a per-realization average:
+a frame spending most of its 2.928 s in a deep fade still gets noise scaled
+to its own mean power, so instantaneous in-fade SNR is much worse than the
+label. Spreads follow the F.1487 2-sigma convention.
+
+Commands (artifacts to gitignored `logs/scratch/`, cited by command because
+HC2 is not a declared mode and has no qualification campaign directory):
+
+```sh
+python -m experiments.hc2_32qam.benchmark_hc2_watterson \
+  --presets mid_latitude_quiet --points 11.5 15 20 --trials 300 \
+  --out logs/scratch/hc2_wat_quiet_a.json
+python -m experiments.hc2_32qam.benchmark_hc2_watterson \
+  --presets mid_latitude_quiet --points 25 30 40 --trials 300 \
+  --out logs/scratch/hc2_wat_quiet_b.json
+python -m experiments.hc2_32qam.benchmark_hc2_watterson \
+  --presets mid_latitude_moderate --points 15 20 25 30 --trials 200 \
+  --out logs/scratch/hc2_wat_moderate.json
+python -m experiments.hc2_32qam.benchmark_hc2_watterson \
+  --presets mid_latitude_disturbed --points 15 20 25 30 --trials 200 \
+  --out logs/scratch/hc2_wat_disturbed.json
+python -m experiments.hc2_32qam.benchmark_hc2_watterson \
+  --delay-ms 0 --spread-hz 0.001 0.0025 0.005 0.0075 0.01 --points 25 \
+  --trials 200 --out logs/scratch/hc2_wat_spread_flat_a.json
+python -m experiments.hc2_32qam.benchmark_hc2_watterson \
+  --delay-ms 0 --spread-hz 0.015 0.02 0.03 0.05 0.1 --points 25 \
+  --trials 200 --out logs/scratch/hc2_wat_spread_flat_b.json
+python -m experiments.hc2_32qam.benchmark_hc2_watterson \
+  --delay-ms 0.5 --spread-hz 0.001 0.005 0.01 0.02 0.05 0.1 --points 25 \
+  --trials 200 --out logs/scratch/hc2_wat_spread_half.json
+python -m experiments.hc2_32qam.benchmark_hc2_watterson \
+  --delay-ms 0 0.1 0.25 0.5 0.75 --spread-hz 0.001 --points 25 \
+  --trials 200 --out logs/scratch/hc2_wat_delay_a.json
+python -m experiments.hc2_32qam.benchmark_hc2_watterson \
+  --delay-ms 1 2 2.667 4 6 8 --spread-hz 0.001 --points 25 \
+  --trials 200 --out logs/scratch/hc2_wat_delay_b.json
+python -m experiments.hc2_32qam.benchmark_hc2_watterson \
+  --delay-ms 0 --spread-hz 0.001 --points 15 20 25 30 --trials 200 \
+  --out logs/scratch/hc2_wat_operating_flat.json
+python -m experiments.hc2_32qam.benchmark_hc2_watterson \
+  --delay-ms 0.1 --spread-hz 0.001 --points 15 20 25 30 --trials 200 \
+  --out logs/scratch/hc2_wat_operating_tenth.json
+```
+
+### Honest limits (milestone 4)
+
+**Realization variance dominates at 200 trials.** The 0.1 ms / 0.001 Hz /
+25 dB point was measured twice under different seeds and gave 191/200 and
+177/200 -- 4.5% and 11.5% FER, with barely overlapping Wilson intervals.
+Pooled, it is 368/400, FER 8.0% [5.7%, 11.1%]. Every single-point FER in the
+tables above carries that much draw-to-draw scatter; read the shape of the
+curves, not individual cells. The boundary values quoted in the conclusion
+(~0.1 ms, ~0.005 Hz) are therefore order-of-magnitude statements, not
+thresholds established to two significant figures.
+
+**One geometry only.** Two equal-power paths, no Doppler *shift* (only
+spread), no sample-clock offset, no CFO (all trials at zero offset), one
+logical direction, no radio, no ARQ. Real paths carry unequal path powers and
+a bulk frequency shift, neither of which is tested here.
+
+**The quiet-preset result is bounded below, not measured.** 0/1,800 says the
+FER is above 99.8% with 95% confidence. It does not distinguish "always
+fails" from "succeeds once in 10,000", and nothing in this campaign should be
+read as the latter being ruled out.
+
+**Not qualification evidence.** AWGN and Watterson sweeps in an experiment
+directory, from a working tree, with artifacts in gitignored scratch. HC2 has
+no manifest entry, no mode ID, and no `logs/mode_qualification/` campaign.
+
+### Recommendations (milestone 4)
+
+1. **Do not build the fallback trigger on EVM alone.** The CRC is the trustworthy
+   signal -- zero false accepts in 10,400 fading trials -- and EVM is not, in
+   the regime that matters. Demote on decode outcome; use EVM only as
+   corroboration, and expect a single global threshold to both miss real
+   failures and demote healthy frames near the boundary.
+2. **Refresh the channel estimate mid-frame.** This was recommendation 2 of
+   milestone 3 and the fading data promotes it to the single highest-value
+   change. Two training symbols at the head of a 2.928 s frame is the design
+   most exposed to exactly what binds here. HC2c's payload-pilot work is the
+   precedent, and its measured result -- pilots helped at every moderate and
+   disturbed point -- is the reason to expect it to move this boundary.
+3. **Attack frequency selectivity, not just time selectivity.** Delay binds
+   first, so mid-frame pilots alone will not be enough; the per-carrier
+   equalizer has to survive nulls across a 2,250 Hz band. Frequency-domain
+   interpolation across carriers and deeper interleaving are the levers.
+4. **Consider a shorter frame for the top rung.** 2.928 s is nearly four times
+   HC1's. A shorter frame both shortens the tracking span and cuts the cost of
+   each retransmission, at some rate overhead.
+5. **Declare the envelope explicitly.** Whatever HC2 becomes, its negotiation
+   entry needs to state the delay and spread bounds above, because the mode
+   fails silently inside part of that region rather than announcing itself.
+
+## Next experiment (milestone 5)
+
+Two candidate paths, in order of expected value:
+
+1. Mid-frame channel tracking (recommendations 2 and 3 above), then re-run
+   this exact boundary sweep to measure how far the envelope moves. The
+   commands and seeds here make that a paired comparison.
+2. Soft 32QAM LLR demapping, worth ~2.4 dB on AWGN, which widens the fading
+   envelope only insofar as the boundary is SNR-limited -- and this campaign
+   shows it mostly is not.
+
+Real-radio measurement (the original milestone 5) should wait until the
+envelope is wide enough that a real path can be expected to sit inside it.

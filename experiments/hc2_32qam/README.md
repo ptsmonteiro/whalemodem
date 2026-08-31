@@ -75,7 +75,29 @@ sample at any SNR down to 0 dB. Post-equalization decision-directed EVM still
 supports a fallback trigger at 10%. `RESULTS.md` records both campaigns side
 by side -- current and superseded -- with the full curves, the EVM overlap
 regions, the estimated ~2.4 dB hard-decision demapping penalty that remains
-out of scope, and what is left to do. AWGN only; Watterson is milestone 4.
+out of scope, and what is left to do.
+
+Milestone 4 adds `benchmark_hc2_watterson.py` and `test_hc2_watterson.py`, a
+10,400-trial fading campaign that maps where the mode actually stops working.
+The headline is that **HC2's envelope is narrower than the mildest standard
+HF preset**: against `mid_latitude_quiet` it delivered 0 of 300 frames at
+every SNR from 11.5 dB to 40 dB. Parametrically, at a generous 25 dB, a flat
+static channel delivers 599/600, but 0.25 ms of differential delay -- a tenth
+of the cyclic prefix -- already costs 35.5% FER and 0.5 ms costs 57.3%, while
+a flat channel tolerates only about 0.005 Hz of frequency spread. Differential
+delay binds first and the cyclic prefix is not the limit: this is two-path
+frequency-selective fading against one front-loaded channel estimate, not
+inter-symbol interference. Above roughly 15 dB, more SNR buys nothing.
+
+For a speed-first top rung that is the expected shape of the answer, not a
+defect -- the ladder supplies robustness. Two findings do carry forward. The
+CRC never once accepted a corrupt frame in 10,400 fading trials, so frame
+integrity is solid; but the milestone-3 EVM trigger caught only 45-71% of
+failures in the delay-dominated regime, where broken frames read barely above
+the 10% threshold, so a fallback design must demote on decode outcome rather
+than on EVM. `RESULTS.md` has the full boundary tables, the detection-rate
+breakdown, and the realization-variance caveat that makes the boundary values
+order-of-magnitude rather than exact.
 
 Run the harness tests with:
 

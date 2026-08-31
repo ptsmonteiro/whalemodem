@@ -595,13 +595,31 @@ symbols were made distinct. None of that is qualification evidence. The AWGN
 sweep is a diagnostic baseline, which section 3 explicitly does not accept as a
 qualification channel; the artifacts are scratch, produced from a dirty tree
 with the experiment package untracked, and no `logs/mode_qualification/`
-campaign directory exists for HC2. Watterson trials, hardware evidence,
-negotiation, and application-throughput work all remain prerequisites before it
-can enter this process. As a candidate HF top rung it would be evaluated
-against the section 6 speed gate on a good channel, with a narrow declared
+campaign directory exists for HC2. Hardware evidence, negotiation, and
+application-throughput work all remain prerequisites before it can enter this
+process. As a candidate HF top rung it would be evaluated against the
+section 6 speed gate on a good channel, with a narrow declared
 envelope, rather than against disturbed-preset robustness. The AWGN result is
 consistent with that shape -- with the fix in place, delivery collapses below
 about 11.5 dB waveform SNR, realized payload exceeds the 7,050 bit/s reference
 row from 11.5 dB up, and frame error rate reaches 1e-2 by 13 dB (superseding
-the 12 dB / 12.5 dB / 16 dB figures the first sweep produced) -- but a declared
-envelope requires the fading evidence it does not yet have.
+the 12 dB / 12.5 dB / 16 dB figures the first sweep produced) -- and a
+2026-08-30 Watterson sweep now supplies the fading evidence a declared
+envelope needs. That evidence is unfavourable and is the more important
+result: over 10,400 fading trials HC2 delivered 0 of 300 frames against the
+`mid_latitude_quiet` preset at every SNR from 11.5 dB to 40 dB, and
+parametrically it requires better than roughly 0.1 ms of differential delay
+and 0.005 Hz of frequency spread, with delay binding first well inside the
+cyclic prefix. Its envelope is thus narrower than the mildest preset in
+section 3's table, which for a speed-first top rung is a boundary measurement
+rather than a gate failure, but it means no envelope HC2 could currently
+declare would intersect the fading conditions this process tests against.
+
+Two further results from that sweep bear on any future promotion. Frame
+integrity held completely -- not one corrupt frame passed CRC32 in 10,400
+fading trials -- but the EVM health metric the AWGN campaign proposed as a
+fallback trigger caught only 45 to 71 percent of failures in the
+delay-dominated regime, so a demotion policy built on it would sit at high
+frame error rates believing the link was healthy. Section 3's requirement for
+fallback from every faster rung should therefore be read as needing decode
+outcome, not EVM, as the primary demotion signal.

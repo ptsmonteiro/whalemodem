@@ -63,11 +63,19 @@ sequences, so frame acquisition has one unambiguous correlation peak -- for
 
 It is intentionally absent from every registry and from HF negotiation. It has
 an oracle-aligned receiver and a real acquisition/CFO/equalization/phase-tracking
-one, and an AWGN FER/EVM screen (`experiments/hc2_32qam/RESULTS.md`), but no
-sample-clock tracking, no Watterson evidence, no radio-linearity evidence, and
-no link air header, ARQ, or PTT accounting. Its result establishes codec and
-waveform rate feasibility plus a benign-channel SNR floor; it is not evidence
-that the mode works over an HF path.
+one, an AWGN FER/EVM screen, and a Watterson boundary sweep
+(`experiments/hc2_32qam/RESULTS.md`), but no sample-clock tracking, no
+radio-linearity evidence, and no link air header, ARQ, or PTT accounting.
+
+The fading sweep is what bounds it: HC2 delivered 0 of 300 frames against the
+`mid_latitude_quiet` preset at every SNR from 11.5 dB to 40 dB, and
+parametrically it needs better than about 0.1 ms of differential delay and
+0.005 Hz of frequency spread. Differential delay binds first, well inside the
+2.67 ms cyclic prefix, because one front-loaded channel estimate cannot ride
+out frequency-selective nulls across a 2,250 Hz band. Its results therefore
+establish codec and waveform rate feasibility, a benign-channel SNR floor, and
+an operating envelope narrower than any standard HF fading preset; they are
+not evidence that the mode works over a real HF path.
 
 ## Modulation profiles
 
