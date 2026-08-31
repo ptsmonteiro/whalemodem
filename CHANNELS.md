@@ -335,6 +335,9 @@ Examples:
 python scripts/benchmark_simulated_channels.py --model fm --policy vhf-fm `
     --points 5 10 15 20 25 30 --trials 100
 python scripts/benchmark_simulated_channels.py --model fm --policy vhf-fm `
+    --mode-level experimental --fm-profile flat_nbfm --modes vf6 `
+    --points 30 35 40 --trials 100
+python scripts/benchmark_simulated_channels.py --model fm --policy vhf-fm `
     --fm-preset ic705_to_kg_uv9d --points 10 20 30 --trials 20 `
     --modes 2 --payload-bytes 193 --out logs/mode2_diagnostic.json
 python scripts/benchmark_simulated_channels.py --model watterson `
@@ -349,6 +352,11 @@ The Monte Carlo seed for each frame is derived from the master seed, global
 mode ID, point index, and trial number. Selecting fewer modes therefore does
 not silently change the realizations of the modes that remain. A benchmark
 result should be retained whenever its performance claim is retained.
+
+`--mode-level experimental` makes declared experimental modes selectable by
+the frame benchmark. For FM, `--fm-profile` selects a named synthetic project
+recipe instead of the measured `--fm-preset`; artifacts record both fields so
+synthetic evidence cannot be mistaken for measured-radio qualification.
 
 The 2026-08-29 mode-2 diagnostic matrix under
 `logs/mode_qualification/vhf-fm/cpfsk/2026-08-29/diagnostics` is investigation

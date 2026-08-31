@@ -113,6 +113,16 @@ receives DATA once the ISS steps down. And because a VF3 keying is 5.2 s
 whatever it carries, a short packet would waste the difference -- which is
 harmless, since control packets never ride a DATA mode.
 
+### Mode 6: VF6, the experimental top VHF data mode
+
+Mode `6` keeps VF5's 58-carrier, 5.200-second pilot-assisted OFDM geometry,
+uses Gray square 256-QAM, and deliberately targets excellent FM channels. Its
+87,696-bit grid holds 10,962 bytes. Forty-three byte-interleaved shortened
+RS(254,238) codewords use 10,922 bytes, leaving 40 unused; their 10,234 data
+bytes contain length, up to 10,228 packet bytes, and CRC32. Removing the
+link's ten-byte air header gives a 10,218-byte DATA chunk. VF6 has no
+convolutional inner code and is offered only by the experimental VHF registry.
+
 ### Mode 4: HC1, the fast HF data mode
 
 Mode `4` is `whale.modes.hc1_mode.HC1`, the upper rung of

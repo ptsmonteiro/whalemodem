@@ -19,11 +19,15 @@ ChannelFactory = Callable[[int], AudioChannel]
 
 def channel_factory(model: str, point_db: float, *,
                     watterson_preset: str = "mid_latitude_moderate",
-                    fm_preset: str = "vhf_bench_conservative") -> ChannelFactory:
+                    fm_preset: str = "vhf_bench_conservative",
+                    fm_profile: str | None = None) -> ChannelFactory:
     """Build the canonical seeded channel factory used by qualification tools."""
     if model == "awgn":
         return lambda seed: AwgnChannel(48_000, SnrSpec(point_db), seed)
     if model == "fm":
+        if fm_profile is not None:
+            return lambda seed: ComplexFmChannel.from_profile(
+                48_000, fm_profile, point_db, seed)
         return lambda seed: ComplexFmChannel.from_preset(
             48_000, fm_preset, point_db, seed)
     if model == "watterson":
@@ -36,9 +40,11 @@ def channel_factory(model: str, point_db: float, *,
 
 def channel_point_label(model: str, point_db: float, *,
                         watterson_preset: str = "mid_latitude_moderate",
-                        fm_preset: str = "vhf_bench_conservative") -> str:
+                        fm_preset: str = "vhf_bench_conservative",
+                        fm_profile: str | None = None) -> str:
     if model == "fm":
-        return f"{fm_preset}, RF C/N {point_db:g} dB"
+        recipe = fm_profile if fm_profile is not None else fm_preset
+        return f"{recipe}, RF C/N {point_db:g} dB"
     if model == "watterson":
         return f"{watterson_preset}, waveform SNR {point_db:g} dB"
     if model == "awgn":

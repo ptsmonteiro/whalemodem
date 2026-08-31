@@ -12,6 +12,8 @@ from whale import framing, modes
 from whale.channel import (AwgnChannel, ChannelChain, SnrSpec,
                            WattersonChannel)
 from whale.fm_channel import ComplexFmChannel
+from whale.modes import vf6
+from whale.modes.vf6_mode import VF6
 from whale.qualification import run_frame_trial, run_frame_trials, trial_seed
 
 
@@ -38,6 +40,20 @@ def test_vhf_modes_at_measured_fm_bench_point(mode_name, trials, minimum):
             seed=seed),
         trials, MASTER_SEED, point_index=0, direction="FM C/N 30 dB")
     assert sum(record.decoded for record in records) >= minimum
+
+
+@pytest.mark.channel_regression
+def test_vf6_full_capacity_on_very_good_flat_nbfm_channel():
+    """Pin VF6 through the complete complex-IQ FM path, not audio AWGN."""
+    records = run_frame_trials(
+        VF6,
+        lambda seed: ComplexFmChannel.from_profile(
+            48_000, "flat_nbfm", carrier_to_noise_db=40, seed=seed),
+        2, 20260831, point_index=0,
+        direction="flat_nbfm, RF C/N 40 dB")
+    assert all(record.decoded for record in records)
+    assert all(record.payload_bytes == vf6.MAX_PAYLOAD_BYTES
+               for record in records)
 
 
 @pytest.mark.channel_regression

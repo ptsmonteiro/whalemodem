@@ -38,6 +38,15 @@ default ladders recorded in the assessment below. A `default` entry is a
 product-availability disposition, not proof that the evidence gates passed;
 promotion evidence retains the separate status words below.
 
+VF6 (VHF FM mode ID `6`) is the first declared experimental top rung. Its
+codec, clean audio path, and bounded synthetic `flat_nbfm` channel point have
+focused conformance tests. A retained 20-trial-per-point smoke sweep passes
+20/20 full-capacity frames at 35 and 40 dB RF C/N and fails 20/20 at 30 dB;
+this is provisional because it is below the Monte Carlo trial count and is a
+synthetic recipe rather than the required measured preset. Session,
+interoperability, hardware, and resource gates remain unmeasured; its manifest
+entry must not be read as a promotion or application-throughput claim.
+
 Evidence in the assessment table uses four words:
 
 - `passed`: a retained result meets the gate exactly;
