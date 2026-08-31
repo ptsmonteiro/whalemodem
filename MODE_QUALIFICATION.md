@@ -87,6 +87,53 @@ synthetic recipe rather than the required measured preset. Session,
 interoperability, hardware, and resource gates remain unmeasured; its manifest
 entry must not be read as a promotion or application-throughput claim.
 
+VF4 (VHF FM mode ID `8`) declares Level 3 ("Fast data"): 58-carrier OFDM
+reusing VF6's frame geometry, acquisition, and pilot tracking, but spending
+4 bits/carrier/symbol (square 16-QAM) instead of VF6's 8, with the same
+RS(254,238) outer code resized to its smaller payload grid. A promotion-sized
+Monte Carlo campaign against the synthetic `flat_nbfm` profile (not a measured
+preset -- see the gap below) clears the Level 3 gate at and above 25 dB RF
+C/N: 300/300 at the 25 dB boundary (Wilson 95% LB 98.7%) and 100/100 at 27 and
+30 dB, with zero `error` outcomes and 100% acquisition throughout; the
+transition falls sharply between 15 and 17 dB on this channel, well below the
+target. Its nominal frame-level useful throughput is 7,664.6 bit/s (28% above
+the 6,000 bit/s floor), and it beats VF3 by 3.49x at 20/25/30 dB RF C/N shared
+passing points on the same synthetic channel, clearing section 6's >=25%
+adjacent-rung requirement by a wide margin. See
+`logs/mode_qualification/vhf-fm/vf4/2026-08-31/INDEX.md` for full point-by-point
+results and commands. **This evidence is simulation-only and does not satisfy
+Level 3's required "measured clean path" envelope**: no preset in
+`FM_RADIO_PRESETS` (CHANNELS.md) is documented, measured, or named as a clean
+25 dB-class VHF leg, only the Level 0-2 `vhf_bench_conservative` preset and its
+two directional measured legs. No radios were available to produce one. VF4's
+manifest entry is therefore Experimental only; Optional and Default promotion
+remain blocked on a real measured clean-path fixture plus the session,
+hardware, and resource gates below, none of which this campaign attempts.
+
+HF3 (hf-ssb mode ID `9`) declares Level 3 ("Fast data"): a from-scratch
+36-carrier coherent 16-QAM OFDM design (46.875 Hz spacing, 421.875-2,062.5
+Hz, rate-1/2 K=9 code, 9-pilot comb with per-symbol polar-interpolated
+tracking), designed independently of HC0/HC1/HF2/HR0's specific geometries
+per its own design record (`experiments/hf3/DESIGN.md`). A confirmed-tier
+(300-trial) Monte Carlo campaign clears the frame Monte Carlo gate at the
+required quiet-Watterson +10 dB boundary: 291/300 decoded (95% Wilson-UB FER
+0.056, under the 0.10 ceiling), 300/300 acquired (95% Wilson-LB 0.987), zero
+`error` outcomes. Frame-prorated useful throughput at that same boundary is
+1,964.5 bit/s -- essentially at, not comfortably above, the 2,000 bit/s
+floor by this stricter proxy (nominal 100%-success throughput is 2,025.2
+bit/s). The required benign/static +8 dB boundary's confirmed-tier campaign
+was run in the same work session as this entry; see
+`logs/mode_qualification/hf-ssb/hf3/2026-08-31/INDEX.md` for its result and
+whether both required points now clear the gate -- if that document's
+benign/static section still reads "PENDING," treat that point as
+unmeasured. Measured (not nominal-span) 99%-power occupied bandwidth is
+~1,758 Hz for representative and maximum-length frames, comfortably under
+the 2,300 Hz ceiling. Session, adjacent-rung overlap, interoperability,
+hardware, and resource gates remain unmeasured; HF3's manifest entry is
+Experimental only and must not be read as a promotion or complete
+application-throughput claim -- see `experiments/hf3/RESULTS.md`'s "What is
+not yet established" section for the full gap list.
+
 Evidence in the assessment table uses four words:
 
 - `passed`: a retained result meets the gate exactly;
