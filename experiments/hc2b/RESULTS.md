@@ -2,9 +2,9 @@
 
 ## Conclusion
 
-Longer differential-QPSK frames are useful only as a top rung for quiet HF
+Longer differential-QPSK frames are useful only as a high-rate mode for quiet HF
 conditions. They do not fix HC1's moderate/disturbed fading weakness. The
-2.055 s frame does meet the proposed nominal frame-rate target—1,176 payload
+2.055 s frame does meet that experiment's nominal frame-rate screen—1,176 payload
 bit/s, 54% above the correctly timed 0.775 s HC1 baseline's 764 bit/s—but it
 does not yet meet the reliability/confidence gate, and nominal frame rate is
 not application throughput.

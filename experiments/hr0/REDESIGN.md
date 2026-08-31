@@ -3,7 +3,7 @@
 > **Point-5 update (2026-08-31):** the small real-receiver screen requested
 > by this handoff is complete in [`SCREEN.md`](SCREEN.md). Revision B's full
 > class has promising boundaries, but its tiny ACK class fails the
-> retry-weighted 18 bit/s session gate and its 19.54 s full frame exceeds the
+> fixed 20 bit/s Level 0 session gate and its 19.54 s full frame exceeds the
 > production 10 s RX buffer and 8 s HF useful-frame policy. The current
 > decision is **redesign before the full campaign**. The point-4 decision and
 > evidence below are retained as the rationale for running that screen.
@@ -24,8 +24,9 @@ the implemented max-log proxy gives 0.353.  No replacement binary code can
 repair that rate deficit at the same geometry and airtime.
 
 HR0-B changes the interface and energy allocation rather than weakening the
-target.  Its full class delivered 19/20 held-out oracle-aligned checked frames
-at -24 dB, 20/20 at -23 dB, and 0/20 at -25 dB.  Its bounded real acquisition
+historical experiment target. Its full class delivered 19/20 held-out
+oracle-aligned checked frames at -24 dB, 20/20 at -23 dB, and 0/20 at -25 dB.
+Its bounded real acquisition
 and decoder delivered 3/3 high-SNR frames in each of
 `mid_latitude_disturbed`, `mid_latitude_disturbed_nvis`, and
 `high_latitude_disturbed`.  These are deliberately small screening samples,
@@ -75,7 +76,7 @@ The arithmetic also explains why merely adding a stronger binary
 convolutional, LDPC, or polar code was rejected.  At -24 dB, the bitwise
 channel supplies 0.353--0.389 bit/tone, far below the 1.333 requested by A.
 Full-frame repetition or rate 1/6 can lower the request, but cannot retain the
-18 bit/s clean DATA+ACK budget.  A multilevel or iterative coded-modulation
+20 bit/s Level 0 DATA+ACK budget. A multilevel or iterative coded-modulation
 LDPC/polar design remains possible, but it is a new symbol-aware architecture,
 not a drop-in decoder improvement.
 
@@ -154,7 +155,7 @@ Revision B is intentionally wire-incompatible with A:
 
 The 0.157 bit/s surplus is very small.  It is a clean projection, not a
 measured session rate, and any ordinary retransmission rate will pull the
-session below 18 bit/s.  HR0-B therefore advances only to a boundary screen;
+session below 20 bit/s. HR0-B therefore advances only to a boundary screen;
 it is not ready for session or production promotion.
 
 ## Implemented receiver and bounded work
@@ -191,8 +192,8 @@ Twenty trials are not a qualification gate: 19/20 has a wide Wilson interval
 and does not establish the required FER upper bound.  No canonical or
 fixed-N0 Watterson boundary, continuous fade, false-acquisition campaign,
 interference/CW/notch result, CPU target result, full session, radio result,
-or VARA comparison has been run.  The 18.157 bit/s figure has no retry margin
-and is the main redesign risk.
+or VARA comparison has been run. The 18.157 bit/s figure is below the fixed
+20 bit/s Level 0 target, has no retry margin, and is the main redesign risk.
 
 ## Handoff
 
@@ -207,7 +208,7 @@ Proceed sequentially with a **small HR0-B real-receiver screen**, not the full
    preset.
 3. Measure tiny-class AWGN and Watterson boundaries.  Stop or redesign the
    ACK/IR policy unless the predicted retry-weighted session rate remains at
-   least 18 bit/s.
+   least 20 bit/s.
 4. Only if those screens pass, freeze the likelihood estimator and
    acquisition threshold on training seeds, run held-out absent-window tests,
    and then return to `PLAN.md`'s statistical campaign.

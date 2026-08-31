@@ -214,7 +214,8 @@ Each endpoint adapts only its own transmit direction from ARQ outcomes:
 - Three consecutive first-attempt chunks change one step up before the next chunk.
 - Steps follow registry order and are limited to modes the peer advertised.
   The default VHF FM ladder is 0, 1, 2 with mode 3 (VF3) appended above them;
-  the explicit experimental registry also appends mode 6 (VF6) as a top rung (see
+  the explicit experimental registry also appends mode 6 (VF6) as its fastest
+  current experimental mode (see
   [`FRAMING.md`](FRAMING.md#mode-3-vf3-a-non-cpfsk-data-mode)). The HF SSB
   ladder is mode 5 (HC0, the control mode) with mode 4 (HC1) above it.
 

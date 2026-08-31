@@ -1,4 +1,4 @@
-# VF6 — experimental square-256-QAM VHF FM top rung
+# VF6 — experimental square-256-QAM VHF FM high-rate mode
 
 VF6 is production-integrated as mode ID `6`, but remains opt-in through
 `whale.modes.experimental_registry()`. It keeps VF5's 48 kHz, 58-carrier,

@@ -2,11 +2,12 @@
 
 ## Purpose and status
 
-HR0 is a working name for an experimental HF level-0/control waveform whose
-first priority is verified delivery on the worst declared HF channel. Rate is
-secondary, but the experiment should test whether spending approximately the
-airtime budget of VARA HF's published lowest row can buy materially more
-margin than Whalemodem's current HC0.
+HR0 is a working name for an experimental HF Level 0/control waveform whose
+first priority is verified delivery across the fixed Level 0 envelope in
+[`SPEED_LADDERS.md`](../../SPEED_LADDERS.md). Rate is secondary, but it must
+still reach the 20 bit/s useful-application floor. The experiment also tests
+whether spending approximately the airtime budget of VARA HF's published
+lowest row can buy materially more margin than Whalemodem's current HC0.
 
 The external reference is limited to the vendor-published VARA HF standard-mode
 row: 23 symbols/s, 32 carriers, FSK, and 18 bit/s net. This repository has no
@@ -21,7 +22,7 @@ adds no encoder, decoder, mode ID, registry entry, or production behavior.
 
 ## What is already known
 
-- HC0 is the current HF level-0/control mode: non-coherent constant-envelope
+- HC0 is the current HF Level 0/control mode: non-coherent constant-envelope
   16-FSK at 93.75 symbols/s, 54 DATA bytes per 3.423-second keying, or about
   126.2 useful DATA bit/s before ACKs, retries, turnaround, and setup.
 - The retained 2026-08-30 Monte Carlo campaign delivered 100/100 HC0 frames at
@@ -89,15 +90,16 @@ separate workloads; fixed-length padding is not useful throughput.
 
 ### Rate and latency budget
 
-The target is at least 18 bit/s **session useful rate** in long, one-direction
-bulk transfer at points inside the final envelope, not merely an 18 bit/s
-codec. Screening may use a frame useful rate of 24--30 bit/s to leave room for
-ARQ overhead. For the standard 54-byte DATA-body comparison, 18 frame bit/s
-corresponds to 24 seconds of keying; any candidate longer than 24 seconds must
-justify a smaller payload/session design rather than silently claim the VARA
-reference rate. Measure 12-byte control-packet airtime and connection setup
-separately, because an extremely robust mode that takes minutes to establish
-a link is not automatically usable.
+The target is at least 20 bit/s **session useful rate** in long,
+one-direction bulk transfer at every point in the fixed Level 0 envelope, not
+merely a 20 bit/s codec. Screening should use a frame useful rate of at least
+28--34 bit/s to leave room for ARQ overhead. For the standard 54-byte
+DATA-body comparison, 20 frame bit/s corresponds to 21.6 seconds of keying;
+any longer candidate must justify a smaller payload/session design rather
+than claiming the Level 0 rate from nominal arithmetic. Measure 12-byte
+control-packet airtime and connection setup separately, because an extremely
+robust mode that takes minutes to establish a link is not automatically
+usable.
 
 ## Falsifiable design targets
 
@@ -107,17 +109,17 @@ These are experiment targets, not current claims:
 | --- | --- |
 | Baseline | Reproduce HC0 and locate its AWGN and each Watterson boundary with the same harness, payload, seeds policy, and gates used for HR0. |
 | Minimum value | HR0's qualified boundary is at least 3 dB below HC0 in `mid_latitude_disturbed`, with a point where HR0 passes and HC0 fails. |
-| Primary robustness | Pass at -24 dB canonical AWGN and -20 dB fixed-N0 `mid_latitude_disturbed`, while maintaining at least 18 bit/s long-transfer session throughput. |
+| Primary robustness stretch | Pass at -24 dB canonical AWGN and -20 dB fixed-N0 `mid_latitude_disturbed`, while maintaining at least 20 bit/s long-transfer session throughput. This is additional coverage beyond the fixed Level 0 envelope. |
 | Geographic coverage | Declare and pass an explicit boundary for every F.1487 preset, including `mid_latitude_disturbed_nvis` and `high_latitude_disturbed`; do not substitute the three mid-latitude presets for the complete registry. |
 | Stretch | Pass -24 dB fixed-N0 `mid_latitude_disturbed` and -20 dB fixed-N0 `high_latitude_disturbed`, or document the measured physical/algorithmic limit. |
 | Acquisition | Acquisition is no worse than checked-frame delivery at the boundary; a lead miss or false label cannot suppress a body that would pass integrity checks. |
 | Integrity | Zero undetected payload substitutions, false checked frames, exceptions, hangs, or unbounded candidate searches. |
 
-Failure of the primary numbers is useful if the campaign locates a stable
-boundary and attributes the loss. Do not redefine the target after seeing the
-data. A final operating envelope may be narrower, but HR0 cannot replace HC0
-as level 0 unless it spans the policy's worst claimed conditions and adds a
-distinct robust point.
+Failure of the stretch numbers is useful if the campaign locates a stable
+boundary and attributes the loss. Do not redefine the fixed Level 0 target
+after seeing the data. HR0 cannot fill Level 0 unless it spans the complete
+target envelope, meets the throughput floor, and adds the distinct robust
+point required by `MODE_QUALIFICATION.md`.
 
 ## Test matrix
 
@@ -344,7 +346,7 @@ Execute each point only after its predecessor leaves a written handoff:
 5. **Run synchronization, radio-boundary, interference, and combined-stress
    matrices.** Revise the declared envelope only from retained evidence.
 6. **Integrate experimentally and run asymmetric full sessions/recovery.**
-   Confirm at least 18 bit/s session useful rate and level-0 behavior.
+   Confirm at least 20 bit/s session useful rate and Level 0 behavior.
 7. **Measure resources, then wait for radios.** Development-host resource
    evidence may proceed; optional/default promotion remains blocked until the
    bidirectional radio and minimum-target gates in `MODE_QUALIFICATION.md` are

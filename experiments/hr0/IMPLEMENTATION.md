@@ -5,7 +5,8 @@
 > as the control.  The experiment-local, wire-incompatible HR0-B candidate is
 > implemented in `hr0b.py`; its retained bounded screen delivered 19/20
 > oracle-aligned frames at -24 dB and projects 18.157 bit/s for a clean full
-> DATA/tiny-ACK exchange.  The current handoff is go only to a small
+> DATA/tiny-ACK exchange, below the fixed 20 bit/s Level 0 target. The current
+> handoff is go only to a small
 > real-receiver boundary screen, not the full campaign or production.
 >
 > **Point-5 update (2026-08-31):** that screen is complete in

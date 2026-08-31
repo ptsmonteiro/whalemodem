@@ -128,8 +128,8 @@ which is the point: nothing in connection management, ARQ or negotiation
 changed to accommodate it.
 
 It is not in `afsk.default_registry()`, which stays the CPFSK-only ladder; it
-is the top rung of `whale.modes.default_registry()`, which is what a station
-on the VHF FM channel actually runs. VF3 passed 6/6 full-capacity frames in
+is the fastest current rung of `whale.modes.default_registry()`, which is what
+a station on the VHF FM channel actually runs. VF3 passed 6/6 full-capacity frames in
 each direction on the bench with ARQ bypassed (`experiments/vf3/RESULTS.md`)
 and has since carried acceptance sessions over the air in both directions.
 
@@ -139,7 +139,7 @@ receives DATA once the ISS steps down. And because a VF3 keying is 5.2 s
 whatever it carries, a short packet would waste the difference -- which is
 harmless, since control packets never ride a DATA mode.
 
-### Mode 6: VF6, the experimental top VHF data mode
+### Mode 6: VF6, the fastest current experimental VHF data mode
 
 Mode `6` keeps VF5's 58-carrier, 5.200-second pilot-assisted OFDM geometry,
 uses Gray square 256-QAM, and deliberately targets excellent FM channels. Its

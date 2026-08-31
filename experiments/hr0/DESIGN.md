@@ -21,12 +21,11 @@ of:
 - the `-24 dB` canonical-AWGN target with a real 54-byte DATA body;
 - the `-20 dB` fixed-N0 disturbed-mid-latitude target;
 - an explicit result on the 7 ms/30 Hz high-latitude case; and
-- at least 18 bit/s measured long-session useful rate after ACKs, retries,
+- at least 20 bit/s measured long-session useful rate after ACKs, retries,
   turnaround, and acquisition overhead.
 
-The current arithmetic leaves margin over 18 bit/s only in a clean
-stop-and-wait exchange. It therefore establishes feasibility, not the session
-rate gate.
+The current arithmetic does not establish the 20 bit/s Level 0 session-rate
+gate.
 
 ## Repository facts that constrain the choice
 
@@ -307,7 +306,7 @@ merely to improve its isolated FER.
    Keep one tone at a time and place the extra branch in a disjoint tone/time
    permutation. Pivot if CW/notch/selective-fade failures dominate while the
    measured clean session rate has enough surplus. Reject if it takes the
-   long-session rate below 18 bit/s.
+   long-session rate below 20 bit/s.
 3. **Short-block rate-1/3 or rate-1/4 LDPC/polar outer code on the HR0-A
    geometry.** Pivot if oracle symbol metrics are healthy but the frozen
    `(171,133,165)` code misses the AWGN target by more than 1 dB or shows an
@@ -339,11 +338,11 @@ with these stops:
   delay/Doppler contamination, or if measured 99%-power bandwidth exceeds
   2,300 Hz after reasonable edge movement/shaping.
 - **Redesign framing/ARQ** if real acquisition plus tiny ACKs cannot project
-  at least 18 bit/s at the target FER. Do not call the 34.275 bit/s full-frame
+  at least 20 bit/s at the target FER. Do not call the 34.275 bit/s full-frame
   number a session result.
 - **Stop HR0-A** if a bounded real receiver cannot keep acquisition at least
   as reliable as checked payload delivery, or if it cannot beat the newly
-  measured HC0 disturbed boundary by 3 dB without dropping below 18 bit/s.
+  measured HC0 disturbed boundary by 3 dB without dropping below 20 bit/s.
 - **Stop the current family search** if no constant-envelope orthogonal or
   spread candidate can meet both the physical robustness and useful-session
   rate targets under the frozen whole-keying SNR definition. Report that

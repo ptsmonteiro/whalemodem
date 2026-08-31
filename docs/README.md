@@ -8,6 +8,8 @@ history.
 
 - [Project goals](../GOALS.md) defines the end state, success criteria, and
   architectural principles.
+- [HF and VHF FM speed ladders](../SPEED_LADDERS.md) defines the five target
+  rungs, their useful-throughput floors, and their channel envelopes.
 - [Link protocol](../LINK.md) specifies connection management, ARQ, mode
   negotiation, disconnect behavior, and the local TCP interface.
 - [Modulation, coding, and framing](../FRAMING.md) specifies waveform

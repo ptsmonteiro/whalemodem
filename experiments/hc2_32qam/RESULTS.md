@@ -71,7 +71,7 @@ range: the worst decoding frame measures 13.14% and the best failing frame
 9.34%. A trigger at **EVM > 10%** still admits 6,025 frames of which 6,017
 decode (P(decode | accept) = 0.9987).
 
-This is a benign-channel screen of a top-rung candidate, not qualification
+This is a benign-channel screen of a high-rate candidate, not qualification
 evidence. AWGN says nothing about the frequency-selective fading that is the
 actual reason HC1 fails the disturbed Watterson preset; milestone 4 covers
 that.
@@ -498,7 +498,7 @@ HC2 delivered **0 of 300 frames at every SNR from 11.5 dB to 40 dB**. That is
 1,800 consecutive failures with no SNR trend. The mode does not have a quiet
 -preset threshold; it has none at all.
 
-This is the expected shape of the answer for a speed-first top rung, and it
+This is useful boundary evidence for a speed-first high-rate mode, and it
 is not a defect. The useful result is the parametric boundary underneath it,
 which says *how* favourable a path has to be:
 
@@ -701,7 +701,7 @@ no manifest entry, no mode ID, and no `logs/mode_qualification/` campaign.
    first, so mid-frame pilots alone will not be enough; the per-carrier
    equalizer has to survive nulls across a 2,250 Hz band. Frequency-domain
    interpolation across carriers and deeper interleaving are the levers.
-4. **Consider a shorter frame for the top rung.** 2.928 s is nearly four times
+4. **Consider a shorter frame for a high-rate rung.** 2.928 s is nearly four times
    HC1's. A shorter frame both shortens the tracking span and cuts the cost of
    each retransmission, at some rate overhead.
 5. **Declare the envelope explicitly.** Whatever HC2 becomes, its negotiation

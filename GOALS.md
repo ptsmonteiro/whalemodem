@@ -38,8 +38,10 @@ should be designed and judged against the objective for its own rung:
 Every mode therefore declares an **operating envelope**: the channel
 conditions under which it is expected to deliver. Robustness work belongs
 inside a mode's declared envelope; outside it, the ladder — not the mode —
-is responsible for coverage. Narrowing a fast rung's envelope in response to
-measurement is a legitimate outcome, not a defect to be fixed.
+is responsible for coverage. The fixed five-rung throughput and channel
+contracts are defined in [SPEED_LADDERS.md](SPEED_LADDERS.md). A mode with a
+narrower measured envelope may remain useful experimentally, but it does not
+fill that target rung.
 
 Performance work should consider more than nominal bit rate. Measurements
 should include:
@@ -55,7 +57,7 @@ should include:
 Claims of competitiveness should ultimately be supported by reproducible
 benchmarks over simulated audio channels and representative radio hardware.
 
-#### VARA HF reference target
+#### VARA HF reference data
 
 VARA HF v4.3.0 publishes the following net rates for its 2300 Hz standard
 mode. These are vendor-claimed reference points, not measurements made by this
@@ -80,7 +82,7 @@ project:
 | 42 | 49 | 16QAM | 5,872 |
 | 42 | 49 | 32QAM | 7,050 |
 
-#### VARA FM reference target
+#### VARA FM reference data
 
 VARA FM publishes the following net rates for its narrow mode. These are also
 vendor-claimed reference points rather than project measurements:
@@ -99,22 +101,14 @@ vendor-claimed reference points rather than project measurements:
 | 42 | 58 | 128QAM | 11,162 |
 | 42 | 58 | 256QAM | 12,750 |
 
-The long-term HF and VHF mode ladders should cover the same useful ranges as
-their respective references: a robust low-rate control and fallback mode,
-intermediate modes that trade robustness for speed, and top rates competitive
-with 7,050 bit/s in a 2300 Hz HF channel and 12,750 bit/s in VARA FM Narrow.
-A valid comparison must measure useful application throughput and delivery
-reliability at stated channel conditions, including SNR and impairments; a
-nominal or codec rate alone does not demonstrate parity with a row in these
-tables.
+The long-term targets derived from these reference ranges are specified in
+[SPEED_LADDERS.md](SPEED_LADDERS.md). A valid comparison must measure useful
+application throughput and delivery reliability at the target channel
+conditions; a nominal or codec rate alone does not demonstrate parity.
 
-The two ends of each ladder are held to different targets. The level-0 rung
-is judged by how poor a channel it still delivers on, and should aim to
-remain usable at or below the conditions where the corresponding VARA
-fallback mode operates. The top rung is judged by peak useful application
-throughput on a good channel, and should aim at the 7,050 bit/s and
-12,750 bit/s reference rows above; it is not required to work anywhere near
-the level-0 rung's conditions.
+The two ends of each ladder are held to different targets. Level 0 is judged
+by its required worst-channel boundary; Level 4 is judged by its required
+peak useful application throughput in its deliberately narrow envelope.
 
 ### Adaptive radio timing
 
@@ -265,8 +259,8 @@ Design decisions should favor:
 - Resource efficiency and predictable real-time behavior on low-end hardware
 - Correctness and observability before optimization
 - Robustness per rung as declared, rather than as much robustness as
-  possible in every mode: maximum margin at level 0, maximum speed at the
-  top, and an explicit operating envelope for each
+  possible in every mode: maximum margin at Level 0, maximum speed at Level
+  4, and the fixed operating envelope for each
 
 ## Definition of the end state
 

@@ -1,6 +1,6 @@
 # HC2 49-carrier coherent-32QAM rate proof
 
-This isolated experiment is milestone 1 for a speed-first top HF ladder mode.
+This isolated experiment is milestone 1 for a high-rate HF waveform.
 It proves exact full-payload audio round trips through a clean identity channel
 with an oracle-aligned receiver. It is not registered, negotiable, or claimed
 to be qualified.
@@ -89,8 +89,8 @@ delay binds first and the cyclic prefix is not the limit: this is two-path
 frequency-selective fading against one front-loaded channel estimate, not
 inter-symbol interference. Above roughly 15 dB, more SNR buys nothing.
 
-For a speed-first top rung that is the expected shape of the answer, not a
-defect -- the ladder supplies robustness. Two findings do carry forward. The
+For a high-rate candidate this is useful boundary evidence, not a defect in
+the channel model. Two findings do carry forward. The
 CRC never once accepted a corrupt frame in 10,400 fading trials, so frame
 integrity is solid; but the milestone-3 EVM trigger caught only 45-71% of
 failures in the delay-dominated regime, where broken frames read barely above

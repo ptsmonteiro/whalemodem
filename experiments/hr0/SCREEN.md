@@ -12,9 +12,9 @@ has no high-SNR impairment floor in the three requested disturbed Watterson
 presets. It delivered 30/30 exploratory frames at -19 dB disturbed mid, -17
 dB disturbed NVIS, and -20 dB disturbed high. The tiny class is not reliable
 at those same points (15/30, 19/30, and 7/30), so retry-weighted stop-and-wait
-throughput is far below 18 bit/s. Independently, the 19.54 s full frame cannot
-fit the current production 10 s RX buffer or the HF policy's 8 s useful-frame
-budget.
+throughput is far below the fixed 20 bit/s Level 0 target. Independently, the
+19.54 s full frame cannot fit the current production 10 s RX buffer or the HF
+policy's 8 s useful-frame budget.
 
 This is a small screen, not an operating envelope or qualification result.
 No receiver parameter was changed.
@@ -92,15 +92,17 @@ and `q = pD*pA`. One clean exchange takes
 `19.540 + 3.652 + 2*0.300 = 23.792 s`, so its clean projection is only
 `432/23.792 = 18.157 bit/s`.
 
-Two retry models reach the same decision:
+Two retry models reach the same decision. Even perfect delivery (`q = 1`)
+tops out at 18.157 bit/s, so neither model can meet the fixed 20 bit/s Level 0
+target:
 
 1. An optimistic model charges every attempt only one complete clean exchange:
-   `R = 432*q/23.792`. It needs `q >= 0.99133` for 18 bit/s.
+   `R = 432*q/23.792`.
 2. A model using current production HF timeout arithmetic charges 48.332 s
    for a failed attempt: the 19.540 s DATA transmission followed by a 28.792 s
    timeout (`DATA + ACK + two turnarounds + 5 s slack`). Its unlimited-retry
    expectation is
-   `R = 432 / (23.792 + ((1-q)/q)*48.332)` and needs `q >= 0.99571`.
+   `R = 432 / (23.792 + ((1-q)/q)*48.332)`.
 
 Using the empirical point estimates, the optimistic/current-timeout rates are
 10.29/7.11 bit/s at AWGN -23 dB, 9.08/5.99 in disturbed mid at -19 dB,
