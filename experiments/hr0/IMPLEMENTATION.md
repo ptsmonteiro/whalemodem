@@ -7,6 +7,10 @@
 > oracle-aligned frames at -24 dB and projects 18.157 bit/s for a clean full
 > DATA/tiny-ACK exchange.  The current handoff is go only to a small
 > real-receiver boundary screen, not the full campaign or production.
+>
+> **Point-5 update (2026-08-31):** that screen is complete in
+> [`SCREEN.md`](SCREEN.md). The tiny ACK/session and production buffer gates
+> failed, so the current decision is redesign before the full campaign.
 
 ## Status and decision
 

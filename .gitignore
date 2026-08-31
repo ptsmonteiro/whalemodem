@@ -12,3 +12,4 @@ experiments/ofdm/results/failures/
 experiments/qpsk29/results/captures/
 experiments/qpsk29/results/failures/
 experiments/qpsk29/results/logs/
+experiments/hr0/results/*_captures/

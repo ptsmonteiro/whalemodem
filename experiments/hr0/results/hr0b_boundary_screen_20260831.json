@@ -1,0 +1,170 @@
+{
+  "schema_id": "whalemodem.hr0.hr0b_boundary_screen",
+  "schema_version": 1,
+  "date": "2026-08-31",
+  "claim_scope": "small_real_receiver_exploration_not_qualification",
+  "decision": "redesign_before_full_campaign",
+  "candidate": {
+    "name": "hr0-b-exp",
+    "wire_revision": "B",
+    "source": "experiments/hr0/hr0b.py",
+    "sha256": "d0ad94945b2fe845d44473163b07172b54e25b2ce6cdafaa1130dc24999a3f61"
+  },
+  "snr_convention": {
+    "kind": "waveform",
+    "signal": "mean_square_over_complete_half_open_keying_interval",
+    "reference_samples": "[0, tx_samples)",
+    "noise": "real_awgn_over_0_to_24000_hz_nyquist_band",
+    "watterson_model": "canonical_independent_frame_watterson_then_post_fade_per_frame_awgn"
+  },
+  "workloads": {
+    "full": {
+      "physical_payload_bytes": 64,
+      "data_body_bytes": 54,
+      "tx_samples": 937920,
+      "keyed_seconds": 19.54,
+      "frame_useful_rate_bps": 22.10849539406346
+    },
+    "tiny_ack": {
+      "physical_payload_bytes": 12,
+      "ack_body_bytes_after_air_header": 2,
+      "tx_samples": 175296,
+      "keyed_seconds": 3.652
+    }
+  },
+  "full_awgn_30_trial_points": [
+    {"waveform_snr_db": -25.0, "acquired": 30, "checked_delivered": 0, "payload_failed": 30, "trials": 30},
+    {"waveform_snr_db": -24.0, "acquired": 30, "checked_delivered": 17, "payload_failed": 13, "trials": 30},
+    {"waveform_snr_db": -23.0, "acquired": 30, "checked_delivered": 30, "payload_failed": 0, "trials": 30},
+    {"waveform_snr_db": -22.0, "acquired": 30, "checked_delivered": 30, "payload_failed": 0, "trials": 30}
+  ],
+  "full_watterson": [
+    {
+      "preset": "mid_latitude_disturbed",
+      "high_snr_floor_check": {"waveform_snr_db": 20.0, "checked_delivered": 10, "trials": 10},
+      "key_points": [
+        {"waveform_snr_db": -19.0, "acquired": 30, "checked_delivered": 30, "trials": 30},
+        {"waveform_snr_db": -20.0, "acquired": 30, "checked_delivered": 22, "trials": 30},
+        {"waveform_snr_db": -21.0, "acquired": 30, "checked_delivered": 12, "trials": 30}
+      ],
+      "exploratory_edge": "between -19 and -20 dB"
+    },
+    {
+      "preset": "mid_latitude_disturbed_nvis",
+      "high_snr_floor_check": {"waveform_snr_db": 20.0, "checked_delivered": 10, "trials": 10},
+      "key_points": [
+        {"waveform_snr_db": -17.0, "acquired": 30, "checked_delivered": 30, "trials": 30},
+        {"waveform_snr_db": -18.0, "acquired": 30, "checked_delivered": 28, "trials": 30},
+        {"waveform_snr_db": -19.0, "acquired": 30, "checked_delivered": 21, "trials": 30}
+      ],
+      "exploratory_edge": "between -17 and -18 dB under the 30/30 screen convention"
+    },
+    {
+      "preset": "high_latitude_disturbed",
+      "high_snr_floor_check": {"waveform_snr_db": 20.0, "checked_delivered": 10, "trials": 10},
+      "key_points": [
+        {"waveform_snr_db": -19.0, "acquired": 30, "checked_delivered": 30, "trials": 30},
+        {"waveform_snr_db": -20.0, "acquired": 30, "checked_delivered": 30, "trials": 30},
+        {"waveform_snr_db": -21.0, "acquired": 30, "checked_delivered": 7, "trials": 30}
+      ],
+      "exploratory_edge": "between -20 and -21 dB"
+    }
+  ],
+  "tiny_ack_key_points": [
+    {"model": "awgn", "preset": null, "waveform_snr_db": -24.0, "acquired": 30, "checked_delivered": 2, "trials": 30},
+    {"model": "awgn", "preset": null, "waveform_snr_db": -23.0, "acquired": 30, "checked_delivered": 17, "trials": 30},
+    {"model": "awgn", "preset": null, "waveform_snr_db": -22.0, "acquired": 30, "checked_delivered": 30, "trials": 30},
+    {"model": "watterson_canonical", "preset": "mid_latitude_disturbed", "waveform_snr_db": -19.0, "acquired": 30, "checked_delivered": 15, "trials": 30},
+    {"model": "watterson_canonical", "preset": "mid_latitude_disturbed_nvis", "waveform_snr_db": -17.0, "acquired": 30, "checked_delivered": 19, "trials": 30},
+    {"model": "watterson_canonical", "preset": "high_latitude_disturbed", "waveform_snr_db": -20.0, "acquired": 30, "checked_delivered": 7, "trials": 30}
+  ],
+  "retry_models": {
+    "assumptions": {
+      "data_and_ack_independent": true,
+      "exchange_success_probability_q": "p_data * p_ack",
+      "useful_bits_per_data_frame": 432,
+      "data_seconds": 19.54,
+      "ack_seconds": 3.652,
+      "two_turnarounds_seconds": 0.6,
+      "clean_exchange_seconds": 23.792,
+      "hf_ack_timeout_slack_seconds": 5.0,
+      "failed_attempt_seconds_with_current_link_timeout_arithmetic": 48.332
+    },
+    "optimistic_immediate_repeat": {
+      "formula_bps": "432*q/23.792",
+      "minimum_q_for_18_bps": 0.9913333333333334
+    },
+    "current_link_timeout": {
+      "formula_bps": "432/(23.792+((1-q)/q)*48.332)",
+      "minimum_q_for_18_bps": 0.9957148743304491
+    },
+    "point_estimates": [
+      {"point": "awgn_-23", "q": 0.5666666666666667, "optimistic_bps": 10.289172831203764, "current_link_timeout_bps": 7.1109045488874685},
+      {"point": "awgn_-22", "q": 1.0, "optimistic_bps": 18.15736381977135, "current_link_timeout_bps": 18.15736381977135},
+      {"point": "mid_latitude_disturbed_-19", "q": 0.5, "optimistic_bps": 9.078681909885676, "current_link_timeout_bps": 5.98968443236648},
+      {"point": "mid_latitude_disturbed_nvis_-17", "q": 0.6333333333333333, "optimistic_bps": 11.499663752521855, "current_link_timeout_bps": 8.344007319304666},
+      {"point": "high_latitude_disturbed_-20", "q": 0.23333333333333334, "optimistic_bps": 4.236718224613315, "current_link_timeout_bps": 2.365863962822138}
+    ]
+  },
+  "integrity_and_work": {
+    "total_trials": 1050,
+    "acquired_above_threshold": 1050,
+    "checked_delivered": 713,
+    "payload_failed": 337,
+    "acquisition_failed": 0,
+    "errors": 0,
+    "checked_wrong_payloads": 0,
+    "saved_failed_captures": 57,
+    "candidate_count_max": 16,
+    "candidates_tried_max": 16,
+    "search_cells_per_trial": 54054,
+    "refinement_cells_max": 3120,
+    "total_gf16_viterbi_branches_max": 12713984,
+    "development_host": "Apple M1, 8 GiB, four worker processes",
+    "decode_wall_seconds": {
+      "full_success_p95": 0.5239434580144007,
+      "full_failure_p95": 2.195915749995038,
+      "full_max": 2.376773958996637,
+      "tiny_success_p95": 0.37743120797676966,
+      "tiny_failure_p95": 1.3894220840011258,
+      "tiny_max": 1.5895028750237543
+    },
+    "decode_process_cpu_seconds": {
+      "full_success_p95": 0.4718889999999991,
+      "full_failure_p95": 2.0917580000000022,
+      "full_max": 2.3055989999999973,
+      "tiny_success_p95": 0.37195,
+      "tiny_failure_p95": 1.336462,
+      "tiny_max": 1.4595979999999997
+    }
+  },
+  "buffer_and_timing": {
+    "experiment_decoder_capture_limit_seconds": 24.0,
+    "largest_observed_full_rx_samples_at_12khz": 234580,
+    "largest_observed_full_capture_seconds": 19.548333333333332,
+    "production_rx_buffer_seconds": 10.0,
+    "production_hf_max_useful_frame_seconds": 8.0,
+    "production_compatible": false
+  },
+  "replay_checks": [
+    {"artifact": "hr0b_awgn_full_20260831.json", "record_index": 0, "matched": true, "outcome": "payload_failed"},
+    {"artifact": "hr0b_watterson_high_latitude_disturbed_tiny_key_20260831.json", "record_index": 0, "matched": true, "outcome": "payload_failed"}
+  ],
+  "primary_artifacts": [
+    "hr0b_awgn_full_20260831.json",
+    "hr0b_awgn_tiny_key_20260831.json",
+    "hr0b_watterson_mid_latitude_disturbed_full_key_20260831.json",
+    "hr0b_watterson_mid_latitude_disturbed_full_key2_20260831.json",
+    "hr0b_watterson_mid_latitude_disturbed_nvis_full_key_20260831.json",
+    "hr0b_watterson_high_latitude_disturbed_full_key_20260831.json",
+    "hr0b_watterson_mid_latitude_disturbed_tiny_key_20260831.json",
+    "hr0b_watterson_mid_latitude_disturbed_nvis_tiny_key_20260831.json",
+    "hr0b_watterson_high_latitude_disturbed_tiny_key_20260831.json"
+  ],
+  "limitations": [
+    "Thirty trials per key point are exploratory and do not satisfy qualification gates.",
+    "The acquisition threshold has not passed held-out signal-absent testing.",
+    "Canonical Watterson resets fading per frame and normalizes AWGN from each post-fade frame; no fixed-N0 or continuous-fade result is included.",
+    "No radio, minimum Raspberry Pi-class target, full link session, or VARA implementation was exercised."
+  ]
+}

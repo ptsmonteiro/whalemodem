@@ -1,6 +1,14 @@
 # HR0 point 4: capacity diagnosis and HR0-B redesign
 
-## Decision
+> **Point-5 update (2026-08-31):** the small real-receiver screen requested
+> by this handoff is complete in [`SCREEN.md`](SCREEN.md). Revision B's full
+> class has promising boundaries, but its tiny ACK class fails the
+> retry-weighted 18 bit/s session gate and its 19.54 s full frame exceeds the
+> production 10 s RX buffer and 8 s HF useful-frame policy. The current
+> decision is **redesign before the full campaign**. The point-4 decision and
+> evidence below are retained as the rationale for running that screen.
+
+## Point-4 decision (executed)
 
 **Go with HR0-B to a small real-receiver AWGN/Watterson boundary screen; do
 not run the full campaign yet.**  HR0-A is preserved as revision A in
@@ -208,3 +216,8 @@ Current decision: **go HR0-B to the next small screen**.  A failure of the
 tiny-class/session gate is a framing/ARQ redesign; a 7 ms/30 Hz floor is a
 geometry redesign; failure of real AWGN near -24 dB after acquisition is
 a stop for this GF(16)+RS revision.  The target must not be weakened.
+
+## Subsequent result
+
+The tiny-class/session failure occurred; see `SCREEN.md`. The superseding
+campaign decision is **redesign**.

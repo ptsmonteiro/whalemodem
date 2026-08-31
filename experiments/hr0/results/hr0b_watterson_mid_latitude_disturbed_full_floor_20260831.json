@@ -1,0 +1,1670 @@
+{
+  "schema_id": "whalemodem.hr0.frame_benchmark",
+  "schema_version": 2,
+  "claim_scope": "exploration_not_qualification",
+  "command": "/Users/pedro/miniconda3/envs/gnuradio/bin/python /Users/pedro/Projects/whalemodem/experiments/hr0/benchmark.py sweep --modes experiments.hr0.hr0b:HR0B --model watterson_canonical --watterson-preset mid_latitude_disturbed --points 20 --trials 10 --workers 4 --seed 20260831 --save-failures 3 --out experiments/hr0/results/hr0b_watterson_mid_latitude_disturbed_full_floor_20260831.json",
+  "started_utc": "2026-08-31T12:46:47.768572+00:00",
+  "completed_utc": "2026-08-31T12:46:51.370108+00:00",
+  "master_seed": 20260831,
+  "seed_policy": {
+    "algorithm": "sha256_first_63_bits",
+    "inputs": [
+      "master_seed",
+      "namespace",
+      "canonical_point_key",
+      "one_based_trial"
+    ],
+    "namespaces": [
+      "workload",
+      "watterson",
+      "awgn"
+    ],
+    "matched_across_modes": true,
+    "point_order_independent": true
+  },
+  "worker_processes": 4,
+  "trials_per_mode_point": 10,
+  "workload": {
+    "name": "full_data",
+    "physical_payload_bytes": 64,
+    "air_header_bytes": 10,
+    "data_body_bytes": 54,
+    "useful_application_bytes": 54,
+    "useful_application_bits": 432
+  },
+  "snr_convention": {
+    "kind": "waveform",
+    "signal": "mean_square_over_complete_half_open_keying_interval",
+    "reference_samples": "[0, tx_samples)",
+    "noise": "real_awgn_over_0_to_24000_hz_nyquist_band"
+  },
+  "model": "watterson_canonical",
+  "watterson_preset": "mid_latitude_disturbed",
+  "points_db": [
+    20.0
+  ],
+  "mode_metadata": [
+    {
+      "selector": "experiments.hr0.hr0b:HR0B",
+      "name": "hr0-b-exp",
+      "mode_id": 241,
+      "candidate_revision": {
+        "path": "/Users/pedro/Projects/whalemodem/experiments/hr0/hr0b.py",
+        "sha256": "d0ad94945b2fe845d44473163b07172b54e25b2ce6cdafaa1130dc24999a3f61"
+      },
+      "tx_sample_rate": 48000,
+      "rx_sample_rate": 12000,
+      "confidence_threshold": 0.012,
+      "physical_payload_bytes": 64,
+      "air_header_bytes": 10,
+      "data_body_bytes": 54,
+      "useful_application_bytes": 54,
+      "tx_samples": 937920,
+      "snr_reference_samples": [
+        0,
+        937920
+      ],
+      "keyed_seconds": 19.54,
+      "declared_airtime_seconds": 19.54,
+      "frame_useful_rate_bps": 22.10849539406346,
+      "waveform_snr_to_useful_eb_n0_offset_db": 30.356520542794485,
+      "mean_square_power": 0.010828790317882276,
+      "energy_mean_square_seconds": 0.21159456281141967,
+      "energy_per_useful_bit": 0.0004898022287301381,
+      "rms": 0.10406147374452408,
+      "peak": 0.18384777009487152,
+      "crest_factor": 1.7667227214773704,
+      "occupied_bandwidth_99": {
+        "low_hz": 325.63971340839305,
+        "high_hz": 2291.658137154555,
+        "width_hz": 1966.0184237461617,
+        "definition": "0.5_to_99.5_percent_cumulative_rfft_power"
+      }
+    }
+  ],
+  "summaries": [
+    {
+      "mode_selector": "experiments.hr0.hr0b:HR0B",
+      "mode_name": "hr0-b-exp",
+      "mode_id": 241,
+      "point_key": "watterson_canonical|mid_latitude_disturbed|20",
+      "model": "watterson_canonical",
+      "preset": "mid_latitude_disturbed",
+      "waveform_snr_db": 20.0,
+      "trial_count": 10,
+      "outcomes": {
+        "decoded": 10,
+        "acquisition_failed": 0,
+        "payload_failed": 0,
+        "error": 0
+      },
+      "acquisition_probability": {
+        "count": 10,
+        "total": 10,
+        "rate": 1.0,
+        "wilson_95": [
+          0.7224672001371107,
+          0.9999999999999999
+        ]
+      },
+      "payload_success_conditional_on_acquisition": {
+        "count": 10,
+        "total": 10,
+        "rate": 1.0,
+        "wilson_95": [
+          0.7224672001371107,
+          0.9999999999999999
+        ]
+      },
+      "payload_failure_conditional_on_acquisition": {
+        "count": 0,
+        "total": 10,
+        "rate": 0.0,
+        "wilson_95": [
+          0.0,
+          0.2775327998628892
+        ]
+      },
+      "frame_error_rate": {
+        "count": 0,
+        "total": 10,
+        "rate": 0.0,
+        "wilson_95": [
+          0.0,
+          0.2775327998628892
+        ]
+      },
+      "verified_delivery_probability": {
+        "count": 10,
+        "total": 10,
+        "rate": 1.0,
+        "wilson_95": [
+          0.7224672001371107,
+          0.9999999999999999
+        ]
+      },
+      "checked_wrong_payloads": 0,
+      "exploration_only": true,
+      "qualification_gate_eligible": false
+    }
+  ],
+  "trials": [
+    {
+      "trial": 1,
+      "mode_selector": "experiments.hr0.hr0b:HR0B",
+      "mode_name": "hr0-b-exp",
+      "mode_id": 241,
+      "point_key": "watterson_canonical|mid_latitude_disturbed|20",
+      "model": "watterson_canonical",
+      "preset": "mid_latitude_disturbed",
+      "waveform_snr_db": 20.0,
+      "derived_seeds": {
+        "workload": 2021177861748401059,
+        "watterson": 8342824031954430819,
+        "awgn": 5162000026859382769
+      },
+      "payload_sha256": "fa100fc68bd950862ed31e69423c7374e39370513c0b97879f12ca9198fd7844",
+      "physical_payload_bytes": 64,
+      "air_header_bytes": 10,
+      "data_body_bytes": 54,
+      "useful_application_bytes": 54,
+      "outcome": "decoded",
+      "acquired_above_threshold": true,
+      "checked_wrong_payload": false,
+      "tx_samples": 937920,
+      "tx_sample_rate": 48000,
+      "snr_reference_samples": [
+        0,
+        937920
+      ],
+      "keyed_seconds": 19.54,
+      "rx_samples": 234520,
+      "rx_sample_rate": 12000,
+      "channel_description": {
+        "type": "chain",
+        "sample_rate": 48000,
+        "stages": [
+          {
+            "type": "watterson",
+            "sample_rate": 48000,
+            "seed": 8342824031954430819,
+            "preset": "mid_latitude_disturbed",
+            "oscillators": 256,
+            "fading_sample_rate": 200.0,
+            "frequency_spread_convention": "2_sigma",
+            "paths": [
+              {
+                "delay_seconds": 0.0,
+                "frequency_spread_hz": 1.0,
+                "power": 1.0,
+                "doppler_shift_hz": 0.0
+              },
+              {
+                "delay_seconds": 0.002,
+                "frequency_spread_hz": 1.0,
+                "power": 1.0,
+                "doppler_shift_hz": 0.0
+              }
+            ]
+          },
+          {
+            "type": "awgn",
+            "sample_rate": 48000,
+            "seed": 5162000026859382769,
+            "snr": {
+              "db": 20.0,
+              "kind": "waveform",
+              "band_hz": null,
+              "bit_rate": null,
+              "reference_start": 0,
+              "reference_stop": 937920
+            }
+          }
+        ],
+        "stage_order": [
+          "watterson",
+          "awgn"
+        ],
+        "normalization": "post_watterson_per_frame",
+        "fading_continuity": "independent_reset_per_frame",
+        "snr_reference_samples": [
+          0,
+          937920
+        ]
+      },
+      "channel_measurements": {
+        "stage_0": {
+          "paths": 2,
+          "path_realized_mean_powers": [
+            0.5997948545898749,
+            0.6443048719005677
+          ],
+          "elapsed_seconds": 19.54,
+          "max_delay_samples": 96
+        },
+        "stage_1": {
+          "waveform_snr_db": 20.0,
+          "realized_waveform_snr_db": 20.009323816437885,
+          "signal_power": 0.013463173282255146,
+          "noise_power": 0.0001343430036065314,
+          "reference_samples": [
+            0,
+            937920
+          ]
+        }
+      },
+      "decoder_metrics": {
+        "confidence": 0.9743132463756822,
+        "cfo_hz": 0.0,
+        "crc_ok": true,
+        "start_index": 1554,
+        "end_index": 234498,
+        "capture_rms": 0.11627677693972319,
+        "capture_peak": 0.5633207559585571,
+        "candidate_limit": 16,
+        "candidate_count": 16,
+        "candidates_tried": 1,
+        "candidate_rank": 1,
+        "search_cells_evaluated": 54054,
+        "refinement_cells_evaluated": 195,
+        "acquired_class": 1,
+        "fec_tail_ok": true,
+        "zero_fill_ok": true,
+        "gf16_viterbi_steps": 194,
+        "gf16_viterbi_states": 256,
+        "gf16_viterbi_branches": 794624,
+        "total_gf16_viterbi_branches": 794624,
+        "rs_ok": true,
+        "rs_corrected_bytes": 0,
+        "likelihood_scale": 87.32799276237515,
+        "observation_combining": "coherent_last_two_8ms_observations",
+        "process_cpu_seconds": 0.27248399999999995,
+        "wall_seconds": 0.29718416699324735
+      },
+      "trial_work": {
+        "process_cpu_seconds": 0.938339,
+        "wall_seconds": 1.1673709170136135
+      },
+      "error": null,
+      "record_index": 0,
+      "replay_command": "/Users/pedro/miniconda3/envs/gnuradio/bin/python /Users/pedro/Projects/whalemodem/experiments/hr0/benchmark.py replay --artifact /Users/pedro/Projects/whalemodem/experiments/hr0/results/hr0b_watterson_mid_latitude_disturbed_full_floor_20260831.json --record-index 0",
+      "capture": null
+    },
+    {
+      "trial": 2,
+      "mode_selector": "experiments.hr0.hr0b:HR0B",
+      "mode_name": "hr0-b-exp",
+      "mode_id": 241,
+      "point_key": "watterson_canonical|mid_latitude_disturbed|20",
+      "model": "watterson_canonical",
+      "preset": "mid_latitude_disturbed",
+      "waveform_snr_db": 20.0,
+      "derived_seeds": {
+        "workload": 7714384199503437933,
+        "watterson": 5545935773402109411,
+        "awgn": 4105364708395843738
+      },
+      "payload_sha256": "744d29b17fea277792d91f727440ed3aa8ce991242d38b8bfeecb172600bcca8",
+      "physical_payload_bytes": 64,
+      "air_header_bytes": 10,
+      "data_body_bytes": 54,
+      "useful_application_bytes": 54,
+      "outcome": "decoded",
+      "acquired_above_threshold": true,
+      "checked_wrong_payload": false,
+      "tx_samples": 937920,
+      "tx_sample_rate": 48000,
+      "snr_reference_samples": [
+        0,
+        937920
+      ],
+      "keyed_seconds": 19.54,
+      "rx_samples": 234520,
+      "rx_sample_rate": 12000,
+      "channel_description": {
+        "type": "chain",
+        "sample_rate": 48000,
+        "stages": [
+          {
+            "type": "watterson",
+            "sample_rate": 48000,
+            "seed": 5545935773402109411,
+            "preset": "mid_latitude_disturbed",
+            "oscillators": 256,
+            "fading_sample_rate": 200.0,
+            "frequency_spread_convention": "2_sigma",
+            "paths": [
+              {
+                "delay_seconds": 0.0,
+                "frequency_spread_hz": 1.0,
+                "power": 1.0,
+                "doppler_shift_hz": 0.0
+              },
+              {
+                "delay_seconds": 0.002,
+                "frequency_spread_hz": 1.0,
+                "power": 1.0,
+                "doppler_shift_hz": 0.0
+              }
+            ]
+          },
+          {
+            "type": "awgn",
+            "sample_rate": 48000,
+            "seed": 4105364708395843738,
+            "snr": {
+              "db": 20.0,
+              "kind": "waveform",
+              "band_hz": null,
+              "bit_rate": null,
+              "reference_start": 0,
+              "reference_stop": 937920
+            }
+          }
+        ],
+        "stage_order": [
+          "watterson",
+          "awgn"
+        ],
+        "normalization": "post_watterson_per_frame",
+        "fading_continuity": "independent_reset_per_frame",
+        "snr_reference_samples": [
+          0,
+          937920
+        ]
+      },
+      "channel_measurements": {
+        "stage_0": {
+          "paths": 2,
+          "path_realized_mean_powers": [
+            0.4717146613827862,
+            0.5535383881313083
+          ],
+          "elapsed_seconds": 19.54,
+          "max_delay_samples": 96
+        },
+        "stage_1": {
+          "waveform_snr_db": 20.0,
+          "realized_waveform_snr_db": 20.00681943169432,
+          "signal_power": 0.010875048405639834,
+          "noise_power": 0.000108579854546188,
+          "reference_samples": [
+            0,
+            937920
+          ]
+        }
+      },
+      "decoder_metrics": {
+        "confidence": 0.9759098857755527,
+        "cfo_hz": 0.0,
+        "crc_ok": true,
+        "start_index": 1575,
+        "end_index": 234519,
+        "capture_rms": 0.10448174986124463,
+        "capture_peak": 0.4935135245323181,
+        "candidate_limit": 16,
+        "candidate_count": 16,
+        "candidates_tried": 1,
+        "candidate_rank": 1,
+        "search_cells_evaluated": 54054,
+        "refinement_cells_evaluated": 195,
+        "acquired_class": 1,
+        "fec_tail_ok": true,
+        "zero_fill_ok": true,
+        "gf16_viterbi_steps": 194,
+        "gf16_viterbi_states": 256,
+        "gf16_viterbi_branches": 794624,
+        "total_gf16_viterbi_branches": 794624,
+        "rs_ok": true,
+        "rs_corrected_bytes": 0,
+        "likelihood_scale": 156.20685971709787,
+        "observation_combining": "coherent_last_two_8ms_observations",
+        "process_cpu_seconds": 0.26550300000000004,
+        "wall_seconds": 0.2890724170138128
+      },
+      "trial_work": {
+        "process_cpu_seconds": 0.924046,
+        "wall_seconds": 1.149140166991856
+      },
+      "error": null,
+      "record_index": 1,
+      "replay_command": "/Users/pedro/miniconda3/envs/gnuradio/bin/python /Users/pedro/Projects/whalemodem/experiments/hr0/benchmark.py replay --artifact /Users/pedro/Projects/whalemodem/experiments/hr0/results/hr0b_watterson_mid_latitude_disturbed_full_floor_20260831.json --record-index 1",
+      "capture": null
+    },
+    {
+      "trial": 3,
+      "mode_selector": "experiments.hr0.hr0b:HR0B",
+      "mode_name": "hr0-b-exp",
+      "mode_id": 241,
+      "point_key": "watterson_canonical|mid_latitude_disturbed|20",
+      "model": "watterson_canonical",
+      "preset": "mid_latitude_disturbed",
+      "waveform_snr_db": 20.0,
+      "derived_seeds": {
+        "workload": 7344773842493493237,
+        "watterson": 7110612716651616052,
+        "awgn": 6340742826187754719
+      },
+      "payload_sha256": "246c1c6ea5241bcdb2bebdbeda3858187bd53bebb0434987ac126a9ea1b17c78",
+      "physical_payload_bytes": 64,
+      "air_header_bytes": 10,
+      "data_body_bytes": 54,
+      "useful_application_bytes": 54,
+      "outcome": "decoded",
+      "acquired_above_threshold": true,
+      "checked_wrong_payload": false,
+      "tx_samples": 937920,
+      "tx_sample_rate": 48000,
+      "snr_reference_samples": [
+        0,
+        937920
+      ],
+      "keyed_seconds": 19.54,
+      "rx_samples": 234520,
+      "rx_sample_rate": 12000,
+      "channel_description": {
+        "type": "chain",
+        "sample_rate": 48000,
+        "stages": [
+          {
+            "type": "watterson",
+            "sample_rate": 48000,
+            "seed": 7110612716651616052,
+            "preset": "mid_latitude_disturbed",
+            "oscillators": 256,
+            "fading_sample_rate": 200.0,
+            "frequency_spread_convention": "2_sigma",
+            "paths": [
+              {
+                "delay_seconds": 0.0,
+                "frequency_spread_hz": 1.0,
+                "power": 1.0,
+                "doppler_shift_hz": 0.0
+              },
+              {
+                "delay_seconds": 0.002,
+                "frequency_spread_hz": 1.0,
+                "power": 1.0,
+                "doppler_shift_hz": 0.0
+              }
+            ]
+          },
+          {
+            "type": "awgn",
+            "sample_rate": 48000,
+            "seed": 6340742826187754719,
+            "snr": {
+              "db": 20.0,
+              "kind": "waveform",
+              "band_hz": null,
+              "bit_rate": null,
+              "reference_start": 0,
+              "reference_stop": 937920
+            }
+          }
+        ],
+        "stage_order": [
+          "watterson",
+          "awgn"
+        ],
+        "normalization": "post_watterson_per_frame",
+        "fading_continuity": "independent_reset_per_frame",
+        "snr_reference_samples": [
+          0,
+          937920
+        ]
+      },
+      "channel_measurements": {
+        "stage_0": {
+          "paths": 2,
+          "path_realized_mean_powers": [
+            0.4973242563705763,
+            0.5035572908057632
+          ],
+          "elapsed_seconds": 19.54,
+          "max_delay_samples": 96
+        },
+        "stage_1": {
+          "waveform_snr_db": 20.0,
+          "realized_waveform_snr_db": 20.00215178841746,
+          "signal_power": 0.010687871041317232,
+          "noise_power": 0.00010682576859230678,
+          "reference_samples": [
+            0,
+            937920
+          ]
+        }
+      },
+      "decoder_metrics": {
+        "confidence": 0.9530737691634722,
+        "cfo_hz": 0.0,
+        "crc_ok": true,
+        "start_index": 1554,
+        "end_index": 234498,
+        "capture_rms": 0.10359186574390472,
+        "capture_peak": 0.5390238761901855,
+        "candidate_limit": 16,
+        "candidate_count": 16,
+        "candidates_tried": 1,
+        "candidate_rank": 1,
+        "search_cells_evaluated": 54054,
+        "refinement_cells_evaluated": 195,
+        "acquired_class": 1,
+        "fec_tail_ok": true,
+        "zero_fill_ok": true,
+        "gf16_viterbi_steps": 194,
+        "gf16_viterbi_states": 256,
+        "gf16_viterbi_branches": 794624,
+        "total_gf16_viterbi_branches": 794624,
+        "rs_ok": true,
+        "rs_corrected_bytes": 0,
+        "likelihood_scale": 134.1151183762771,
+        "observation_combining": "coherent_last_two_8ms_observations",
+        "process_cpu_seconds": 0.254213,
+        "wall_seconds": 0.27289862500038
+      },
+      "trial_work": {
+        "process_cpu_seconds": 0.9420559999999999,
+        "wall_seconds": 1.1851083330111578
+      },
+      "error": null,
+      "record_index": 2,
+      "replay_command": "/Users/pedro/miniconda3/envs/gnuradio/bin/python /Users/pedro/Projects/whalemodem/experiments/hr0/benchmark.py replay --artifact /Users/pedro/Projects/whalemodem/experiments/hr0/results/hr0b_watterson_mid_latitude_disturbed_full_floor_20260831.json --record-index 2",
+      "capture": null
+    },
+    {
+      "trial": 4,
+      "mode_selector": "experiments.hr0.hr0b:HR0B",
+      "mode_name": "hr0-b-exp",
+      "mode_id": 241,
+      "point_key": "watterson_canonical|mid_latitude_disturbed|20",
+      "model": "watterson_canonical",
+      "preset": "mid_latitude_disturbed",
+      "waveform_snr_db": 20.0,
+      "derived_seeds": {
+        "workload": 1382661205681737783,
+        "watterson": 4140586964571295713,
+        "awgn": 7885750168852993920
+      },
+      "payload_sha256": "f9b840620b1c7dc160797fbd26f5fdd118cc4447aee9cf8fcb81696e881725a7",
+      "physical_payload_bytes": 64,
+      "air_header_bytes": 10,
+      "data_body_bytes": 54,
+      "useful_application_bytes": 54,
+      "outcome": "decoded",
+      "acquired_above_threshold": true,
+      "checked_wrong_payload": false,
+      "tx_samples": 937920,
+      "tx_sample_rate": 48000,
+      "snr_reference_samples": [
+        0,
+        937920
+      ],
+      "keyed_seconds": 19.54,
+      "rx_samples": 234520,
+      "rx_sample_rate": 12000,
+      "channel_description": {
+        "type": "chain",
+        "sample_rate": 48000,
+        "stages": [
+          {
+            "type": "watterson",
+            "sample_rate": 48000,
+            "seed": 4140586964571295713,
+            "preset": "mid_latitude_disturbed",
+            "oscillators": 256,
+            "fading_sample_rate": 200.0,
+            "frequency_spread_convention": "2_sigma",
+            "paths": [
+              {
+                "delay_seconds": 0.0,
+                "frequency_spread_hz": 1.0,
+                "power": 1.0,
+                "doppler_shift_hz": 0.0
+              },
+              {
+                "delay_seconds": 0.002,
+                "frequency_spread_hz": 1.0,
+                "power": 1.0,
+                "doppler_shift_hz": 0.0
+              }
+            ]
+          },
+          {
+            "type": "awgn",
+            "sample_rate": 48000,
+            "seed": 7885750168852993920,
+            "snr": {
+              "db": 20.0,
+              "kind": "waveform",
+              "band_hz": null,
+              "bit_rate": null,
+              "reference_start": 0,
+              "reference_stop": 937920
+            }
+          }
+        ],
+        "stage_order": [
+          "watterson",
+          "awgn"
+        ],
+        "normalization": "post_watterson_per_frame",
+        "fading_continuity": "independent_reset_per_frame",
+        "snr_reference_samples": [
+          0,
+          937920
+        ]
+      },
+      "channel_measurements": {
+        "stage_0": {
+          "paths": 2,
+          "path_realized_mean_powers": [
+            0.49110197181735726,
+            0.581189566099022
+          ],
+          "elapsed_seconds": 19.54,
+          "max_delay_samples": 96
+        },
+        "stage_1": {
+          "waveform_snr_db": 20.0,
+          "realized_waveform_snr_db": 20.005774294442343,
+          "signal_power": 0.011767366032948649,
+          "noise_power": 0.00011751730769825375,
+          "reference_samples": [
+            0,
+            937920
+          ]
+        }
+      },
+      "decoder_metrics": {
+        "confidence": 0.9421566329299605,
+        "cfo_hz": 0.0,
+        "crc_ok": true,
+        "start_index": 1554,
+        "end_index": 234498,
+        "capture_rms": 0.10870591826747558,
+        "capture_peak": 0.5229045152664185,
+        "candidate_limit": 16,
+        "candidate_count": 16,
+        "candidates_tried": 1,
+        "candidate_rank": 1,
+        "search_cells_evaluated": 54054,
+        "refinement_cells_evaluated": 195,
+        "acquired_class": 1,
+        "fec_tail_ok": true,
+        "zero_fill_ok": true,
+        "gf16_viterbi_steps": 194,
+        "gf16_viterbi_states": 256,
+        "gf16_viterbi_branches": 794624,
+        "total_gf16_viterbi_branches": 794624,
+        "rs_ok": true,
+        "rs_corrected_bytes": 0,
+        "likelihood_scale": 179.91507737290638,
+        "observation_combining": "coherent_last_two_8ms_observations",
+        "process_cpu_seconds": 0.25310999999999995,
+        "wall_seconds": 0.27029266700265
+      },
+      "trial_work": {
+        "process_cpu_seconds": 0.9412290000000001,
+        "wall_seconds": 1.183861916011665
+      },
+      "error": null,
+      "record_index": 3,
+      "replay_command": "/Users/pedro/miniconda3/envs/gnuradio/bin/python /Users/pedro/Projects/whalemodem/experiments/hr0/benchmark.py replay --artifact /Users/pedro/Projects/whalemodem/experiments/hr0/results/hr0b_watterson_mid_latitude_disturbed_full_floor_20260831.json --record-index 3",
+      "capture": null
+    },
+    {
+      "trial": 5,
+      "mode_selector": "experiments.hr0.hr0b:HR0B",
+      "mode_name": "hr0-b-exp",
+      "mode_id": 241,
+      "point_key": "watterson_canonical|mid_latitude_disturbed|20",
+      "model": "watterson_canonical",
+      "preset": "mid_latitude_disturbed",
+      "waveform_snr_db": 20.0,
+      "derived_seeds": {
+        "workload": 1313534076292538258,
+        "watterson": 7238895870586234444,
+        "awgn": 9118987248634008959
+      },
+      "payload_sha256": "c6d56a806d55590b5ccfa5832765f8c62109321e44a7b7830b966ba04de492e5",
+      "physical_payload_bytes": 64,
+      "air_header_bytes": 10,
+      "data_body_bytes": 54,
+      "useful_application_bytes": 54,
+      "outcome": "decoded",
+      "acquired_above_threshold": true,
+      "checked_wrong_payload": false,
+      "tx_samples": 937920,
+      "tx_sample_rate": 48000,
+      "snr_reference_samples": [
+        0,
+        937920
+      ],
+      "keyed_seconds": 19.54,
+      "rx_samples": 234520,
+      "rx_sample_rate": 12000,
+      "channel_description": {
+        "type": "chain",
+        "sample_rate": 48000,
+        "stages": [
+          {
+            "type": "watterson",
+            "sample_rate": 48000,
+            "seed": 7238895870586234444,
+            "preset": "mid_latitude_disturbed",
+            "oscillators": 256,
+            "fading_sample_rate": 200.0,
+            "frequency_spread_convention": "2_sigma",
+            "paths": [
+              {
+                "delay_seconds": 0.0,
+                "frequency_spread_hz": 1.0,
+                "power": 1.0,
+                "doppler_shift_hz": 0.0
+              },
+              {
+                "delay_seconds": 0.002,
+                "frequency_spread_hz": 1.0,
+                "power": 1.0,
+                "doppler_shift_hz": 0.0
+              }
+            ]
+          },
+          {
+            "type": "awgn",
+            "sample_rate": 48000,
+            "seed": 9118987248634008959,
+            "snr": {
+              "db": 20.0,
+              "kind": "waveform",
+              "band_hz": null,
+              "bit_rate": null,
+              "reference_start": 0,
+              "reference_stop": 937920
+            }
+          }
+        ],
+        "stage_order": [
+          "watterson",
+          "awgn"
+        ],
+        "normalization": "post_watterson_per_frame",
+        "fading_continuity": "independent_reset_per_frame",
+        "snr_reference_samples": [
+          0,
+          937920
+        ]
+      },
+      "channel_measurements": {
+        "stage_0": {
+          "paths": 2,
+          "path_realized_mean_powers": [
+            0.5922716977136583,
+            0.37824196470355226
+          ],
+          "elapsed_seconds": 19.54,
+          "max_delay_samples": 96
+        },
+        "stage_1": {
+          "waveform_snr_db": 20.0,
+          "realized_waveform_snr_db": 19.997178849105453,
+          "signal_power": 0.010671090760483384,
+          "noise_power": 0.00010678024888949665,
+          "reference_samples": [
+            0,
+            937920
+          ]
+        }
+      },
+      "decoder_metrics": {
+        "confidence": 0.9745712823243343,
+        "cfo_hz": 0.0,
+        "crc_ok": true,
+        "start_index": 1551,
+        "end_index": 234495,
+        "capture_rms": 0.10353256635162612,
+        "capture_peak": 0.45405441522598267,
+        "candidate_limit": 16,
+        "candidate_count": 16,
+        "candidates_tried": 1,
+        "candidate_rank": 1,
+        "search_cells_evaluated": 54054,
+        "refinement_cells_evaluated": 195,
+        "acquired_class": 1,
+        "fec_tail_ok": true,
+        "zero_fill_ok": true,
+        "gf16_viterbi_steps": 194,
+        "gf16_viterbi_states": 256,
+        "gf16_viterbi_branches": 794624,
+        "total_gf16_viterbi_branches": 794624,
+        "rs_ok": true,
+        "rs_corrected_bytes": 0,
+        "likelihood_scale": 224.49499098419156,
+        "observation_combining": "coherent_last_two_8ms_observations",
+        "process_cpu_seconds": 0.23991600000000002,
+        "wall_seconds": 0.24551354098366573
+      },
+      "trial_work": {
+        "process_cpu_seconds": 0.7675550000000002,
+        "wall_seconds": 0.8215270419896115
+      },
+      "error": null,
+      "record_index": 4,
+      "replay_command": "/Users/pedro/miniconda3/envs/gnuradio/bin/python /Users/pedro/Projects/whalemodem/experiments/hr0/benchmark.py replay --artifact /Users/pedro/Projects/whalemodem/experiments/hr0/results/hr0b_watterson_mid_latitude_disturbed_full_floor_20260831.json --record-index 4",
+      "capture": null
+    },
+    {
+      "trial": 6,
+      "mode_selector": "experiments.hr0.hr0b:HR0B",
+      "mode_name": "hr0-b-exp",
+      "mode_id": 241,
+      "point_key": "watterson_canonical|mid_latitude_disturbed|20",
+      "model": "watterson_canonical",
+      "preset": "mid_latitude_disturbed",
+      "waveform_snr_db": 20.0,
+      "derived_seeds": {
+        "workload": 940962117824999738,
+        "watterson": 1383919595892327004,
+        "awgn": 5480020052057238140
+      },
+      "payload_sha256": "05f247ee531389d3ebd3b75bf6b369757e46fa5bfae6f4716b4a7dab49056120",
+      "physical_payload_bytes": 64,
+      "air_header_bytes": 10,
+      "data_body_bytes": 54,
+      "useful_application_bytes": 54,
+      "outcome": "decoded",
+      "acquired_above_threshold": true,
+      "checked_wrong_payload": false,
+      "tx_samples": 937920,
+      "tx_sample_rate": 48000,
+      "snr_reference_samples": [
+        0,
+        937920
+      ],
+      "keyed_seconds": 19.54,
+      "rx_samples": 234520,
+      "rx_sample_rate": 12000,
+      "channel_description": {
+        "type": "chain",
+        "sample_rate": 48000,
+        "stages": [
+          {
+            "type": "watterson",
+            "sample_rate": 48000,
+            "seed": 1383919595892327004,
+            "preset": "mid_latitude_disturbed",
+            "oscillators": 256,
+            "fading_sample_rate": 200.0,
+            "frequency_spread_convention": "2_sigma",
+            "paths": [
+              {
+                "delay_seconds": 0.0,
+                "frequency_spread_hz": 1.0,
+                "power": 1.0,
+                "doppler_shift_hz": 0.0
+              },
+              {
+                "delay_seconds": 0.002,
+                "frequency_spread_hz": 1.0,
+                "power": 1.0,
+                "doppler_shift_hz": 0.0
+              }
+            ]
+          },
+          {
+            "type": "awgn",
+            "sample_rate": 48000,
+            "seed": 5480020052057238140,
+            "snr": {
+              "db": 20.0,
+              "kind": "waveform",
+              "band_hz": null,
+              "bit_rate": null,
+              "reference_start": 0,
+              "reference_stop": 937920
+            }
+          }
+        ],
+        "stage_order": [
+          "watterson",
+          "awgn"
+        ],
+        "normalization": "post_watterson_per_frame",
+        "fading_continuity": "independent_reset_per_frame",
+        "snr_reference_samples": [
+          0,
+          937920
+        ]
+      },
+      "channel_measurements": {
+        "stage_0": {
+          "paths": 2,
+          "path_realized_mean_powers": [
+            0.41177834994623636,
+            0.4505917536849437
+          ],
+          "elapsed_seconds": 19.54,
+          "max_delay_samples": 96
+        },
+        "stage_1": {
+          "waveform_snr_db": 20.0,
+          "realized_waveform_snr_db": 19.996279395613644,
+          "signal_power": 0.009420585834383533,
+          "noise_power": 9.428659916032224e-05,
+          "reference_samples": [
+            0,
+            937920
+          ]
+        }
+      },
+      "decoder_metrics": {
+        "confidence": 0.9528435202074551,
+        "cfo_hz": 0.0,
+        "crc_ok": true,
+        "start_index": 1575,
+        "end_index": 234519,
+        "capture_rms": 0.09727776852206041,
+        "capture_peak": 0.47895440459251404,
+        "candidate_limit": 16,
+        "candidate_count": 16,
+        "candidates_tried": 1,
+        "candidate_rank": 1,
+        "search_cells_evaluated": 54054,
+        "refinement_cells_evaluated": 195,
+        "acquired_class": 1,
+        "fec_tail_ok": true,
+        "zero_fill_ok": true,
+        "gf16_viterbi_steps": 194,
+        "gf16_viterbi_states": 256,
+        "gf16_viterbi_branches": 794624,
+        "total_gf16_viterbi_branches": 794624,
+        "rs_ok": true,
+        "rs_corrected_bytes": 0,
+        "likelihood_scale": 289.34410251575395,
+        "observation_combining": "coherent_last_two_8ms_observations",
+        "process_cpu_seconds": 0.23554699999999995,
+        "wall_seconds": 0.24012762500206009
+      },
+      "trial_work": {
+        "process_cpu_seconds": 0.76599,
+        "wall_seconds": 0.8254087500099558
+      },
+      "error": null,
+      "record_index": 5,
+      "replay_command": "/Users/pedro/miniconda3/envs/gnuradio/bin/python /Users/pedro/Projects/whalemodem/experiments/hr0/benchmark.py replay --artifact /Users/pedro/Projects/whalemodem/experiments/hr0/results/hr0b_watterson_mid_latitude_disturbed_full_floor_20260831.json --record-index 5",
+      "capture": null
+    },
+    {
+      "trial": 7,
+      "mode_selector": "experiments.hr0.hr0b:HR0B",
+      "mode_name": "hr0-b-exp",
+      "mode_id": 241,
+      "point_key": "watterson_canonical|mid_latitude_disturbed|20",
+      "model": "watterson_canonical",
+      "preset": "mid_latitude_disturbed",
+      "waveform_snr_db": 20.0,
+      "derived_seeds": {
+        "workload": 7745916253762671920,
+        "watterson": 5167996580139623309,
+        "awgn": 4177558415776899204
+      },
+      "payload_sha256": "971f3d61d638dfa5c148cfff4ad0c36aaf629e97d256da46a75914bf3512bfd4",
+      "physical_payload_bytes": 64,
+      "air_header_bytes": 10,
+      "data_body_bytes": 54,
+      "useful_application_bytes": 54,
+      "outcome": "decoded",
+      "acquired_above_threshold": true,
+      "checked_wrong_payload": false,
+      "tx_samples": 937920,
+      "tx_sample_rate": 48000,
+      "snr_reference_samples": [
+        0,
+        937920
+      ],
+      "keyed_seconds": 19.54,
+      "rx_samples": 234520,
+      "rx_sample_rate": 12000,
+      "channel_description": {
+        "type": "chain",
+        "sample_rate": 48000,
+        "stages": [
+          {
+            "type": "watterson",
+            "sample_rate": 48000,
+            "seed": 5167996580139623309,
+            "preset": "mid_latitude_disturbed",
+            "oscillators": 256,
+            "fading_sample_rate": 200.0,
+            "frequency_spread_convention": "2_sigma",
+            "paths": [
+              {
+                "delay_seconds": 0.0,
+                "frequency_spread_hz": 1.0,
+                "power": 1.0,
+                "doppler_shift_hz": 0.0
+              },
+              {
+                "delay_seconds": 0.002,
+                "frequency_spread_hz": 1.0,
+                "power": 1.0,
+                "doppler_shift_hz": 0.0
+              }
+            ]
+          },
+          {
+            "type": "awgn",
+            "sample_rate": 48000,
+            "seed": 4177558415776899204,
+            "snr": {
+              "db": 20.0,
+              "kind": "waveform",
+              "band_hz": null,
+              "bit_rate": null,
+              "reference_start": 0,
+              "reference_stop": 937920
+            }
+          }
+        ],
+        "stage_order": [
+          "watterson",
+          "awgn"
+        ],
+        "normalization": "post_watterson_per_frame",
+        "fading_continuity": "independent_reset_per_frame",
+        "snr_reference_samples": [
+          0,
+          937920
+        ]
+      },
+      "channel_measurements": {
+        "stage_0": {
+          "paths": 2,
+          "path_realized_mean_powers": [
+            0.4653359374805864,
+            0.3614885240645351
+          ],
+          "elapsed_seconds": 19.54,
+          "max_delay_samples": 96
+        },
+        "stage_1": {
+          "waveform_snr_db": 20.0,
+          "realized_waveform_snr_db": 20.00452465065049,
+          "signal_power": 0.00901814591394379,
+          "noise_power": 9.00875534757232e-05,
+          "reference_samples": [
+            0,
+            937920
+          ]
+        }
+      },
+      "decoder_metrics": {
+        "confidence": 0.9508291038604781,
+        "cfo_hz": 0.0,
+        "crc_ok": true,
+        "start_index": 1575,
+        "end_index": 234519,
+        "capture_rms": 0.09515444491356667,
+        "capture_peak": 0.41698336601257324,
+        "candidate_limit": 16,
+        "candidate_count": 16,
+        "candidates_tried": 1,
+        "candidate_rank": 1,
+        "search_cells_evaluated": 54054,
+        "refinement_cells_evaluated": 195,
+        "acquired_class": 1,
+        "fec_tail_ok": true,
+        "zero_fill_ok": true,
+        "gf16_viterbi_steps": 194,
+        "gf16_viterbi_states": 256,
+        "gf16_viterbi_branches": 794624,
+        "total_gf16_viterbi_branches": 794624,
+        "rs_ok": true,
+        "rs_corrected_bytes": 0,
+        "likelihood_scale": 148.84205256644913,
+        "observation_combining": "coherent_last_two_8ms_observations",
+        "process_cpu_seconds": 0.2282099999999998,
+        "wall_seconds": 0.23162533302092925
+      },
+      "trial_work": {
+        "process_cpu_seconds": 0.7618769999999999,
+        "wall_seconds": 0.8147118329943623
+      },
+      "error": null,
+      "record_index": 6,
+      "replay_command": "/Users/pedro/miniconda3/envs/gnuradio/bin/python /Users/pedro/Projects/whalemodem/experiments/hr0/benchmark.py replay --artifact /Users/pedro/Projects/whalemodem/experiments/hr0/results/hr0b_watterson_mid_latitude_disturbed_full_floor_20260831.json --record-index 6",
+      "capture": null
+    },
+    {
+      "trial": 8,
+      "mode_selector": "experiments.hr0.hr0b:HR0B",
+      "mode_name": "hr0-b-exp",
+      "mode_id": 241,
+      "point_key": "watterson_canonical|mid_latitude_disturbed|20",
+      "model": "watterson_canonical",
+      "preset": "mid_latitude_disturbed",
+      "waveform_snr_db": 20.0,
+      "derived_seeds": {
+        "workload": 1340311301701485210,
+        "watterson": 997158404339521340,
+        "awgn": 7025896516844678986
+      },
+      "payload_sha256": "587302394673c1076264388a800a9ef1e03b4cad8012d8c568a267e9bf33197d",
+      "physical_payload_bytes": 64,
+      "air_header_bytes": 10,
+      "data_body_bytes": 54,
+      "useful_application_bytes": 54,
+      "outcome": "decoded",
+      "acquired_above_threshold": true,
+      "checked_wrong_payload": false,
+      "tx_samples": 937920,
+      "tx_sample_rate": 48000,
+      "snr_reference_samples": [
+        0,
+        937920
+      ],
+      "keyed_seconds": 19.54,
+      "rx_samples": 234520,
+      "rx_sample_rate": 12000,
+      "channel_description": {
+        "type": "chain",
+        "sample_rate": 48000,
+        "stages": [
+          {
+            "type": "watterson",
+            "sample_rate": 48000,
+            "seed": 997158404339521340,
+            "preset": "mid_latitude_disturbed",
+            "oscillators": 256,
+            "fading_sample_rate": 200.0,
+            "frequency_spread_convention": "2_sigma",
+            "paths": [
+              {
+                "delay_seconds": 0.0,
+                "frequency_spread_hz": 1.0,
+                "power": 1.0,
+                "doppler_shift_hz": 0.0
+              },
+              {
+                "delay_seconds": 0.002,
+                "frequency_spread_hz": 1.0,
+                "power": 1.0,
+                "doppler_shift_hz": 0.0
+              }
+            ]
+          },
+          {
+            "type": "awgn",
+            "sample_rate": 48000,
+            "seed": 7025896516844678986,
+            "snr": {
+              "db": 20.0,
+              "kind": "waveform",
+              "band_hz": null,
+              "bit_rate": null,
+              "reference_start": 0,
+              "reference_stop": 937920
+            }
+          }
+        ],
+        "stage_order": [
+          "watterson",
+          "awgn"
+        ],
+        "normalization": "post_watterson_per_frame",
+        "fading_continuity": "independent_reset_per_frame",
+        "snr_reference_samples": [
+          0,
+          937920
+        ]
+      },
+      "channel_measurements": {
+        "stage_0": {
+          "paths": 2,
+          "path_realized_mean_powers": [
+            0.480363999462251,
+            0.3777882541533969
+          ],
+          "elapsed_seconds": 19.54,
+          "max_delay_samples": 96
+        },
+        "stage_1": {
+          "waveform_snr_db": 20.0,
+          "realized_waveform_snr_db": 19.997997103217173,
+          "signal_power": 0.009323498252850997,
+          "noise_power": 9.327799092988743e-05,
+          "reference_samples": [
+            0,
+            937920
+          ]
+        }
+      },
+      "decoder_metrics": {
+        "confidence": 0.9453770839071602,
+        "cfo_hz": 0.0,
+        "crc_ok": true,
+        "start_index": 1557,
+        "end_index": 234501,
+        "capture_rms": 0.09675649405007897,
+        "capture_peak": 0.4026980698108673,
+        "candidate_limit": 16,
+        "candidate_count": 16,
+        "candidates_tried": 1,
+        "candidate_rank": 1,
+        "search_cells_evaluated": 54054,
+        "refinement_cells_evaluated": 195,
+        "acquired_class": 1,
+        "fec_tail_ok": true,
+        "zero_fill_ok": true,
+        "gf16_viterbi_steps": 194,
+        "gf16_viterbi_states": 256,
+        "gf16_viterbi_branches": 794624,
+        "total_gf16_viterbi_branches": 794624,
+        "rs_ok": true,
+        "rs_corrected_bytes": 0,
+        "likelihood_scale": 130.1677523136111,
+        "observation_combining": "coherent_last_two_8ms_observations",
+        "process_cpu_seconds": 0.2238749999999996,
+        "wall_seconds": 0.22785374999511987
+      },
+      "trial_work": {
+        "process_cpu_seconds": 0.7623820000000001,
+        "wall_seconds": 0.8171578329929616
+      },
+      "error": null,
+      "record_index": 7,
+      "replay_command": "/Users/pedro/miniconda3/envs/gnuradio/bin/python /Users/pedro/Projects/whalemodem/experiments/hr0/benchmark.py replay --artifact /Users/pedro/Projects/whalemodem/experiments/hr0/results/hr0b_watterson_mid_latitude_disturbed_full_floor_20260831.json --record-index 7",
+      "capture": null
+    },
+    {
+      "trial": 9,
+      "mode_selector": "experiments.hr0.hr0b:HR0B",
+      "mode_name": "hr0-b-exp",
+      "mode_id": 241,
+      "point_key": "watterson_canonical|mid_latitude_disturbed|20",
+      "model": "watterson_canonical",
+      "preset": "mid_latitude_disturbed",
+      "waveform_snr_db": 20.0,
+      "derived_seeds": {
+        "workload": 4352883934412720884,
+        "watterson": 3780741359857917065,
+        "awgn": 2075647883299048117
+      },
+      "payload_sha256": "627888c41ae5fcedb9a086f3c4b43bc75c2b538d40be40ea914108eabdef1af4",
+      "physical_payload_bytes": 64,
+      "air_header_bytes": 10,
+      "data_body_bytes": 54,
+      "useful_application_bytes": 54,
+      "outcome": "decoded",
+      "acquired_above_threshold": true,
+      "checked_wrong_payload": false,
+      "tx_samples": 937920,
+      "tx_sample_rate": 48000,
+      "snr_reference_samples": [
+        0,
+        937920
+      ],
+      "keyed_seconds": 19.54,
+      "rx_samples": 234520,
+      "rx_sample_rate": 12000,
+      "channel_description": {
+        "type": "chain",
+        "sample_rate": 48000,
+        "stages": [
+          {
+            "type": "watterson",
+            "sample_rate": 48000,
+            "seed": 3780741359857917065,
+            "preset": "mid_latitude_disturbed",
+            "oscillators": 256,
+            "fading_sample_rate": 200.0,
+            "frequency_spread_convention": "2_sigma",
+            "paths": [
+              {
+                "delay_seconds": 0.0,
+                "frequency_spread_hz": 1.0,
+                "power": 1.0,
+                "doppler_shift_hz": 0.0
+              },
+              {
+                "delay_seconds": 0.002,
+                "frequency_spread_hz": 1.0,
+                "power": 1.0,
+                "doppler_shift_hz": 0.0
+              }
+            ]
+          },
+          {
+            "type": "awgn",
+            "sample_rate": 48000,
+            "seed": 2075647883299048117,
+            "snr": {
+              "db": 20.0,
+              "kind": "waveform",
+              "band_hz": null,
+              "bit_rate": null,
+              "reference_start": 0,
+              "reference_stop": 937920
+            }
+          }
+        ],
+        "stage_order": [
+          "watterson",
+          "awgn"
+        ],
+        "normalization": "post_watterson_per_frame",
+        "fading_continuity": "independent_reset_per_frame",
+        "snr_reference_samples": [
+          0,
+          937920
+        ]
+      },
+      "channel_measurements": {
+        "stage_0": {
+          "paths": 2,
+          "path_realized_mean_powers": [
+            0.41661116634343986,
+            0.4961830299169952
+          ],
+          "elapsed_seconds": 19.54,
+          "max_delay_samples": 96
+        },
+        "stage_1": {
+          "waveform_snr_db": 20.0,
+          "realized_waveform_snr_db": 19.99713131656706,
+          "signal_power": 0.010189522144401877,
+          "noise_power": 0.00010196254942227609,
+          "reference_samples": [
+            0,
+            937920
+          ]
+        }
+      },
+      "decoder_metrics": {
+        "confidence": 0.9551669170623874,
+        "cfo_hz": 0.0,
+        "crc_ok": true,
+        "start_index": 1575,
+        "end_index": 234519,
+        "capture_rms": 0.10116661655342839,
+        "capture_peak": 0.4809459447860718,
+        "candidate_limit": 16,
+        "candidate_count": 16,
+        "candidates_tried": 1,
+        "candidate_rank": 1,
+        "search_cells_evaluated": 54054,
+        "refinement_cells_evaluated": 195,
+        "acquired_class": 1,
+        "fec_tail_ok": true,
+        "zero_fill_ok": true,
+        "gf16_viterbi_steps": 194,
+        "gf16_viterbi_states": 256,
+        "gf16_viterbi_branches": 794624,
+        "total_gf16_viterbi_branches": 794624,
+        "rs_ok": true,
+        "rs_corrected_bytes": 0,
+        "likelihood_scale": 204.989172217787,
+        "observation_combining": "coherent_last_two_8ms_observations",
+        "process_cpu_seconds": 0.2014800000000001,
+        "wall_seconds": 0.20214958398719318
+      },
+      "trial_work": {
+        "process_cpu_seconds": 0.5013170000000002,
+        "wall_seconds": 0.5031944999936968
+      },
+      "error": null,
+      "record_index": 8,
+      "replay_command": "/Users/pedro/miniconda3/envs/gnuradio/bin/python /Users/pedro/Projects/whalemodem/experiments/hr0/benchmark.py replay --artifact /Users/pedro/Projects/whalemodem/experiments/hr0/results/hr0b_watterson_mid_latitude_disturbed_full_floor_20260831.json --record-index 8",
+      "capture": null
+    },
+    {
+      "trial": 10,
+      "mode_selector": "experiments.hr0.hr0b:HR0B",
+      "mode_name": "hr0-b-exp",
+      "mode_id": 241,
+      "point_key": "watterson_canonical|mid_latitude_disturbed|20",
+      "model": "watterson_canonical",
+      "preset": "mid_latitude_disturbed",
+      "waveform_snr_db": 20.0,
+      "derived_seeds": {
+        "workload": 8116489585014184432,
+        "watterson": 6543854814741956103,
+        "awgn": 1449688471768706352
+      },
+      "payload_sha256": "ce9e0ae6791293364da0386ab29c031d26929ce92a069bf4ad71dcd014273057",
+      "physical_payload_bytes": 64,
+      "air_header_bytes": 10,
+      "data_body_bytes": 54,
+      "useful_application_bytes": 54,
+      "outcome": "decoded",
+      "acquired_above_threshold": true,
+      "checked_wrong_payload": false,
+      "tx_samples": 937920,
+      "tx_sample_rate": 48000,
+      "snr_reference_samples": [
+        0,
+        937920
+      ],
+      "keyed_seconds": 19.54,
+      "rx_samples": 234520,
+      "rx_sample_rate": 12000,
+      "channel_description": {
+        "type": "chain",
+        "sample_rate": 48000,
+        "stages": [
+          {
+            "type": "watterson",
+            "sample_rate": 48000,
+            "seed": 6543854814741956103,
+            "preset": "mid_latitude_disturbed",
+            "oscillators": 256,
+            "fading_sample_rate": 200.0,
+            "frequency_spread_convention": "2_sigma",
+            "paths": [
+              {
+                "delay_seconds": 0.0,
+                "frequency_spread_hz": 1.0,
+                "power": 1.0,
+                "doppler_shift_hz": 0.0
+              },
+              {
+                "delay_seconds": 0.002,
+                "frequency_spread_hz": 1.0,
+                "power": 1.0,
+                "doppler_shift_hz": 0.0
+              }
+            ]
+          },
+          {
+            "type": "awgn",
+            "sample_rate": 48000,
+            "seed": 1449688471768706352,
+            "snr": {
+              "db": 20.0,
+              "kind": "waveform",
+              "band_hz": null,
+              "bit_rate": null,
+              "reference_start": 0,
+              "reference_stop": 937920
+            }
+          }
+        ],
+        "stage_order": [
+          "watterson",
+          "awgn"
+        ],
+        "normalization": "post_watterson_per_frame",
+        "fading_continuity": "independent_reset_per_frame",
+        "snr_reference_samples": [
+          0,
+          937920
+        ]
+      },
+      "channel_measurements": {
+        "stage_0": {
+          "paths": 2,
+          "path_realized_mean_powers": [
+            0.4876053067575128,
+            0.3129802061498763
+          ],
+          "elapsed_seconds": 19.54,
+          "max_delay_samples": 96
+        },
+        "stage_1": {
+          "waveform_snr_db": 20.0,
+          "realized_waveform_snr_db": 20.006790790437673,
+          "signal_power": 0.008601707717284217,
+          "noise_power": 8.588268276342471e-05,
+          "reference_samples": [
+            0,
+            937920
+          ]
+        }
+      },
+      "decoder_metrics": {
+        "confidence": 0.9620641600359705,
+        "cfo_hz": 0.0,
+        "crc_ok": true,
+        "start_index": 1551,
+        "end_index": 234495,
+        "capture_rms": 0.09293297580272694,
+        "capture_peak": 0.408386766910553,
+        "candidate_limit": 16,
+        "candidate_count": 16,
+        "candidates_tried": 1,
+        "candidate_rank": 1,
+        "search_cells_evaluated": 54054,
+        "refinement_cells_evaluated": 195,
+        "acquired_class": 1,
+        "fec_tail_ok": true,
+        "zero_fill_ok": true,
+        "gf16_viterbi_steps": 194,
+        "gf16_viterbi_states": 256,
+        "gf16_viterbi_branches": 794624,
+        "total_gf16_viterbi_branches": 794624,
+        "rs_ok": true,
+        "rs_corrected_bytes": 0,
+        "likelihood_scale": 232.0398545190417,
+        "observation_combining": "coherent_last_two_8ms_observations",
+        "process_cpu_seconds": 0.1956019999999996,
+        "wall_seconds": 0.19601741697988473
+      },
+      "trial_work": {
+        "process_cpu_seconds": 0.49605900000000025,
+        "wall_seconds": 0.4993253329885192
+      },
+      "error": null,
+      "record_index": 9,
+      "replay_command": "/Users/pedro/miniconda3/envs/gnuradio/bin/python /Users/pedro/Projects/whalemodem/experiments/hr0/benchmark.py replay --artifact /Users/pedro/Projects/whalemodem/experiments/hr0/results/hr0b_watterson_mid_latitude_disturbed_full_floor_20260831.json --record-index 9",
+      "capture": null
+    }
+  ],
+  "git": {
+    "commit": "ee9704c667c212c30e711b172847284db655539c",
+    "dirty": true,
+    "dirty_paths": [
+      "?? experiments/hc2b/README.md",
+      "?? experiments/hc2b/RESULTS.md",
+      "?? experiments/hc2b/__init__.py",
+      "?? experiments/hc2b/benchmark_hc2b.py",
+      "?? experiments/hc2b/hc2b.py",
+      "?? experiments/hc2b/test_hc2b.py",
+      "?? experiments/hc2c/README.md",
+      "?? experiments/hc2c/RESULTS.md",
+      "?? experiments/hc2c/__init__.py",
+      "?? experiments/hc2c/benchmark_hc2c.py",
+      "?? experiments/hc2c/hc2c.py",
+      "?? experiments/hc2c/test_hc2c.py",
+      "?? experiments/hr0/BASELINE.md",
+      "?? experiments/hr0/DESIGN.md",
+      "?? experiments/hr0/IMPLEMENTATION.md",
+      "?? experiments/hr0/PLAN.md",
+      "?? experiments/hr0/REDESIGN.md",
+      "?? experiments/hr0/architecture_screen.py",
+      "?? experiments/hr0/benchmark.py",
+      "?? experiments/hr0/hr0.py",
+      "?? experiments/hr0/hr0b.py",
+      "?? experiments/hr0/redesign_screen.py",
+      "?? experiments/hr0/results/hc0_awgn_exploration_20260830.json",
+      "?? experiments/hr0/results/hc0_awgn_exploration_20260830_captures/record_000150.npz",
+      "?? experiments/hr0/results/hc0_awgn_exploration_20260830_captures/record_000152.npz",
+      "?? experiments/hr0/results/hc0_awgn_exploration_20260830_captures/record_000153.npz",
+      "?? experiments/hr0/results/hc0_watterson_fixed_n0_mid_latitude_disturbed_exploration_20260830.json",
+      "?? experiments/hr0/results/hc0_watterson_fixed_n0_mid_latitude_disturbed_exploration_20260830_captures/record_000132.npz",
+      "?? experiments/hr0/results/hc0_watterson_fixed_n0_mid_latitude_disturbed_exploration_20260830_captures/record_000135.npz",
+      "?? experiments/hr0/results/hc0_watterson_fixed_n0_mid_latitude_disturbed_exploration_20260830_captures/record_000137.npz",
+      "?? experiments/hr0/results/hc0_watterson_high_latitude_disturbed_exploration_20260830.json",
+      "?? experiments/hr0/results/hc0_watterson_high_latitude_disturbed_exploration_20260830_captures/record_000000.npz",
+      "?? experiments/hr0/results/hc0_watterson_high_latitude_disturbed_exploration_20260830_captures/record_000001.npz",
+      "?? experiments/hr0/results/hc0_watterson_high_latitude_disturbed_exploration_20260830_captures/record_000002.npz",
+      "?? experiments/hr0/results/hc0_watterson_high_latitude_disturbed_extension_20260830.json",
+      "?? experiments/hr0/results/hc0_watterson_high_latitude_disturbed_extension_20260830_captures/record_000000.npz",
+      "?? experiments/hr0/results/hc0_watterson_high_latitude_disturbed_extension_20260830_captures/record_000001.npz",
+      "?? experiments/hr0/results/hc0_watterson_high_latitude_moderate_exploration_20260830.json",
+      "?? experiments/hr0/results/hc0_watterson_high_latitude_moderate_exploration_20260830_captures/record_000063.npz",
+      "?? experiments/hr0/results/hc0_watterson_high_latitude_quiet_exploration_20260830.json",
+      "?? experiments/hr0/results/hc0_watterson_high_latitude_quiet_exploration_20260830_captures/record_000066.npz",
+      "?? experiments/hr0/results/hc0_watterson_low_latitude_disturbed_exploration_20260830.json",
+      "?? experiments/hr0/results/hc0_watterson_low_latitude_disturbed_exploration_20260830_captures/record_000002.npz",
+      "?? experiments/hr0/results/hc0_watterson_low_latitude_moderate_exploration_20260830.json",
+      "?? experiments/hr0/results/hc0_watterson_low_latitude_moderate_exploration_20260830_captures/record_000070.npz",
+      "?? experiments/hr0/results/hc0_watterson_low_latitude_quiet_exploration_20260830.json",
+      "?? experiments/hr0/results/hc0_watterson_low_latitude_quiet_exploration_20260830_captures/record_000071.npz",
+      "?? experiments/hr0/results/hc0_watterson_mid_latitude_disturbed_exploration_20260830.json",
+      "?? experiments/hr0/results/hc0_watterson_mid_latitude_disturbed_exploration_20260830_captures/record_000065.npz",
+      "?? experiments/hr0/results/hc0_watterson_mid_latitude_disturbed_exploration_20260830_captures/record_000091.npz",
+      "?? experiments/hr0/results/hc0_watterson_mid_latitude_disturbed_exploration_20260830_captures/record_000092.npz",
+      "?? experiments/hr0/results/hc0_watterson_mid_latitude_disturbed_nvis_exploration_20260830.json",
+      "?? experiments/hr0/results/hc0_watterson_mid_latitude_disturbed_nvis_exploration_20260830_captures/record_000002.npz",
+      "?? experiments/hr0/results/hc0_watterson_mid_latitude_disturbed_nvis_exploration_20260830_captures/record_000003.npz",
+      "?? experiments/hr0/results/hc0_watterson_mid_latitude_disturbed_nvis_exploration_20260830_captures/record_000007.npz",
+      "?? experiments/hr0/results/hc0_watterson_mid_latitude_disturbed_nvis_extension_20260830.json",
+      "?? experiments/hr0/results/hc0_watterson_mid_latitude_disturbed_nvis_extension_20260830_captures/record_000001.npz",
+      "?? experiments/hr0/results/hc0_watterson_mid_latitude_disturbed_nvis_extension_20260830_captures/record_000002.npz",
+      "?? experiments/hr0/results/hc0_watterson_mid_latitude_disturbed_refinement_20260830.json",
+      "?? experiments/hr0/results/hc0_watterson_mid_latitude_disturbed_refinement_20260830_captures/record_000030.npz",
+      "?? experiments/hr0/results/hc0_watterson_mid_latitude_disturbed_refinement_20260830_captures/record_000031.npz",
+      "?? experiments/hr0/results/hc0_watterson_mid_latitude_moderate_exploration_20260830.json",
+      "?? experiments/hr0/results/hc0_watterson_mid_latitude_moderate_exploration_20260830_captures/record_000077.npz",
+      "?? experiments/hr0/results/hc0_watterson_mid_latitude_quiet_exploration_20260830.json",
+      "?? experiments/hr0/results/hc0_watterson_mid_latitude_quiet_exploration_20260830_captures/record_000090.npz",
+      "?? experiments/hr0/results/hr0b_awgn_full_20260831.json",
+      "?? experiments/hr0/results/hr0b_awgn_full_20260831_captures/record_000000.npz",
+      "?? experiments/hr0/results/hr0b_awgn_full_20260831_captures/record_000001.npz",
+      "?? experiments/hr0/results/hr0b_awgn_full_20260831_captures/record_000002.npz",
+      "?? experiments/hr0/results/hr0b_awgn_full_20260831_captures/record_000003.npz",
+      "?? experiments/hr0/results/hr0b_redesign_screen_20260830.json",
+      "?? experiments/hr0/test_benchmark.py",
+      "?? experiments/hr0/test_hr0.py",
+      "?? experiments/hr0/test_hr0b.py",
+      "?? experiments/lead/README.md",
+      "?? experiments/lead/RESULTS.md",
+      "?? experiments/lead/__init__.py",
+      "?? experiments/lead/lead.py",
+      "?? experiments/lead/screen_lead.py",
+      "?? experiments/lead/test_lead.py",
+      "?? experiments/lead2/README.md",
+      "?? experiments/lead2/RESULTS.md",
+      "?? experiments/lead2/__init__.py",
+      "?? experiments/lead2/lead2.py",
+      "?? experiments/lead2/screen_lead2.py",
+      "?? experiments/lead2/test_lead2.py"
+    ]
+  },
+  "environment": {
+    "python": "3.11.15 | packaged by conda-forge | (main, Jun 11 2026, 03:29:05) [Clang 19.1.7 ]",
+    "python_executable": "/Users/pedro/miniconda3/envs/gnuradio/bin/python",
+    "numpy": "2.4.6",
+    "scipy": "1.17.1",
+    "platform": "macOS-26.6.2-arm64-arm-64bit",
+    "machine": "arm64",
+    "processor": "arm",
+    "logical_cpu_count": 8
+  },
+  "limitations": [
+    "No radio or VARA implementation was exercised.",
+    "All Watterson trials reset fading independently per frame.",
+    "watterson_fixed_n0 fixes AWGN power from each mode's unfaded transmit reference; it is not a continuous-fade campaign."
+  ]
+}

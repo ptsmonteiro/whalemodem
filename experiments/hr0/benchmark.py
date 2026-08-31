@@ -1,9 +1,12 @@
 #!/usr/bin/env python3
-"""Matched, replayable frame benchmark for HC0 and future HR0 candidates.
+"""Matched, replayable frame benchmark for HC0 and HR0 candidates.
 
 This runner is intentionally experiment-local.  It does not register HR0 or
 change a production channel.  A future candidate can be supplied as
 ``package.module:OBJECT`` when it exposes the ordinary WaveformMode surface.
+The default frozen workload is the historic 64-byte full DATA frame; explicit
+payload/useful-byte options also exercise short control classes without
+changing schema-v1 full-frame replay.
 """
 
 from __future__ import annotations
