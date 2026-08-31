@@ -1,0 +1,850 @@
+{
+  "schema": "whalemodem.hr0.redesign-screen.v1",
+  "claim_scope": "bounded_redesign_screen_not_qualification",
+  "held_out_master_seed": 1213345858,
+  "candidate_source": {
+    "path": "/Users/pedro/Projects/whalemodem/experiments/hr0/hr0b.py",
+    "sha256": "d0ad94945b2fe845d44473163b07172b54e25b2ce6cdafaa1130dc24999a3f61"
+  },
+  "git": {
+    "commit": "ee9704c667c212c30e711b172847284db655539c",
+    "dirty": true,
+    "dirty_paths": [
+      "?? experiments/hc2b/README.md",
+      "?? experiments/hc2b/RESULTS.md",
+      "?? experiments/hc2b/__init__.py",
+      "?? experiments/hc2b/benchmark_hc2b.py",
+      "?? experiments/hc2b/hc2b.py",
+      "?? experiments/hc2b/test_hc2b.py",
+      "?? experiments/hc2c/README.md",
+      "?? experiments/hc2c/RESULTS.md",
+      "?? experiments/hc2c/__init__.py",
+      "?? experiments/hc2c/benchmark_hc2c.py",
+      "?? experiments/hc2c/hc2c.py",
+      "?? experiments/hc2c/test_hc2c.py",
+      "?? experiments/hr0/BASELINE.md",
+      "?? experiments/hr0/DESIGN.md",
+      "?? experiments/hr0/IMPLEMENTATION.md",
+      "?? experiments/hr0/PLAN.md",
+      "?? experiments/hr0/REDESIGN.md",
+      "?? experiments/hr0/architecture_screen.py",
+      "?? experiments/hr0/benchmark.py",
+      "?? experiments/hr0/hr0.py",
+      "?? experiments/hr0/hr0b.py",
+      "?? experiments/hr0/redesign_screen.py",
+      "?? experiments/hr0/results/hc0_awgn_exploration_20260830.json",
+      "?? experiments/hr0/results/hc0_awgn_exploration_20260830_captures/record_000150.npz",
+      "?? experiments/hr0/results/hc0_awgn_exploration_20260830_captures/record_000152.npz",
+      "?? experiments/hr0/results/hc0_awgn_exploration_20260830_captures/record_000153.npz",
+      "?? experiments/hr0/results/hc0_watterson_fixed_n0_mid_latitude_disturbed_exploration_20260830.json",
+      "?? experiments/hr0/results/hc0_watterson_fixed_n0_mid_latitude_disturbed_exploration_20260830_captures/record_000132.npz",
+      "?? experiments/hr0/results/hc0_watterson_fixed_n0_mid_latitude_disturbed_exploration_20260830_captures/record_000135.npz",
+      "?? experiments/hr0/results/hc0_watterson_fixed_n0_mid_latitude_disturbed_exploration_20260830_captures/record_000137.npz",
+      "?? experiments/hr0/results/hc0_watterson_high_latitude_disturbed_exploration_20260830.json",
+      "?? experiments/hr0/results/hc0_watterson_high_latitude_disturbed_exploration_20260830_captures/record_000000.npz",
+      "?? experiments/hr0/results/hc0_watterson_high_latitude_disturbed_exploration_20260830_captures/record_000001.npz",
+      "?? experiments/hr0/results/hc0_watterson_high_latitude_disturbed_exploration_20260830_captures/record_000002.npz",
+      "?? experiments/hr0/results/hc0_watterson_high_latitude_disturbed_extension_20260830.json",
+      "?? experiments/hr0/results/hc0_watterson_high_latitude_disturbed_extension_20260830_captures/record_000000.npz",
+      "?? experiments/hr0/results/hc0_watterson_high_latitude_disturbed_extension_20260830_captures/record_000001.npz",
+      "?? experiments/hr0/results/hc0_watterson_high_latitude_moderate_exploration_20260830.json",
+      "?? experiments/hr0/results/hc0_watterson_high_latitude_moderate_exploration_20260830_captures/record_000063.npz",
+      "?? experiments/hr0/results/hc0_watterson_high_latitude_quiet_exploration_20260830.json",
+      "?? experiments/hr0/results/hc0_watterson_high_latitude_quiet_exploration_20260830_captures/record_000066.npz",
+      "?? experiments/hr0/results/hc0_watterson_low_latitude_disturbed_exploration_20260830.json",
+      "?? experiments/hr0/results/hc0_watterson_low_latitude_disturbed_exploration_20260830_captures/record_000002.npz",
+      "?? experiments/hr0/results/hc0_watterson_low_latitude_moderate_exploration_20260830.json",
+      "?? experiments/hr0/results/hc0_watterson_low_latitude_moderate_exploration_20260830_captures/record_000070.npz",
+      "?? experiments/hr0/results/hc0_watterson_low_latitude_quiet_exploration_20260830.json",
+      "?? experiments/hr0/results/hc0_watterson_low_latitude_quiet_exploration_20260830_captures/record_000071.npz",
+      "?? experiments/hr0/results/hc0_watterson_mid_latitude_disturbed_exploration_20260830.json",
+      "?? experiments/hr0/results/hc0_watterson_mid_latitude_disturbed_exploration_20260830_captures/record_000065.npz",
+      "?? experiments/hr0/results/hc0_watterson_mid_latitude_disturbed_exploration_20260830_captures/record_000091.npz",
+      "?? experiments/hr0/results/hc0_watterson_mid_latitude_disturbed_exploration_20260830_captures/record_000092.npz",
+      "?? experiments/hr0/results/hc0_watterson_mid_latitude_disturbed_nvis_exploration_20260830.json",
+      "?? experiments/hr0/results/hc0_watterson_mid_latitude_disturbed_nvis_exploration_20260830_captures/record_000002.npz",
+      "?? experiments/hr0/results/hc0_watterson_mid_latitude_disturbed_nvis_exploration_20260830_captures/record_000003.npz",
+      "?? experiments/hr0/results/hc0_watterson_mid_latitude_disturbed_nvis_exploration_20260830_captures/record_000007.npz",
+      "?? experiments/hr0/results/hc0_watterson_mid_latitude_disturbed_nvis_extension_20260830.json",
+      "?? experiments/hr0/results/hc0_watterson_mid_latitude_disturbed_nvis_extension_20260830_captures/record_000001.npz",
+      "?? experiments/hr0/results/hc0_watterson_mid_latitude_disturbed_nvis_extension_20260830_captures/record_000002.npz",
+      "?? experiments/hr0/results/hc0_watterson_mid_latitude_disturbed_refinement_20260830.json",
+      "?? experiments/hr0/results/hc0_watterson_mid_latitude_disturbed_refinement_20260830_captures/record_000030.npz",
+      "?? experiments/hr0/results/hc0_watterson_mid_latitude_disturbed_refinement_20260830_captures/record_000031.npz",
+      "?? experiments/hr0/results/hc0_watterson_mid_latitude_moderate_exploration_20260830.json",
+      "?? experiments/hr0/results/hc0_watterson_mid_latitude_moderate_exploration_20260830_captures/record_000077.npz",
+      "?? experiments/hr0/results/hc0_watterson_mid_latitude_quiet_exploration_20260830.json",
+      "?? experiments/hr0/results/hc0_watterson_mid_latitude_quiet_exploration_20260830_captures/record_000090.npz",
+      "?? experiments/hr0/results/hr0b_redesign_screen_20260830.json",
+      "?? experiments/hr0/test_benchmark.py",
+      "?? experiments/hr0/test_hr0.py",
+      "?? experiments/hr0/test_hr0b.py",
+      "?? experiments/lead/README.md",
+      "?? experiments/lead/RESULTS.md",
+      "?? experiments/lead/__init__.py",
+      "?? experiments/lead/lead.py",
+      "?? experiments/lead/screen_lead.py",
+      "?? experiments/lead/test_lead.py",
+      "?? experiments/lead2/README.md",
+      "?? experiments/lead2/RESULTS.md",
+      "?? experiments/lead2/__init__.py",
+      "?? experiments/lead2/lead2.py",
+      "?? experiments/lead2/screen_lead2.py",
+      "?? experiments/lead2/test_lead2.py"
+    ]
+  },
+  "environment": {
+    "python": "3.11.15 | packaged by conda-forge | (main, Jun 11 2026, 03:29:05) [Clang 19.1.7 ]",
+    "python_executable": "/Users/pedro/miniconda3/envs/gnuradio/bin/python",
+    "numpy": "2.4.6",
+    "scipy": "1.17.1",
+    "platform": "macOS-26.6.2-arm64-arm-64bit",
+    "machine": "arm64",
+    "processor": "arm",
+    "logical_cpu_count": 8
+  },
+  "snr_convention": {
+    "kind": "waveform",
+    "signal_reference": "complete_half_open_keying_interval",
+    "noise_band_hz": [
+      0.0,
+      24000.0
+    ]
+  },
+  "whole_keying_waveform_snr_db": -24.0,
+  "information_samples_per_point": 200000,
+  "information": {
+    "hr0a_last_two": {
+      "m": 16,
+      "esn0_linear": 1.5287315349254298,
+      "esn0_db": 1.843312243675309,
+      "coded_modulation_bits_per_symbol": 0.7859587985916597,
+      "information_density_variance_bits2": 2.3544574000449034,
+      "exact_bicm_bits_per_symbol": 0.38876483699887776,
+      "maxlog_bicm_gmi_bits_per_symbol": 0.35333577617709944
+    },
+    "hr0a_all_three_clean_oracle": {
+      "m": 16,
+      "esn0_linear": 2.2930973023881447,
+      "esn0_db": 3.6042248342321215,
+      "coded_modulation_bits_per_symbol": 1.3583125507991465,
+      "information_density_variance_bits2": 3.4106534114450744,
+      "exact_bicm_bits_per_symbol": 0.8039438238461534,
+      "maxlog_bicm_gmi_bits_per_symbol": 0.7593991302745817
+    },
+    "hr0b_coherent_trusted_pair": {
+      "m": 16,
+      "esn0_linear": 2.2352225068222484,
+      "esn0_db": 3.4932076177453424,
+      "coded_modulation_bits_per_symbol": 1.3106567489567476,
+      "information_density_variance_bits2": 3.340319628828997,
+      "exact_bicm_bits_per_symbol": 0.7630545766350246,
+      "maxlog_bicm_gmi_bits_per_symbol": 0.7201743363340014
+    },
+    "tone_count_comparison_last_two": [
+      {
+        "m": 8,
+        "esn0_linear": 1.5287315349254298,
+        "esn0_db": 1.843312243675309,
+        "coded_modulation_bits_per_symbol": 0.6869412076135283,
+        "information_density_variance_bits2": 1.830739725241675,
+        "exact_bicm_bits_per_symbol": 0.4547375856006294,
+        "maxlog_bicm_gmi_bits_per_symbol": 0.42926354229245833
+      },
+      {
+        "m": 16,
+        "esn0_linear": 1.5287315349254298,
+        "esn0_db": 1.843312243675309,
+        "coded_modulation_bits_per_symbol": 0.7865910710715196,
+        "information_density_variance_bits2": 2.3405570406385934,
+        "exact_bicm_bits_per_symbol": 0.38845792299871695,
+        "maxlog_bicm_gmi_bits_per_symbol": 0.3505149247513659
+      },
+      {
+        "m": 32,
+        "esn0_linear": 1.5287315349254298,
+        "esn0_db": 1.843312243675309,
+        "coded_modulation_bits_per_symbol": 0.8457926654859999,
+        "information_density_variance_bits2": 2.7293805754560383,
+        "exact_bicm_bits_per_symbol": 0.2931489872431059,
+        "maxlog_bicm_gmi_bits_per_symbol": 0.24943644676196797
+      }
+    ],
+    "hr0a_all_three_bicm_threshold_grid": [
+      {
+        "waveform_snr_db": -24,
+        "m": 16,
+        "esn0_linear": 2.2930973023881447,
+        "esn0_db": 3.6042248342321215,
+        "coded_modulation_bits_per_symbol": 1.3568758874685165,
+        "information_density_variance_bits2": 3.3999997928224084,
+        "exact_bicm_bits_per_symbol": 0.7988308218068128,
+        "maxlog_bicm_gmi_bits_per_symbol": 0.7550759956957495
+      },
+      {
+        "waveform_snr_db": -23,
+        "m": 16,
+        "esn0_linear": 2.886838465693089,
+        "esn0_db": 4.604224834232121,
+        "coded_modulation_bits_per_symbol": 1.7824911569764363,
+        "information_density_variance_bits2": 3.766487951148634,
+        "exact_bicm_bits_per_symbol": 1.1755989059736383,
+        "maxlog_bicm_gmi_bits_per_symbol": 1.1328901035509815
+      },
+      {
+        "waveform_snr_db": -22,
+        "m": 16,
+        "esn0_linear": 3.634314304205914,
+        "esn0_db": 5.604224834232121,
+        "coded_modulation_bits_per_symbol": 2.2467070922359316,
+        "information_density_variance_bits2": 3.7591318202947104,
+        "exact_bicm_bits_per_symbol": 1.6291414453061621,
+        "maxlog_bicm_gmi_bits_per_symbol": 1.5867056984939414
+      },
+      {
+        "waveform_snr_db": -21,
+        "m": 16,
+        "esn0_linear": 4.5753306320118625,
+        "esn0_db": 6.604224834232122,
+        "coded_modulation_bits_per_symbol": 2.7313807527734157,
+        "information_density_variance_bits2": 3.323684220796678,
+        "exact_bicm_bits_per_symbol": 2.175141622320048,
+        "maxlog_bicm_gmi_bits_per_symbol": 2.1428415668374026
+      },
+      {
+        "waveform_snr_db": -20,
+        "m": 16,
+        "esn0_linear": 5.760000000000002,
+        "esn0_db": 7.604224834232122,
+        "coded_modulation_bits_per_symbol": 3.192391687141137,
+        "information_density_variance_bits2": 2.4247565493250667,
+        "exact_bicm_bits_per_symbol": 2.7513349084376326,
+        "maxlog_bicm_gmi_bits_per_symbol": 2.7283829745710317
+      }
+    ]
+  },
+  "loss_and_rate_accounting": {
+    "guard_loss_db": 1.7609125905568124,
+    "preamble_pilot_lead_tail_energy_fraction": 0.1888289431926372,
+    "preamble_pilot_lead_tail_loss_db": 0.9088755368763708,
+    "checked_framing_loss_db_useful432_to_fec568": 1.188645888961068,
+    "termination_pad_finite_frame_loss_db": 0.06160308704818433,
+    "hr0a_required_checked_bits_per_data_symbol": 1.3333333333333333,
+    "hr0a_session_rate_projection_bps": 23.894,
+    "hr0b_full_frame_seconds": 19.54,
+    "hr0b_tiny_frame_seconds": 3.652,
+    "hr0b_clean_session_rate_projection_bps": 18.15736381977135
+  },
+  "bounded_candidate_set": {
+    "geometry": [
+      {
+        "m": 8,
+        "observation_ms": 8,
+        "dwell_ms": 24,
+        "spacing_hz": 125,
+        "nominal_bank_hz": 1000,
+        "spread_to_spacing_30hz": 0.24,
+        "decision": "reject_lower_cm_information_than_16_at_same_energy"
+      },
+      {
+        "m": 16,
+        "observation_ms": 8,
+        "dwell_ms": 24,
+        "spacing_hz": 125,
+        "nominal_bank_hz": 2000,
+        "spread_to_spacing_30hz": 0.24,
+        "decision": "select"
+      },
+      {
+        "m": 32,
+        "observation_ms": 8,
+        "dwell_ms": 24,
+        "spacing_hz": 125,
+        "nominal_bank_hz": 4000,
+        "spread_to_spacing_30hz": 0.24,
+        "decision": "reject_bandwidth"
+      },
+      {
+        "m": 32,
+        "observation_ms": 16,
+        "dwell_ms": 32,
+        "spacing_hz": 62.5,
+        "nominal_bank_hz": 2000,
+        "spread_to_spacing_30hz": 0.48,
+        "decision": "defer_doppler_and_16ms_guard_cost"
+      }
+    ],
+    "coding": [
+      {
+        "name": "HR0-A binary rate-1/3 convolutional",
+        "decision": "reject_information_interface_and_code_loss"
+      },
+      {
+        "name": "exact binary likelihood plus stronger binary code",
+        "decision": "reject_same_airtime_bicm_rate_deficit"
+      },
+      {
+        "name": "GF16 rate-1/4 convolutional plus shortened RS",
+        "decision": "select"
+      },
+      {
+        "name": "short LDPC or polar over independent bit metrics",
+        "decision": "defer_requires_multilevel_or_joint_demapper"
+      },
+      {
+        "name": "full-frame repetition or rate-1/6",
+        "decision": "reject_clean_session_rate_below_18bps"
+      },
+      {
+        "name": "incremental parity on ARQ failure",
+        "decision": "retain_future_option_not_in_clean_wire"
+      }
+    ]
+  },
+  "hr0b": {
+    "wire_revision": "B",
+    "full_inner": "GF16 memory-2 rate 1/4",
+    "full_outer": "shortened RS(96,70), corrects 13 bytes",
+    "tiny_inner": "GF16 memory-2 rate 1/3",
+    "guard": "8 ms silence then two phase-continuous 8 ms observations",
+    "occupied_bandwidth_99": {
+      "low_hz": 328.863868986694,
+      "high_hz": 2298.720573183214,
+      "width_hz": 1969.8567041965202,
+      "definition": "0.5_to_99.5_percent_cumulative_rfft_power"
+    },
+    "awgn_held_out": [
+      {
+        "waveform_snr_db": -25.0,
+        "trials": 20,
+        "delivered": 0,
+        "outcomes": [
+          {
+            "trial": 1,
+            "derived_seed": 1095346635752525166,
+            "decoded": false,
+            "failure": "could not locate all RS errors",
+            "rs_corrected_bytes": null
+          },
+          {
+            "trial": 2,
+            "derived_seed": 5968834331412425102,
+            "decoded": false,
+            "failure": "could not locate all RS errors",
+            "rs_corrected_bytes": null
+          },
+          {
+            "trial": 3,
+            "derived_seed": 5765228536748382921,
+            "decoded": false,
+            "failure": "could not locate all RS errors",
+            "rs_corrected_bytes": null
+          },
+          {
+            "trial": 4,
+            "derived_seed": 37283818311645288,
+            "decoded": false,
+            "failure": "could not locate all RS errors",
+            "rs_corrected_bytes": null
+          },
+          {
+            "trial": 5,
+            "derived_seed": 3148039614564323389,
+            "decoded": false,
+            "failure": "could not locate all RS errors",
+            "rs_corrected_bytes": null
+          },
+          {
+            "trial": 6,
+            "derived_seed": 268613210304880842,
+            "decoded": false,
+            "failure": "could not locate all RS errors",
+            "rs_corrected_bytes": null
+          },
+          {
+            "trial": 7,
+            "derived_seed": 6682149158185457242,
+            "decoded": false,
+            "failure": "could not locate all RS errors",
+            "rs_corrected_bytes": null
+          },
+          {
+            "trial": 8,
+            "derived_seed": 3980036172411909955,
+            "decoded": false,
+            "failure": "could not locate all RS errors",
+            "rs_corrected_bytes": null
+          },
+          {
+            "trial": 9,
+            "derived_seed": 4353304150554077173,
+            "decoded": false,
+            "failure": "could not locate all RS errors",
+            "rs_corrected_bytes": null
+          },
+          {
+            "trial": 10,
+            "derived_seed": 260576582132602959,
+            "decoded": false,
+            "failure": "could not locate all RS errors",
+            "rs_corrected_bytes": null
+          },
+          {
+            "trial": 11,
+            "derived_seed": 195961544036154980,
+            "decoded": false,
+            "failure": "could not locate all RS errors",
+            "rs_corrected_bytes": null
+          },
+          {
+            "trial": 12,
+            "derived_seed": 4605605377396030,
+            "decoded": false,
+            "failure": "could not locate all RS errors",
+            "rs_corrected_bytes": null
+          },
+          {
+            "trial": 13,
+            "derived_seed": 5062481375477586915,
+            "decoded": false,
+            "failure": "could not locate all RS errors",
+            "rs_corrected_bytes": null
+          },
+          {
+            "trial": 14,
+            "derived_seed": 2644152347439915187,
+            "decoded": false,
+            "failure": "could not locate all RS errors",
+            "rs_corrected_bytes": null
+          },
+          {
+            "trial": 15,
+            "derived_seed": 2342548685166189142,
+            "decoded": false,
+            "failure": "could not locate all RS errors",
+            "rs_corrected_bytes": null
+          },
+          {
+            "trial": 16,
+            "derived_seed": 2698290952705967136,
+            "decoded": false,
+            "failure": "could not locate all RS errors",
+            "rs_corrected_bytes": null
+          },
+          {
+            "trial": 17,
+            "derived_seed": 2570401840332565643,
+            "decoded": false,
+            "failure": "could not locate all RS errors",
+            "rs_corrected_bytes": null
+          },
+          {
+            "trial": 18,
+            "derived_seed": 7896314707103970771,
+            "decoded": false,
+            "failure": "could not locate all RS errors",
+            "rs_corrected_bytes": null
+          },
+          {
+            "trial": 19,
+            "derived_seed": 1583450471044273199,
+            "decoded": false,
+            "failure": "could not locate all RS errors",
+            "rs_corrected_bytes": null
+          },
+          {
+            "trial": 20,
+            "derived_seed": 1357615908415509440,
+            "decoded": false,
+            "failure": "could not locate all RS errors",
+            "rs_corrected_bytes": null
+          }
+        ]
+      },
+      {
+        "waveform_snr_db": -24.0,
+        "trials": 20,
+        "delivered": 19,
+        "outcomes": [
+          {
+            "trial": 1,
+            "derived_seed": 4911916164025712451,
+            "decoded": true,
+            "failure": null,
+            "rs_corrected_bytes": 5
+          },
+          {
+            "trial": 2,
+            "derived_seed": 3300628707503636374,
+            "decoded": true,
+            "failure": null,
+            "rs_corrected_bytes": 4
+          },
+          {
+            "trial": 3,
+            "derived_seed": 8409547779167330779,
+            "decoded": true,
+            "failure": null,
+            "rs_corrected_bytes": 5
+          },
+          {
+            "trial": 4,
+            "derived_seed": 6034123140990992203,
+            "decoded": false,
+            "failure": "could not locate all RS errors",
+            "rs_corrected_bytes": null
+          },
+          {
+            "trial": 5,
+            "derived_seed": 6343756695320129344,
+            "decoded": true,
+            "failure": null,
+            "rs_corrected_bytes": 6
+          },
+          {
+            "trial": 6,
+            "derived_seed": 8648857964954677645,
+            "decoded": true,
+            "failure": null,
+            "rs_corrected_bytes": 6
+          },
+          {
+            "trial": 7,
+            "derived_seed": 7131582298300851346,
+            "decoded": true,
+            "failure": null,
+            "rs_corrected_bytes": 3
+          },
+          {
+            "trial": 8,
+            "derived_seed": 2222973559168324186,
+            "decoded": true,
+            "failure": null,
+            "rs_corrected_bytes": 2
+          },
+          {
+            "trial": 9,
+            "derived_seed": 2123807274048844984,
+            "decoded": true,
+            "failure": null,
+            "rs_corrected_bytes": 3
+          },
+          {
+            "trial": 10,
+            "derived_seed": 509716788157740848,
+            "decoded": true,
+            "failure": null,
+            "rs_corrected_bytes": 6
+          },
+          {
+            "trial": 11,
+            "derived_seed": 7764299240181535001,
+            "decoded": true,
+            "failure": null,
+            "rs_corrected_bytes": 13
+          },
+          {
+            "trial": 12,
+            "derived_seed": 4206792234653570183,
+            "decoded": true,
+            "failure": null,
+            "rs_corrected_bytes": 0
+          },
+          {
+            "trial": 13,
+            "derived_seed": 5247550352021561858,
+            "decoded": true,
+            "failure": null,
+            "rs_corrected_bytes": 5
+          },
+          {
+            "trial": 14,
+            "derived_seed": 6124232588185040897,
+            "decoded": true,
+            "failure": null,
+            "rs_corrected_bytes": 1
+          },
+          {
+            "trial": 15,
+            "derived_seed": 3538672072169638010,
+            "decoded": true,
+            "failure": null,
+            "rs_corrected_bytes": 9
+          },
+          {
+            "trial": 16,
+            "derived_seed": 348727948429548851,
+            "decoded": true,
+            "failure": null,
+            "rs_corrected_bytes": 0
+          },
+          {
+            "trial": 17,
+            "derived_seed": 5397180329598343352,
+            "decoded": true,
+            "failure": null,
+            "rs_corrected_bytes": 1
+          },
+          {
+            "trial": 18,
+            "derived_seed": 3123444728779330986,
+            "decoded": true,
+            "failure": null,
+            "rs_corrected_bytes": 12
+          },
+          {
+            "trial": 19,
+            "derived_seed": 2851510485373001979,
+            "decoded": true,
+            "failure": null,
+            "rs_corrected_bytes": 8
+          },
+          {
+            "trial": 20,
+            "derived_seed": 2461536909603699135,
+            "decoded": true,
+            "failure": null,
+            "rs_corrected_bytes": 4
+          }
+        ]
+      },
+      {
+        "waveform_snr_db": -23.0,
+        "trials": 20,
+        "delivered": 20,
+        "outcomes": [
+          {
+            "trial": 1,
+            "derived_seed": 2303092402694649559,
+            "decoded": true,
+            "failure": null,
+            "rs_corrected_bytes": 0
+          },
+          {
+            "trial": 2,
+            "derived_seed": 1457723310119801483,
+            "decoded": true,
+            "failure": null,
+            "rs_corrected_bytes": 0
+          },
+          {
+            "trial": 3,
+            "derived_seed": 8401208080210658844,
+            "decoded": true,
+            "failure": null,
+            "rs_corrected_bytes": 0
+          },
+          {
+            "trial": 4,
+            "derived_seed": 785147903409402775,
+            "decoded": true,
+            "failure": null,
+            "rs_corrected_bytes": 0
+          },
+          {
+            "trial": 5,
+            "derived_seed": 5562774108398345833,
+            "decoded": true,
+            "failure": null,
+            "rs_corrected_bytes": 0
+          },
+          {
+            "trial": 6,
+            "derived_seed": 2622505054668442558,
+            "decoded": true,
+            "failure": null,
+            "rs_corrected_bytes": 2
+          },
+          {
+            "trial": 7,
+            "derived_seed": 3592586019613240343,
+            "decoded": true,
+            "failure": null,
+            "rs_corrected_bytes": 0
+          },
+          {
+            "trial": 8,
+            "derived_seed": 9071471524693118793,
+            "decoded": true,
+            "failure": null,
+            "rs_corrected_bytes": 0
+          },
+          {
+            "trial": 9,
+            "derived_seed": 1383393848462006022,
+            "decoded": true,
+            "failure": null,
+            "rs_corrected_bytes": 3
+          },
+          {
+            "trial": 10,
+            "derived_seed": 4195363337546953050,
+            "decoded": true,
+            "failure": null,
+            "rs_corrected_bytes": 0
+          },
+          {
+            "trial": 11,
+            "derived_seed": 6728816944628635846,
+            "decoded": true,
+            "failure": null,
+            "rs_corrected_bytes": 0
+          },
+          {
+            "trial": 12,
+            "derived_seed": 1749167483946501658,
+            "decoded": true,
+            "failure": null,
+            "rs_corrected_bytes": 0
+          },
+          {
+            "trial": 13,
+            "derived_seed": 4587820210284128558,
+            "decoded": true,
+            "failure": null,
+            "rs_corrected_bytes": 0
+          },
+          {
+            "trial": 14,
+            "derived_seed": 3510645562314687410,
+            "decoded": true,
+            "failure": null,
+            "rs_corrected_bytes": 4
+          },
+          {
+            "trial": 15,
+            "derived_seed": 5069327441522025881,
+            "decoded": true,
+            "failure": null,
+            "rs_corrected_bytes": 0
+          },
+          {
+            "trial": 16,
+            "derived_seed": 2872530290412821685,
+            "decoded": true,
+            "failure": null,
+            "rs_corrected_bytes": 0
+          },
+          {
+            "trial": 17,
+            "derived_seed": 1847067546136868944,
+            "decoded": true,
+            "failure": null,
+            "rs_corrected_bytes": 0
+          },
+          {
+            "trial": 18,
+            "derived_seed": 8332045438505942722,
+            "decoded": true,
+            "failure": null,
+            "rs_corrected_bytes": 0
+          },
+          {
+            "trial": 19,
+            "derived_seed": 650398361077863538,
+            "decoded": true,
+            "failure": null,
+            "rs_corrected_bytes": 0
+          },
+          {
+            "trial": 20,
+            "derived_seed": 3578291262998777206,
+            "decoded": true,
+            "failure": null,
+            "rs_corrected_bytes": 0
+          }
+        ]
+      }
+    ],
+    "watterson_high_snr_real_receiver_wiring": [
+      {
+        "preset": "mid_latitude_disturbed",
+        "waveform_snr_db": 20.0,
+        "trials": 3,
+        "delivered": 3,
+        "outcomes": [
+          {
+            "trial": 1,
+            "derived_seed": 4830841328588865024,
+            "decoded": true,
+            "failure": null,
+            "candidate_rank": 1
+          },
+          {
+            "trial": 2,
+            "derived_seed": 1778871064627179514,
+            "decoded": true,
+            "failure": null,
+            "candidate_rank": 1
+          },
+          {
+            "trial": 3,
+            "derived_seed": 2782709356906273190,
+            "decoded": true,
+            "failure": null,
+            "candidate_rank": 1
+          }
+        ]
+      },
+      {
+        "preset": "mid_latitude_disturbed_nvis",
+        "waveform_snr_db": 20.0,
+        "trials": 3,
+        "delivered": 3,
+        "outcomes": [
+          {
+            "trial": 1,
+            "derived_seed": 5474190624808980251,
+            "decoded": true,
+            "failure": null,
+            "candidate_rank": 1
+          },
+          {
+            "trial": 2,
+            "derived_seed": 6651599300156062265,
+            "decoded": true,
+            "failure": null,
+            "candidate_rank": 1
+          },
+          {
+            "trial": 3,
+            "derived_seed": 4604632085322897209,
+            "decoded": true,
+            "failure": null,
+            "candidate_rank": 1
+          }
+        ]
+      },
+      {
+        "preset": "high_latitude_disturbed",
+        "waveform_snr_db": 20.0,
+        "trials": 3,
+        "delivered": 3,
+        "outcomes": [
+          {
+            "trial": 1,
+            "derived_seed": 5006503998809230910,
+            "decoded": true,
+            "failure": null,
+            "candidate_rank": 1
+          },
+          {
+            "trial": 2,
+            "derived_seed": 2843738352598757369,
+            "decoded": true,
+            "failure": null,
+            "candidate_rank": 1
+          },
+          {
+            "trial": 3,
+            "derived_seed": 1196008266999025158,
+            "decoded": true,
+            "failure": null,
+            "candidate_rank": 1
+          }
+        ]
+      }
+    ]
+  },
+  "decision": "go_hr0b_to_small_real_receiver_boundary_screen"
+}
