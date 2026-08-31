@@ -27,9 +27,9 @@ defined in [MODE_QUALIFICATION.md](MODE_QUALIFICATION.md).
 ## HF SSB ladder
 
 All HF targets use no more than 2,300 Hz occupied bandwidth. SNR uses the
-waveform convention in [CHANNELS.md](CHANNELS.md): mean signal power over an
-explicitly recorded half-open reference interval divided by real AWGN power
-over the 0--24 kHz Nyquist band at the 48 kHz audio boundary. Target
+standard 3 kHz passband convention in [CHANNELS.md](CHANNELS.md): mean signal
+power over an explicitly recorded half-open reference interval divided by
+white-noise power in 3,000 Hz. Target
 qualification uses the interval from the first transmitted acquisition sample
 through the last intentional frame or tail sample, including internal guards.
 
@@ -49,11 +49,14 @@ evidence is insufficient.
 
 | Level | Objective | Minimum useful application throughput | Required operating envelope |
 | ---: | --- | ---: | --- |
-| 0 | Control and last-resort fallback | 20 bit/s | Quiet, moderate, and disturbed at -5 dB waveform SNR and above |
-| 1 | Robust data | 100 bit/s | Quiet and moderate at 0 dB and above; disturbed at +5 dB and above |
-| 2 | General-purpose data | 500 bit/s | Quiet at +5 dB and above; moderate at +10 dB and above |
-| 3 | Fast data | 2,000 bit/s | Benign/static at +8 dB and above; quiet at +10 dB and above |
-| 4 | Maximum speed | 7,050 bit/s | Benign/static at +13 dB and above |
+| 0 | Control and last-resort fallback | 20 bit/s | Quiet, moderate, and disturbed at +4 dB SNR/3 kHz and above |
+| 1 | Robust data | 100 bit/s | Quiet and moderate at +9 dB and above; disturbed at +14 dB and above |
+| 2 | General-purpose data | 500 bit/s | Quiet at +14 dB and above; moderate at +19 dB and above |
+| 3 | Fast data | 2,000 bit/s | Benign/static at +17 dB and above; quiet at +19 dB and above |
+| 4 | Maximum speed | 7,050 bit/s | Benign/static at +22 dB and above |
+
+These rounded thresholds preserve the former physical noise levels after
+conversion from the retired 0--24 kHz convention (exact offset: +9.03 dB).
 
 ## VHF FM ladder
 

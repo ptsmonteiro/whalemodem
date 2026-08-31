@@ -32,7 +32,7 @@ def test_waveform_snr_reference_interval_has_explicit_power():
     audio = np.array([0.0, 1.0, -1.0, 0.0])
     spec = SnrSpec(7.0, reference_start=1, reference_stop=3)
     assert waveform_power(audio, spec) == 1.0
-    assert spec.kind is SnrKind.WAVEFORM
+    assert spec.kind is SnrKind.PASSBAND_3KHZ
 
 
 def test_snr_kinds_require_their_defining_metadata():
@@ -50,7 +50,7 @@ def test_trial_run_serializes_enum_and_summary():
         payload_bytes=54, outcome=TrialOutcome.DECODED,
         tx_samples=162_240, tx_sample_rate=48_000,
         rx_samples=40_560, rx_sample_rate=12_000,
-        keyed_seconds=3.38, channel_measurements={"waveform_snr_db": -12.0},
+        keyed_seconds=3.38, channel_measurements={"snr_3khz_db": -12.0},
         decoder_metrics={"tone_snr_db": np.float64(4.5),
                          "carriers": np.array([4.0, -np.inf])})
     document = TrialRun(channel={"type": "identity"}, trials=[trial], seed=7).to_dict()
@@ -89,11 +89,22 @@ def test_awgn_has_requested_power_and_reset_replays_exact_realization():
     audio = np.ones(100_000, dtype=np.float32) * 0.25
     channel = AwgnChannel(48_000, SnrSpec(10.0), seed=123)
     first = channel.process(audio)
-    assert first.measurements["realized_waveform_snr_db"] == pytest.approx(10.0, abs=0.08)
+    assert first.measurements["realized_snr_3khz_db"] == pytest.approx(10.0, abs=0.08)
+    assert first.measurements["noise_reference_bandwidth_hz"] == 3_000
+    assert first.measurements["full_band_noise_power"] == pytest.approx(
+        first.measurements["noise_power_3khz"] * 8)
     channel.reset()
     second = channel.process(audio)
     assert np.array_equal(first.audio, second.audio)
     assert channel.describe()["seed"] == 123
+
+
+def test_legacy_full_nyquist_snr_reports_3khz_equivalent():
+    channel = AwgnChannel(48_000, SnrSpec(10.0, SnrKind.WAVEFORM), seed=123)
+    measured = channel.process(np.ones(100_000, dtype=np.float32)).measurements
+    assert measured["realized_waveform_snr_db"] == pytest.approx(10.0, abs=0.08)
+    assert measured["equivalent_realized_snr_3khz_db"] == pytest.approx(
+        19.0309, abs=0.08)
 
 
 def test_frequency_offset_and_drift_continue_between_calls_then_reset():

@@ -72,8 +72,8 @@ class HfSsbScenario:
                  snr: SnrSpec, seed: int):
         if sample_rate <= 0:
             raise ValueError("sample_rate must be positive")
-        if snr.kind is not SnrKind.WAVEFORM:
-            raise ValueError("HF scenario AWGN requires waveform-referenced SNR")
+        if snr.kind is not SnrKind.PASSBAND_3KHZ:
+            raise ValueError("HF scenario AWGN requires 3 kHz passband-referenced SNR")
         self.preset = preset
         self.sample_rate = int(sample_rate)
         self.snr = snr

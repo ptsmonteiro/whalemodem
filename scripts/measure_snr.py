@@ -13,13 +13,12 @@ squelch-open reception) by comparing:
     CPFSK tones).
   - "noise" power: RMS in two side bands just outside the tone band
     (700-950 Hz and 2050-2300 Hz for that same profile),
-    power-spectral-density-normalized and scaled up to the tone band's
-    bandwidth, as an estimate of what the noise floor contributes inside the
-    tone band. _bands_for_profile flags a noise band landing on a tone's 3rd
+    power-spectral-density-normalized and scaled to the standard 3 kHz
+    reference bandwidth. _bands_for_profile flags a noise band landing on a tone's 3rd
     harmonic; none of the current profiles' do, since every profile is
     centred on 1500 Hz and their harmonics all sit above 2900 Hz.
 
-SNR_dB = 10*log10(signal_power / estimated_noise_power_in_band)
+SNR/3kHz_dB = 10*log10(signal_power / (estimated_noise_PSD * 3000 Hz))
 
 This is *not* the same number VARA's status line calls "SNR" -- there's no
 shared reference implementation here -- but it is a real, reproducible
@@ -48,6 +47,7 @@ TAIL_TRIM = 0.2  # drop the last bit too, in case squelch starts closing before 
 BAND_MARGIN = 200.0  # Hz of headroom either side of the tone pair for the signal band
 NOISE_GUARD = 50.0    # Hz gap left between the signal band and each noise band
 NOISE_WIDTH = 250.0   # Hz width of each noise band
+SNR_REFERENCE_BANDWIDTH_HZ = 3_000.0
 
 
 def _bands_for_profile(profile):
@@ -82,14 +82,12 @@ def _estimate_snr_db(audio, sample_rate, signal_band, noise_bands):
     lo, hi = signal_band
     signal_rms = _band_rms(audio, sample_rate, lo, hi)
     signal_power = signal_rms ** 2
-    signal_bw = hi - lo
-
     noise_psd_estimates = []
     for nlo, nhi in noise_bands:
         rms = _band_rms(audio, sample_rate, nlo, nhi)
         noise_psd_estimates.append((rms ** 2) / (nhi - nlo))
     noise_psd = float(np.mean(noise_psd_estimates))
-    noise_power_in_band = noise_psd * signal_bw
+    noise_power_in_band = noise_psd * SNR_REFERENCE_BANDWIDTH_HZ
 
     if signal_power <= 0 or noise_power_in_band <= 0:
         return None, signal_rms, noise_power_in_band
@@ -122,11 +120,11 @@ def _measure_direction(tx: RadioTransport, rx: RadioTransport, tx_name, rx_name,
 
     snr_db, signal_rms, noise_power_in_band = _estimate_snr_db(core, SAMPLE_RATE, signal_band, noise_bands)
     print(f"  signal RMS ({signal_band[0]:.0f}-{signal_band[1]:.0f} Hz): {signal_rms:.6f}")
-    print(f"  estimated noise power in tone band: {noise_power_in_band:.3e}")
+    print(f"  estimated noise power in 3 kHz: {noise_power_in_band:.3e}")
     if snr_db is None:
         print(f"  could not compute SNR (zero signal or noise) for {tx_name} -> {rx_name}")
         return None
-    print(f"  SNR {tx_name} -> {rx_name}: {snr_db:.1f} dB (confidence_threshold={profile.confidence_threshold})")
+    print(f"  SNR/3 kHz {tx_name} -> {rx_name}: {snr_db:.1f} dB (confidence_threshold={profile.confidence_threshold})")
     return snr_db
 
 

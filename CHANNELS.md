@@ -303,7 +303,7 @@ Channel qualification is deliberately split by purpose:
   plus AWGN. These tests catch deterministic performance regressions; their
   tiny sample counts are not reliability estimates.
 - `scripts/benchmark_simulated_channels.py` is the explicit Monte Carlo tool.
-  It sweeps waveform SNR for AWGN/Watterson or RF C/N for complex FM, defaults
+  It sweeps 3 kHz passband-referenced SNR for AWGN/Watterson or RF C/N for complex FM, defaults
   to 100 trials per mode and point, and reports acquisition probability, FER,
   payload delivery rate, and 95% Wilson intervals. BER is present only when a
   waveform decoder supplies bit-error evidence. Injected-channel measurements
@@ -390,12 +390,17 @@ receive conversion. With no channel supplied, each direction gets a distinct
 ## SNR conventions
 
 An unqualified `snr_db` is forbidden in channel configuration and result
-metadata. Use a `SnrSpec` kind and a key that states the reference.
+metadata. Use a `SnrSpec` kind and a key that states the reference. Unless a
+more specific diagnostic is named, project SNR means S/N in a 3,000 Hz
+reference bandwidth.
 
-- `waveform`: the canonical simulated-channel SNR. It is mean-square signal
-  power over the explicitly recorded half-open reference sample interval,
-  divided by mean-square real AWGN over the complete 0 Hz to Nyquist band. If
-  the interval is omitted, it is the complete waveform passed to the channel.
+- `passband_3khz`: the canonical simulated-channel SNR. It is mean-square
+  signal power over the explicitly recorded half-open reference sample
+  interval, divided by white-noise power in 3,000 Hz. If the interval is
+  omitted, it is the complete waveform passed to the channel. The simulator
+  still generates white noise across the full Nyquist band, scaling its total
+  power by `(sample_rate / 2) / 3000`; the requested SNR therefore does not
+  change when the audio sample rate changes.
 - `in_band`: signal power divided by noise power integrated over the recorded
   audio-frequency band. This is appropriate for off-air measurements such as
   `scripts/measure_snr.py`; the band edges must accompany the number.
@@ -409,10 +414,15 @@ points in a curve and record its bounds. It must also state whether radio/audio
 filtering occurs before or after noise injection.
 
 Decoder outputs currently named `snr_db`, `tone_snr_db`, and
-`carrier_snr_db` remain waveform-specific quality estimates. They are useful
-diagnostics, but are not measurements of injected channel SNR and must not be
-used as its replacement. Trial documents therefore store them under
+`carrier_snr_db` are estimator-specific quality metrics, not passband SNR.
+They are useful diagnostics, but must not be used as a replacement for
+injected or measured `snr_3khz_db`. Trial documents therefore store them under
 `decoder_metrics`, separately from `channel_measurements`.
+
+Historical results labeled `waveform_snr_db` used full-Nyquist noise power.
+At the 48 kHz audio boundary, convert those values to the present convention
+by adding `10 log10(24000 / 3000) = 9.03 dB`. Retained result files are not
+rewritten, so their original labels remain auditable.
 
 ## Trial result schema
 

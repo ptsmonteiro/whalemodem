@@ -46,9 +46,9 @@ def channel_point_label(model: str, point_db: float, *,
         recipe = fm_profile if fm_profile is not None else fm_preset
         return f"{recipe}, RF C/N {point_db:g} dB"
     if model == "watterson":
-        return f"{watterson_preset}, waveform SNR {point_db:g} dB"
+        return f"{watterson_preset}, SNR/3 kHz {point_db:g} dB"
     if model == "awgn":
-        return f"AWGN waveform SNR {point_db:g} dB"
+        return f"AWGN SNR/3 kHz {point_db:g} dB"
     raise ValueError(f"unknown channel model {model!r}")
 
 

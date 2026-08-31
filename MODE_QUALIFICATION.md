@@ -67,7 +67,7 @@ come from `SPEED_LADDERS.md`. A qualification artifact expands that contract
 into the exact named preset(s), directions, and boundary points used by the
 campaign. For `vhf-fm` this includes the measured preset and RF C/N; for
 `hf-ssb` it includes the named Watterson or bounded benign/static channel and
-waveform SNR.
+SNR in the standard 3 kHz reference bandwidth.
 
 The target envelopes are fixed project requirements, not values inferred from
 a candidate's results. A mode that misses any required point does not fill
@@ -165,7 +165,7 @@ The outside points are there to locate the boundary, not to be passed. Use:
 
 - `fm` with the policy's measured radio preset for VHF FM;
 - `watterson` with the policy-relevant presets spanned by the mode's
-  envelope, with explicit waveform SNR;
+  envelope, with explicit SNR/3 kHz;
 - `awgn` as a diagnostic baseline, not as the sole qualification channel.
 
 A **Level 0** mode's grid must include the disturbed HF preset (`hf-ssb`) or
@@ -611,7 +611,8 @@ process. As a high-rate HF candidate it would be evaluated against the fixed
 Level 4 throughput and benign/static envelope, rather than against
 disturbed-preset robustness. The AWGN result is
 consistent with that shape -- with the fix in place, delivery collapses below
-about 11.5 dB waveform SNR, realized payload exceeds the 7,050 bit/s reference
+about 20.5 dB SNR/3 kHz (11.5 dB under the retired full-Nyquist convention),
+realized payload exceeds the 7,050 bit/s reference
 row from 11.5 dB up, and frame error rate reaches 1e-2 by 13 dB (superseding
 the 12 dB / 12.5 dB / 16 dB figures the first sweep produced) -- and a
 2026-08-30 Watterson sweep now supplies the fading evidence a declared

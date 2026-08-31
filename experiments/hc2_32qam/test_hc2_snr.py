@@ -7,7 +7,7 @@ full sweep is a long-running command, not a pytest.
 import numpy as np
 import pytest
 
-from whale.channel import AwgnChannel, SnrSpec
+from whale.channel import AwgnChannel, SnrKind, SnrSpec
 from whale.qualification import trial_seed
 from whale.trials import TrialOutcome, TrialResult
 
@@ -25,7 +25,8 @@ def _capture(payload, snr_db=None, seed=7):
                               np.zeros(PAD, np.float32)))
     if snr_db is None:
         return np.asarray(capture, dtype=float)
-    spec = SnrSpec(snr_db, reference_start=PAD, reference_stop=PAD + len(frame))
+    spec = SnrSpec(snr_db, SnrKind.WAVEFORM,
+                   reference_start=PAD, reference_stop=PAD + len(frame))
     channel = AwgnChannel(hc2.SAMPLE_RATE, spec, seed)
     return np.asarray(channel.process(capture).audio, dtype=float)
 

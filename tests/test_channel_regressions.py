@@ -66,12 +66,12 @@ def test_hf_modes_on_moderate_watterson_with_awgn(mode_name):
         return ChannelChain((
             WattersonChannel.from_preset(
                 48_000, "mid_latitude_moderate", seed),
-            AwgnChannel(48_000, SnrSpec(5.0), seed ^ 0x5A5A),
+            AwgnChannel(48_000, SnrSpec(14.0308998699), seed ^ 0x5A5A),
         ))
 
     records = run_frame_trials(
         mode, channel, 2, MASTER_SEED, point_index=1,
-        direction="mid-latitude moderate, waveform SNR 5 dB")
+        direction="mid-latitude moderate, SNR/3 kHz 14.03 dB")
     assert all(record.decoded for record in records)
 
 

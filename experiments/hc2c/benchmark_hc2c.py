@@ -17,7 +17,9 @@ from .hc2c import MODE as PILOT_MODE
 
 
 MODES = (HC2B_MODES[2], PILOT_MODE)
-POINTS = (0.0, 5.0, 10.0, 15.0)
+# Rounded 3 kHz equivalents of the historical 0/5/10/15 dB full-Nyquist
+# screen, preserving approximately the same physical noise levels.
+POINTS = (9.0, 14.0, 19.0, 24.0)
 PRESETS = ("mid_latitude_quiet", "mid_latitude_moderate",
            "mid_latitude_disturbed")
 
@@ -51,7 +53,7 @@ def run(args):
                 nominal_bps = ((mode.chunk_size + 10) * 8
                                / mode.airtime(mode.chunk_size + 10))
                 row = {
-                    "mode": mode.name, "preset": preset, "snr_db": point,
+                    "mode": mode.name, "preset": preset, "snr_3khz_db": point,
                     "payload_bytes": mode.chunk_size + 10,
                     "frame_seconds": mode.airtime(mode.chunk_size + 10),
                     "delivered": delivered, "trials": len(trials),
@@ -66,7 +68,7 @@ def run(args):
             point_index += 1
     serialized = TrialRun(
         channel={"type": "watterson", "presets": list(args.presets),
-                 "points_db": list(args.points)},
+                 "snr_kind": "passband_3khz", "points_db": list(args.points)},
         trials=records, seed=args.seed,
         metadata={"benchmark": "hc2c_paired_pilot_screen"},
     ).to_dict()["trials"]

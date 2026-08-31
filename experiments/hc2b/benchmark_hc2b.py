@@ -20,7 +20,7 @@ from whale.trials import TrialRun
 from .hc2b import MODES
 
 
-DEFAULT_POINTS = (0.0, 5.0, 10.0, 15.0)
+DEFAULT_POINTS = (9.0, 14.0, 19.0, 24.0)
 DEFAULT_PRESETS = ("mid_latitude_quiet", "mid_latitude_moderate",
                    "mid_latitude_disturbed")
 

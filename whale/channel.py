@@ -22,11 +22,15 @@ from scipy.signal import (butter, hilbert, iirnotch, lfilter, resample_poly,
 
 TAIL_RELATIVE_TOLERANCE = 1e-6
 TAIL_MAX_SECONDS = 1.0
+SNR_REFERENCE_BANDWIDTH_HZ = 3_000.0
 
 
 class SnrKind(StrEnum):
     """The power ratio represented by an SNR value."""
 
+    PASSBAND_3KHZ = "passband_3khz"
+    # Retained only so historical experiments remain reproducible. New work
+    # must use PASSBAND_3KHZ.
     WAVEFORM = "waveform"
     IN_BAND = "in_band"
     EB_N0 = "eb_n0"
@@ -36,10 +40,10 @@ class SnrKind(StrEnum):
 class SnrSpec:
     """An unambiguous SNR request or measurement.
 
-    ``WAVEFORM`` is the canonical simulated-channel convention: mean power of
-    the samples in ``reference_start:reference_stop`` divided by mean power of
-    real AWGN across the complete 0..sample_rate/2 Nyquist band.  The interval
-    is half-open.  Omitting both bounds means the complete supplied waveform.
+    ``PASSBAND_3KHZ`` is the canonical simulated-channel convention: mean
+    signal power in ``reference_start:reference_stop`` divided by white-noise
+    power in a standard 3,000 Hz reference bandwidth.  The interval is
+    half-open.  Omitting both bounds means the complete supplied waveform.
 
     ``IN_BAND`` compares signal and noise power integrated over ``band_hz``.
     ``EB_N0`` is reserved for coded-waveform analysis and requires
@@ -47,7 +51,7 @@ class SnrSpec:
     """
 
     db: float
-    kind: SnrKind = SnrKind.WAVEFORM
+    kind: SnrKind = SnrKind.PASSBAND_3KHZ
     band_hz: tuple[float, float] | None = None
     bit_rate: float | None = None
     reference_start: int | None = None
@@ -179,31 +183,54 @@ class ChannelChain:
 
 
 class AwgnChannel:
-    """Real, full-Nyquist-band AWGN at waveform-referenced SNR."""
+    """Real white noise at SNR referenced to a 3 kHz passband."""
 
     def __init__(self, sample_rate: int, snr: SnrSpec, seed: int):
         _positive_rate(sample_rate)
-        if snr.kind is not SnrKind.WAVEFORM:
-            raise ValueError("AWGN currently requires waveform-referenced SNR")
+        if snr.kind not in (SnrKind.PASSBAND_3KHZ, SnrKind.WAVEFORM):
+            raise ValueError("AWGN requires passband or legacy waveform SNR")
+        if (snr.kind is SnrKind.PASSBAND_3KHZ
+                and sample_rate / 2 < SNR_REFERENCE_BANDWIDTH_HZ):
+            raise ValueError("sample rate must provide a 3 kHz noise bandwidth")
         self.sample_rate, self.snr, self.seed = sample_rate, snr, int(seed)
         self.reset()
 
     def process(self, audio: np.ndarray) -> ChannelResult:
         samples = _mono(audio).astype(np.float64)
         power = waveform_power(samples, self.snr)
-        noise_power = power / 10.0 ** (self.snr.db / 10.0)
-        noise = self._rng.normal(0.0, np.sqrt(noise_power), len(samples))
+        requested_noise_power = power / 10.0 ** (self.snr.db / 10.0)
+        nyquist_hz = self.sample_rate / 2
+        full_band_noise_power = (requested_noise_power * nyquist_hz
+                                 / SNR_REFERENCE_BANDWIDTH_HZ
+                                 if self.snr.kind is SnrKind.PASSBAND_3KHZ
+                                 else requested_noise_power)
+        noise = self._rng.normal(0.0, np.sqrt(full_band_noise_power), len(samples))
         reference = self.snr.reference_slice(len(samples))
-        realized_noise_power = float(np.mean(noise[reference] ** 2))
-        realized_snr = (float("inf") if realized_noise_power == 0 else
-                        10.0 * np.log10(power / realized_noise_power))
-        return ChannelResult((samples + noise).astype(np.float32), {
-            "waveform_snr_db": self.snr.db,
-            "realized_waveform_snr_db": float(realized_snr),
+        realized_full_band_noise_power = float(np.mean(noise[reference] ** 2))
+        realized_reference_noise_power = (realized_full_band_noise_power
+                                           * SNR_REFERENCE_BANDWIDTH_HZ
+                                           / nyquist_hz)
+        realized_snr = (float("inf") if realized_reference_noise_power == 0 else
+                        10.0 * np.log10(power / realized_reference_noise_power))
+        measurements = {
+            "noise_reference_bandwidth_hz": SNR_REFERENCE_BANDWIDTH_HZ,
             "signal_power": power,
-            "noise_power": realized_noise_power,
+            "noise_power_3khz": realized_reference_noise_power,
+            "full_band_noise_power": realized_full_band_noise_power,
             "reference_samples": [reference.start, reference.stop],
-        })
+        }
+        if self.snr.kind is SnrKind.PASSBAND_3KHZ:
+            measurements.update(snr_3khz_db=self.snr.db,
+                                realized_snr_3khz_db=float(realized_snr))
+        else:
+            realized_waveform_snr = (float("inf")
+                if realized_full_band_noise_power == 0 else
+                10.0 * np.log10(power / realized_full_band_noise_power))
+            measurements.update(
+                waveform_snr_db=self.snr.db,
+                realized_waveform_snr_db=float(realized_waveform_snr),
+                equivalent_realized_snr_3khz_db=float(realized_snr))
+        return ChannelResult((samples + noise).astype(np.float32), measurements)
 
     def reset(self) -> None:
         self._rng = np.random.default_rng(self.seed)
@@ -941,10 +968,10 @@ class WattersonChannel:
 
 
 def waveform_power(audio: np.ndarray, spec: SnrSpec) -> float:
-    """Mean-square power for a ``WAVEFORM`` SNR reference interval."""
+    """Mean signal power over an SNR specification's reference interval."""
 
-    if spec.kind is not SnrKind.WAVEFORM:
-        raise ValueError("waveform_power requires waveform SNR")
+    if spec.kind not in (SnrKind.PASSBAND_3KHZ, SnrKind.WAVEFORM):
+        raise ValueError("waveform_power requires passband or waveform SNR")
     samples = np.asarray(audio, dtype=np.float64)
     if samples.ndim != 1:
         raise ValueError("channel audio must be a mono one-dimensional array")
