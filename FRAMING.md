@@ -110,8 +110,9 @@ that ladder. On the HF SSB ladder it is mode `5` (HC0, below), with mode `4`
 (HC1) above it as the fast rung; the CPFSK profiles are not offered at all,
 because they carry no carrier-frequency estimate and so on SSB they are not a
 robust fallback but a mode that stops working as soon as the two stations
-disagree about frequency. See `whale/policy.py`, which pairs each
-`ChannelPolicy` with its ladder.
+disagree about frequency. Mode `7` (HF2, below) is a further, experimental-
+only rung above HC1, not offered by default. See `whale/policy.py`, which
+pairs each `ChannelPolicy` with its ladder.
 
 Mode IDs are global across channels: an ID names one waveform everywhere, even
 where no registry offers two of them together.
@@ -271,18 +272,46 @@ Three details follow from being non-coherent:
   reads its ceiling whatever the timing, flat to within 1e-9 across +-48
   samples.
 
+### Mode 7: HF2, an experimental faster HF data mode
+
+Mode `7` is `whale.modes.hf2_mode.HF2`, a pilot-assisted coherent 16-QAM OFDM
+mode built and qualified in `experiments/hf2/` as a from-scratch design
+independent of HC0/HC1/VF6/HR0 (see `experiments/hf2/DESIGN.md`), then wired
+into `whale/modes/` as a thin `WaveformMode` adapter over the unchanged
+experiment module, the same shape `hc1_mode.py` uses over `hc1.py`. It
+targets Level 2 of the HF SSB speed ladder (`SPEED_LADDERS.md`):
+general-purpose data, quiet Watterson fading at +5 dB and above, moderate at
++10 dB and above. 19 carriers (656.25-2343.75 Hz, 93.75 Hz spacing) carry 8
+comb pilots and 11 16-QAM data carriers grouped into 5 logical carriers with
+physical frequency diversity (each logical value repeated on 2-3 carriers
+spread across the band, LLR-combined at the receiver) to survive persistent
+Watterson notches; framing is the same rate-1/2 K=7 convolutional code,
+CRC32 and length field used inside the payload grid as HC0/HC1/VF3. A frame
+carries 117 payload bytes (107 after the link's air header) in 109 symbols /
+0.775 s of frame body plus the common HF lead.
+
+`experiments/hf2/RESULTS.md` records the qualifying Monte Carlo evidence: a
+>=300-trial confirmed boundary at both required Level 2 envelope points
+(`mid_latitude_quiet` +5 dB and `mid_latitude_moderate` +10 dB), clearing
+`MODE_QUALIFICATION.md`'s FER/acquisition gate with useful throughput of
+about 577-585 bit/s -- above the 500 bit/s floor, but by a thin margin (see
+that document's caveats). HF2 is registered as EXPERIMENTAL only
+(`whale/mode_qualification.py`); it is not offered by any default or
+optional registry and carries no hardware, session, or ARQ evidence yet.
+
 ### Common HF lead and frame signature
 
-Every HC0 and HC1 keying begins with the same lead modulation and symbol rate:
-HC0's constant-envelope non-coherent 16-FSK bank at 93.75 baud. The minimum
-lead is a six-symbol identity block repeated twice, or 12 symbols / 6,144
-samples / 128 ms. Adaptive protection extends it in complete six-symbol
-blocks, repeating the same identity block throughout.
+Every HC0, HC1 and HF2 keying begins with the same lead modulation and
+symbol rate: HC0's constant-envelope non-coherent 16-FSK bank at 93.75 baud.
+The minimum lead is a six-symbol identity block repeated twice, or 12
+symbols / 6,144 samples / 128 ms. Adaptive protection extends it in complete
+six-symbol blocks, repeating the same identity block throughout.
 
 | Following mode | Tone indices |
 | --- | --- |
 | HC0 | `9 6 12 15 0 3` |
 | HC1 | `12 3 15 6 9 0` |
+| HF2 | `2 11 5 14 8 0` |
 
 The detected label may order decoder attempts, but is not authenticated.
 Leading clipping can erase it and noise can produce a wrong candidate, so all

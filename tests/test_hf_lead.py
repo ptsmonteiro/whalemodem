@@ -147,9 +147,9 @@ def test_candidate_work_is_bounded_even_with_many_false_signatures():
     capture = _capture(false_leads)
 
     ranked = hf_lead.candidates(capture, limit=3)
-    assert len(ranked) <= 6  # both labels at no more than three boundaries
-    assert {candidate.label for candidate in ranked} <= {
-        hf_lead.HC0_LABEL, hf_lead.HC1_LABEL}
+    # every label at no more than three boundaries
+    assert len(ranked) <= 3 * len(hf_lead.BLOCKS)
+    assert {candidate.label for candidate in ranked} <= set(range(len(hf_lead.BLOCKS)))
 
 
 def test_a_false_signature_before_a_real_frame_cannot_hide_its_boundary():

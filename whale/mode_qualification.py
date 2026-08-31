@@ -49,6 +49,7 @@ MANIFEST = (
     QualificationEntry("vhf-fm", 6, QualificationLevel.EXPERIMENTAL),
     QualificationEntry("hf-ssb", 5, QualificationLevel.DEFAULT),
     QualificationEntry("hf-ssb", 4, QualificationLevel.DEFAULT),
+    QualificationEntry("hf-ssb", 7, QualificationLevel.EXPERIMENTAL),
 )
 
 
@@ -75,7 +76,8 @@ def registry(policy: str, level: QualificationLevel | str =
     elif policy == "hf-ssb":
         from .modes.hc0_mode import HC0
         from .modes.hc1_mode import HC1
-        candidates, control = (HC0, HC1), HC0
+        from .modes.hf2_mode import HF2
+        candidates, control = (HC0, HC1, HF2), HC0
     else:
         raise ValueError(f"unknown channel policy {policy!r}")
 
