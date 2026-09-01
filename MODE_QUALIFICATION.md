@@ -3,13 +3,14 @@
 This document defines the evidence required to place a waveform in an
 experimental, optional, or default Whalemodem mode registry. It applies per
 channel policy: qualification on `vhf-fm` does not qualify a mode for
-`hf-ssb`. The objective is a reproducible decision about verified application
-delivery, acquisition, adaptation, and resource cost, not merely a successful
-codec loopback or a nominal bit rate.
+`hf-ssb`. The objective is a reproducible decision about whether one waveform
+delivers useful data inside its declared channel envelope. Whole-ladder
+adaptation and connection lifecycle behavior are separate qualification
+scopes; a failure there does not retroactively make the waveform unqualified.
 
 Qualification is scoped to one of the fixed rung contracts in
 [SPEED_LADDERS.md](SPEED_LADDERS.md). A mode fills a rung only when it meets
-both that rung's useful-throughput floor and its complete required channel
+both that rung's per-frame net-throughput floor and its complete required channel
 envelope. Every gate below that references channel conditions applies across
 that target envelope. Failing outside it is expected behaviour and never a
 gate failure, provided a lower rung covers those conditions.
@@ -62,7 +63,7 @@ The rung level is one of:
 - **Level 3** -- fast data; or
 - **Level 4** -- maximum speed inside a deliberately narrow envelope.
 
-The minimum envelope and useful-throughput floor for each policy and level
+The minimum envelope and per-frame net-throughput floor for each policy and level
 come from `SPEED_LADDERS.md`. A qualification artifact expands that contract
 into the exact named preset(s), directions, and boundary points used by the
 campaign. For `vhf-fm` this includes the measured preset and RF C/N; for
@@ -225,6 +226,22 @@ Evidence in the assessment table uses four words:
 
 ## Reproducible test matrix
 
+The evidence is divided into three independent scopes:
+
+1. **Waveform/mode qualification** (sections 1-5) asks whether one fixed mode
+   works inside its declared channel envelope. It controls the mode's
+   Experimental/Optional/Default registry evidence status.
+2. **Ladder qualification** (section 6) asks whether ordered modes add useful
+   speed and coverage and whether selection, fallback, and re-climb work.
+3. **Complete modem/system qualification** (section 7) covers connection,
+   negotiation, bidirectional ARQ recovery, disconnect, adapters, radio
+   control, and sustained operation.
+
+Sections 6 and 7 remain essential project gates, but are never gates for an
+individual waveform. Mode qualification does not require connect/disconnect,
+negotiation, adaptation, fallback/re-climb, adjacent-rung comparisons, or
+general link/ARQ fault recovery.
+
 ### 1. Unit and malformed-input tests
 
 Every mode must have deterministic tests for:
@@ -310,19 +327,10 @@ envelope are recorded to locate the boundary and do not affect the gate,
 except that an `error` outcome -- an exception or unbounded work -- is a
 failure anywhere, envelope or not.
 
-Two asymmetric requirements make the ladder's shape explicit, one in each
-direction:
-
-- A lower rung must have a point at which it meets those limits while the
-  next faster rung does not, demonstrating that it adds coverage rather than
-  only overhead.
-- A faster rung must have a point inside both envelopes at which it meets
-  those limits and beats the rung below on useful throughput by the margin
-  in section 6, demonstrating that it adds speed rather than only risk.
-
-**Gate:** both requirements hold, and the mode meets the FER/acquisition
-limits across the target rung's complete envelope. A miss at any required
-point fails that rung; the target envelope is not narrowed to fit the result.
+**Gate:** the mode meets the FER/acquisition limits across its claimed
+envelope. A miss at any required point fails that claim; the envelope is not
+narrowed after seeing the results. Comparisons with neighbouring modes belong
+to ladder qualification, not this gate.
 
 The script reports acquisition probability, FER, payload delivery, confidence
 intervals, channel/decoder measurements, seeds, expanded channel descriptions,
@@ -331,98 +339,81 @@ bit evidence. It currently runs one logical direction per frame; symmetric
 simulation is acceptable for waveform qualification, while asymmetry is
 covered at session and hardware levels.
 
-### 4. Full-stack sessions, ARQ, adaptation, and recovery
+### 4. Net throughput per data frame
 
-Use `scripts/benchmark_sessions.py` for connection, simultaneous
-bidirectional verified transfer, ARQ, per-direction adaptation, and clean
-disconnect through the selected policy. Run at least 20 trials per smoke
-point and 100 per promotion point, with at least 10,000 application bytes in
-each direction so that every adjacent mode transition can occur. Include:
+Measure each candidate independently from one full-capacity application DATA
+frame. The mode's net throughput is:
 
-- clean and transition points in both directions;
-- an asymmetric run using `--reverse-model`/`--reverse-points`;
-- lost DATA, lost ACK, corrupted DATA, and a transient transport failure;
-- fallback from every faster rung and a later climb after recovery;
-- connection and disconnect loss/retry cases.
+`8 * DATA chunk bytes / complete encoded DATA-frame airtime`
 
-The benchmark currently records connection, directional delivery, ARQ-facing
-link metrics, adaptation effects, useful bytes per simulated second, channel
-measurements, seeds, and Git state. Tests in `test_link_recovery.py` exercise
-the individual drop/corruption cases. **Gap:** the command exposes neither
-its existing frame-drop/transport-fault hooks nor a scripted recovery schedule
-on the CLI, and it does not summarize time spent in each mode. The smallest
-implementation is repeatable `--fault direction:phase:index:action` arguments
-and per-direction mode-history fields in its JSON.
+The DATA chunk is application content only. It excludes the air header and
+physical/link overhead. Complete frame airtime includes acquisition,
+framing, coding, guards, and intentional waveform lead/tail samples. Do not
+include ACKs, retries, turnaround, connection or negotiation traffic,
+adaptation, disconnect, or any other frames in either side of the calculation.
 
-**Gate:** 100% verified bidirectional delivery and clean disconnect, with the
-95% Wilson lower bound at least 95% at promotion points; every injected fault
-must be observed, recovered without duplicate application bytes, and followed
-by the expected fallback/re-climb. No deadlock or uncaught exception is
-allowed.
+Derive the value from the actual bytes passed to the public encoder and the
+resulting sample count at the mode's transmit sample rate. Retain the payload
+capacity, encoded sample count, sample rate, frame airtime, and calculated
+bit/s so the result is reproducible. A nominal symbol or codec rate is not
+evidence. Channel failures also do not prorate this number: FER, acquisition,
+and exact delivery are independent gates under sections 3 and 5.
 
-### 5. Bidirectional hardware
+For HF, also measure 99%-power occupied bandwidth over representative and
+maximum payloads and retain an upper confidence bound below 2,300 Hz.
+
+**Gate:** the reproducible per-frame net throughput meets the declared floor,
+the frame passes the reliability gates throughout its required envelope, and
+occupied bandwidth meets the applicable policy ceiling.
+
+### 5. Retained-direction hardware frames
 
 Use `scripts/sweep_modes.py` for direct full-capacity frames through two named
-radios, audio devices, PTT backends, settings, and cables. Test both directions
-with at least 40 frames per direction for optional promotion and 100 per
-direction on two materially different radio/audio pairs for default promotion.
-Retain all failed captures and at least one successful capture per direction.
-Then run the full hardware link with `scripts/run_acceptance_test.py` (and the
-focused hardware recovery scripts where applicable): connect, transfer at
-least 10,000 verified bytes each way, exercise ARQ and mode changes, recover
-from one induced lost frame and one lost ACK, and disconnect. Do not infer the
-reverse direction from one successful leg.
+radios, audio devices, PTT backends, settings, and cables. Select and declare
+one retained qualification direction for each radio/audio pair. The better
+usable direction may be retained: run at least 40 frames in that direction for
+optional promotion and 100 frames in the retained direction on each of two
+materially different radio/audio pairs for default promotion. Retain all
+failed captures and at least one successful capture from the retained
+direction.
+
+Record the retained direction and why it was selected. A short probe in both
+directions is recommended when practical, but it is characterization rather
+than a qualification gate. Select the direction before the promotion-sized
+run so repeated small runs are not searched for an accidentally favorable
+sample. Non-retained results remain in the evidence record but do not enter
+the retained direction's Wilson interval or verdict.
 
 The frame sweep already emits the versioned trial schema, Wilson intervals,
 throughput, levels, decoder metrics, radio names, registry IDs, Git commit,
-and failed captures. Hardware smoke/recovery scripts exist, but their result
-formats and fault controls are not unified. **Gap:** extend the hardware
-acceptance runner to emit a session artifact equivalent to
-`benchmark_sessions.py`, including radio/audio/PTT configuration and fault
-events.
+and failed captures.
 
 **Gate:** frame delivery satisfies the same FER/acquisition bounds as the
-Monte Carlo gate in each direction, and every hardware session completes
-exactly and recovers, with the hardware pair's conditions inside the mode's
-target envelope. A run in which the bench was misconfigured -- a dummy load
+Monte Carlo gate in the declared retained direction, with the hardware pair's
+conditions inside the mode's target envelope. A run in which the bench was
+misconfigured -- a dummy load
 in place of an antenna, a muted or mis-levelled audio path, the wrong
 filter -- did not place the mode inside its envelope and is an **invalid
 run**, recorded as `unmeasured` with the diagnosis retained, not as a
 failure. Such a diagnosis must be supported by the captured metrics and, once
 this document's configuration metadata is retained, by the recorded setup.
-A known failed direction on a valid run is a failed gate. If the failure is
-shown to be a property of conditions outside the target envelope, the run is
-not evidence for or against the target; otherwise the rung fails. An
-unexplained directional asymmetry is always a failure.
+A failed non-retained direction does not fail the direct-frame gate, but it
+must remain documented and must not be hidden when describing path asymmetry.
+If a retained-direction failure is shown to be a property of conditions
+outside the target envelope, the run is not evidence for or against the
+target; otherwise the rung fails.
 
-### 6. Useful throughput and adjacent-rung overlap
+### 6. Ladder qualification
 
-Measure one-direction bulk-transfer throughput from the first application
-DATA byte becoming available until the final DATA byte is acknowledged. Use
-verified application bits divided by elapsed simulated or measured channel
-time. The interval includes DATA and control frames, ACKs, retries, PTT
-leads/tails, and radio turnaround. Connection setup and disconnect are
-reported separately and are not included in this primary throughput number.
-Nominal codec rate, physical-layer payload per keyed second, and a clean frame
-loopback are not application-throughput evidence.
-
-For every HF rung, measure 99%-power occupied bandwidth over representative
-and maximum-length frames, including acquisition and framing. The upper
-confidence bound of the measured occupied bandwidth must not exceed 2,300 Hz;
-a nominal carrier span alone is not bandwidth evidence.
-
-At every channel point claimed for a rung, its median full-session useful
-application throughput must meet the floor in `SPEED_LADDERS.md` without
-reducing the section 4 completion reliability. Test at least 10,000
-application bytes per direction; increase the transfer size when necessary
-to keep fixed setup effects below 5% of the measured transfer interval.
-
-For every adjacent pair, retain at least two channel points where both modes
-satisfy the frame reliability gate. At each point, enabling the faster rung
-must improve median full-session useful application throughput by at least
-25%. The lower rung must also retain a point where it passes and the faster
-rung fails, as required by section 3. A mode that is faster but misses its
-level's absolute throughput floor does not fill that rung.
+Ladder qualification combines already qualified modes and tests the policy's
+ordering and adaptation. Use `scripts/benchmark_sessions.py` with clean and
+transition points, asymmetric forward/reverse paths, and at least 10,000
+verified bytes per direction. Demonstrate a lower-rung-only passing point,
+at least two shared passing points where the faster rung improves median
+useful throughput by at least 25%, fallback from every faster rung, and later
+re-climb after conditions recover. Retain per-direction mode histories and
+time in mode. These results qualify the ladder and never change the component
+modes' waveform verdicts.
 
 `benchmark_simulated_channels.py`, `benchmark_sessions.py`, and
 `sweep_modes.py` calculate the needed useful-throughput quantities. **Gap:**
@@ -430,7 +421,23 @@ none produces an automatic adjacent-rung comparison report. The smallest
 addition is a summary function that joins mode/point rows, checks confidence
 bounds, and emits ratios and pass/fail fields.
 
-### 7. CPU and memory
+### 7. Complete modem/system qualification
+
+Use full simulated and hardware sessions to test connection, capability and
+mode negotiation, simultaneous bidirectional transfer, ARQ, floor control,
+loss/corruption recovery, and clean disconnect. Include asymmetric paths,
+lost DATA and ACK, corrupted DATA, transient transport failure, and
+connection/disconnect loss. Promotion-sized simulated points use 100 trials;
+hardware sessions transfer at least 10,000 verified bytes each way. Every
+fault must be observed and recovered without duplicate application bytes,
+deadlock, or uncaught exception.
+
+System qualification also covers application adapters, audio/PTT/radio
+control, interoperability, and sustained low-end-host operation. Existing
+`test_audio_e2e.py` and `test_link_recovery.py` provide regression evidence;
+uniform promotion and hardware-session artifacts remain a gap.
+
+#### CPU and memory
 
 Measure on both a named development machine and the documented minimum
 low-end target. Record OS, Python/NumPy/SciPy versions, CPU model/core count,
@@ -474,15 +481,21 @@ versioned schema. Retain:
   metrics separate from injected channel measurements, durations and useful
   bytes;
 - Wilson intervals and explicit gate calculations;
-- radio, audio device, PTT backend, levels, filters, frequencies, firmware,
-  direction, and operator notes for hardware runs;
+- for hardware runs, the minimum reproducibility set: retained direction;
+  radio and audio-interface models; frequency and radio data mode; TX/RX
+  filter bandwidth; transmit power; TX and RX audio levels; processing/ALC,
+  AGC, preamp and attenuator state; RF path (antennas, cable, attenuators or
+  dummy loads); and PTT method. Record firmware when readily available;
 - failed captures with expected payload and replay command, plus representative
   successful captures; and
 - CPU/RSS samples, overruns, and warm-up definition for resource runs.
 
-The frame tools already provide most waveform/channel fields. Dependency and
-host metadata, successful hardware captures, uniform hardware session JSON,
-and resource JSON are the principal missing pieces.
+This minimum distinguishes waveform behavior from the common alternatives of
+wrong filtering, clipping/under-drive, insufficient path level, or a dummy
+load. It is enough to interpret and reproduce a result without demanding an
+inventory of every radio menu setting. The frame tools already provide most
+waveform/channel fields; successful captures and the minimum setup record are
+the principal hardware gaps.
 
 ## Promotion decision
 
@@ -491,13 +504,15 @@ Promotion is monotonic in evidence, not in implementation maturity:
 | Destination | Mandatory gates |
 | --- | --- |
 | Experimental | Unit/malformed-input suite and a bounded clean loopback pass; unique stable mode ID; declared target rung or explicit supplemental status; provisional measured envelope; decoder resource use is bounded by construction/test. |
-| Optional | All experimental gates; bounded CI; frame Monte Carlo across the claimed envelope; one bidirectional radio pair; full simulated sessions and recovery; adjacent-rung value/overlap when claiming a target rung; development-host CPU/RSS. |
-| Default | All optional gates; the complete target envelope and throughput floor confirmed by promotion-sized runs; 100-trial promotion session points; two bidirectional hardware pairs and hardware recovery; minimum-target CPU/RSS and no dropouts; complete clean-commit artifacts and documentation. |
+| Optional | All experimental gates; bounded CI; frame Monte Carlo across the claimed envelope; per-frame net-throughput and bandwidth gates; one radio/audio pair with a 40-frame retained-direction campaign; complete artifacts and minimum hardware metadata. |
+| Default | All optional gates; the complete target envelope and throughput floor confirmed by promotion-sized runs; two materially different radio/audio pairs with 100-frame retained-direction campaigns on each retained direction; bounded decoder resource evidence; complete clean-commit artifacts and documentation. |
 
 Every mandatory row must be `passed`. `failed`, `unmeasured`, or `provisional`
 blocks a new promotion. A regression in a default mode removes it from the
 default registry unless a documented compatibility/security reason requires
 a time-bounded exception. Mode IDs are never reused after on-air publication.
+Ladder and system qualification have their own verdicts under sections 6 and
+7 and do not appear in this waveform-promotion table.
 
 ## Assessment of the current modes
 
@@ -508,6 +523,8 @@ the group status. The per-mode envelope rows below record historical/current
 measurements. They do not override the fixed targets, and a `passed` result in
 those rows does not claim that the mode fills a target rung; that separate
 status is explicitly `unmeasured` below.
+Rows labelled ladder or system evidence are reported for project visibility;
+they do not enter the individual mode promotion verdict.
 
 | Requirement | CPFSK | VF3 | HC0 | HC1 |
 | --- | --- | --- | --- | --- | --- |
@@ -516,11 +533,12 @@ status is explicitly `unmeasured` below.
 | Unit, framing, malformed input | passed | passed | provisional | provisional |
 | Bounded policy channel CI | passed | passed | passed | passed |
 | Historical frame Monte Carlo at measured points | passed (2026-08-29 clean-tree rerun after the channel-drain fix; 300 and 600 baud delivered 600/600 and 598/600, 1200 baud delivered 591/600, all within the FER/acquisition gate) | passed within the measured envelope (2026-08-30 clean-tree run; 99-100/100 at every point from 10 dB RF C/N up). 0/100 at 5 dB was root-caused to a genuine carrier-SNR floor -- see campaign notes below | passed (2026-08-30 clean-tree run; 100/100 at every SNR point across quiet, moderate, and disturbed Watterson presets) | passed within the measured envelope (2026-08-30 clean-tree run; clears quiet above -5 dB and moderate at 10 dB+); fails disturbed at every tested SNR |
-| Full-stack connection and bidirectional ARQ | passed | passed | passed | passed |
-| Scripted adaptation/fault recovery artifact | provisional | provisional | provisional | provisional |
-| Bidirectional hardware frame gate | unmeasured | provisional (6/6, 3 each way) | provisional (2026-08-28 captures, 11/11 and 5/5 each way, below trial minimum) | unmeasured (2026-08-28 captures, 17/17 one direction, 0/3 the other; the weak leg is attributed to the IC-705 transmitting into a dummy load, so the session does not measure HC1's envelope and the 0/3 is an invalid run rather than a failed direction -- see `logs/mode_qualification/hf-ssb/hc0-hc1/2026-08-28-hardware/INDEX.md`. Re-run required with both stations on antennas and the transmit configuration recorded) |
-| Full hardware link/recovery gate | provisional | unmeasured | unmeasured | unmeasured |
-| Useful throughput and adjacent overlap | provisional | provisional | provisional | unmeasured |
+| System evidence: full-stack connection and bidirectional ARQ | passed | passed | passed | passed |
+| Ladder/system evidence: scripted adaptation/fault recovery | provisional | provisional | provisional | provisional |
+| Retained-direction hardware frame gate | unmeasured | provisional (best retained leg 3/3, below 40-frame minimum) | provisional (best retained leg 11/11, below 40-frame minimum) | provisional (17/17 on the usable retained leg, below 40-frame minimum; the other leg used an IC-705 transmitting into a dummy load and is retained as invalid characterization evidence -- see `logs/mode_qualification/hf-ssb/hc0-hc1/2026-08-28-hardware/INDEX.md`. Re-run the retained direction with complete configuration metadata) |
+| System evidence: full hardware link/recovery | provisional | unmeasured | unmeasured | unmeasured |
+| Ladder evidence: adjacent overlap | provisional | provisional | provisional | unmeasured |
+| Waveform evidence: per-frame net throughput | unmeasured | unmeasured | unmeasured | unmeasured |
 | Development CPU and RSS | unmeasured | unmeasured | unmeasured | unmeasured |
 | Minimum-target CPU, RSS, and dropouts | unmeasured | unmeasured | unmeasured | unmeasured |
 | Complete promotion artifact/metadata | unmeasured | provisional | provisional | provisional |

@@ -1,9 +1,10 @@
 # HF and VHF FM speed-ladder targets
 
 This document defines the five target rungs for Whalemodem's HF SSB and VHF
-FM speed ladders. A rung is a service objective: it combines minimum useful
-application throughput with a required channel envelope. Modulation, coding,
-frame geometry, and implementation are deliberately outside this document.
+FM speed ladders. A rung is a service objective: it combines minimum net
+application throughput per data frame with a required channel envelope.
+Modulation, coding, frame geometry, and implementation are deliberately
+outside this document.
 
 These are end-state targets, not descriptions of the modes currently present
 in the repository. The evidence and pass/fail rules for claiming a rung are
@@ -13,14 +14,21 @@ defined in [MODE_QUALIFICATION.md](MODE_QUALIFICATION.md).
 
 - Level 0 is the control and last-resort fallback rung. Its priority is
   maximum coverage.
-- Levels 1 through 3 exchange channel margin for increasing useful
-  application throughput.
+- Levels 1 through 3 exchange channel margin for increasing net application
+  throughput per data frame.
 - Level 4 is the maximum-speed rung. Its deliberately narrow channel envelope
   must not be widened by sacrificing its throughput target.
 - A target is satisfied only when both its throughput and every channel point
   in its required envelope pass the qualification rules.
-- Speeds are minimum sustained useful application throughput, not symbol,
-  coded, nominal, payload-per-frame, or error-free-loopback rates.
+- Speeds are minimum net application throughput per full-capacity DATA frame:
+  application DATA-chunk bits divided by that encoded frame's complete
+  airtime. The numerator excludes the air header and all other link/physical
+  overhead; the denominator includes the waveform's acquisition, framing,
+  coding, guards, and intentional lead/tail samples. ACKs, retries, radio
+  turnaround, connection traffic, adaptation, and other session traffic are
+  excluded. Frame delivery reliability is enforced separately by the channel
+  envelope gates in `MODE_QUALIFICATION.md` and is not multiplied into this
+  rate.
 - Channel thresholds are inclusive: a target stated at `10 dB and above`
   includes the 10 dB boundary point.
 
@@ -47,7 +55,7 @@ Its qualification channel must retain its complete filter, frequency-offset,
 drift, level, and nonlinearity description; identity-channel or AWGN-only
 evidence is insufficient.
 
-| Level | Objective | Minimum useful application throughput | Required operating envelope |
+| Level | Objective | Minimum net application throughput per DATA frame | Required operating envelope |
 | ---: | --- | ---: | --- |
 | 0 | Control and last-resort fallback | 20 bit/s | Quiet, moderate, and disturbed at -5 dB waveform SNR and above |
 | 1 | Robust data | 100 bit/s | Quiet and moderate at 0 dB and above; disturbed at +5 dB and above |
@@ -70,7 +78,7 @@ excellent path with the bandwidth and linearity needed for the target rate.
 Synthetic profiles may locate boundaries but cannot by themselves satisfy a
 target rung.
 
-| Level | Objective | Minimum useful application throughput | Required operating envelope |
+| Level | Objective | Minimum net application throughput per DATA frame | Required operating envelope |
 | ---: | --- | ---: | --- |
 | 0 | Control and fallback | 500 bit/s | Conservative measured path at 5 dB RF C/N and above |
 | 1 | Robust data | 1,000 bit/s | Conservative measured path at 10 dB RF C/N and above |

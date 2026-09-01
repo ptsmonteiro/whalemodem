@@ -61,10 +61,13 @@ def fake_pair_factory(a, b, warmup):
 def test_channel_registries_drive_mode_selection():
     vhf = sweep_modes.registry_for("vhf-fm")
     hf = sweep_modes.registry_for("hf-ssb")
+    hf_experimental = sweep_modes.registry_for("hf-ssb", "experimental")
     assert sweep_modes.select_modes(vhf, None) == tuple(vhf.modes)
     assert [mode.name for mode in sweep_modes.select_modes(vhf, ["0", "vf3"])] == [
         "300baud", "vf3"]
-    assert [mode.name for mode in hf.modes] == ["hc0", "hc1"]
+    assert [mode.name for mode in hf.modes] == ["hr0", "hc0", "hc1", "hf2"]
+    assert "hf3" not in [mode.name for mode in hf.modes]
+    assert "hf3" in [mode.name for mode in hf_experimental.modes]
 
 
 def test_direct_trial_uses_full_link_packet_and_versioned_record(tmp_path):
@@ -88,7 +91,7 @@ def test_main_writes_strict_json_and_summary_without_real_hardware(tmp_path, mon
         modes = (FakeMode(),)
         supported_ids = (9,)
 
-    monkeypatch.setattr(sweep_modes, "registry_for", lambda _: Registry())
+    monkeypatch.setattr(sweep_modes, "registry_for", lambda _channel, _level: Registry())
     exit_code = sweep_modes.main([
         "--channel", "vhf-fm", "--trials", "2", "--capture", "none",
         "--capture-tail", "0", "--inter-trial", "0",
@@ -101,4 +104,5 @@ def test_main_writes_strict_json_and_summary_without_real_hardware(tmp_path, mon
     assert len(document["metadata"]["summary_by_mode_direction"]) == 2
     assert document["metadata"]["summary_by_mode_direction"][0][
         "data_chunk_bytes"] == 6
+    assert document["metadata"]["mode_level"] == "default"
     assert not (tmp_path / "captures").exists()

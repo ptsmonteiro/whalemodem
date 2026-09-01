@@ -2,7 +2,8 @@
 
 whalemodem uses progressively more realistic checks: deterministic unit
 tests, full-stack paired audio, simulated channels, recorded radio captures,
-and finally bidirectional hardware trials. A mode is not promoted solely
+and finally retained-direction hardware frame trials plus bidirectional
+hardware sessions. A mode is not promoted solely
 because it passes a clean software loopback.
 
 Install the test extra in the project's virtual environment before running
@@ -64,8 +65,9 @@ python -m pytest tests/test_vf3_capture_replay.py -q
 ```
 
 Capture replay establishes reproducibility against a recorded path. It does
-not substitute for trials on both live directions: one recording represents
-one radio pair, configuration, propagation state, and point in time.
+not substitute for a promotion-sized live retained-direction campaign: one
+recording represents one radio pair, configuration, propagation state, and
+point in time.
 
 ## Hardware progression
 
@@ -101,9 +103,16 @@ lives in `scripts/bench.py`; receiver CPU measurement lives in
 `scripts/benchmark_sessions.py`.
 
 The complete promotion gates—including malformed input, channel regression,
-Monte Carlo sweeps, full-stack recovery, bidirectional hardware, adjacent-rung
-overlap, throughput, CPU, memory, and required artifacts—are specified in
+Monte Carlo sweeps, full-stack recovery, retained-direction hardware frames,
+bidirectional hardware recovery, adjacent-rung overlap, throughput, CPU,
+memory, and required artifacts—are specified in
 [MODE_QUALIFICATION.md](../MODE_QUALIFICATION.md).
+
+For an individual mode, the qualification throughput is the net application
+DATA chunk carried by one full-capacity frame divided by that encoded frame's
+airtime. Session throughput reported by acceptance and transfer benchmarks
+includes protocol timing effects and is useful system evidence, but it is not
+the mode throughput gate.
 
 Experiment directories retain implementation notes and raw result links for
 waveform candidates. Their `RESULTS.md` files are evidence records, not a

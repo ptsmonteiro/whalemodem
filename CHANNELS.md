@@ -194,7 +194,13 @@ Examples:
 python scripts/sweep_modes.py --channel vhf-fm
 python scripts/sweep_modes.py --channel hf-ssb --trials 10
 python scripts/sweep_modes.py --channel hf-ssb --modes hc0 --direction ab
+python scripts/sweep_modes.py --channel hf-ssb --mode-level experimental --modes hf3 --direction ab
 ```
+
+The default sweep uses the policy's ordinary advertised ladder. Pass
+`--mode-level optional` or `--mode-level experimental` to qualify modes that
+require explicit operator/developer opt-in; this does not promote those modes
+or change what a normal station advertises.
 
 Results default to a timestamped directory under `logs/mode_sweeps`. A sweep
 returns failure unless every mode/direction reaches `--required-rate`, which

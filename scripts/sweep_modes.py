@@ -9,6 +9,7 @@ Examples:
     python scripts/sweep_modes.py --channel vhf-fm
     python scripts/sweep_modes.py --channel hf-ssb --trials 10
     python scripts/sweep_modes.py --channel hf-ssb --modes hc0 --direction ab
+    python scripts/sweep_modes.py --channel hf-ssb --mode-level experimental --modes hf3 --direction ab
 """
 
 from __future__ import annotations
@@ -22,10 +23,18 @@ import time
 from datetime import datetime, timezone
 from pathlib import Path
 
+# Direct script execution puts scripts/, not the repository root, on
+# sys.path. Experimental modes currently live under experiments/ and are
+# intentionally not part of the installed package, so expose the source root
+# before importing the qualification registry that lazily loads them.
+REPOSITORY_ROOT = Path(__file__).resolve().parents[1]
+if str(REPOSITORY_ROOT) not in sys.path:
+    sys.path.insert(0, str(REPOSITORY_ROOT))
+
 import numpy as np
 
 import bench
-from whale import framing, policy
+from whale import framing, mode_qualification, policy
 from whale.trials import (TrialOutcome, TrialResult, TrialRun,
                           classify_decode, common_decoder_metrics)
 
@@ -40,9 +49,12 @@ DEFAULT_RADIOS = {
 }
 
 
-def registry_for(channel_name):
+def registry_for(channel_name, mode_level="default"):
     channel_policy = policy.by_name(channel_name)
-    return channel_policy.mode_ladder(channel_policy.max_useful_frame_seconds)
+    if mode_level == "default":
+        return channel_policy.mode_ladder(channel_policy.max_useful_frame_seconds)
+    return mode_qualification.registry(
+        channel_name, mode_level, channel_policy.max_useful_frame_seconds)
 
 
 def select_modes(registry, requested):
@@ -189,6 +201,9 @@ def main(argv=None, *, pair_factory=bench.radio_pair):
     ap = argparse.ArgumentParser(description=__doc__,
                                  formatter_class=argparse.RawDescriptionHelpFormatter)
     ap.add_argument("--channel", choices=sorted(policy.CHANNELS), default="vhf-fm")
+    ap.add_argument("--mode-level", choices=("default", "optional", "experimental"),
+                    default="default",
+                    help="highest qualification registry to expose (default: default)")
     ap.add_argument("--a", help="station A radio (channel-specific default)")
     ap.add_argument("--b", help="station B radio (channel-specific default)")
     ap.add_argument("--modes", nargs="+", metavar="MODE",
@@ -212,7 +227,7 @@ def main(argv=None, *, pair_factory=bench.radio_pair):
     if args.capture_tail < 0 or args.inter_trial < 0:
         ap.error("capture and inter-trial delays must be non-negative")
 
-    registry = registry_for(args.channel)
+    registry = registry_for(args.channel, args.mode_level)
     try:
         selected = select_modes(registry, args.modes)
     except ValueError as exc:
@@ -264,6 +279,7 @@ def main(argv=None, *, pair_factory=bench.radio_pair):
                  "radio_a": radio_a, "radio_b": radio_b},
         trials=records, seed=args.seed,
         metadata={"git_commit": _git_commit(), "git_dirty": _git_dirty(),
+                  "mode_level": args.mode_level,
                   "registry_mode_ids": list(registry.supported_ids),
                   "selected_mode_ids": [mode.mode_id for mode in selected],
                   "trials_per_direction": args.trials,

@@ -46,7 +46,8 @@ fill that target rung.
 Performance work should consider more than nominal bit rate. Measurements
 should include:
 
-- Useful application throughput
+- Net application throughput per data frame, with session/control overhead
+  measured separately
 - Connection setup time
 - Round-trip time
 - Frame and message delivery rate
@@ -102,13 +103,14 @@ vendor-claimed reference points rather than project measurements:
 | 42 | 58 | 256QAM | 12,750 |
 
 The long-term targets derived from these reference ranges are specified in
-[SPEED_LADDERS.md](SPEED_LADDERS.md). A valid comparison must measure useful
-application throughput and delivery reliability at the target channel
+[SPEED_LADDERS.md](SPEED_LADDERS.md). A valid comparison must measure net
+application throughput per data frame and delivery reliability at the target channel
 conditions; a nominal or codec rate alone does not demonstrate parity.
 
 The two ends of each ladder are held to different targets. Level 0 is judged
 by its required worst-channel boundary; Level 4 is judged by its required
-peak useful application throughput in its deliberately narrow envelope.
+peak net application throughput per data frame in its deliberately narrow
+envelope.
 
 ### Adaptive radio timing
 
