@@ -73,11 +73,12 @@ See `DESIGN.md`'s stage 4b note for that full table.
 `MODE_QUALIFICATION.md`'s confirmed-boundary statistical gate (95% Wilson-UB
 FER <= 0.10, 95% Wilson-LB acquisition >= 0.90, zero `error` outcomes).
 
-**Floor: passes, but with thin margin.** Useful application throughput
-(decoded payload bytes / total keyed time, via `mode.airtime()`, the
-MODE_QUALIFICATION.md section-6 convention) measured 576.7–584.5 bit/s
-across every qualifying point in both tables above — above the 500 bit/s
-Level 2 floor at every point, but by only 15–17%. This is a materially
+**Floor: passes, but with thin margin.** Net application throughput per
+full-capacity DATA frame is 534.6 bit/s: 107 application DATA-chunk bytes
+divided by the complete encoded frame airtime. This is above the 500 bit/s
+Level 2 floor by 6.9%. The tables' 576.7--584.5 bit/s figures count the
+10-byte air header and sometimes prorate frame loss; they are retained as
+historical channel statistics, not the current mode criterion. This is a materially
 thinner margin than the design's first working iteration (stage 4a,
 ~900–1060 bit/s) had before the frequency-diversity fix for the
 persistent-carrier-fade erasure floor (DESIGN.md's stage 4b note) traded
@@ -171,9 +172,9 @@ otherwise unchanged and still applies in full.
   `mid_latitude_quiet` and `mid_latitude_moderate`. Disturbed Watterson
   fading and the low/high-latitude presets are out of scope for Level 2 and
   were not tested.
-- **Thin throughput margin.** As noted above, measured useful throughput
-  (576.7–584.5 bit/s) clears the 500 bit/s floor by only 15–17%, not by a
-  wide margin. A reader relying on this result for anything beyond "clears
+- **Thin throughput margin.** As noted above, the per-frame net rate
+  (534.6 bit/s) clears the 500 bit/s floor by only 6.9%, not by a wide
+  margin. A reader relying on this result for anything beyond "clears
   Level 2 as specified" should treat that margin as the main caveat.
 - **No claim of parity or comparison** with HC0, HC1, VF6, HR0, or VARA
   (per DESIGN.md's explicit scope note).
