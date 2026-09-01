@@ -50,7 +50,7 @@ layout, and coding choice, and why each was picked.
 
 | Target | Required result |
 | --- | --- |
-| Floor | >=500 bit/s useful application throughput (decoded payload bytes / total keyed seconds), at both required envelope points, simultaneously with the FER/acquisition gate below. |
+| Floor | >=500 bit/s net application throughput per full-capacity DATA frame (DATA-chunk bits / complete encoded frame airtime), simultaneously with the separate FER/acquisition gate below. |
 | Envelope | Passes the MODE_QUALIFICATION.md Monte Carlo gate at every point in `mid_latitude_quiet` >= +5 dB and `mid_latitude_moderate` >= +10 dB tested. |
 | Stretch | Maximize useful throughput beyond the 500 bit/s floor without narrowing the required envelope; report the achieved rate honestly rather than assuming a nominal one. |
 

@@ -1,0 +1,102 @@
+{
+  "channel": {
+    "type": "hardware",
+    "policy": "hf-ssb",
+    "radio_a": "ic7300",
+    "radio_b": "ic705"
+  },
+  "trials": [
+    {
+      "trial": 1,
+      "direction": "A:ic7300->B:ic705",
+      "mode_id": 7,
+      "mode_name": "hf2",
+      "payload_bytes": 117,
+      "outcome": "decoded",
+      "tx_samples": 76864,
+      "tx_sample_rate": 48000,
+      "rx_samples": 39120,
+      "rx_sample_rate": 12000,
+      "keyed_seconds": 1.7563843727111816,
+      "channel_measurements": {},
+      "decoder_metrics": {
+        "confidence": 0.9776010968482833,
+        "cfo_hz": -8.188083464435367,
+        "clock_offset_ppm": 48.724860045614754,
+        "crc_ok": true,
+        "present_carriers": 19,
+        "carrier_snr_db": [
+          19.982896177085742,
+          14.8880974569358,
+          17.250799600800974,
+          16.951447776148544,
+          17.157763011960387,
+          17.145834989183932,
+          16.795664965888683,
+          21.294254629694358,
+          17.25943936546665,
+          21.29322144925259,
+          16.71196637025069,
+          17.48434405110839,
+          16.589885414638093,
+          15.534756380163763,
+          18.597846225889594,
+          16.62482206264918,
+          16.268284587641887,
+          19.664428116242316,
+          22.923160209255027
+        ],
+        "decoded_length": 117,
+        "start_index": 2901,
+        "end_index": 20581,
+        "head_seconds_received": 0.128,
+        "head_blocks_observed": 2,
+        "capture_rms": 0.03716836831023719,
+        "capture_peak": 0.19631443917751312
+      },
+      "capture": "logs\\mode_qualification\\hf-ssb\\hf2\\2026-09-01-bandwidth-restricted-check\\captures\\7_hf2_A_ic7300__B_ic705_001.npz",
+      "error": null,
+      "decoded": true
+    }
+  ],
+  "seed": 20260829,
+  "metadata": {
+    "git_commit": "9376a0c9583763091fcb2cf2a5bfae0adc1005b4",
+    "git_dirty": true,
+    "mode_level": "experimental",
+    "registry_mode_ids": [
+      10,
+      5,
+      4,
+      7,
+      9
+    ],
+    "selected_mode_ids": [
+      7
+    ],
+    "trials_per_direction": 1,
+    "capture": "all",
+    "summary_by_mode_direction": [
+      {
+        "mode_id": 7,
+        "mode_name": "hf2",
+        "direction": "A:ic7300->B:ic705",
+        "passed": 1,
+        "total": 1,
+        "rate": 1.0,
+        "wilson_95": [
+          0.20654931437723745,
+          1.0
+        ],
+        "data_chunk_bytes": 107,
+        "useful_throughput_bps": 487.3648463853418
+      }
+    ]
+  },
+  "created_utc": "2026-09-01T08:55:24.260828+00:00",
+  "schema_version": 2,
+  "summary": {
+    "passed": 1,
+    "total": 1
+  }
+}
