@@ -61,7 +61,20 @@ evidence is insufficient.
 | 1 | Robust data | 100 bit/s | Quiet and moderate at 0 dB and above; disturbed at +5 dB and above |
 | 2 | General-purpose data | 500 bit/s | Quiet at +5 dB and above; moderate at +10 dB and above |
 | 3 | Fast data | 2,000 bit/s | Benign/static at +8 dB and above; quiet at +10 dB and above |
-| 4 | Maximum speed | 7,050 bit/s | Benign/static at +13 dB and above |
+| 4 | Maximum speed | 4,000 bit/s | Benign/static at +13 dB and above |
+
+**2026-09-01 revision:** Level 4's floor was lowered from 7,050 bit/s to 4,000
+bit/s. The original figure was carried over from the VHF FM ladder's shape and
+was never grounded in an HF SSB measurement; the accumulated real-hardware
+record across `experiments/hf5_8psk_4k` through `experiments/hf13_fast_sync_v1`
+(single-carrier 8PSK ceiling ~4,050 bit/s uncoded; 49-carrier OFDM with 16-QAM
+and LDPC 3/4 reaching ~4,332 bit/s qualified and ~4,969 bit/s provisional) shows
+this channel and hardware pair topping out around 4-5 kbit/s, not 7. The new
+floor is a deliberate, evidence-based target fixed going forward -- it must not
+be adjusted again merely because a future candidate's own result falls short of
+it; per the shared interpretation above, a target is not narrowed after seeing
+a candidate's numbers. Any future increase requires new measured ceiling
+evidence exceeding today's, not a redesign of a specific mode's shortfall.
 
 ## VHF FM ladder
 

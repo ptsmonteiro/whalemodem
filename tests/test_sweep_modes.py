@@ -65,7 +65,7 @@ def test_channel_registries_drive_mode_selection():
     assert sweep_modes.select_modes(vhf, None) == tuple(vhf.modes)
     assert [mode.name for mode in sweep_modes.select_modes(vhf, ["0", "vf3"])] == [
         "300baud", "vf3"]
-    assert [mode.name for mode in hf.modes] == ["hr0", "hc0", "hc1", "hf2"]
+    assert [mode.name for mode in hf.modes] == ["hr0", "hc0", "hc1", "hf2", "hf4"]
     assert "hf3" not in [mode.name for mode in hf.modes]
     assert "hf3" in [mode.name for mode in hf_experimental.modes]
 

@@ -53,6 +53,7 @@ MANIFEST = (
     QualificationEntry("hf-ssb", 10, QualificationLevel.DEFAULT),
     QualificationEntry("hf-ssb", 7, QualificationLevel.DEFAULT),
     QualificationEntry("hf-ssb", 9, QualificationLevel.EXPERIMENTAL),
+    QualificationEntry("hf-ssb", 11, QualificationLevel.DEFAULT),
 )
 
 
@@ -82,11 +83,13 @@ def registry(policy: str, level: QualificationLevel | str =
         from .modes.hc0_mode import HC0
         from .modes.hc1_mode import HC1
         from .modes.hf2_mode import HF2
-        candidates, control = (HR0, HC0, HC1, HF2), HR0
-        # HF3 remains an experiment-backed adapter and an optional development
+        from .modes.hf4_mode import HF4
+        candidates, control = (HR0, HC0, HC1, HF2, HF4), HR0
+        # HF3 remains an experiment-backed adapter and optional development
         # dependency; a normal/default station must not import it merely to
-        # construct the production HF ladder. HF2 is a manifest DEFAULT mode
-        # (see MANIFEST above) and so is always importable/selectable.
+        # construct the production HF ladder. HF2 and HF4 are manifest
+        # DEFAULT modes (see MANIFEST above) and so are always
+        # importable/selectable.
         if requested >= QualificationLevel.EXPERIMENTAL:
             from .modes.hf3_mode import HF3
             candidates += (HF3,)
