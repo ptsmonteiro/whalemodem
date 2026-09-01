@@ -1,0 +1,119 @@
+{
+  "channel": {
+    "type": "hardware",
+    "policy": "hf-ssb",
+    "radio_a": "ic7300",
+    "radio_b": "ic705"
+  },
+  "trials": [
+    {
+      "trial": 1,
+      "direction": "A:ic7300->B:ic705",
+      "mode_id": 9,
+      "mode_name": "hf3",
+      "payload_bytes": 803,
+      "outcome": "decoded",
+      "tx_samples": 152256,
+      "tx_sample_rate": 48000,
+      "rx_samples": 58200,
+      "rx_sample_rate": 12000,
+      "keyed_seconds": 3.3273634910583496,
+      "channel_measurements": {},
+      "decoder_metrics": {
+        "confidence": 0.9824294160784764,
+        "cfo_hz": -8.17391096964253,
+        "clock_offset_ppm": -117.8739973544633,
+        "crc_ok": true,
+        "present_carriers": 36,
+        "carrier_snr_db": [
+          17.62108983533908,
+          20.101198589637228,
+          21.728239927568115,
+          18.34133493705985,
+          18.099965880480426,
+          20.799929266264154,
+          17.483478206890382,
+          18.82874014483676,
+          17.395103450114547,
+          16.81645650105416,
+          21.088331192721455,
+          22.792217061287687,
+          20.900420717511384,
+          21.149720914971255,
+          23.129109413051516,
+          20.374715571997797,
+          18.402850754271014,
+          15.701698512377781,
+          7.707410077773684,
+          15.13242116081906,
+          14.445868397506773,
+          16.266412782155765,
+          16.897286469775345,
+          15.894849897766976,
+          17.616869110466336,
+          22.025114641912474,
+          16.986660007884595,
+          15.48335849547908,
+          17.426841354741512,
+          18.115509820124597,
+          17.569562998148346,
+          20.534149342417088,
+          20.32861823903554,
+          23.372866754723237,
+          18.44309740439717,
+          18.015118760239165
+        ],
+        "decoded_length": 803,
+        "start_index": 3207,
+        "end_index": 39735,
+        "head_seconds_received": 0.128,
+        "head_blocks_observed": 2,
+        "capture_rms": 0.03986713506256242,
+        "capture_peak": 0.1928323656320572
+      },
+      "capture": "logs\\mode_qualification\\hf-ssb\\hf3\\2026-09-01-bandwidth-restricted-check\\captures\\9_hf3_A_ic7300__B_ic705_001.npz",
+      "error": null,
+      "decoded": true
+    }
+  ],
+  "seed": 20260829,
+  "metadata": {
+    "git_commit": "9376a0c9583763091fcb2cf2a5bfae0adc1005b4",
+    "git_dirty": true,
+    "mode_level": "experimental",
+    "registry_mode_ids": [
+      10,
+      5,
+      4,
+      7,
+      9
+    ],
+    "selected_mode_ids": [
+      9
+    ],
+    "trials_per_direction": 1,
+    "capture": "all",
+    "summary_by_mode_direction": [
+      {
+        "mode_id": 9,
+        "mode_name": "hf3",
+        "direction": "A:ic7300->B:ic705",
+        "passed": 1,
+        "total": 1,
+        "rate": 1.0,
+        "wilson_95": [
+          0.20654931437723745,
+          1.0
+        ],
+        "data_chunk_bytes": 793,
+        "useful_throughput_bps": 1906.6146566337827
+      }
+    ]
+  },
+  "created_utc": "2026-09-01T08:54:32.173272+00:00",
+  "schema_version": 2,
+  "summary": {
+    "passed": 1,
+    "total": 1
+  }
+}

@@ -10,7 +10,7 @@ geometry, pilot layout, or frame size.
 
 ## Target envelope (SPEED_LADDERS.md, Level 3 "fast data")
 
-- >= 2,000 bit/s useful application throughput (decoded payload bytes /
+- >= 2,000 bit/s net application throughput per full-capacity DATA frame (DATA-chunk bits /
   `mode.airtime()`, not raw/coded rate).
 - <= 2,300 Hz occupied bandwidth.
 - Benign/static SSB path (<=0.1 ms differential delay spread, <=0.005 Hz
@@ -248,3 +248,78 @@ final candidate.
 - Decision-directed or Kalman-style temporal channel tracking (combining
   pilot and data-carrier soft decisions across symbols, rather than a fixed
   moving-average window) was not attempted.
+
+## Hardware test status (2026-08-31 / 2026-09-01, dated note)
+
+HF3 has **not yet been hardware-qualified**, but it now has successful
+one-direction radio evidence: on 2026-09-01, 3/3 retained full-capacity
+frames decoded byte-for-byte from IC-7300 to IC-705. This is a status record,
+not a design change -- nothing in `hf3.py`/`whale/modes/hf3_mode.py`/
+`whale/modes/hf_lead.py` was modified as a result of the investigation below.
+
+A first single-frame IC-705 -> IC-7300 smoke test (same frequency) had HC0
+(the existing control mode) decode cleanly both directions, then HF3 fail to
+decode on an identical-shape test. Three follow-up over-the-air captures were
+taken and analyzed offline (not just simulated) to find the cause:
+
+1. A diagnostic HF3-only capture showed no detectable signal at all -- not
+   just HF3's lead pattern but *none* of the five `hf_lead` labels (HC0/HC1/
+   HF2/HF3/HR0) correlated above the noise floor anywhere in the 10 s
+   capture, and the time/frequency-domain envelope was flat and structureless
+   throughout. This pointed at a capture-path or setup issue, not a code
+   defect.
+2. A second, combined test (HC0 then HF3, back to back, same session, dial
+   frequencies confirmed matching) ruled that out: HC0 decoded cleanly
+   (tone_snr_db=14.2 dB, CRC ok), confirming the capture path and link were
+   fine, while HF3 was still undetectable anywhere in its capture (its own
+   OFDM header-SNR acquisition metric scanned the whole file and stayed flat
+   around -3 to -1.7 dB with no real peak).
+3. HF3's OFDM waveform has a much higher peak-to-average power ratio than
+   HC0's (measured 12.1 dB crest factor for HF3 vs. 3.0 dB for HC0 at
+   matched payload sizes/RMS), which is a known real-world risk for OFDM over
+   an SSB voice transmitter's ALC -- so a discriminating test was run: an HF3
+   frame at normal drive level vs. an HF3 frame with TX audio at -6 dB, same
+   session, same HC0 control. If ALC/PAPR-driven clipping were the cause, the
+   quieter frame should score equal-or-better; if it were plain insufficient
+   SNR, it should score strictly worse. Result: the -6 dB frame scored worse
+   (confidence 0.242 vs. 0.300), matching the plain-insufficient-SNR
+   prediction and not the PAPR/ALC prediction. Received RMS also barely
+   moved between the two TX levels (0.0739 vs. 0.0765 despite a 2x TX-level
+   change), consistent with the receive side already being noise/QRM-floor
+   dominated rather than signal-limited.
+
+Per the user, the IC-705 -> IC-7300 leg used for these tests currently has
+QRM (interference) on-frequency and is inherently low-SNR, operationally
+unavoidable at the time of testing. HC0's own control-mode floor is
+-5 dB waveform SNR (SPEED_LADDERS.md); HF3's Level 3 floor is +8 dB
+benign/static. HC0 decoded but not by a wide margin (confidence 0.40, not
+clean-decode-with-headroom); HF3 needs roughly 13 dB more SNR than HC0's
+floor requires. The evidence collected is consistent with this specific
+leg's real usable SNR currently sitting somewhere below HF3's +8 dB floor
+but above HC0's -5 dB floor -- i.e. an expected outcome of Level 3's
+declared, narrower channel envelope on a leg that does not currently meet
+it, not a demonstrated code defect in HF3's acquisition or DSP.
+
+This is not a confirmed conclusion, only the best-supported one from the
+data gathered: nothing in this investigation *proves* HF3's DSP is correct
+against real hardware impairments (real CFO drift, real ALC/audio-chain
+nonlinearity, real Doppler/fading), only that this leg's low SNR is
+sufficient on its own to explain every observed result without needing to
+invoke a code-level cause.
+
+The stronger IC-7300 -> IC-705 direction subsequently decoded 3/3
+full-capacity 803-byte waveform frames, with confidence 0.962-0.981, all 36
+carriers present, valid CRCs, and retained captures. See
+`logs/mode_qualification/hf-ssb/hf3/2026-09-01-hardware/INDEX.md`. This
+verifies HF3 across one favorable real-radio direction; it does not clear
+the retained-direction hardware gate because the 40-frame minimum has not
+been run. IC-705 -> IC-7300 still has no HF3 decode and remains useful path
+characterization, but is not required by that frame gate. No bidirectional
+hardware Link/ARQ/recovery session has been measured.
+
+HF3's transmitted 99%-power occupied bandwidth was subsequently measured
+over 300 independent random representative payloads and 300 maximum payloads.
+The worst distribution-free 95.1% upper confidence bound on the population
+99th percentile is 1,774.59 Hz, below the 2,300 Hz design ceiling by
+525.41 Hz. The method and raw measurements are retained in
+`logs/mode_qualification/hf-ssb/hf3/2026-09-01-bandwidth/INDEX.md`.

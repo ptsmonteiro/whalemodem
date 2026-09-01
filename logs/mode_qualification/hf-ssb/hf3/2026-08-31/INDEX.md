@@ -11,8 +11,9 @@ benign/static at +8 dB waveform SNR and above, quiet Watterson fading
 Watterson +10 dB) clear their statistical gates at the confirmed tier
 (see "Results" below). It does **not** support Optional or Default
 promotion -- see `experiments/hf3/RESULTS.md`'s "What is not yet
-established" section for the full gap list (full-session/ARQ throughput,
-adjacent-rung overlap, hardware, CPU/RSS, interoperability).
+established" section for the current gap list. A later campaign clears the
+occupied-bandwidth gate; see
+`logs/mode_qualification/hf-ssb/hf3/2026-09-01-bandwidth/INDEX.md`.
 
 ## Design
 
@@ -46,7 +47,7 @@ the single largest reliability improvement found.
 | Max application payload | 803 bytes (packet minus 2-byte length + 4-byte CRC32) |
 | Link chunk size (minus 10-byte air header) | 793 bytes |
 | Nominal (100%-success) frame-level throughput | 803*8/3.172 = 2,025.2 bit/s |
-| Measured 99%-power occupied bandwidth | ~1,758 Hz (representative and max-length frames), vs. the 2,300 Hz ceiling |
+| Measured 99%-power occupied bandwidth | This campaign's deterministic checks measured ~1,758 Hz; the later 300-trial/class statistical campaign establishes a 1,774.59 Hz 95.1% UCB vs. the 2,300 Hz ceiling. |
 
 ## Campaign
 
@@ -129,10 +130,10 @@ below its required boundary.
 | Section 1 (unit/malformed-input tests) | Cleared -- `experiments/hf3/test_hf3.py` (round trips, oversize rejection, hostile-input rejection, occupied-bandwidth check) and `tests/test_mode_conformance.py`'s parameterized hostile-input sweep, all passing. |
 | Section 2 (bounded CI regression) | Cleared as a smoke anchor only -- `tests/test_channel_regressions.py::test_hf3_on_benign_static_at_8db` and `::test_hf3_on_quiet_watterson_at_10db`, 2 trials/point, `>=1/2` decoded required (not a reliability claim). |
 | Section 3 (frame Monte Carlo, confirmed tier) | **Cleared at both required points**: quiet Watterson +10 dB (291/300, FER Wilson-UB 0.056) and benign/static +8 dB (300/300, FER Wilson-UB 0.013), both with 300/300 acquisition and zero `error` outcomes. |
-| Section 4 (full-stack sessions/ARQ/recovery) | Not run -- unmeasured. |
+| Section 4 (fixed-mode useful transfer and HF bandwidth) | Useful transfer was not run. The bandwidth sub-gate was subsequently cleared by `2026-09-01-bandwidth/INDEX.md`. |
 | Section 5 (hardware) | Not run -- unmeasured. No radios available. |
-| Section 6 (useful throughput, adjacent-rung overlap) | Not measured at the full-session level. Frame-prorated diagnostic throughput clears the floor comfortably at benign/static +8 dB (2,025.2 bit/s, 100% frame success) but is marginal at quiet Watterson +10 dB (1,964.5 bit/s, 1.8% under the 2,000 bit/s floor by this proxy; nominal 100%-success rate is 2,025.2 bit/s). Adjacent-rung overlap against HC0/HC1/HF2 not measured. |
-| Section 7 (CPU/RSS) | Not measured -- unmeasured. |
+| Section 6 (ladder qualification) | Not measured against HC0/HC1/HF2; not a waveform gate. |
+| Section 7 (complete system) | Not measured; not a waveform gate. |
 
 Per MODE_QUALIFICATION.md's promotion table, HF3 clears the mandatory gates
 for **Experimental** registration (unit/malformed-input suite, bounded clean

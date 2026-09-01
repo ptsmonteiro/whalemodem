@@ -1,0 +1,121 @@
+{
+  "schema_version": 1,
+  "benchmark": "fixed_mode_useful_transfer",
+  "created_utc": "2026-09-01T08:06:05.430001+00:00",
+  "git_commit": "9376a0c9583763091fcb2cf2a5bfae0adc1005b4",
+  "git_dirty": true,
+  "configuration": {
+    "mode": "hf3",
+    "model": "watterson",
+    "point": 10.0,
+    "watterson_preset": "mid_latitude_quiet",
+    "trials": 6,
+    "payload_bytes": 10000,
+    "seed": 20260901,
+    "out": "logs\\mode_qualification\\hf-ssb\\hf3\\2026-09-01-fixed-transfer\\hf3_quiet_watterson_10db.json",
+    "turnaround_seconds_each_change": 0.3,
+    "ack_timeout_slack_seconds": 5.0,
+    "ack_mode": "hc0",
+    "data_mode_locked": "hf3",
+    "includes": [
+      "DATA framing",
+      "DATA_ACK",
+      "retries",
+      "turnaround",
+      "waveform PTT lead/tail"
+    ],
+    "excludes": [
+      "connection",
+      "negotiation",
+      "adaptation",
+      "fallback",
+      "disconnect"
+    ]
+  },
+  "trials": [
+    {
+      "seed": 7548838131893792108,
+      "offered_bytes": 10000,
+      "verified_bytes": 10000,
+      "exact_payload": true,
+      "data_frames": 13,
+      "data_attempts": 13,
+      "retransmissions": 0,
+      "elapsed_channel_seconds": 93.53066666666666,
+      "useful_throughput_bit_s": 855.3344357643839,
+      "trial": 1
+    },
+    {
+      "seed": 18038435803274177899,
+      "offered_bytes": 10000,
+      "verified_bytes": 10000,
+      "exact_payload": true,
+      "data_frames": 13,
+      "data_attempts": 13,
+      "retransmissions": 0,
+      "elapsed_channel_seconds": 93.53066666666666,
+      "useful_throughput_bit_s": 855.3344357643839,
+      "trial": 2
+    },
+    {
+      "seed": 13695477126440991189,
+      "offered_bytes": 10000,
+      "verified_bytes": 10000,
+      "exact_payload": true,
+      "data_frames": 13,
+      "data_attempts": 13,
+      "retransmissions": 0,
+      "elapsed_channel_seconds": 93.53066666666666,
+      "useful_throughput_bit_s": 855.3344357643839,
+      "trial": 3
+    },
+    {
+      "seed": 6066505489250612485,
+      "offered_bytes": 10000,
+      "verified_bytes": 10000,
+      "exact_payload": true,
+      "data_frames": 13,
+      "data_attempts": 13,
+      "retransmissions": 0,
+      "elapsed_channel_seconds": 93.53066666666666,
+      "useful_throughput_bit_s": 855.3344357643839,
+      "trial": 4
+    },
+    {
+      "seed": 6277219259345738487,
+      "offered_bytes": 10000,
+      "verified_bytes": 10000,
+      "exact_payload": true,
+      "data_frames": 13,
+      "data_attempts": 14,
+      "retransmissions": 1,
+      "elapsed_channel_seconds": 105.72533333333332,
+      "useful_throughput_bit_s": 756.6776805306833,
+      "trial": 5
+    },
+    {
+      "seed": 11849010886993436015,
+      "offered_bytes": 10000,
+      "verified_bytes": 10000,
+      "exact_payload": true,
+      "data_frames": 13,
+      "data_attempts": 13,
+      "retransmissions": 0,
+      "elapsed_channel_seconds": 93.53066666666666,
+      "useful_throughput_bit_s": 855.3344357643839,
+      "trial": 6
+    }
+  ],
+  "summary": {
+    "completed_trials": 6,
+    "total_trials": 6,
+    "median_useful_throughput_bit_s": 855.3344357643839,
+    "median_distribution_free_95_ci_bit_s": [
+      756.6776805306833,
+      855.3344357643839
+    ],
+    "confidence_bound_order_statistic_rank": 1,
+    "throughput_floor_bit_s": 2000.0,
+    "passes_throughput_gate": false
+  }
+}

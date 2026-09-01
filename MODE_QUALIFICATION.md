@@ -197,21 +197,28 @@ per its own design record (`experiments/hf3/DESIGN.md`). Confirmed-tier
 (300-trial) Monte Carlo campaigns clear the frame Monte Carlo gate at
 **both** required boundary points. Benign/static +8 dB: 300/300 decoded
 (95% Wilson-UB FER 0.013), 300/300 acquired (95% Wilson-LB 0.987), zero
-`error` outcomes; frame-level useful throughput 2,025.2 bit/s, clearing
+`error` outcomes; per-frame net throughput 2,000.0 bit/s, exactly meeting
 the 2,000 bit/s floor. Quiet-Watterson +10 dB: 291/300 decoded (95%
 Wilson-UB FER 0.056, under the 0.10 ceiling), 300/300 acquired (95%
-Wilson-LB 0.987), zero `error` outcomes; frame-prorated useful throughput
-at that boundary is 1,964.5 bit/s -- essentially at, not comfortably
-above, the 2,000 bit/s floor by this stricter proxy (nominal
-100%-success throughput is 2,025.2 bit/s). See
+Wilson-LB 0.987), zero `error` outcomes. Earlier 1,964.5--2,025.2 bit/s
+statistics counted the 10-byte air header and sometimes prorated frame loss;
+they are retained as historical channel context but are not the mode
+throughput criterion. See
 `logs/mode_qualification/hf-ssb/hf3/2026-08-31/INDEX.md` and
 `experiments/hf3/RESULTS.md` for full point-by-point results and
-commands. Measured (not nominal-span) 99%-power occupied bandwidth is
-~1,758 Hz for representative and maximum-length frames, comfortably under
-the 2,300 Hz ceiling. Full-session/ARQ useful throughput, adjacent-rung
-overlap, interoperability, hardware, and resource gates remain
-unmeasured; HF3's manifest entry is Experimental only and must not be
-read as a promotion or complete application-throughput claim -- see
+commands. A 300-trial-per-payload statistical campaign measured 99%-power
+occupied bandwidth over representative and maximum payloads. Its
+distribution-free 95.1% upper confidence bound on the population 99th
+percentile is 1,774.59 Hz, 525.41 Hz below the 2,300 Hz ceiling; this gate
+passes. See
+`logs/mode_qualification/hf-ssb/hf3/2026-09-01-bandwidth/INDEX.md`.
+Retained-direction hardware confirmation and resource evidence remain
+unmeasured. A later
+IC-7300-to-IC-705 radio smoke
+campaign decoded 3/3 full-capacity frames, but is below the retained-direction
+trial minimum and lacks the minimum setup record. HF3's manifest entry is
+Experimental only and must not be read as a promotion or complete useful-
+throughput claim -- see
 `experiments/hf3/RESULTS.md`'s "What is not yet established" section for
 the full gap list.
 

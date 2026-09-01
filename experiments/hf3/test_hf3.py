@@ -10,6 +10,7 @@ import numpy as np
 import pytest
 
 from experiments.hf3 import hf3
+from experiments.hf3 import measure_bandwidth
 from whale import rx_audio
 
 
@@ -91,6 +92,23 @@ def _occupied_bandwidth_99(audio, sample_rate):
     low = freqs[np.searchsorted(cumulative, total * 0.005)]
     high = freqs[np.searchsorted(cumulative, total * 0.995)]
     return low, high
+
+
+def test_bandwidth_campaign_confidence_is_distribution_free_and_promotion_sized():
+    confidence = measure_bandwidth.quantile_upper_bound_confidence(300, 0.99)
+    assert confidence >= 0.95
+    assert measure_bandwidth.quantile_upper_bound_confidence(298, 0.99) < 0.95
+
+
+def test_bandwidth_campaign_smoke_covers_both_payload_classes():
+    result = measure_bandwidth.run_campaign(
+        trials=2, seed=17,
+        payload_lengths=(hf3.MAX_PAYLOAD_BYTES // 2, hf3.MAX_PAYLOAD_BYTES))
+    assert result["passes"] is True
+    assert [row["payload_bytes"] for row in result["payload_classes"]] == [
+        hf3.MAX_PAYLOAD_BYTES // 2, hf3.MAX_PAYLOAD_BYTES]
+    assert all(len(row["measurements"]) == 2
+               for row in result["payload_classes"])
 
 
 @pytest.mark.parametrize("payload_len", [
