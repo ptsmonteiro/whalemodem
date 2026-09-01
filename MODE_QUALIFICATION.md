@@ -110,6 +110,84 @@ manifest entry is therefore Experimental only; Optional and Default promotion
 remain blocked on a real measured clean-path fixture plus the session,
 hardware, and resource gates below, none of which this campaign attempts.
 
+HF2 (hf-ssb mode ID `7`) declares Level 2 ("General-purpose data"): a
+from-scratch 19-carrier pilot-assisted coherent 16-QAM OFDM design (93.75 Hz
+spacing, 656.25-2,343.75 Hz) with frequency-diversity carrier grouping,
+designed independently per its own design record
+(`experiments/hf2/DESIGN.md`). Confirmed-tier (300-trial) Monte Carlo
+campaigns clear the frame Monte Carlo gate at **both** required boundary
+points. Quiet Watterson +5 dB: 300/300 decoded (95% Wilson-UB FER 0.013),
+300/300 acquired (95% Wilson-LB 0.987), zero `error` outcomes. Moderate Watterson
++10 dB: 296/300 decoded (95% Wilson-UB FER 0.034), 300/300 acquired (95%
+Wilson-LB 0.987), zero `error` outcomes. Per-frame net throughput is 534.6
+bit/s at both points. Earlier 576.7--584.5 bit/s figures counted the 10-byte
+air header and sometimes prorated frame loss; neither belongs in the mode's
+net application-throughput criterion. The frame geometry clears the floor by
+6.9%, a thin margin the design record
+flags explicitly. See `experiments/hf2/RESULTS.md` for full point-by-point
+results and commands, and `tests/test_channel_regressions.py`'s
+`test_hf2_on_quiet_watterson_at_5db` / `test_hf2_on_moderate_watterson_at_10db`
+for the bounded CI regression anchor at both required points.
+
+A 300-trial-per-payload statistical campaign measured 99%-power occupied
+bandwidth over representative and maximum payloads. Its distribution-free
+95.1% upper confidence bound on the population 99th percentile is
+**4,212.11-4,218.98 Hz, nearly double the 2,300 Hz ceiling; this gate
+fails**, and by a wide, non-marginal margin -- even the sample minimum
+across 300 trials (2,866-3,044 Hz) already exceeds the ceiling. The
+occupied interval runs roughly 480-4,100 Hz, far wider than HF2's nominal
+656.25-2,343.75 Hz carrier plan would predict, and much wider than HF3's
+comparable measurement (~1,775 Hz) despite both modes sharing the same
+`whale.modes.hf_lead` acquisition preamble. This points to spectral leakage
+in HF2's own OFDM symbol generation (most likely missing or insufficient
+inter-symbol windowing) rather than an artifact of the measurement or an
+inherent property of the carrier band, but the root cause has not been
+isolated or fixed as part of this qualification pass. See
+`logs/mode_qualification/hf-ssb/hf2/2026-09-01-bandwidth/INDEX.md`.
+
+A subsequent IC-7300-to-IC-705 radio campaign -- a 3-frame smoke/confirm
+pair followed by a 40-frame retained-direction run -- decoded 43/43
+full-capacity frames byte-for-byte (19/19 carriers every trial, carrier SNR
+5.9-23 dB). The 40-frame run numerically clears the retained-direction
+FER/acquisition Wilson gate (LB 0.9124 acquisition, UB 0.0876 FER against
+the 0.90/0.10 bounds), meeting the >=40-frame minimum for optional
+promotion, but by a thin margin at this trial count, and it lacks the
+minimum setup record (RF frequency, filter, power, antenna path) for either
+radio. See `logs/mode_qualification/hf-ssb/hf2/2026-09-01-hardware/INDEX.md`.
+Resource evidence remains unmeasured.
+
+**Clearing the hardware frame gate does not, on the evidence alone, promote
+HF2.** The occupied-bandwidth failure above is a real, currently-open gate
+failure -- not merely unmeasured evidence -- and on evidence grounds alone it
+would independently block Optional/Default promotion regardless of the
+hardware result: this campaign's radio pair's actual TX/RX filter passband
+was not verified against that failure, so a clean hardware pass says nothing
+about channel-plan compliance. See `experiments/hf2/RESULTS.md`'s "What is
+not yet established" section for the remaining gap list (session/ARQ,
+resource evidence, hardware setup record); the bandwidth failure remains the
+qualification's primary open item on the evidence record.
+
+**Product decision: promoted to Default on 2026-09-01, overriding the open
+gate.** As explained near the top of this document, a `default` entry is a
+product-availability disposition, not proof that the evidence gates passed.
+The repo owner made an explicit, informed decision on 2026-09-01 to ship HF2
+as part of the normal hf-ssb mode ladder -- `whale/mode_qualification.py`'s
+`MANIFEST` now lists `QualificationEntry("hf-ssb", 7, QualificationLevel.DEFAULT)`
+-- meaning HF2 is now negotiated and transmitted automatically by any
+default-configuration station, with no operator opt-in. This decision
+overrides, and does not resolve, the occupied-bandwidth gate failure above:
+the 99%-power occupied bandwidth still measures ~4,212-4,219 Hz against the
+2,300 Hz ceiling, nearly double the limit, driven by both an over-ceiling top
+carrier (2,343.75 Hz) and unwindowed OFDM sidelobe leakage. This is not just
+an internal test threshold -- it is a real-world SSB channel-plan compliance
+concern: a station running HF2 at Default will routinely occupy spectrum
+outside its assigned/expected passband, with the attendant risk of adjacent-
+channel interference on shared HF SSB spectrum. Operators and integrators
+should treat HF2's bandwidth behavior as a known, unresolved defect, not as
+a false alarm cleared by this promotion. The waveform's spectral leakage and
+over-ceiling top carrier remain undiagnosed and unfixed, and the bandwidth
+campaign has not been re-run.
+
 HF3 (hf-ssb mode ID `9`) declares Level 3 ("Fast data"): a from-scratch
 36-carrier coherent 16-QAM OFDM design (46.875 Hz spacing, 421.875-2,062.5
 Hz, rate-1/2 K=9 code, 9-pilot comb with per-symbol polar-interpolated

@@ -14,6 +14,7 @@ from whale.channel import (AwgnChannel, ChannelChain, SnrSpec,
                            WattersonChannel)
 from whale.fm_channel import ComplexFmChannel
 from whale.modes import vf4, vf6
+from whale.modes.hf2_mode import HF2
 from whale.modes.hf3_mode import HF3
 from whale.modes.vf4_mode import VF4
 from whale.modes.vf6_mode import VF6
@@ -93,6 +94,44 @@ def test_hf_modes_on_moderate_watterson_with_awgn(mode_name):
         mode, channel, 2, MASTER_SEED, point_index=1,
         direction="mid-latitude moderate, waveform SNR 5 dB")
     assert all(record.decoded for record in records)
+
+
+@pytest.mark.channel_regression
+def test_hf2_on_quiet_watterson_at_5db():
+    """HF2's Level 2 quiet-Watterson boundary point (SPEED_LADDERS.md), the
+    required +5 dB envelope edge confirmed at 300 trials in
+    experiments/hf2/RESULTS.md."""
+
+    def channel(seed):
+        return ChannelChain((
+            WattersonChannel.from_preset(48_000, "mid_latitude_quiet", seed),
+            AwgnChannel(48_000, SnrSpec(5.0), seed ^ 0x5A5A),
+        ))
+
+    records = run_frame_trials(
+        HF2, channel, 2, MASTER_SEED, point_index=4,
+        direction="mid-latitude quiet, waveform SNR 5 dB",
+        payload_bytes=HF2.chunk_size + framing.AIR_HEADER_BYTES)
+    assert sum(record.decoded for record in records) >= 1
+
+
+@pytest.mark.channel_regression
+def test_hf2_on_moderate_watterson_at_10db():
+    """HF2's Level 2 moderate-Watterson boundary point (SPEED_LADDERS.md),
+    the required +10 dB envelope edge confirmed at 300 trials in
+    experiments/hf2/RESULTS.md."""
+
+    def channel(seed):
+        return ChannelChain((
+            WattersonChannel.from_preset(48_000, "mid_latitude_moderate", seed),
+            AwgnChannel(48_000, SnrSpec(10.0), seed ^ 0x5A5A),
+        ))
+
+    records = run_frame_trials(
+        HF2, channel, 2, MASTER_SEED, point_index=5,
+        direction="mid-latitude moderate, waveform SNR 10 dB",
+        payload_bytes=HF2.chunk_size + framing.AIR_HEADER_BYTES)
+    assert sum(record.decoded for record in records) >= 1
 
 
 @pytest.mark.channel_regression

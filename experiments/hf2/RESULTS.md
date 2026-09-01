@@ -92,14 +92,77 @@ bit/s useful throughput simultaneously with the FER/acquisition gate — at
 both required envelope points, in Monte Carlo simulation over the
 repository's Watterson channel model.
 
+## Post-simulation qualification update (2026-09-01)
+
+Later work against `MODE_QUALIFICATION.md`'s remaining gates found a real
+**gate failure**: a 300-trial-per-payload occupied-bandwidth campaign
+(`experiments/hf2/measure_bandwidth.py`) measured a distribution-free 95.1%
+upper confidence bound of 4,212.11-4,218.98 Hz on the 99%-power occupied
+bandwidth at representative and maximum payload -- nearly double the
+2,300 Hz ceiling, and by a wide margin (even the 300-trial sample minimum,
+2,866-3,044 Hz, exceeds the ceiling). Two compounding causes, not one: (1)
+HF2's own top carrier sits at 2,343.75 Hz, already 43.75 Hz above the
+2,300 Hz ceiling by design, before any leakage is counted -- unlike HF3,
+which deliberately kept its top carrier ~240 Hz below the ceiling to absorb
+exactly this kind of skirt; and (2) HF2's coarser 93.75 Hz carrier spacing
+(512-sample OFDM core, vs. HF3's 1,024) spreads the shared, unwindowed
+`whale/dsp/ofdm.py` kernel's inherent symbol-to-symbol spectral leakage
+roughly 2x wider in Hz than HF3's finer spacing produces, with zero
+headroom to absorb it. The root cause has not been fixed -- both the
+carrier plan and the lack of inter-symbol windowing need addressing. See
+`logs/mode_qualification/hf-ssb/hf2/2026-09-01-bandwidth/INDEX.md`.
+
+A subsequent IC-7300-to-IC-705 hardware campaign -- 3-frame smoke/confirm
+followed by a 40-frame retained-direction run -- decoded 43/43 full-capacity
+frames byte-for-byte, and the 40-frame run numerically clears the
+retained-direction FER/acquisition Wilson gate (see
+`logs/mode_qualification/hf-ssb/hf2/2026-09-01-hardware/INDEX.md`). A
+bounded CI regression anchor was added at both required envelope points
+(`tests/test_channel_regressions.py`). **None of this changes the bandwidth
+verdict above.** The hardware run does not establish channel-plan
+compliance -- neither radio's actual TX/RX filter passband was captured or
+verified against the bandwidth failure, so a clean hardware pass over this
+one pair says nothing about whether the transmitted signal was band-limited
+by the radios or emitted largely as measured. The bandwidth failure remains
+the qualification's primary open item and, on the evidence alone, would
+block Optional/Default promotion regardless of the hardware and CI results.
+
+## Product decision: promoted to Default (2026-09-01)
+
+The evidence picture above is unchanged and the bandwidth gate is still
+open. Separately, the repo owner made an explicit product decision on
+2026-09-01 to promote HF2 to Default status in
+`whale/mode_qualification.py`'s `MANIFEST`
+(`QualificationEntry("hf-ssb", 7, QualificationLevel.DEFAULT)`), overriding
+this open gate. As `MODE_QUALIFICATION.md` states, a `default` entry is a
+product-availability disposition, not proof that the evidence gates passed
+-- this promotion does not mean the bandwidth failure was resolved,
+re-measured, or found to be a false alarm. It was not: the 99%-power
+occupied bandwidth is still measured at ~4,212-4,219 Hz against the
+2,300 Hz ceiling, and the underlying causes (an over-ceiling top carrier
+and unwindowed OFDM sidelobe leakage) remain unfixed.
+
+Because HF2 is now Default, it is negotiated and transmitted automatically
+by any default-configuration station, with no operator opt-in. The open
+bandwidth failure is therefore not just an internal test number: it is a
+live SSB channel-plan compliance concern, since a station running HF2 will
+routinely occupy spectrum outside its expected passband and risks
+adjacent-channel interference on shared HF spectrum. This gap list is
+otherwise unchanged and still applies in full.
+
 ## What is not yet established
 
-- **No hardware or radio evidence.** No radios were available for this
-  experiment (see PLAN.md's status section); every result above is
-  simulated over `whale.channel`'s Watterson model. `MODE_QUALIFICATION.md`
-  treats simulated Monte Carlo evidence as valid primary qualification
-  evidence, but hardware/session evidence is a separate, later gate this
-  experiment does not attempt to satisfy.
+- **Occupied bandwidth fails the gate.** See the update above -- this
+  remains the primary blocker on the evidence, not merely unmeasured
+  evidence, and the 40-frame hardware pass below does not address it. As of
+  2026-09-01, HF2 ships at Default status anyway by explicit product
+  decision (see above); the gate itself is still open.
+- **Hardware setup record is missing.** 43/43 frames decoded
+  IC-7300-to-IC-705 across all runs, including a 40-frame retained-direction
+  campaign that numerically clears the frame gate, but without the minimum
+  setup record (RF frequency, filter, power, antenna path) for either
+  radio -- and radio filter settings are exactly what would determine
+  whether the bandwidth failure above actually reached the air unfiltered.
 - **No full-session or ARQ evidence.** These results are single-frame
   acquire/decode trials, not a full link session (retries, ARQ, turnaround,
   PTT/ALC behavior over an extended exchange).

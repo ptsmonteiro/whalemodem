@@ -1,0 +1,154 @@
+{
+  "channel": {
+    "type": "hardware",
+    "policy": "hf-ssb",
+    "radio_a": "ic7300",
+    "radio_b": "ic705"
+  },
+  "trials": [
+    {
+      "trial": 1,
+      "direction": "A:ic7300->B:ic705",
+      "mode_id": 7,
+      "mode_name": "hf2",
+      "payload_bytes": 117,
+      "outcome": "decoded",
+      "tx_samples": 76864,
+      "tx_sample_rate": 48000,
+      "rx_samples": 39120,
+      "rx_sample_rate": 12000,
+      "keyed_seconds": 1.7533915042877197,
+      "channel_measurements": {},
+      "decoder_metrics": {
+        "confidence": 0.9792145826192665,
+        "cfo_hz": -8.247616075992791,
+        "clock_offset_ppm": 47.16981132075475,
+        "crc_ok": true,
+        "present_carriers": 19,
+        "carrier_snr_db": [
+          17.92029863968207,
+          14.501115381423503,
+          16.893273404764642,
+          15.139682431179068,
+          15.050537605477242,
+          15.710689095872238,
+          16.618327141790274,
+          20.58258114219361,
+          17.40456015052821,
+          19.44515649831559,
+          18.6619458193082,
+          19.090854296079268,
+          17.2830773590673,
+          16.646259110900317,
+          20.00692542610036,
+          17.489522872651506,
+          17.597971363629764,
+          21.175517516189085,
+          22.827753262132205
+        ],
+        "decoded_length": 117,
+        "start_index": 2887,
+        "end_index": 20567,
+        "head_seconds_received": 0.128,
+        "head_blocks_observed": 2,
+        "capture_rms": 0.036470422395918946,
+        "capture_peak": 0.1935151070356369
+      },
+      "capture": "logs\\mode_qualification\\hf-ssb\\hf2\\2026-09-01-hardware\\confirm-ic7300-to-ic705\\captures\\7_hf2_A_ic7300__B_ic705_001.npz",
+      "error": null,
+      "decoded": true
+    },
+    {
+      "trial": 2,
+      "direction": "A:ic7300->B:ic705",
+      "mode_id": 7,
+      "mode_name": "hf2",
+      "payload_bytes": 117,
+      "outcome": "decoded",
+      "tx_samples": 76864,
+      "tx_sample_rate": 48000,
+      "rx_samples": 39120,
+      "rx_sample_rate": 12000,
+      "keyed_seconds": 1.7547554969787598,
+      "channel_measurements": {},
+      "decoder_metrics": {
+        "confidence": 0.980181417442216,
+        "cfo_hz": -8.113881325206163,
+        "clock_offset_ppm": 14.254613311217096,
+        "crc_ok": true,
+        "present_carriers": 19,
+        "carrier_snr_db": [
+          19.752886304241997,
+          14.82446125259715,
+          18.238601186898233,
+          16.44693411285822,
+          16.375258514887076,
+          15.967785746530204,
+          16.784540936601775,
+          21.91907131590288,
+          16.734990410349457,
+          20.02299060114376,
+          17.304523947401954,
+          18.232028505034922,
+          17.366772157301316,
+          16.278983262547616,
+          20.071195136817302,
+          17.0965881834731,
+          16.750948222874655,
+          21.194969359196406,
+          23.022991886030116
+        ],
+        "decoded_length": 117,
+        "start_index": 2851,
+        "end_index": 20531,
+        "head_seconds_received": 0.128,
+        "head_blocks_observed": 2,
+        "capture_rms": 0.03796845647165564,
+        "capture_peak": 0.1954447627067566
+      },
+      "capture": "logs\\mode_qualification\\hf-ssb\\hf2\\2026-09-01-hardware\\confirm-ic7300-to-ic705\\captures\\7_hf2_A_ic7300__B_ic705_002.npz",
+      "error": null,
+      "decoded": true
+    }
+  ],
+  "seed": 20260829,
+  "metadata": {
+    "git_commit": "9376a0c9583763091fcb2cf2a5bfae0adc1005b4",
+    "git_dirty": true,
+    "mode_level": "experimental",
+    "registry_mode_ids": [
+      10,
+      5,
+      4,
+      7,
+      9
+    ],
+    "selected_mode_ids": [
+      7
+    ],
+    "trials_per_direction": 2,
+    "capture": "all",
+    "summary_by_mode_direction": [
+      {
+        "mode_id": 7,
+        "mode_name": "hf2",
+        "direction": "A:ic7300->B:ic705",
+        "passed": 2,
+        "total": 2,
+        "rate": 1.0,
+        "wilson_95": [
+          0.34238022750665303,
+          1.0
+        ],
+        "data_chunk_bytes": 107,
+        "useful_throughput_bps": 488.0069162956824
+      }
+    ]
+  },
+  "created_utc": "2026-09-01T08:09:06.983958+00:00",
+  "schema_version": 2,
+  "summary": {
+    "passed": 2,
+    "total": 2
+  }
+}
