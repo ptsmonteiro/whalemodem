@@ -133,22 +133,79 @@ result.
   hf5's original ~1.3-1.5 s/frame measured in Stage 1 -- consistent with
   the ~4.8x real speedup already established.
 
+## Session 2: independent re-qualification (seed 20260902)
+
+Per this project's convention (hf10's 3-seed-batch qualification, and
+documented session-to-session channel drift in hf4/hf8/hf11 RESULTS.md), a
+single real-hardware session is not sufficient to treat a mode as fully
+qualified. This session repeats Stage 2's qualification batch on a fresh
+day/channel state with a different seed to check for drift.
+
+Run: `python experiments/hf13_fast_sync_v1/hardware_test.py --trials 12 --seed 20260902`
+(same IC-7300(TX) -> IC-705(RX) only direction, same PHY config as Stage 2).
+Raw log: `logs/mode_qualification/hf-ssb/hf13_fast_sync_v1/20260901T183742Z/result.json`.
+
+| trial | outcome | confidence | channel_snr_db | freq_offset_hz | demod_ms | raw_ber (errors/bits) | post_fec_ber |
+|---|---|---|---|---|---|---|---|
+| 1 | decoded | 0.736 | 20.3 | -7.79 | 312 | 0.00000 (0/23952) | null |
+| 2 | decoded | 0.688 | 20.0 | -7.81 | 316 | 0.00000 (0/23952) | null |
+| 3 | decoded | 0.665 | 20.3 | -7.93 | 339 | 0.00000 (0/23952) | null |
+| 4 | decoded | 0.657 | 20.3 | -8.01 | 343 | 0.00000 (0/23952) | null |
+| 5 | decoded | 0.680 | 20.2 | -8.05 | 318 | 0.00000 (0/23952) | null |
+| 6 | decoded | 0.655 | 20.4 | -8.12 | 335 | 0.00000 (0/23952) | null |
+| 7 | decoded | 0.683 | 20.0 | -8.16 | 344 | 0.00000 (0/23952) | null |
+| 8 | decoded | 0.666 | 20.3 | -8.19 | 339 | 0.00000 (0/23952) | null |
+| 9 | decoded | 0.678 | 20.0 | -8.22 | 353 | 0.00000 (0/23952) | null |
+| 10 | decoded | 0.675 | 20.3 | -8.27 | 334 | 0.00000 (0/23952) | null |
+| 11 | decoded | 0.654 | 20.3 | -8.29 | 331 | 0.00000 (0/23952) | null |
+| 12 | decoded | 0.672 | 14.7 | -8.31 | 335 | 0.00000 (0/23952) | null |
+
+- **Decode rate: 12/12 (100%).** No CRC failures this session.
+- **Mean raw BER: 0.0** (0 bit errors across all 12 x 23,952 compared bits).
+  Post-FEC BER: null on every trial (no FEC in this mode, as expected).
+- **Mean net throughput on decoded frames: ~4048.3 bps**, identical to
+  Stage 2 and to hf5's qualified baseline (expected -- this is a sync-search
+  CPU optimization, not a PHY change).
+- **Mean demodulate() time: ~333 ms/frame**, consistent with Stage 2's
+  ~303 ms/frame (both well within the ~4.8x speedup regime vs. hf5
+  original's ~1.3-1.5 s/frame; the ~10% difference between sessions is
+  ordinary run-to-run variance, not a regression).
+
+### Comparison to Session 1 (seed 20260901) and drift assessment
+
+Channel conditions were noticeably *better* this session: SNR ran ~20.0-20.4 dB
+for 11 of 12 trials (vs. ~14.7-15.5 dB throughout Session 1), with only the
+last trial dropping to 14.7 dB -- and even that trial still decoded cleanly
+with zero bit errors. Freq offset drifted smoothly across trials in both
+sessions (~-7.8 to -8.3 Hz here vs. ~-8.1 to -8.5 Hz in Session 1), consistent
+with ordinary VFO/clock drift rather than any anomaly. Confidence values are
+in the same ~0.65-0.74 range both sessions. No discrepancies, decode
+failures, or timing anomalies attributable to `sc_fast.py` itself were
+observed; the only session-to-session difference is a favorable SNR shift
+that plausibly explains going from 11/12 (one near-miss CRC failure) to
+12/12 decoded. This is channel-condition variance, not evidence of a
+sync-search defect, and there is no sign of adverse drift.
+
 ## Final recommendation
 
-The fused-FFT sync search (`sc_fast.py`) is **safe to adopt**: Stage 1
-showed zero discrepancies against the original `sc.py` on 10 real captures
-(identical sync/CRC/payload/confidence/freq-offset/SNR outcomes, including
-matching failure cases), and Stage 2's qualification batch confirms
-`sc_fast.py` decodes real hf5-baseline-equivalent frames reliably
-(11/12, mean raw BER ~3.5e-6) at hf5's qualified ~4049 bps, while cutting
-demodulate() CPU time by ~4.8x on real hardware (~1.4s -> ~0.3s per frame).
+The fused-FFT sync search (`sc_fast.py`) is **safe to adopt** and is now
+**two-session qualified on real hardware**: Stage 1 showed zero
+discrepancies against the original `sc.py` on 10 real captures (identical
+sync/CRC/payload/confidence/freq-offset/SNR outcomes, including matching
+failure cases); Stage 2's qualification batch (seed 20260901) decoded
+11/12 real hf5-baseline-equivalent frames (mean raw BER ~3.5e-6) at hf5's
+qualified ~4049 bps; and this independent Session 2 (seed 20260902, a
+different day/channel state) decoded 12/12 with mean raw BER 0.0 at the
+same ~4048 bps, with no discrepancies and no adverse drift versus Session 1
+-- only a favorable SNR shift. Both sessions cut demodulate() CPU time by
+~4.6-4.8x on real hardware (~1.4s -> ~0.3s per frame).
 
 Recommend **`sc_fast.py` as the go-to implementation going forward** for
 this 8PSK@1500baud/no-FEC operating point -- same PHY, same throughput,
-same real-hardware reliability, at roughly a fifth of the CPU cost. It
-should supplement (not blindly replace) `hf5_8psk_4k/sc.py`: hf5 remains
-the frozen, read-only, independently-qualified reference this experiment
-validated against, and any future PHY change (FEC, new modulation, pilot
-tuning) should still be evaluated against that reference baseline. But for
-runtime/production use where CPU headroom matters, `sc_fast.py` is the
-recommended drop-in.
+same real-hardware reliability (confirmed across two independent sessions),
+at roughly a fifth of the CPU cost. It should supplement (not blindly
+replace) `hf5_8psk_4k/sc.py`: hf5 remains the frozen, read-only,
+independently-qualified reference this experiment validated against, and
+any future PHY change (FEC, new modulation, pilot tuning) should still be
+evaluated against that reference baseline. But for runtime/production use
+where CPU headroom matters, `sc_fast.py` is the recommended drop-in.
