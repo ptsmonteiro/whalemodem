@@ -106,8 +106,8 @@ are negotiated and adapted independently as described in
 
 Which mode is the control mode is a property of the registry, and therefore of
 the channel. On the VHF FM ladder it is mode `0`, and modes `0..2` above are
-that ladder. On the HF SSB ladder it is mode `5` (HC0, below), with mode `4`
-(HC1) above it as the fast rung; the CPFSK profiles are not offered at all,
+that ladder. On the HF SSB ladder it is mode `10` (HR0), followed by mode `5`
+(HC0) and mode `4` (HC1); the CPFSK profiles are not offered at all,
 because they carry no carrier-frequency estimate and so on SSB they are not a
 robust fallback but a mode that stops working as soon as the two stations
 disagree about frequency. Mode `7` (HF2, below) is a further, experimental-
@@ -299,9 +299,24 @@ that document's caveats). HF2 is registered as EXPERIMENTAL only
 (`whale/mode_qualification.py`); it is not offered by any default or
 optional registry and carries no hardware, session, or ARQ evidence yet.
 
+### Mode 10: HR0, the maximum-margin HF control mode
+
+HR0 is constant-envelope non-coherent 128-FSK at 17.857 baud. Its 128
+orthogonal tones occupy 2,285.7 Hz, each symbol is 2,688 samples at 48 kHz,
+and each carries seven Gray-mapped coded bits. Sixteen known sync symbols
+precede 112 payload symbols. A soft-decision rate-1/2 K=9 convolutional code,
+bit interleaver, whitened length field, and CRC32 protect up to 42 waveform
+bytes, or a 32-byte DATA chunk after the link air header. The fixed frame is
+7.316 seconds including the minimum common lead and tail, yielding 35.0
+bit/s at the DATA-chunk boundary before ARQ overhead. This exceeds the HF
+Level-0 20 bit/s floor while targeting decode at -15 dB waveform SNR.
+
+The -15 dB boundary is a design target pending the required retained-channel
+qualification campaign and radio tests; it is not yet a measured claim.
+
 ### Common HF lead and frame signature
 
-Every HC0, HC1 and HF2 keying begins with the same lead modulation and
+Every HR0, HC0, HC1, HF2 and HF3 keying begins with the same lead modulation and
 symbol rate: HC0's constant-envelope non-coherent 16-FSK bank at 93.75 baud.
 The minimum lead is a six-symbol identity block repeated twice, or 12
 symbols / 6,144 samples / 128 ms. Adaptive protection extends it in complete
@@ -312,6 +327,8 @@ six-symbol blocks, repeating the same identity block throughout.
 | HC0 | `9 6 12 15 0 3` |
 | HC1 | `12 3 15 6 9 0` |
 | HF2 | `2 11 5 14 8 0` |
+| HF3 | `7 13 1 10 4 15` |
+| HR0 | `1 14 5 11 8 2` |
 
 The detected label may order decoder attempts, but is not authenticated.
 Leading clipping can erase it and noise can produce a wrong candidate, so all

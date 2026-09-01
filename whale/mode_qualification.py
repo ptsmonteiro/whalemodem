@@ -50,6 +50,7 @@ MANIFEST = (
     QualificationEntry("vhf-fm", 6, QualificationLevel.EXPERIMENTAL),
     QualificationEntry("hf-ssb", 5, QualificationLevel.DEFAULT),
     QualificationEntry("hf-ssb", 4, QualificationLevel.DEFAULT),
+    QualificationEntry("hf-ssb", 10, QualificationLevel.DEFAULT),
     QualificationEntry("hf-ssb", 7, QualificationLevel.EXPERIMENTAL),
     QualificationEntry("hf-ssb", 9, QualificationLevel.EXPERIMENTAL),
 )
@@ -77,11 +78,17 @@ def registry(policy: str, level: QualificationLevel | str =
         base = afsk.default_registry() if budget is None else afsk.default_registry(budget)
         candidates, control = tuple(base.modes) + (VF3, VF4, VF6), base.control
     elif policy == "hf-ssb":
+        from .modes.hr0_mode import HR0
         from .modes.hc0_mode import HC0
         from .modes.hc1_mode import HC1
-        from .modes.hf2_mode import HF2
-        from .modes.hf3_mode import HF3
-        candidates, control = (HC0, HC1, HF2, HF3), HC0
+        candidates, control = (HR0, HC0, HC1), HR0
+        # Experiment-backed adapters are optional development dependencies.
+        # A normal/default station must not import them merely to construct
+        # the production HF ladder.
+        if requested >= QualificationLevel.EXPERIMENTAL:
+            from .modes.hf2_mode import HF2
+            from .modes.hf3_mode import HF3
+            candidates += (HF2, HF3)
     else:
         raise ValueError(f"unknown channel policy {policy!r}")
 

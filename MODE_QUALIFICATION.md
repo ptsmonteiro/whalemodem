@@ -114,25 +114,27 @@ HF3 (hf-ssb mode ID `9`) declares Level 3 ("Fast data"): a from-scratch
 36-carrier coherent 16-QAM OFDM design (46.875 Hz spacing, 421.875-2,062.5
 Hz, rate-1/2 K=9 code, 9-pilot comb with per-symbol polar-interpolated
 tracking), designed independently of HC0/HC1/HF2/HR0's specific geometries
-per its own design record (`experiments/hf3/DESIGN.md`). A confirmed-tier
-(300-trial) Monte Carlo campaign clears the frame Monte Carlo gate at the
-required quiet-Watterson +10 dB boundary: 291/300 decoded (95% Wilson-UB FER
-0.056, under the 0.10 ceiling), 300/300 acquired (95% Wilson-LB 0.987), zero
-`error` outcomes. Frame-prorated useful throughput at that same boundary is
-1,964.5 bit/s -- essentially at, not comfortably above, the 2,000 bit/s
-floor by this stricter proxy (nominal 100%-success throughput is 2,025.2
-bit/s). The required benign/static +8 dB boundary's confirmed-tier campaign
-was run in the same work session as this entry; see
-`logs/mode_qualification/hf-ssb/hf3/2026-08-31/INDEX.md` for its result and
-whether both required points now clear the gate -- if that document's
-benign/static section still reads "PENDING," treat that point as
-unmeasured. Measured (not nominal-span) 99%-power occupied bandwidth is
+per its own design record (`experiments/hf3/DESIGN.md`). Confirmed-tier
+(300-trial) Monte Carlo campaigns clear the frame Monte Carlo gate at
+**both** required boundary points. Benign/static +8 dB: 300/300 decoded
+(95% Wilson-UB FER 0.013), 300/300 acquired (95% Wilson-LB 0.987), zero
+`error` outcomes; frame-level useful throughput 2,025.2 bit/s, clearing
+the 2,000 bit/s floor. Quiet-Watterson +10 dB: 291/300 decoded (95%
+Wilson-UB FER 0.056, under the 0.10 ceiling), 300/300 acquired (95%
+Wilson-LB 0.987), zero `error` outcomes; frame-prorated useful throughput
+at that boundary is 1,964.5 bit/s -- essentially at, not comfortably
+above, the 2,000 bit/s floor by this stricter proxy (nominal
+100%-success throughput is 2,025.2 bit/s). See
+`logs/mode_qualification/hf-ssb/hf3/2026-08-31/INDEX.md` and
+`experiments/hf3/RESULTS.md` for full point-by-point results and
+commands. Measured (not nominal-span) 99%-power occupied bandwidth is
 ~1,758 Hz for representative and maximum-length frames, comfortably under
-the 2,300 Hz ceiling. Session, adjacent-rung overlap, interoperability,
-hardware, and resource gates remain unmeasured; HF3's manifest entry is
-Experimental only and must not be read as a promotion or complete
-application-throughput claim -- see `experiments/hf3/RESULTS.md`'s "What is
-not yet established" section for the full gap list.
+the 2,300 Hz ceiling. Full-session/ARQ useful throughput, adjacent-rung
+overlap, interoperability, hardware, and resource gates remain
+unmeasured; HF3's manifest entry is Experimental only and must not be
+read as a promotion or complete application-throughput claim -- see
+`experiments/hf3/RESULTS.md`'s "What is not yet established" section for
+the full gap list.
 
 Evidence in the assessment table uses four words:
 

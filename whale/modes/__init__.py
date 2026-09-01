@@ -44,12 +44,10 @@ def experimental_registry(budget=None):
 
 
 def hf_registry(budget=None):
-    """The station's mode ladder for an HF SSB channel: HC0, then HC1.
+    """The HF SSB ladder: HR0 control, then HC0 and HC1.
 
-    HC0 (`whale/modes/hc0.py`) is the control mode and the bottom rung -- a
-    non-coherent 16-FSK frame that decodes 19.5 dB further into the noise
-    than the OFDM rung above it.  HC1 is that rung, five times faster on a
-    path that can carry it.
+    HR0 is the maximum-margin 128-FSK Level-0 control mode. HC0 and HC1 are
+    retained above it for progressively shorter keyings on supporting paths.
 
     Separate from `default_registry` rather than an extension of it: the
     CPFSK profiles have no carrier-frequency estimate anywhere in them, so

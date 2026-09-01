@@ -5,9 +5,11 @@ from whale import rx_audio
 from whale.modes import hf_lead
 from whale.modes.hc0_mode import HC0
 from whale.modes.hc1_mode import HC1
+from whale.modes.hr0_mode import HR0
 
 
-HF_MODES = ((HC0, hf_lead.HC0_LABEL), (HC1, hf_lead.HC1_LABEL))
+HF_MODES = ((HC0, hf_lead.HC0_LABEL), (HC1, hf_lead.HC1_LABEL),
+            (HR0, hf_lead.HR0_LABEL))
 
 
 def _capture(audio):

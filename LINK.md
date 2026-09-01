@@ -24,7 +24,7 @@ A station is started on a *channel*, which is a `whale.policy.ChannelPolicy`:
 one set of timeouts, retry budgets and keying limits, plus the mode ladder
 that suits the path. `vhf-fm` is the two-FM-handhelds bench this modem was
 built and measured against; `hf-ssb` is HF single sideband, which offers mode
-5 (HC0) as its control mode and mode 4 (HC1) above it. Nothing about a channel is negotiated or goes on air -- two
+10 (HR0) as its control mode, with modes 5 (HC0) and 4 (HC1) above it. Nothing about a channel is negotiated or goes on air -- two
 stations running different policies interoperate, and negotiation over the
 advertised mode IDs does the rest. Select one with
 `python -m whale.vara_server --channel hf-ssb` or
@@ -32,7 +32,8 @@ advertised mode IDs does the rest. Select one with
 
 The HF policy's timeouts and retry budget are reasoned placeholders, not
 measurements -- `whale/policy.py` says so field by field. Its waveforms are
-not: both HF modes have carried the acceptance test over real radios.
+not. HC0 and HC1 have carried acceptance tests over real radios; HR0 has no
+radio evidence yet.
 
 ## Layering
 
@@ -217,7 +218,8 @@ Each endpoint adapts only its own transmit direction from ARQ outcomes:
   the explicit experimental registry also appends mode 6 (VF6) as its fastest
   current experimental mode (see
   [`FRAMING.md`](FRAMING.md#mode-3-vf3-a-non-cpfsk-data-mode)). The HF SSB
-  ladder is mode 5 (HC0, the control mode) with mode 4 (HC1) above it.
+  ladder is mode 10 (HR0, the control mode), then mode 5 (HC0) and mode 4
+  (HC1).
 
 There is no separate mode-change exchange. While connected, a receiver tries
 the control mode and every mutually advertised DATA mode. A decoded DATA frame

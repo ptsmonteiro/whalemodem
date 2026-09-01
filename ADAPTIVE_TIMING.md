@@ -15,7 +15,7 @@ keying ends at the final CRC and PTT is released when those samples finish.
 ## Head sequence and measurement
 
 On VHF/FM, CPFSK retains the order-15 PN head defined in `FRAMING.md`; VF3
-retains its sync-core lead. On HF, every HC0 and HC1 frame uses the common
+retains its sync-core lead. On HF, every HR0, HC0 and HC1 frame uses the common
 93.75-baud 16-FSK lead: a six-symbol mode-identifying block repeated at least
 twice. Calibration repeats it for one second and ordinary frames repeat it for
 the current adaptive duration, rounded upward to a complete block.
