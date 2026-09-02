@@ -212,13 +212,14 @@ distribution-free 95.1% upper confidence bound on the population 99th
 percentile is 1,774.59 Hz, 525.41 Hz below the 2,300 Hz ceiling; this gate
 passes. See
 `logs/mode_qualification/hf-ssb/hf3/2026-09-01-bandwidth/INDEX.md`.
-Retained-direction hardware confirmation and resource evidence remain
-unmeasured. A later
-IC-7300-to-IC-705 radio smoke
-campaign decoded 3/3 full-capacity frames, but is below the retained-direction
-trial minimum and lacks the minimum setup record. HF3's manifest entry is
-Experimental only and must not be read as a promotion or complete useful-
-throughput claim -- see
+Resource evidence remains unmeasured. A 2026-09-02 retained-direction
+IC-7300-to-IC-705 campaign first decoded 40/40 full-capacity frames from a
+dirty tree. Its predeclared clean-state repeat decoded 36/40: all frames
+acquired, but four failed CRC validation. The 95% FER upper bound is 23.1%,
+above the 10% ceiling, so the hardware frame gate currently fails. See
+`logs/mode_qualification/hf-ssb/hf3/2026-09-02-hardware/INDEX.md`. HF3's
+manifest entry is Experimental only and must not be read as a promotion or
+complete useful-throughput claim -- see
 `experiments/hf3/RESULTS.md`'s "What is not yet established" section for
 the full gap list.
 

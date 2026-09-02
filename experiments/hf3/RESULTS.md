@@ -112,13 +112,13 @@ separates from the rest.
 - **Complete modem/system qualification** (section 7): connection lifecycle,
   general ARQ fault recovery, and hardware sessions are not run. These do not
   block HF3's waveform qualification.
-- **Hardware evidence** (section 5): provisional in one direction only.
-  HF3 decoded 3/3 retained full-capacity frames from IC-7300 to IC-705, with
-  valid CRCs and all 36 carriers present. IC-705 to IC-7300 has no successful
-  HF3 frame; that leg is non-retained characterization under the current
-  criterion. The >=40-frame retained-direction minimum and minimum setup
-  metadata are still missing. See
-  `logs/mode_qualification/hf-ssb/hf3/2026-09-01-hardware/INDEX.md`.
+- **Hardware evidence** (section 5): the predeclared clean-state 40-frame
+  IC-7300-to-IC-705 campaign decoded 36/40. All frames acquired, but four
+  failed CRC validation; the 95% FER upper bound is 23.1%, above the 10%
+  ceiling. An immediately preceding dirty-tree campaign decoded 40/40 but is
+  retained as characterization rather than selected over the clean repeat.
+  The hardware frame gate therefore fails. See
+  `logs/mode_qualification/hf-ssb/hf3/2026-09-02-hardware/INDEX.md`.
 - **CPU/RSS/resource evidence** (section 7): not measured.
 - **Interoperability**: HF3 has not been tested against any implementation
   other than itself.
@@ -137,9 +137,8 @@ separates from the rest.
 
 Given these gaps, HF3's honest waveform disposition is **Experimental only**.
 Both required frame Monte Carlo points clear their statistical gates. Optional
-waveform status still needs a documented
-40-frame IC-7300-to-IC-705 retained-direction run; the bandwidth gate now
-passes.
+waveform status now needs diagnosis and a predeclared hardware rerun that
+clears the retained-direction FER bound; the bandwidth gate passes.
 Default additionally needs 100 retained-direction frames on each of two
 materially different radio/audio pairs and bounded resource evidence. Ladder
 and complete-system gaps remain important project work, but no longer block

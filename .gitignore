@@ -1,4 +1,6 @@
 __pycache__/
+.pytest_cache/
+.tmp_pytest*/
 *.pyc
 logs/*
 !logs/mode_qualification/
