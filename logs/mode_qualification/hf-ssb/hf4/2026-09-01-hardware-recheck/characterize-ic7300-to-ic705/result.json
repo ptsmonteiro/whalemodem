@@ -1,0 +1,185 @@
+{
+  "mode": "hf4",
+  "payload_bytes": 7368,
+  "trials": 25,
+  "a": "ic7300",
+  "b": "ic705",
+  "ic7300->ic705": [
+    {
+      "trial": 1,
+      "decoded": false,
+      "confidence": 0.5690150074738763,
+      "start_index": 14524,
+      "synced": false
+    },
+    {
+      "trial": 2,
+      "decoded": false,
+      "confidence": 0.9998824943741234,
+      "start_index": 14744,
+      "synced": true
+    },
+    {
+      "trial": 3,
+      "decoded": false,
+      "confidence": 0.9320137421019787,
+      "start_index": 17690,
+      "synced": true
+    },
+    {
+      "trial": 4,
+      "decoded": false,
+      "confidence": 0.885037088048578,
+      "start_index": 16431,
+      "synced": true
+    },
+    {
+      "trial": 5,
+      "decoded": false,
+      "confidence": 0.5294478352396137,
+      "start_index": 16728,
+      "synced": false
+    },
+    {
+      "trial": 6,
+      "decoded": false,
+      "confidence": 0.19486686822056132,
+      "start_index": 19628,
+      "synced": false
+    },
+    {
+      "trial": 7,
+      "decoded": false,
+      "confidence": 0.9448223852755941,
+      "start_index": 17009,
+      "synced": true
+    },
+    {
+      "trial": 8,
+      "decoded": false,
+      "confidence": 0.957001931027775,
+      "start_index": 16647,
+      "synced": true
+    },
+    {
+      "trial": 9,
+      "decoded": false,
+      "confidence": 0.9944420199307086,
+      "start_index": 16898,
+      "synced": true
+    },
+    {
+      "trial": 10,
+      "decoded": false,
+      "confidence": 0.9718779787053864,
+      "start_index": 16799,
+      "synced": true
+    },
+    {
+      "trial": 11,
+      "decoded": false,
+      "confidence": 0.9838950599430804,
+      "start_index": 15409,
+      "synced": true
+    },
+    {
+      "trial": 12,
+      "decoded": false,
+      "confidence": 0.9972738760576545,
+      "start_index": 16265,
+      "synced": true
+    },
+    {
+      "trial": 13,
+      "decoded": false,
+      "confidence": 0.9976236877746464,
+      "start_index": 17546,
+      "synced": true
+    },
+    {
+      "trial": 14,
+      "decoded": false,
+      "confidence": 0.12589288100759263,
+      "start_index": 98687,
+      "synced": false
+    },
+    {
+      "trial": 15,
+      "decoded": false,
+      "confidence": 0.274336334862902,
+      "start_index": 19893,
+      "synced": false
+    },
+    {
+      "trial": 16,
+      "decoded": false,
+      "confidence": 0.9888352269901562,
+      "start_index": 17463,
+      "synced": true
+    },
+    {
+      "trial": 17,
+      "decoded": false,
+      "confidence": 0.8689949219177066,
+      "start_index": 17501,
+      "synced": true
+    },
+    {
+      "trial": 18,
+      "decoded": false,
+      "confidence": 0.4016087307453916,
+      "start_index": 17499,
+      "synced": false
+    },
+    {
+      "trial": 19,
+      "decoded": false,
+      "confidence": 0.9986897692593019,
+      "start_index": 16267,
+      "synced": true
+    },
+    {
+      "trial": 20,
+      "decoded": false,
+      "confidence": 0.9988556157672169,
+      "start_index": 15970,
+      "synced": true
+    },
+    {
+      "trial": 21,
+      "decoded": false,
+      "confidence": 0.9912040749884621,
+      "start_index": 16068,
+      "synced": true
+    },
+    {
+      "trial": 22,
+      "decoded": false,
+      "confidence": 0.9932646797752294,
+      "start_index": 16844,
+      "synced": true
+    },
+    {
+      "trial": 23,
+      "decoded": false,
+      "confidence": 0.8245389577975042,
+      "start_index": 16465,
+      "synced": true
+    },
+    {
+      "trial": 24,
+      "decoded": false,
+      "confidence": 0.8297267491887713,
+      "start_index": 14966,
+      "synced": true
+    },
+    {
+      "trial": 25,
+      "decoded": false,
+      "confidence": 0.5221822792322018,
+      "start_index": 15038,
+      "synced": false
+    }
+  ],
+  "ic705->ic7300": []
+}

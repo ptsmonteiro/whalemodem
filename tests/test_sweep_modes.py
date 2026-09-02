@@ -106,3 +106,26 @@ def test_main_writes_strict_json_and_summary_without_real_hardware(tmp_path, mon
         "data_chunk_bytes"] == 6
     assert document["metadata"]["mode_level"] == "default"
     assert not (tmp_path / "captures").exists()
+
+
+def test_main_records_git_state_before_creating_output(tmp_path, monkeypatch):
+    class Registry:
+        modes = (FakeMode(),)
+        supported_ids = (9,)
+
+    output_dir = tmp_path / "new-output"
+    monkeypatch.setattr(sweep_modes, "registry_for", lambda _channel, _level: Registry())
+    monkeypatch.setattr(sweep_modes, "_git_commit", lambda: "clean-start")
+    monkeypatch.setattr(sweep_modes, "_git_dirty", output_dir.exists)
+
+    exit_code = sweep_modes.main([
+        "--channel", "vhf-fm", "--trials", "1", "--capture", "all",
+        "--capture-tail", "0", "--inter-trial", "0",
+        "--output-dir", str(output_dir),
+    ], pair_factory=fake_pair_factory)
+
+    assert exit_code == 0
+    document = json.loads((output_dir / "result.json").read_text())
+    assert document["metadata"]["git_commit"] == "clean-start"
+    assert document["metadata"]["git_dirty"] is False
+    assert (output_dir / "captures").is_dir()

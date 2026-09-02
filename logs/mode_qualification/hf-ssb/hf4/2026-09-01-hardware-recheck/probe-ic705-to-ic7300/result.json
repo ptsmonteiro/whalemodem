@@ -1,0 +1,45 @@
+{
+  "mode": "hf4",
+  "payload_bytes": 7368,
+  "trials": 5,
+  "a": "ic7300",
+  "b": "ic705",
+  "ic7300->ic705": [],
+  "ic705->ic7300": [
+    {
+      "trial": 1,
+      "decoded": false,
+      "confidence": 0.2924253672839712,
+      "start_index": 21397,
+      "synced": false
+    },
+    {
+      "trial": 2,
+      "decoded": false,
+      "confidence": 0.17056585952349854,
+      "start_index": 27690,
+      "synced": false
+    },
+    {
+      "trial": 3,
+      "decoded": false,
+      "confidence": 0.1893903136719689,
+      "start_index": 30983,
+      "synced": false
+    },
+    {
+      "trial": 4,
+      "decoded": false,
+      "confidence": 0.2239274716343226,
+      "start_index": 27951,
+      "synced": false
+    },
+    {
+      "trial": 5,
+      "decoded": false,
+      "confidence": 0.26640853610157733,
+      "start_index": 29587,
+      "synced": false
+    }
+  ]
+}

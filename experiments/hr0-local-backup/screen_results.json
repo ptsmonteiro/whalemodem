@@ -1,0 +1,522 @@
+{
+  "experiment": "hr0_oracle_start_zero_cfo",
+  "seed": 20260831,
+  "geometry": {
+    "sample_rate": 48000,
+    "nfft": 1280,
+    "cp_samples": 128,
+    "cp_ms": 2.6666666666666665,
+    "subcarrier_spacing_hz": 37.5,
+    "carriers": 53,
+    "carrier_edges_hz": [
+      300.0,
+      2250.0
+    ],
+    "occupied_edges_hz": [
+      281.25,
+      2268.75
+    ],
+    "occupied_hz": 1987.5,
+    "total_symbols": 274,
+    "pilot_symbols": 92,
+    "data_symbols": 182,
+    "frame_seconds": 8.037333333333333,
+    "max_payload_bytes": 53,
+    "packet_bytes": 58,
+    "ldpc_blocks": 2,
+    "ldpc_n": 648,
+    "ldpc_k": 324,
+    "shortened_information_bits_per_block": 232,
+    "omitted_filler_bits_per_block": 92,
+    "transmitted_code_bits": 1112,
+    "data_cells": 9646,
+    "repetition_min": 8,
+    "repetition_max": 9,
+    "payload_bit_rate": 52.75381552753816
+  },
+  "results": [
+    {
+      "channel": "awgn",
+      "snr_3khz_db": -15.0,
+      "passed": 0,
+      "total": 3,
+      "delivery_rate": 0.0,
+      "trials": [
+        {
+          "trial": 1,
+          "seed": 357946226,
+          "decoded": false,
+          "crc_ok": false,
+          "ldpc_ok": [
+            false,
+            false
+          ],
+          "ldpc_iterations": [
+            50,
+            50
+          ],
+          "wall_seconds": 0.7814525000285357,
+          "channel_measurements": {
+            "snr_3khz_db": -15.0,
+            "realized_snr_3khz_db": -14.988132987691607,
+            "signal_power": 0.016899999998966797,
+            "noise_power_3khz": 0.5329666121291108,
+            "noise_passband_hz": [
+              0.0,
+              3000.0
+            ],
+            "reference_samples": [
+              0,
+              385792
+            ]
+          }
+        },
+        {
+          "trial": 2,
+          "seed": 2328434273,
+          "decoded": false,
+          "crc_ok": false,
+          "ldpc_ok": [
+            false,
+            false
+          ],
+          "ldpc_iterations": [
+            50,
+            50
+          ],
+          "wall_seconds": 0.7902692998759449,
+          "channel_measurements": {
+            "snr_3khz_db": -15.0,
+            "realized_snr_3khz_db": -15.017828591866982,
+            "signal_power": 0.016899999999310484,
+            "noise_power_3khz": 0.5366233471013665,
+            "noise_passband_hz": [
+              0.0,
+              3000.0
+            ],
+            "reference_samples": [
+              0,
+              385792
+            ]
+          }
+        },
+        {
+          "trial": 3,
+          "seed": 3440334114,
+          "decoded": false,
+          "crc_ok": false,
+          "ldpc_ok": [
+            false,
+            false
+          ],
+          "ldpc_iterations": [
+            50,
+            50
+          ],
+          "wall_seconds": 0.791503099957481,
+          "channel_measurements": {
+            "snr_3khz_db": -15.0,
+            "realized_snr_3khz_db": -15.05555046956222,
+            "signal_power": 0.016900000006976303,
+            "noise_power_3khz": 0.5413046423939628,
+            "noise_passband_hz": [
+              0.0,
+              3000.0
+            ],
+            "reference_samples": [
+              0,
+              385792
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "channel": "mid_latitude_quiet",
+      "snr_3khz_db": -15.0,
+      "passed": 0,
+      "total": 3,
+      "delivery_rate": 0.0,
+      "trials": [
+        {
+          "trial": 1,
+          "seed": 389251091,
+          "decoded": false,
+          "crc_ok": false,
+          "ldpc_ok": [
+            false,
+            false
+          ],
+          "ldpc_iterations": [
+            50,
+            50
+          ],
+          "wall_seconds": 0.9556430999655277,
+          "channel_measurements": {
+            "stage_0": {
+              "paths": 2,
+              "path_realized_mean_powers": [
+                0.3441924521274797,
+                0.43697526764962963
+              ],
+              "elapsed_seconds": 8.037333333333333,
+              "max_delay_samples": 24
+            },
+            "stage_1": {
+              "snr_3khz_db": -15.0,
+              "realized_snr_3khz_db": -14.995257329919527,
+              "signal_power": 0.013274408873970942,
+              "noise_power_3khz": 0.41931550685625135,
+              "noise_passband_hz": [
+                0.0,
+                3000.0
+              ],
+              "reference_samples": [
+                0,
+                385816
+              ]
+            }
+          }
+        },
+        {
+          "trial": 2,
+          "seed": 4120599050,
+          "decoded": false,
+          "crc_ok": false,
+          "ldpc_ok": [
+            false,
+            false
+          ],
+          "ldpc_iterations": [
+            50,
+            50
+          ],
+          "wall_seconds": 0.9455909000243992,
+          "channel_measurements": {
+            "stage_0": {
+              "paths": 2,
+              "path_realized_mean_powers": [
+                0.4472172558072057,
+                0.31491823354643084
+              ],
+              "elapsed_seconds": 8.037333333333333,
+              "max_delay_samples": 24
+            },
+            "stage_1": {
+              "snr_3khz_db": -15.0,
+              "realized_snr_3khz_db": -14.974134275124417,
+              "signal_power": 0.01292220056806693,
+              "noise_power_3khz": 0.40620934008738685,
+              "noise_passband_hz": [
+                0.0,
+                3000.0
+              ],
+              "reference_samples": [
+                0,
+                385816
+              ]
+            }
+          }
+        },
+        {
+          "trial": 3,
+          "seed": 2814943974,
+          "decoded": false,
+          "crc_ok": false,
+          "ldpc_ok": [
+            false,
+            false
+          ],
+          "ldpc_iterations": [
+            50,
+            50
+          ],
+          "wall_seconds": 0.9432810000143945,
+          "channel_measurements": {
+            "stage_0": {
+              "paths": 2,
+              "path_realized_mean_powers": [
+                0.12838620297690229,
+                0.497814044746281
+              ],
+              "elapsed_seconds": 8.037333333333333,
+              "max_delay_samples": 24
+            },
+            "stage_1": {
+              "snr_3khz_db": -15.0,
+              "realized_snr_3khz_db": -14.954002464788143,
+              "signal_power": 0.010581142779652344,
+              "noise_power_3khz": 0.33107990444415014,
+              "noise_passband_hz": [
+                0.0,
+                3000.0
+              ],
+              "reference_samples": [
+                0,
+                385816
+              ]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "channel": "mid_latitude_moderate",
+      "snr_3khz_db": -15.0,
+      "passed": 0,
+      "total": 3,
+      "delivery_rate": 0.0,
+      "trials": [
+        {
+          "trial": 1,
+          "seed": 1158207402,
+          "decoded": false,
+          "crc_ok": false,
+          "ldpc_ok": [
+            false,
+            false
+          ],
+          "ldpc_iterations": [
+            50,
+            50
+          ],
+          "wall_seconds": 0.87119169998914,
+          "channel_measurements": {
+            "stage_0": {
+              "paths": 2,
+              "path_realized_mean_powers": [
+                0.6109106319473501,
+                0.43440461469584857
+              ],
+              "elapsed_seconds": 8.037333333333333,
+              "max_delay_samples": 48
+            },
+            "stage_1": {
+              "snr_3khz_db": -15.0,
+              "realized_snr_3khz_db": -15.019127623497548,
+              "signal_power": 0.017668285100345515,
+              "noise_power_3khz": 0.5611864300547765,
+              "noise_passband_hz": [
+                0.0,
+                3000.0
+              ],
+              "reference_samples": [
+                0,
+                385840
+              ]
+            }
+          }
+        },
+        {
+          "trial": 2,
+          "seed": 861716763,
+          "decoded": false,
+          "crc_ok": false,
+          "ldpc_ok": [
+            false,
+            false
+          ],
+          "ldpc_iterations": [
+            50,
+            50
+          ],
+          "wall_seconds": 0.8848745001014322,
+          "channel_measurements": {
+            "stage_0": {
+              "paths": 2,
+              "path_realized_mean_powers": [
+                0.6237917560921741,
+                0.30510422198846815
+              ],
+              "elapsed_seconds": 8.037333333333333,
+              "max_delay_samples": 48
+            },
+            "stage_1": {
+              "snr_3khz_db": -15.0,
+              "realized_snr_3khz_db": -14.99046123059445,
+              "signal_power": 0.015742579598171238,
+              "noise_power_3khz": 0.4967318654107839,
+              "noise_passband_hz": [
+                0.0,
+                3000.0
+              ],
+              "reference_samples": [
+                0,
+                385840
+              ]
+            }
+          }
+        },
+        {
+          "trial": 3,
+          "seed": 1914263606,
+          "decoded": false,
+          "crc_ok": false,
+          "ldpc_ok": [
+            false,
+            false
+          ],
+          "ldpc_iterations": [
+            50,
+            50
+          ],
+          "wall_seconds": 0.8736977998632938,
+          "channel_measurements": {
+            "stage_0": {
+              "paths": 2,
+              "path_realized_mean_powers": [
+                0.5546888949056414,
+                0.5563971580727392
+              ],
+              "elapsed_seconds": 8.037333333333333,
+              "max_delay_samples": 48
+            },
+            "stage_1": {
+              "snr_3khz_db": -15.0,
+              "realized_snr_3khz_db": -14.992479106883161,
+              "signal_power": 0.018693343263832395,
+              "noise_power_3khz": 0.5901126053082127,
+              "noise_passband_hz": [
+                0.0,
+                3000.0
+              ],
+              "reference_samples": [
+                0,
+                385840
+              ]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "channel": "mid_latitude_disturbed",
+      "snr_3khz_db": -15.0,
+      "passed": 0,
+      "total": 3,
+      "delivery_rate": 0.0,
+      "trials": [
+        {
+          "trial": 1,
+          "seed": 724511348,
+          "decoded": false,
+          "crc_ok": false,
+          "ldpc_ok": [
+            false,
+            false
+          ],
+          "ldpc_iterations": [
+            50,
+            50
+          ],
+          "wall_seconds": 0.8989498999435455,
+          "channel_measurements": {
+            "stage_0": {
+              "paths": 2,
+              "path_realized_mean_powers": [
+                0.2248674018718926,
+                0.26586983956628496
+              ],
+              "elapsed_seconds": 8.037333333333333,
+              "max_delay_samples": 96
+            },
+            "stage_1": {
+              "snr_3khz_db": -15.0,
+              "realized_snr_3khz_db": -14.976350212135776,
+              "signal_power": 0.008306601031964036,
+              "noise_power_3khz": 0.26125124749371476,
+              "noise_passband_hz": [
+                0.0,
+                3000.0
+              ],
+              "reference_samples": [
+                0,
+                385888
+              ]
+            }
+          }
+        },
+        {
+          "trial": 2,
+          "seed": 911831122,
+          "decoded": false,
+          "crc_ok": false,
+          "ldpc_ok": [
+            false,
+            false
+          ],
+          "ldpc_iterations": [
+            50,
+            50
+          ],
+          "wall_seconds": 0.8835908998735249,
+          "channel_measurements": {
+            "stage_0": {
+              "paths": 2,
+              "path_realized_mean_powers": [
+                0.3491623744238375,
+                0.41615709155755454
+              ],
+              "elapsed_seconds": 8.037333333333333,
+              "max_delay_samples": 96
+            },
+            "stage_1": {
+              "snr_3khz_db": -15.0,
+              "realized_snr_3khz_db": -14.974783769572507,
+              "signal_power": 0.012960505565528519,
+              "noise_power_3khz": 0.4074743914797753,
+              "noise_passband_hz": [
+                0.0,
+                3000.0
+              ],
+              "reference_samples": [
+                0,
+                385888
+              ]
+            }
+          }
+        },
+        {
+          "trial": 3,
+          "seed": 4082299950,
+          "decoded": false,
+          "crc_ok": false,
+          "ldpc_ok": [
+            false,
+            false
+          ],
+          "ldpc_iterations": [
+            50,
+            50
+          ],
+          "wall_seconds": 0.9104392000008374,
+          "channel_measurements": {
+            "stage_0": {
+              "paths": 2,
+              "path_realized_mean_powers": [
+                0.41351479715929673,
+                0.5388527381592565
+              ],
+              "elapsed_seconds": 8.037333333333333,
+              "max_delay_samples": 96
+            },
+            "stage_1": {
+              "snr_3khz_db": -15.0,
+              "realized_snr_3khz_db": -14.939241930871939,
+              "signal_power": 0.016044718077172188,
+              "noise_power_3khz": 0.5003296998002031,
+              "noise_passband_hz": [
+                0.0,
+                3000.0
+              ],
+              "reference_samples": [
+                0,
+                385888
+              ]
+            }
+          }
+        }
+      ]
+    }
+  ]
+}

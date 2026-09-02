@@ -235,6 +235,13 @@ def main(argv=None, *, pair_factory=bench.radio_pair):
     default_a, default_b = DEFAULT_RADIOS[args.channel]
     radio_a, radio_b = args.a or default_a, args.b or default_b
     output_dir = args.output_dir or _default_output_dir()
+
+    # Capture provenance before creating the output directory or writing any
+    # captures. Otherwise an in-repository campaign makes its own tree dirty
+    # and can never truthfully report that it started from a clean checkout.
+    git_commit = _git_commit()
+    git_dirty = _git_dirty()
+
     output_dir.mkdir(parents=True, exist_ok=True)
     capture_dir = None
     if args.capture != "none":
@@ -278,7 +285,7 @@ def main(argv=None, *, pair_factory=bench.radio_pair):
         channel={"type": "hardware", "policy": args.channel,
                  "radio_a": radio_a, "radio_b": radio_b},
         trials=records, seed=args.seed,
-        metadata={"git_commit": _git_commit(), "git_dirty": _git_dirty(),
+        metadata={"git_commit": git_commit, "git_dirty": git_dirty,
                   "mode_level": args.mode_level,
                   "registry_mode_ids": list(registry.supported_ids),
                   "selected_mode_ids": [mode.mode_id for mode in selected],
