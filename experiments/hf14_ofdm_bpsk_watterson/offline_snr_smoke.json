@@ -1,0 +1,438 @@
+{
+  "experiment": "hf14 retained-radio-capture offline AWGN sweep",
+  "offline_only": true,
+  "sample_rate": 12000,
+  "master_seed": 20260903,
+  "requested_snr_definition": "estimated captured signal power / added real full-Nyquist AWGN power",
+  "estimated_total_snr_definition": "estimated captured signal power / (off-frame baseline noise power + added AWGN power)",
+  "limitations": [
+    "post-capture noise injection does not exercise RF AGC, receiver sensitivity, or weak-signal front-end behavior",
+    "off-frame receiver noise is treated as additive and stationary",
+    "the maximum-energy frame window is an estimator, not a calibrated RF power measurement"
+  ],
+  "inputs": [
+    {
+      "name": "rank1_fft240_cp36_pi8",
+      "source_result": "C:\\Users\\ptsm\\Projects\\whalemodem\\experiments\\hf14_ofdm_bpsk_watterson\\hardware\\rank1_fft240_cp36_pi8\\result.json",
+      "source_capture_count": 10,
+      "noise_repeats_per_capture": 1,
+      "config": {
+        "fft_size": 240,
+        "cp_len": 36,
+        "active_bins": [
+          6,
+          7,
+          8,
+          9,
+          10,
+          11,
+          12,
+          13,
+          14,
+          15,
+          16,
+          17,
+          18,
+          19,
+          20,
+          21,
+          22,
+          23,
+          24,
+          25,
+          26,
+          27,
+          28,
+          29,
+          30,
+          31,
+          32,
+          33,
+          34,
+          35,
+          36,
+          37,
+          38,
+          39,
+          40,
+          41,
+          42,
+          43,
+          44,
+          45,
+          46,
+          47,
+          48,
+          49,
+          50,
+          51,
+          52,
+          53,
+          54
+        ],
+        "bits_per_symbol": 1,
+        "fec_rate": null,
+        "packet_bytes": 70,
+        "pilot_interval": 8,
+        "pilot_comb_stride": 0,
+        "equalizer": "gain",
+        "edge_guard_bins": 0,
+        "edge_taper": 0,
+        "n_preamble_symbols": 2,
+        "crest_factor_db": 10.212790435661518,
+        "frame_seconds": 0.368,
+        "max_payload_bytes": 64
+      },
+      "power_estimator": {
+        "frame_samples": 4416,
+        "guard_samples": 276,
+        "signal_definition": "maximum frame-window mean square minus off-frame baseline noise power",
+        "noise_definition": "off-frame mean square outside frame plus one-symbol guard",
+        "estimated_baseline_snr_db_mean": 25.921000822566015,
+        "estimated_baseline_snr_db_min": 12.848431573084083,
+        "estimated_baseline_snr_db_max": 29.81113240197198
+      },
+      "points": [
+        {
+          "requested_added_snr_db": 20.0,
+          "estimated_total_snr_db_mean": 18.512872430658994,
+          "decoded": 10,
+          "total": 10,
+          "success_rate": 1.0,
+          "wilson_95": [
+            0.7224672001371107,
+            0.9999999999999999
+          ],
+          "trials": [
+            {
+              "source_trial": 1,
+              "noise_repeat": 1,
+              "noise_seed": 548797206,
+              "outcome": "decoded",
+              "realized_added_snr_db": 19.92446598375508,
+              "estimated_total_snr_db": 12.070889514946035,
+              "decoder_channel_snr_db": 15.902144823605308,
+              "confidence": 1.6220479757191824
+            },
+            {
+              "source_trial": 2,
+              "noise_repeat": 1,
+              "noise_seed": 3456111223,
+              "outcome": "decoded",
+              "realized_added_snr_db": 20.062149336605877,
+              "estimated_total_snr_db": 18.91814590066478,
+              "decoder_channel_snr_db": 15.815743460999279,
+              "confidence": 1.7074793776282169
+            },
+            {
+              "source_trial": 3,
+              "noise_repeat": 1,
+              "noise_seed": 4219137903,
+              "outcome": "decoded",
+              "realized_added_snr_db": 20.007312698115626,
+              "estimated_total_snr_db": 19.575180537479635,
+              "decoder_channel_snr_db": 16.36632009503524,
+              "confidence": 1.7523722974530633
+            },
+            {
+              "source_trial": 4,
+              "noise_repeat": 1,
+              "noise_seed": 917491176,
+              "outcome": "decoded",
+              "realized_added_snr_db": 20.05094979120672,
+              "estimated_total_snr_db": 19.49620862817596,
+              "decoder_channel_snr_db": 16.125810464490257,
+              "confidence": 1.7560848255776211
+            },
+            {
+              "source_trial": 5,
+              "noise_repeat": 1,
+              "noise_seed": 121051913,
+              "outcome": "decoded",
+              "realized_added_snr_db": 19.96939421453696,
+              "estimated_total_snr_db": 19.45805514498379,
+              "decoder_channel_snr_db": 16.911210212057693,
+              "confidence": 1.5830141732467005
+            },
+            {
+              "source_trial": 6,
+              "noise_repeat": 1,
+              "noise_seed": 2931431182,
+              "outcome": "decoded",
+              "realized_added_snr_db": 19.951321041640885,
+              "estimated_total_snr_db": 19.325624911601572,
+              "decoder_channel_snr_db": 16.076402730711802,
+              "confidence": 1.8345299935721664
+            },
+            {
+              "source_trial": 7,
+              "noise_repeat": 1,
+              "noise_seed": 1847490697,
+              "outcome": "decoded",
+              "realized_added_snr_db": 20.03047165595779,
+              "estimated_total_snr_db": 19.336707720906446,
+              "decoder_channel_snr_db": 15.969878556869439,
+              "confidence": 1.7074408319530738
+            },
+            {
+              "source_trial": 8,
+              "noise_repeat": 1,
+              "noise_seed": 1728106782,
+              "outcome": "decoded",
+              "realized_added_snr_db": 20.053791136829467,
+              "estimated_total_snr_db": 18.832257155311698,
+              "decoder_channel_snr_db": 15.86644192229641,
+              "confidence": 1.719361764690382
+            },
+            {
+              "source_trial": 9,
+              "noise_repeat": 1,
+              "noise_seed": 2082955925,
+              "outcome": "decoded",
+              "realized_added_snr_db": 19.998986928428785,
+              "estimated_total_snr_db": 19.396652411673156,
+              "decoder_channel_snr_db": 16.32354427056461,
+              "confidence": 1.6821609908629456
+            },
+            {
+              "source_trial": 10,
+              "noise_repeat": 1,
+              "noise_seed": 3320134513,
+              "outcome": "decoded",
+              "realized_added_snr_db": 19.993611403988087,
+              "estimated_total_snr_db": 18.719002380846874,
+              "decoder_channel_snr_db": 16.573791823988703,
+              "confidence": 1.691863212350136
+            }
+          ]
+        },
+        {
+          "requested_added_snr_db": 8.0,
+          "estimated_total_snr_db_mean": 7.827644834340747,
+          "decoded": 10,
+          "total": 10,
+          "success_rate": 1.0,
+          "wilson_95": [
+            0.7224672001371107,
+            0.9999999999999999
+          ],
+          "trials": [
+            {
+              "source_trial": 1,
+              "noise_repeat": 1,
+              "noise_seed": 2249228178,
+              "outcome": "decoded",
+              "realized_added_snr_db": 7.999846990271056,
+              "estimated_total_snr_db": 6.7696737897017245,
+              "decoder_channel_snr_db": 13.861901046737586,
+              "confidence": 1.3715890563158064
+            },
+            {
+              "source_trial": 2,
+              "noise_repeat": 1,
+              "noise_seed": 3719077744,
+              "outcome": "decoded",
+              "realized_added_snr_db": 8.093973081624702,
+              "estimated_total_snr_db": 8.011571005454616,
+              "decoder_channel_snr_db": 14.690280468737003,
+              "confidence": 1.3730331659920179
+            },
+            {
+              "source_trial": 3,
+              "noise_repeat": 1,
+              "noise_seed": 2782644791,
+              "outcome": "decoded",
+              "realized_added_snr_db": 7.9827628318757995,
+              "estimated_total_snr_db": 7.95434925551774,
+              "decoder_channel_snr_db": 13.591467114600718,
+              "confidence": 1.3659186360390088
+            },
+            {
+              "source_trial": 4,
+              "noise_repeat": 1,
+              "noise_seed": 338063358,
+              "outcome": "decoded",
+              "realized_added_snr_db": 8.031378974990277,
+              "estimated_total_snr_db": 7.994369426706752,
+              "decoder_channel_snr_db": 14.25788733138936,
+              "confidence": 1.3997980223453559
+            },
+            {
+              "source_trial": 5,
+              "noise_repeat": 1,
+              "noise_seed": 1553713270,
+              "outcome": "decoded",
+              "realized_added_snr_db": 8.020072550267468,
+              "estimated_total_snr_db": 7.985568645039338,
+              "decoder_channel_snr_db": 14.226130916989337,
+              "confidence": 1.2954211736783665
+            },
+            {
+              "source_trial": 6,
+              "noise_repeat": 1,
+              "noise_seed": 609635444,
+              "outcome": "decoded",
+              "realized_added_snr_db": 7.971546605955215,
+              "estimated_total_snr_db": 7.929092282301301,
+              "decoder_channel_snr_db": 13.94987543502645,
+              "confidence": 1.4469961400244902
+            },
+            {
+              "source_trial": 7,
+              "noise_repeat": 1,
+              "noise_seed": 3181364804,
+              "outcome": "decoded",
+              "realized_added_snr_db": 7.98472726560489,
+              "estimated_total_snr_db": 7.938013019388654,
+              "decoder_channel_snr_db": 13.848149479030889,
+              "confidence": 1.3172489083098826
+            },
+            {
+              "source_trial": 8,
+              "noise_repeat": 1,
+              "noise_seed": 3638710351,
+              "outcome": "decoded",
+              "realized_added_snr_db": 7.93839868778422,
+              "estimated_total_snr_db": 7.852581218123076,
+              "decoder_channel_snr_db": 14.698365538085428,
+              "confidence": 1.3381142653512046
+            },
+            {
+              "source_trial": 9,
+              "noise_repeat": 1,
+              "noise_seed": 620059817,
+              "outcome": "decoded",
+              "realized_added_snr_db": 7.948678868556492,
+              "estimated_total_snr_db": 7.9085677662462235,
+              "decoder_channel_snr_db": 14.270420666311182,
+              "confidence": 1.3377863167156945
+            },
+            {
+              "source_trial": 10,
+              "noise_repeat": 1,
+              "noise_seed": 1802010282,
+              "outcome": "decoded",
+              "realized_added_snr_db": 8.025819821860095,
+              "estimated_total_snr_db": 7.932661934928051,
+              "decoder_channel_snr_db": 14.147496486945105,
+              "confidence": 1.347458149002427
+            }
+          ]
+        },
+        {
+          "requested_added_snr_db": 0.0,
+          "estimated_total_snr_db_mean": -0.0185961435294305,
+          "decoded": 0,
+          "total": 10,
+          "success_rate": 0.0,
+          "wilson_95": [
+            0.0,
+            0.2775327998628892
+          ],
+          "trials": [
+            {
+              "source_trial": 1,
+              "noise_repeat": 1,
+              "noise_seed": 843305917,
+              "outcome": "crc_fail",
+              "realized_added_snr_db": -0.03045366744002156,
+              "estimated_total_snr_db": -0.24869550030121743,
+              "decoder_channel_snr_db": 8.923144263109673,
+              "confidence": 0.8428532054728781
+            },
+            {
+              "source_trial": 2,
+              "noise_repeat": 1,
+              "noise_seed": 2188667759,
+              "outcome": "crc_fail",
+              "realized_added_snr_db": -0.02841421704514699,
+              "estimated_total_snr_db": -0.041213508271818286,
+              "decoder_channel_snr_db": 9.406671172015999,
+              "confidence": 0.7903461925927707
+            },
+            {
+              "source_trial": 3,
+              "noise_repeat": 1,
+              "noise_seed": 1681498569,
+              "outcome": "crc_fail",
+              "realized_added_snr_db": -0.03851819809879065,
+              "estimated_total_snr_db": -0.043011799557492104,
+              "decoder_channel_snr_db": 10.268320165795418,
+              "confidence": 0.7385822539147219
+            },
+            {
+              "source_trial": 4,
+              "noise_repeat": 1,
+              "noise_seed": 3564252988,
+              "outcome": "crc_fail",
+              "realized_added_snr_db": -0.02132674406359976,
+              "estimated_total_snr_db": -0.027142473383954497,
+              "decoder_channel_snr_db": 10.359260224181892,
+              "confidence": 0.8537317606001453
+            },
+            {
+              "source_trial": 5,
+              "noise_repeat": 1,
+              "noise_seed": 2096436416,
+              "outcome": "crc_fail",
+              "realized_added_snr_db": 0.057989643885286435,
+              "estimated_total_snr_db": 0.052454747121888426,
+              "decoder_channel_snr_db": 7.794859143724659,
+              "confidence": 0.7545722919971286
+            },
+            {
+              "source_trial": 6,
+              "noise_repeat": 1,
+              "noise_seed": 325026698,
+              "outcome": "crc_fail",
+              "realized_added_snr_db": 0.030576668402388117,
+              "estimated_total_snr_db": 0.02372798801576898,
+              "decoder_channel_snr_db": 9.607465081557113,
+              "confidence": 0.8684288660403473
+            },
+            {
+              "source_trial": 7,
+              "noise_repeat": 1,
+              "noise_seed": 2391191845,
+              "outcome": "crc_fail",
+              "realized_added_snr_db": -0.0018175840109885637,
+              "estimated_total_snr_db": -0.009277940752636786,
+              "decoder_channel_snr_db": 8.768868739568434,
+              "confidence": 0.7804747373107129
+            },
+            {
+              "source_trial": 8,
+              "noise_repeat": 1,
+              "noise_seed": 326081144,
+              "outcome": "crc_fail",
+              "realized_added_snr_db": 0.12366787075833385,
+              "estimated_total_snr_db": 0.10935638272652459,
+              "decoder_channel_snr_db": 7.438771824215903,
+              "confidence": 0.776577763797194
+            },
+            {
+              "source_trial": 9,
+              "noise_repeat": 1,
+              "noise_seed": 3911130630,
+              "outcome": "crc_fail",
+              "realized_added_snr_db": 0.05430144089881502,
+              "estimated_total_snr_db": 0.04776250672553273,
+              "decoder_channel_snr_db": 9.409011417479736,
+              "confidence": 0.8188276750701697
+            },
+            {
+              "source_trial": 10,
+              "noise_repeat": 1,
+              "noise_seed": 2433495569,
+              "outcome": "crc_fail",
+              "realized_added_snr_db": -0.035231018297477046,
+              "estimated_total_snr_db": -0.04992183761690062,
+              "decoder_channel_snr_db": 10.043719369101554,
+              "confidence": 0.8200089386089275
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}
