@@ -96,10 +96,22 @@ RX_BUFFER_SECONDS = 10.0
 class RadioTransport:
     """One radio: continuous RX capture + on-demand keyed TX."""
 
-    def __init__(self, radio_name: str, radio_config=None):
+    def __init__(self, radio_name: str, radio_config=None, receive_only: bool = False):
         self.radio = radios_mod.get_radio(radio_name, radio_config)
         self.out_device, self.in_device = self.radio.devices()
-        self.ptt = self.radio.ptt()
+        # receive_only is a safety construction, not a convenience: it takes
+        # the audio and never opens a PTT backend at all, so there is no
+        # object in this process capable of keying the radio. send() then
+        # raises rather than keying, and close() has no transmitter to
+        # account for. Characterisation benches use it for the listening end
+        # of a one-way test -- the receiving radio must not transmit, and
+        # this makes that a property of the object rather than of every
+        # caller remembering which transport is which. It is also the only
+        # way to bench a radio whose CI-V will not answer (see the IC-705's
+        # `CI-V USB Port` menu setting), since PTT discovery is otherwise
+        # required before the audio device can be used.
+        self.receive_only = bool(receive_only)
+        self.ptt = None if self.receive_only else self.radio.ptt()
 
         # A deque of 12 kHz receive chunks rather than one growing array: the audio
         # callback runs on PortAudio's realtime thread, and re-concatenating
@@ -215,6 +227,9 @@ class RadioTransport:
         raised PaErrorCode -9996, and the retry loop's natural instinct was
         to key again -- into a radio whose CI-V had stopped answering.
         """
+        if self.receive_only:
+            raise RuntimeError(
+                f"{self.radio.name} was opened receive-only and must not transmit")
         ptt_lead = 0.0 if ptt_lead is None else ptt_lead
         ptt_tail = 0.0 if ptt_tail is None else ptt_tail
         with self._tx_lock:
@@ -303,6 +318,8 @@ class RadioTransport:
 
     def close(self):
         self.stop_receiving()
+        if self.ptt is None:
+            return
         try:
             # ptt.close() un-keys first, and IcomCivPtt.key(False) no longer
             # raises -- but this is the last un-key of the process, so a

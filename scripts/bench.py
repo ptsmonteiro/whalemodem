@@ -79,9 +79,17 @@ WARMUP_SECONDS = 2.0
 
 
 @contextmanager
-def radio_pair(a=STATION_A, b=STATION_B, warmup=WARMUP_SECONDS, transport_cls=RadioTransport):
+def radio_pair(a=STATION_A, b=STATION_B, warmup=WARMUP_SECONDS, transport_cls=RadioTransport,
+               a_receive_only=False, b_receive_only=False):
     """Opens both bench radios, starts their RX streams, waits out the
     warm-up, and closes both however the body exits.
+
+    a_receive_only or b_receive_only opens that station with no PTT backend
+    at all: the bench takes its audio and nothing in the process can key it. Use it for
+    one-way tests whose receiving radio must not transmit -- it makes that
+    a property of the transport rather than of the caller's discipline --
+    and for a receiver whose PTT control is unavailable, since the audio
+    device is otherwise unreachable behind PTT discovery.
 
     The warm-up is not superstition: the first capture after a stream opens
     is short and sometimes empty, and a trial that runs into it reads as a
@@ -92,9 +100,9 @@ def radio_pair(a=STATION_A, b=STATION_B, warmup=WARMUP_SECONDS, transport_cls=Ra
     send() would otherwise discard.
     """
     print(f"opening radios ({a}, {b})...")
-    t_a = transport_cls(a)
+    t_a = transport_cls(a, receive_only=True) if a_receive_only else transport_cls(a)
     try:
-        t_b = transport_cls(b)
+        t_b = transport_cls(b, receive_only=True) if b_receive_only else transport_cls(b)
     except Exception:
         t_a.close()
         raise
