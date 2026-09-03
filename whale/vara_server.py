@@ -12,19 +12,30 @@ Commands (each line, '\r' or '\n' terminated):
     CONNECT <mycall> <dstcall> initiate a connection
     DISCONNECT                 tear down the current connection
     ABORT                      alias for DISCONNECT
+    CHAT ON / CHAT OFF         set chat mode (accepted; no behavior change yet)
+    BW<n>                      set bandwidth in Hz, e.g. BW2300 (no space)
 
 Status lines pushed back on the command port:
+    OK                         acknowledges MYCALL, CONNECT, DISCONNECT/ABORT,
+                                CHAT ON/OFF, and BW<n>
     PTT ON / PTT OFF
-    CONNECTED <peer> <mycall>
+    CONNECTED <mycall> <peer> <bandwidth>
+                                bandwidth is the value set by a prior BW<n>,
+                                or 0 if none was ever sent (see BW<n> above;
+                                whale has no channel-derived bandwidth to
+                                fall back on -- see _on_modem_event)
     CONNECT FAILED
     DISCONNECTED
-    BUFFER <n>
+    BUFFER <n>                 sent after a data-port write; n is always 0 --
+                                a known simplification, see _data_reader_loop
+    IAMALIVE                   unsolicited keepalive, sent roughly every 60s
+                                for the life of the server, connected or not
 
-Not implemented from real VARA's API: compression modes, bandwidth
-selection, WINLINK-specific extensions. This is a v1 built for one thing --
-two of our own stations exchanging bytes -- using VARA's API shape because
-that shape (two ports, connect/data-stream/disconnect) is a well-understood
-target, not because we're driving real VARA software.
+Not implemented from real VARA's API: compression modes, WINLINK-specific
+extensions. This is a v1 built for one thing -- two of our own stations
+exchanging bytes -- using VARA's API shape because that shape (two ports,
+connect/data-stream/disconnect) is a well-understood target, not because
+we're driving real VARA software.
 """
 
 import argparse
@@ -43,6 +54,11 @@ PUMP_RECV_TIMEOUT = 0.5
 # session is still active.
 DATA_ACCEPT_POLL = 0.5
 
+# Real VARA emits an unsolicited IAMALIVE roughly every 60s for the life of
+# the session, whether or not it is connected. Module-level so tests can
+# monkeypatch it to a short interval instead of waiting on the real cadence.
+IAMALIVE_INTERVAL = 60.0
+
 
 class StationServer:
     """VARA protocol translation over a transport-independent modem service."""
@@ -52,6 +68,9 @@ class StationServer:
         self.host = host
         self.cmd_port = cmd_port
         self.data_port = data_port
+
+        self.chat_mode = False
+        self.bandwidth_hz = None
 
         self.service = service
         self.service.subscribe(self._on_modem_event)
@@ -73,7 +92,13 @@ class StationServer:
         if name == "PTT":
             self._send_status("PTT ON" if kw.get("on") else "PTT OFF")
         elif name == "CONNECTED":
-            self._send_status(f"CONNECTED {kw['peer']} {kw['mycall']}")
+            # Real VARA: CONNECTED <mycall> <dstcall> <bandwidth>. whale has
+            # no channel-derived bandwidth to offer here (StationServer isn't
+            # handed the ChannelPolicy, and ChannelPolicy carries no
+            # bandwidth-like field to read even if it were), so this falls
+            # back to 0 when the client never sent BW<n>.
+            bandwidth = self.bandwidth_hz if self.bandwidth_hz is not None else 0
+            self._send_status(f"CONNECTED {kw['mycall']} {kw['peer']} {bandwidth}")
         elif name == "CONNECT_FAILED":
             self._send_status("CONNECT FAILED")
         elif name == "DISCONNECTED":
@@ -84,6 +109,18 @@ class StationServer:
                 if not self._data_accepting:
                     self._data_accepting = True
                     threading.Thread(target=self._accept_data_connection, daemon=True).start()
+
+    def _iamalive_loop(self):
+        """Send IAMALIVE roughly every IAMALIVE_INTERVAL seconds.
+
+        Runs for the life of the server, independent of connection state,
+        matching real VARA. Uses self._stopping.wait() rather than
+        time.sleep() so stop() interrupts it immediately instead of after
+        up to a full interval.
+        """
+        while not self._stopping.wait(IAMALIVE_INTERVAL):
+            if self._cmd_conn is not None:
+                self._send_status("IAMALIVE")
 
     def _send_status(self, line):
         logger.info("-> %s", line)
@@ -108,6 +145,12 @@ class StationServer:
                 self.service.write(chunk)
             except ConnectionError:
                 return
+            # Real VARA sends BUFFER <n> after an outbound data burst. whale
+            # has no cheap, test-verifiable notion of bytes still queued for
+            # transmission (the service's outbound queue drains asynchronously
+            # and doesn't correspond to over-the-air backlog), so this always
+            # reports 0 -- a known simplification, see LINK.md.
+            self._send_status("BUFFER 0")
 
     def _data_writer_loop(self, conn):
         while True:
@@ -160,7 +203,9 @@ class StationServer:
         if cmd == "MYCALL" and len(parts) >= 2:
             self.mycall = parts[1]
             self.service.set_callsign(parts[1])
+            self._send_status("OK")
         elif cmd == "LISTEN" and len(parts) >= 2:
+            # Not observed acking with OK in the capture; left unconfirmed.
             if parts[1].upper() == "ON":
                 self.service.listen(True)
             else:
@@ -169,8 +214,20 @@ class StationServer:
             mycall, dstcall = parts[1], parts[2]
             self.mycall = mycall
             self.service.connect(dstcall, mycall=mycall)
+            self._send_status("OK")
         elif cmd in ("DISCONNECT", "ABORT"):
+            # Real VARA acks ABORT immediately, before teardown completes --
+            # DISCONNECTED follows later, once the actual handshake with the
+            # peer finishes. Send OK first so the ordering matches regardless
+            # of how long service.disconnect() takes.
+            self._send_status("OK")
             self.service.disconnect()
+        elif cmd == "CHAT" and len(parts) >= 2:
+            self.chat_mode = parts[1].upper() == "ON"
+            self._send_status("OK")
+        elif cmd.startswith("BW") and len(cmd) > 2 and cmd[2:].isdigit():
+            self.bandwidth_hz = int(cmd[2:])
+            self._send_status("OK")
         else:
             logger.warning("unknown command: %r", line)
 
@@ -253,6 +310,7 @@ class StationServer:
 
         logger.info("whale VARA-API server: mycall=%s cmd=%d data=%d",
                     self.mycall, self.cmd_port, self.data_port)
+        threading.Thread(target=self._iamalive_loop, daemon=True).start()
         self.ready.set()
         try:
             while not self._stopping.is_set():

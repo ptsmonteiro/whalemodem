@@ -267,25 +267,51 @@ LISTEN OFF
 CONNECT <mycall> <destination_call>
 DISCONNECT
 ABORT
+CHAT ON
+CHAT OFF
+BW<n>
 ```
 
-`ABORT` is currently identical to `DISCONNECT`. Unknown or malformed commands
-are logged and receive no error response. `LISTEN ON` starts an incoming
-session worker if one is not already running. After the radio connection is
-established, that worker accepts one data-port TCP connection.
+`ABORT` is currently identical to `DISCONNECT`, except that (matching real
+VARA) it sends its `OK` acknowledgment before tearing the connection down,
+not after. Unknown or malformed commands are logged and receive no error
+response. `LISTEN ON` starts an incoming session worker if one is not
+already running. After the radio connection is established, that worker
+accepts one data-port TCP connection. `CHAT ON`/`CHAT OFF` are accepted and
+acknowledged but currently have no effect beyond recording the last-set mode
+on the server (`chat_mode`); `BW<n>` (no space before the number, e.g.
+`BW2300`) similarly records the requested bandwidth in Hz (`bandwidth_hz`)
+without yet changing any other behavior.
 
 The command port can emit these CR-terminated status lines:
 
 ```text
+OK
 PTT ON
 PTT OFF
-CONNECTED <peer> <mycall>
+CONNECTED <mycall> <peer> <bandwidth>
 CONNECT FAILED
 DISCONNECTED
+BUFFER <n>
+IAMALIVE
 ```
 
-Although `BUFFER <n>` appears in the server module's introductory docstring,
-the current implementation never emits it.
+`OK` acknowledges `MYCALL`, `CONNECT`, `DISCONNECT`/`ABORT`, `CHAT ON`/`CHAT
+OFF`, and `BW<n>`; `LISTEN ON`/`LISTEN OFF` are not acknowledged, matching
+what was observed of real VARA. The `<bandwidth>` field on `CONNECTED` is
+whatever a prior `BW<n>` command recorded (`bandwidth_hz`), or `0` if the
+client never sent one -- see "Current limitations" below.
+
+`BUFFER <n>` is sent once after each write on the data port. `n` is always
+`0`: whale has no cheap, test-verifiable notion of bytes still queued for
+over-the-air transmission (the outbound queue inside `ModemService` drains
+asynchronously and doesn't correspond to RF backlog), so this is a known
+simplification rather than a real buffer depth -- see "Current limitations"
+below.
+
+`IAMALIVE` is an unsolicited keepalive sent roughly every 60 seconds for the
+life of the server process, whether or not a radio connection is active,
+matching real VARA's behavior.
 
 ### Data port
 
@@ -315,8 +341,21 @@ is an implementation detail and must not be used for application framing.
 - Callsigns, supported-mode lists, and packet-body lengths are only lightly
   validated. This protocol currently assumes two trusted implementations of
   this code rather than hostile input.
-- Compression, bandwidth commands, WINLINK extensions, and most of the real
-  VARA command/status surface are not implemented.
+- `BW<n>` and `CHAT ON`/`CHAT OFF` are accepted and acknowledged with `OK`
+  and their values recorded (`bandwidth_hz`, `chat_mode`), but neither
+  currently changes any other observable behavior. Compression, WINLINK
+  extensions, and most of the rest of the real VARA command/status surface
+  are not implemented.
+- `BUFFER <n>` is always sent as `BUFFER 0` after a data-port write. This
+  matches the one data point observed of real VARA, but whale does not track
+  an actual outbound backlog, so the value carries no real buffer-depth
+  meaning beyond "a write happened."
+- The `<bandwidth>` argument on `CONNECTED` falls back to `0` when the client
+  never sent `BW<n>`. `whale.policy.ChannelPolicy` (the channel the station
+  was started with) carries no bandwidth-like field, and `StationServer`
+  isn't handed the policy object at all, so there is no channel-derived
+  value to use instead without adding that plumbing. A real bandwidth is
+  only ever reported when the client sets it explicitly.
 - The HF SSB policy sets `require_clear_channel`, and nothing enforces it:
   there is no busy-channel detector in this codebase. A station on `hf-ssb`
   transmits without listening first, which is fine on a bench pair and is not
