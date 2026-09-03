@@ -254,7 +254,7 @@ def test_vara_adapter_disconnect_and_abort_are_distinct_service_operations():
     assert service.calls == [("disconnect",), ("abort",)]
 
 
-def test_vara_adapter_translates_failed_connect_event():
+def test_vara_adapter_reports_failed_connect_as_disconnected():
     service = RecordingService()
     server = StationServer(service, "STA1", 8300, 8301)
     sent = []
@@ -262,7 +262,9 @@ def test_vara_adapter_translates_failed_connect_event():
 
     server._on_modem_event("CONNECT_FAILED")
 
-    assert sent == ["CONNECT FAILED"]
+    # capture-conn-fail.log contains no CONNECT FAILED line: after exhausting
+    # the outbound attempts, real VARA reports DISCONNECTED directly.
+    assert sent == ["DISCONNECTED"]
     assert server._data_accepting is False
 
 

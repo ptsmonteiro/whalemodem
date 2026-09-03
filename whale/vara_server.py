@@ -24,8 +24,8 @@ Status lines pushed back on the command port:
                                 or 0 if none was ever sent (see BW<n> above;
                                 whale has no channel-derived bandwidth to
                                 fall back on -- see _on_modem_event)
-    CONNECT FAILED
-    DISCONNECTED
+    DISCONNECTED                 sent after established teardown or an
+                                 exhausted outbound connection attempt
     BUFFER 0                   sent after queued application data finishes a
                                 link send; nonzero semantics are unconfirmed
     IAMALIVE                   unsolicited keepalive, sent roughly every 60s
@@ -108,7 +108,12 @@ class StationServer:
             bandwidth = self.bandwidth_hz if self.bandwidth_hz is not None else 0
             self._send_status(f"CONNECTED {kw['mycall']} {kw['peer']} {bandwidth}")
         elif name == "CONNECT_FAILED":
-            self._send_status("CONNECT FAILED")
+            # A failed outbound attempt is an internal distinction. VARA HF
+            # 4.3.0 reports the exhausted attempt as DISCONNECTED on its
+            # command port (capture-conn-fail.log), with no CONNECT FAILED
+            # line, even though no CONNECTED status preceded it.
+            self._send_status("DISCONNECTED")
+            self._close_data_connection()
         elif name == "DISCONNECTED":
             self._send_status("DISCONNECTED")
             self._close_data_connection()

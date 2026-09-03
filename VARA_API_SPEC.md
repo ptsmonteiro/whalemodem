@@ -4,14 +4,15 @@ This document records what a real VARA modem was observed to do over its two
 TCP ports (command and data), captured with `scripts/vara_api_sniffer.py`
 proxying between a VARA terminal client and a real VARA instance. It is not a
 transcription of an official specification — EA5HVK has not published one —
-it is inferred from two connect/data/disconnect sessions between two VARA-HF
-stations (`F4JAW-2` connecting to `F4JAW-1`, bandwidth 2300 Hz): the original
-mixed/binary session in `capture1.log` and a short, human-readable chat
-session in `capture-chat.log`.
+it is inferred from three sessions between VARA-HF stations at 2300 Hz: two
+successful connect/data/disconnect sessions (`F4JAW-2` connecting to
+`F4JAW-1`) in the original mixed/binary `capture1.log` and the short,
+human-readable `capture-chat.log`, plus an unsuccessful call from `F4JAW-2`
+to `F4JAW-11` in `capture-conn-fail.log`.
 
 Treat every entry below as **observed, not guaranteed**. Anything not
-exercised in either capture (incoming LISTEN-side connect, CONNECT FAILED,
-compression, WINLINK extensions) is marked as such
+exercised in these captures (incoming LISTEN-side connect, compression,
+WINLINK extensions) is marked as such
 and needs a follow-up capture before being treated as settled. This document
 exists to plan `whale/vara_server.py` work against; see that file and
 [LINK.md](LINK.md) for the current whale-side implementation and its
@@ -69,11 +70,12 @@ commands, WINLINK-session commands.
 | `CONNECTED <mycall> <dstcall> <bandwidth>` | `CONNECTED F4JAW-2 F4JAW-1 2300` | **Three arguments**: local call, peer call, and bandwidth in Hz. Whale's current adapter now emits this observed shape; it uses the preceding `BW<n>` value or `0` if none was supplied. |
 | `SN <x.y>` | `SN 11.4` | Signal-to-noise readout, one decimal place, varies per burst. Usually appears immediately before a `BITRATE (...) RX` line, sometimes in the same packet. |
 | `BUFFER <n>` | `BUFFER 0` | Observed after each of four outbound chat messages, as well as after the outbound binary write in `capture1.log`. Only value `0` was observed; it arrived after the data-bearing TX burst and before a following short PTT cycle. The unit and exact semantics (bytes queued? frames queued?) remain unconfirmed. |
-| `DISCONNECTED` | `DISCONNECTED` | Sent once teardown completes — see ABORT timing below. Matches whale's current format. |
+| `DISCONNECTED` | `DISCONNECTED` | Sent once established-session teardown completes, and also when an outbound connection attempt exhausts its retries without ever connecting. Matches whale's current API format. |
 
-Not exercised in this capture: `CONNECT FAILED` (the connect in this capture
-succeeded), any status specific to an incoming/LISTEN-side connect, WINLINK
-or compression status lines.
+No `CONNECT FAILED` line was observed. The targeted failed-call capture instead
+ended with `DISCONNECTED`; any conditions under which real VARA might use the
+widely cited `CONNECT FAILED` spelling remain unknown. Also not exercised:
+any status specific to an incoming/LISTEN-side connect, WINLINK, or compression.
 
 ### Session sequence (as observed)
 
@@ -104,6 +106,15 @@ or compression status lines.
    the actual disconnect handshake with the peer), then VARA sends
    `PTT OFF`, `DISCONNECTED`, `BUSY OFF`, `BUSY ON` together, and finally a
    trailing `BUSY OFF`.
+7. **Failed outbound connection (`capture-conn-fail.log`)**: VARA acknowledges
+   `CONNECT F4JAW-2 F4JAW-11` with `OK` about 0.09s later, in the same TCP
+   write as the first `PTT ON` and `BUSY ON`. It makes 15 observed transmit
+   attempts, each bracketed by `PTT ON`/`PTT OFF`, over about 47.2s. An
+   `IAMALIVE` occurs normally between attempts. About 1.86s after the final
+   `PTT OFF` (49.07s after the command), VARA sends
+   `DISCONNECTED\rBUSY OFF\r`; `BUSY ON` follows about 1.0s later and
+   `BUSY OFF` about 1.75s after that. It never emits `CONNECTED`,
+   `UNENCRYPTED LINK`, or `CONNECT FAILED` during this attempt.
 
 Important: `ABORT`'s `OK` is an immediate command acknowledgment, not a
 completion signal — `DISCONNECTED` only arrives after the real teardown
@@ -121,7 +132,8 @@ client must accept `DISCONNECTED` without a preceding local command or `OK`.
 
 At the TCP layer this is a byte stream in both directions: TCP writes and
 `recv()` calls do not preserve record boundaries. The modem API did not add
-any separately visible binary envelope around the bytes in either capture.
+any separately visible binary envelope around the bytes in either successful
+capture.
 Any higher-level record format must therefore be parsed across arbitrary TCP
 chunk boundaries.
 
@@ -166,25 +178,28 @@ the generic byte-stream adapter without further evidence.
 
 ## Known gaps in this document
 
-This spec is built from two successful outbound-connect sessions on one
-bandwidth (2300 Hz), both using `CHAT ON`. It does not yet cover:
+This spec is built from two successful outbound-connect sessions and one
+failed outbound-connect session on one bandwidth (2300 Hz), all using
+`CHAT ON`. It does not yet cover:
 
 - An incoming connection accepted via `LISTEN ON` (all status-line wording
   and ordering on the accepting side is unconfirmed).
-- A failed connect (`CONNECT FAILED` wording/timing unconfirmed).
+- Failure modes other than an unanswered outbound call. That observed case
+  ends with `DISCONNECTED`, not `CONNECT FAILED`; whether real VARA emits the
+  latter for rejection or another failure class remains unconfirmed.
 - `DISCONNECT` as distinct from `ABORT` (only `ABORT` was exercised).
   Whale provisionally treats `DISCONNECT` as a graceful drain of already
   accepted outbound bytes and `ABORT` as discarding those bytes before the
   same radio teardown; this is an implementation safety policy, not captured
   VARA behavior.
-- Compression commands. Neither capture contains even a command token, so
+- Compression commands. None of the captures contains even a command token, so
   the spelling, arguments, acknowledgement, session lifetime, and ownership
   of the byte transformation are all unknown. In particular, names such as
   `COMPRESSION ON` must be treated as hypotheses, not protocol facts. A
   follow-up capture must include the command-port exchange and identical
   data-port payloads with the setting disabled and enabled before this can be
   implemented as a compatibility feature.
-- WINLINK-session commands. Neither capture contains a command or status line
+- WINLINK-session commands. None of the captures contains a command or status line
   identifiable as WINLINK-specific, so even the token spelling is unknown.
   Whale consequently leaves every unrecognized extension on its existing
   unknown-command path: it changes no state and sends no `OK`. This boundary

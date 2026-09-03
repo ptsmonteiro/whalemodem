@@ -301,7 +301,6 @@ OK
 PTT ON
 PTT OFF
 CONNECTED <mycall> <peer> <bandwidth>
-CONNECT FAILED
 DISCONNECTED
 BUFFER <n>
 IAMALIVE
@@ -315,18 +314,20 @@ client never sent one -- see "Current limitations" below.
 
 An outbound `CONNECT` is acknowledged with `OK` when its asynchronous attempt
 is accepted for processing. If the link exhausts its retry budget, it returns
-to `IDLE` and the command port subsequently emits `CONNECT FAILED`; no data-port
-connection is accepted. The link-to-service-to-VARA-adapter propagation of
-that outcome is covered by tests. Neither available real-VARA capture contains
-a failed call, however, so the exact spelling and timing of `CONNECT FAILED`
-remain a provisional compatibility choice pending a targeted capture.
+to `IDLE` and its internal service emits `CONNECT_FAILED`. At the VARA API
+boundary that event is translated to `DISCONNECTED`, and no data-port
+connection is accepted. This matches `capture-conn-fail.log`: VARA HF 4.3.0
+acknowledged the call immediately, made 15 keyed attempts over about 47.2s,
+then emitted `DISCONNECTED` about 49.1s after the command without ever
+emitting `CONNECTED` or `CONNECT FAILED`. Whether some other rejection or
+failure class uses `CONNECT FAILED` remains unknown.
 
 For an incoming connection armed by `LISTEN ON`, whale emits
 `CONNECTED <local_call> <caller_call> <bandwidth>` and then accepts the data
 connection exactly as it does for an outbound connection. This local/peer
 ordering is the symmetric extension of the captured outbound form, not a
-claim about observed LISTEN-side VARA behavior: neither available capture
-contains an incoming connection.
+claim about observed LISTEN-side VARA behavior: neither successful capture
+is accepting-side.
 
 `BUFFER 0` is sent after a successful link send when the service's accepted
 application-data queue is empty. It is not sent merely because the TCP data
@@ -382,7 +383,7 @@ is an implementation detail and must not be used for application framing.
   whether compression transforms data-port bytes. Whale therefore leaves
   such commands on the unknown-command path and does not reply `OK`: falsely
   acknowledging a guessed form could make a client send data under an
-  incompatible assumption. Likewise, neither capture contains a command or
+  incompatible assumption. Likewise, none of the captures contains a command or
   status identifiable as WINLINK-specific. Until a paired ordinary/WINLINK
   capture establishes its tokens, replies, lifetime/reset behavior, and data
   semantics, WINLINK extensions deliberately receive no `OK`, change no
