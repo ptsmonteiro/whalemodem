@@ -22,10 +22,10 @@ BER -- the informative FEC diagnostic the task asks for. When FEC is off,
 the two numbers are computed against the same bit stream and should
 match exactly (kept as a live consistency check on the harness itself).
 
-SAFETY: IC-705 must never transmit. --direction is hardcoded to "ab" (no
-"ba"/"both" choice exists) and only transport_a (ic7300 by default) is ever
-keyed via .send(). There is deliberately no code path here that calls
-transport_b.send().
+SAFETY: the normal direction is IC-7300 -> IC-705 and opens the IC-705
+receive-only. The reverse direction exists only behind the explicit
+``--allow-ic705-tx`` acknowledgement; it opens the IC-7300 receive-only and
+keys the IC-705. There is no bidirectional choice.
 """
 
 from __future__ import annotations
@@ -78,7 +78,8 @@ def _compute_ber(truth_bits: np.ndarray, payload_len: int, rx_bits, *, length_by
     return {"ber": errors / bits_compared, "bit_errors": errors, "bits_compared": bits_compared}
 
 
-def run_direction(tx, rx, direction, mode, trials, seed, *, capture_tail, inter_trial):
+def run_direction(tx, rx, direction, mode, trials, seed, *, capture_tail, inter_trial,
+                  capture_dir=None):
     payload_bytes = mode.max_payload_bytes
     fec_text = mode.fec_rate or "none"
     print(f"\n  {direction}: {trials} x {payload_bytes} B, fft={mode.fft_size} "
@@ -99,6 +100,16 @@ def run_direction(tx, rx, direction, mode, trials, seed, *, capture_tail, inter_
         keyed = tx.send(audio)
         time.sleep(capture_tail)
         captured = rx.snapshot_rx()
+
+        # Capture level, before anything looks at the bits. An OFDM signal
+        # with a ~10 dB crest factor dies fast when the receive audio chain
+        # clips, and a clipped capture otherwise presents as an ordinary
+        # decode failure. peak at/above 1.0 means the ADC or the float path
+        # ran out of headroom; RMS at the noise floor means nothing arrived.
+        cap = np.asarray(captured, dtype=np.float64)
+        cap_rms = float(np.sqrt(np.mean(cap ** 2))) if cap.size else None
+        cap_peak = float(np.max(np.abs(cap))) if cap.size else None
+        cap_clipped = int(np.sum(np.abs(cap) >= 0.999)) if cap.size else None
 
         result = mode.demodulate(captured)
         decoded_payload = result.get("payload")
@@ -139,6 +150,12 @@ def run_direction(tx, rx, direction, mode, trials, seed, *, capture_tail, inter_
             "outcome": outcome, "confidence": result.get("confidence"),
             "freq_offset_hz": result.get("freq_offset_hz"),
             "channel_snr_db": result.get("channel_snr_db"),
+            "per_bin_snr_db_min": result.get("per_bin_snr_db_min"),
+            "per_bin_snr_db_median": result.get("per_bin_snr_db_median"),
+            "per_bin_snr_db_max": result.get("per_bin_snr_db_max"),
+            "per_bin_snr_db": result.get("per_bin_snr_db"),
+            "capture_rms": cap_rms, "capture_peak": cap_peak,
+            "capture_clipped_samples": cap_clipped,
             "pilot_symbols": result.get("pilot_symbols"),
             "phase_slope_rad_per_bin": result.get("phase_slope_rad_per_bin"),
             "ldpc_ok": result.get("ldpc_ok"), "ldpc_iterations": result.get("ldpc_iterations"),
@@ -148,6 +165,14 @@ def run_direction(tx, rx, direction, mode, trials, seed, *, capture_tail, inter_
             "ber": post_ber_info["ber"], "bit_errors": post_ber_info["bit_errors"],
             "bits_compared": post_ber_info["bits_compared"],
         }
+        # Raw 12 kHz capture, kept so a disputed trial can be re-demodulated
+        # offline without re-keying a radio. Optional: callers that pass no
+        # capture_dir behave exactly as before.
+        if capture_dir is not None:
+            cap_path = Path(capture_dir) / f"trial{trial:02d}.npy"
+            np.save(cap_path, cap.astype(np.float32))
+            record["capture_file"] = cap_path.name
+
         records.append(record)
         conf = record["confidence"]
         conf_text = "n/a" if conf is None else f"{conf:.3f}"
@@ -160,8 +185,15 @@ def run_direction(tx, rx, direction, mode, trials, seed, *, capture_tail, inter_
         ber = record["ber"]
         ber_text = "ber=n/a" if ber is None else f"ber={ber:.4f}({record['bit_errors']}/{record['bits_compared']})"
         ldpc_text = "" if not mode.fec_rate else f" ldpc_ok={record['ldpc_ok']} iters={record['ldpc_iterations']}"
-        print(f"    {trial}/{trials}: keyed={keyed:.2f}s rx={len(captured)} "
-              f"conf={conf_text}{snr_text}{foff_text} {raw_ber_text} {ber_text}{ldpc_text} {outcome}")
+        lvl_text = ("" if cap_rms is None
+                    else f" rms={cap_rms:.4f} peak={cap_peak:.3f}"
+                         + (f" CLIP({cap_clipped})" if cap_clipped else ""))
+        bsnr_lo = record["per_bin_snr_db_min"]
+        bsnr_text = ("" if bsnr_lo is None
+                     else f" binsnr={bsnr_lo:.1f}/{record['per_bin_snr_db_median']:.1f}/"
+                          f"{record['per_bin_snr_db_max']:.1f}dB")
+        print(f"    {trial}/{trials}: keyed={keyed:.2f}s rx={len(captured)}{lvl_text} "
+              f"conf={conf_text}{snr_text}{bsnr_text}{foff_text} {raw_ber_text} {ber_text}{ldpc_text} {outcome}")
         if trial != trials:
             time.sleep(inter_trial)
     return records
@@ -199,14 +231,23 @@ def main(argv=None, *, pair_factory=bench.radio_pair):
     ap.add_argument("--n-preamble-symbols", type=int, default=2)
     ap.add_argument("--trials", type=int, default=DEFAULT_TRIALS)
     ap.add_argument("--seed", type=int, default=20260901)
-    ap.add_argument("--direction", choices=("ab",), default="ab",
-                     help="ic7300(TX) -> ic705(RX) only. ic705 must never "
-                          "transmit for this task; ba/both are removed.")
+    ap.add_argument("--direction", choices=("ab", "ba"), default="ab",
+                     help="ab is the safe default; ba additionally requires "
+                          "--allow-ic705-tx")
+    ap.add_argument("--allow-ic705-tx", action="store_true",
+                    help="explicit acknowledgement required for direction ba")
     ap.add_argument("--capture-tail", type=float, default=DEFAULT_CAPTURE_TAIL)
     ap.add_argument("--inter-trial", type=float, default=DEFAULT_INTER_TRIAL)
     ap.add_argument("--output-dir", type=Path)
     ap.add_argument("--label", default="")
+    ap.add_argument("--save-captures", action="store_true",
+                     help="write each trial's raw 12 kHz capture to "
+                          "<output-dir>/captures/trialNN.npy for offline re-analysis")
     args = ap.parse_args(argv)
+    if args.direction == "ba" and not args.allow_ic705_tx:
+        ap.error("--direction ba requires explicit --allow-ic705-tx")
+    if args.allow_ic705_tx and args.direction != "ba":
+        ap.error("--allow-ic705-tx is valid only with --direction ba")
 
     in_band = ofdm49.bins_in_band(args.fft_size)
     if args.active_bins is not None:
@@ -233,6 +274,10 @@ def main(argv=None, *, pair_factory=bench.radio_pair):
     stamp = datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%SZ")
     output_dir = args.output_dir or Path("logs") / "mode_sweeps" / f"hf10_ofdm49_v6-{stamp}"
     output_dir.mkdir(parents=True, exist_ok=True)
+    capture_dir = None
+    if args.save_captures:
+        capture_dir = output_dir / "captures"
+        capture_dir.mkdir(parents=True, exist_ok=True)
 
     print(f"hf10_ofdm49_v6 hardware test {args.label}")
     print(f"radios A={args.a}, B={args.b}; seed={args.seed}; trials={args.trials}")
@@ -246,11 +291,20 @@ def main(argv=None, *, pair_factory=bench.radio_pair):
           f"net_bps_if_all_decode={(mode.max_payload_bytes*8)/mode.frame_seconds():.1f}")
 
     records = []
-    with pair_factory(args.a, args.b, warmup=3.0) as (transport_a, transport_b):
+    # Whichever station receives is opened without a PTT backend. Reverse
+    # operation additionally passed the explicit CLI acknowledgement above.
+    pair_options = ({"b_receive_only": True} if args.direction == "ab" else
+                    {"a_receive_only": True})
+    with pair_factory(args.a, args.b, warmup=3.0,
+                      **pair_options) as (transport_a, transport_b):
+        if args.direction == "ab":
+            tx, rx, direction = transport_a, transport_b, f"A:{args.a}->B:{args.b}"
+        else:
+            tx, rx, direction = transport_b, transport_a, f"B:{args.b}->A:{args.a}"
         records.extend(run_direction(
-            transport_a, transport_b, f"A:{args.a}->B:{args.b}", mode,
-            args.trials, args.seed,
-            capture_tail=args.capture_tail, inter_trial=args.inter_trial))
+            tx, rx, direction, mode, args.trials, args.seed,
+            capture_tail=args.capture_tail, inter_trial=args.inter_trial,
+            capture_dir=capture_dir))
 
     decoded = sum(1 for r in records if r["outcome"] == "decoded")
     total = len(records)
@@ -259,8 +313,30 @@ def main(argv=None, *, pair_factory=bench.radio_pair):
     mean_ber = float(np.mean(bers)) if bers else None
     mean_raw_ber = float(np.mean(raw_bers)) if raw_bers else None
     net_bps = (mode.max_payload_bytes * 8 / mode.frame_seconds()) if decoded == total and total > 0 else None
+    peaks = [r["capture_peak"] for r in records if r["capture_peak"] is not None]
+    rmss = [r["capture_rms"] for r in records if r["capture_rms"] is not None]
+    clipped_trials = sum(1 for r in records if r["capture_clipped_samples"])
+    foffs = [r["freq_offset_hz"] for r in records if r["freq_offset_hz"] is not None]
+    bmins = [r["per_bin_snr_db_min"] for r in records if r["per_bin_snr_db_min"] is not None]
+    bmeds = [r["per_bin_snr_db_median"] for r in records if r["per_bin_snr_db_median"] is not None]
+    bmaxs = [r["per_bin_snr_db_max"] for r in records if r["per_bin_snr_db_max"] is not None]
+    levels = {
+        "max_capture_peak": max(peaks) if peaks else None,
+        "mean_capture_rms": float(np.mean(rmss)) if rmss else None,
+        "clipped_trials": clipped_trials,
+        "mean_freq_offset_hz": float(np.mean(foffs)) if foffs else None,
+        "mean_per_bin_snr_db_min": float(np.mean(bmins)) if bmins else None,
+        "mean_per_bin_snr_db_median": float(np.mean(bmeds)) if bmeds else None,
+        "mean_per_bin_snr_db_max": float(np.mean(bmaxs)) if bmaxs else None,
+    }
     print(f"\n== RESULTS == {decoded}/{total} decoded; mean_raw_ber={mean_raw_ber}; "
           f"mean_post_ber={mean_ber}; net_bps={net_bps}")
+    if peaks:
+        print(f"   levels: max_peak={max(peaks):.3f} mean_rms={np.mean(rmss):.4f} "
+              f"clipped_trials={clipped_trials}/{total}")
+    if bmins:
+        print(f"   per-carrier SNR (mean over trials): min={np.mean(bmins):.1f} "
+              f"median={np.mean(bmeds):.1f} max={np.mean(bmaxs):.1f} dB")
 
     out = {
         "note": "Provisional smoke evidence only, not a qualification run.",
@@ -278,7 +354,7 @@ def main(argv=None, *, pair_factory=bench.radio_pair):
                    "max_payload_bytes": mode.max_payload_bytes},
         "seed": args.seed, "trials": records,
         "summary": {"decoded": decoded, "total": total, "mean_ber": mean_ber,
-                     "mean_raw_ber": mean_raw_ber, "net_bps": net_bps},
+                     "mean_raw_ber": mean_raw_ber, "net_bps": net_bps, **levels},
     }
     result_path = output_dir / "result.json"
     result_path.write_text(json.dumps(out, indent=2, allow_nan=False) + "\n")

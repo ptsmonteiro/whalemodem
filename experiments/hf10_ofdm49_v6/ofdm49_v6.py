@@ -488,12 +488,14 @@ class OFDM49Mode:
         noise_powers = []
         sig_powers = []
         bin_noise_list = []  # per-bin residual power, for the LLR demapper
+        bin_sig_list = []    # per-bin reference power, for per_bin_snr_db only
         for pb in pre_bins_seq:
             eq = pb / gain0
             resid = np.abs(eq - self._preamble_bin_symbols) ** 2
             noise_powers.append(np.mean(resid))
             sig_powers.append(np.mean(np.abs(self._preamble_bin_symbols) ** 2))
             bin_noise_list.append(resid)
+            bin_sig_list.append(np.abs(self._preamble_bin_symbols) ** 2)
 
         anchors_idx = [self.n_preamble_symbols / 2.0 - 0.5]
         anchors_gain = [gain0]
@@ -521,6 +523,7 @@ class OFDM49Mode:
                 noise_powers.append(np.mean(pilot_resid))
                 sig_powers.append(np.mean(np.abs(self._pilot_bin_symbols) ** 2))
                 bin_noise_list.append(pilot_resid)
+                bin_sig_list.append(np.abs(self._pilot_bin_symbols) ** 2)
             cursor += count
 
         anchors_idx = np.array(anchors_idx)
@@ -558,6 +561,23 @@ class OFDM49Mode:
         result["pilot_symbols"] = len(anchors_idx) - 1
 
         bin_noise_var = np.mean(bin_noise_list, axis=0)  # (n_active,)
+
+        # Per-carrier post-equalization SNR, reported additively as a
+        # diagnostic (hf14's hardware phase). bin_noise_list holds, for
+        # every known-symbol OFDM symbol (preamble + time pilots), the
+        # per-bin squared error of that symbol AFTER dividing by the gain
+        # estimate, and bin_sig_list the matching per-bin reference power.
+        # The ratio is therefore the SNR each subcarrier actually presents
+        # to the slicer: a deeply faded bin shows up here because its gain
+        # estimate is itself noisy, which the scalar channel_snr_db above
+        # averages away. Nothing below consumes this -- channel_snr_db and
+        # every decode path are unchanged.
+        bin_sig_power = np.mean(bin_sig_list, axis=0)  # (n_active,)
+        per_bin_snr_db = 10 * np.log10(bin_sig_power / (bin_noise_var + 1e-15))
+        result["per_bin_snr_db"] = [float(v) for v in per_bin_snr_db]
+        result["per_bin_snr_db_min"] = float(np.min(per_bin_snr_db))
+        result["per_bin_snr_db_median"] = float(np.median(per_bin_snr_db))
+        result["per_bin_snr_db_max"] = float(np.max(per_bin_snr_db))
 
         data_syms_full = (eq_data * np.exp(-1j * self._phase_schedule)[None, :])
         data_syms_flat = data_syms_full[:, self._data_idx].reshape(-1)
