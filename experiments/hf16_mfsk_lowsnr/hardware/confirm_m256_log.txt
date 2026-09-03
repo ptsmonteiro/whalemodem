@@ -1,0 +1,67 @@
+  raising receive buffer 10.0s -> 15.2s for a 12.0s frame
+hf16 MFSK hardware test hf16 confirm M256 r1 K7 12s amp0.9
+  ic705(TX) -> ic7300(RX)  trials=55 seed=20260903 amplitude=0.9
+  1 configs, about 660s of keying total
+  M256_r1_K7_f12_s1: M=256 spacing=9.38Hz symbol=106.7ms K=7 repeat=1 sync=10sym payload=100sym bytes=43 frame=12.00s raw=75bps net=28.7bps
+opening radios (ic705, ic7300)...
+warming up 3s...
+    [1/55] M256_r1_K7_f12_s1            keyed=12.15s rms=0.0752 peak=0.340 sync=0.023 off=+8.37Hz tone_snr=10.2dB decoded
+    [2/55] M256_r1_K7_f12_s1            keyed=12.15s rms=0.0764 peak=0.344 sync=0.024 off=+8.48Hz tone_snr=9.9dB decoded
+    [3/55] M256_r1_K7_f12_s1            keyed=12.15s rms=0.0755 peak=0.341 sync=0.024 off=+8.62Hz tone_snr=10.2dB crc_fail
+    [4/55] M256_r1_K7_f12_s1            keyed=12.15s rms=0.0761 peak=0.359 sync=0.024 off=+7.80Hz tone_snr=10.1dB crc_fail
+    [5/55] M256_r1_K7_f12_s1            keyed=12.15s rms=0.0697 peak=0.369 sync=0.019 off=+8.49Hz tone_snr=10.6dB decoded
+    [6/55] M256_r1_K7_f12_s1            keyed=12.15s rms=0.0750 peak=0.323 sync=0.023 off=+7.87Hz tone_snr=9.5dB decoded
+    [7/55] M256_r1_K7_f12_s1            keyed=12.15s rms=0.0747 peak=0.339 sync=0.025 off=+8.65Hz tone_snr=10.1dB decoded
+    [8/55] M256_r1_K7_f12_s1            keyed=12.15s rms=0.0713 peak=0.342 sync=0.022 off=+7.99Hz tone_snr=10.3dB decoded
+    [9/55] M256_r1_K7_f12_s1            keyed=12.15s rms=0.0748 peak=0.337 sync=0.021 off=+8.12Hz tone_snr=9.7dB crc_fail
+    [10/55] M256_r1_K7_f12_s1            keyed=12.15s rms=0.0755 peak=0.356 sync=0.019 off=+8.40Hz tone_snr=10.0dB decoded
+    [11/55] M256_r1_K7_f12_s1            keyed=12.15s rms=0.0687 peak=0.350 sync=0.025 off=+8.00Hz tone_snr=10.6dB decoded
+    [12/55] M256_r1_K7_f12_s1            keyed=12.15s rms=0.0695 peak=0.364 sync=0.014 off=+7.86Hz tone_snr=10.4dB decoded
+    [13/55] M256_r1_K7_f12_s1            keyed=12.15s rms=0.0741 peak=0.341 sync=0.023 off=+8.25Hz tone_snr=10.8dB decoded
+    [14/55] M256_r1_K7_f12_s1            keyed=12.15s rms=0.0626 peak=0.358 sync=0.025 off=+17.03Hz tone_snr=n/a no_sync
+    [15/55] M256_r1_K7_f12_s1            keyed=12.15s rms=0.0755 peak=0.338 sync=0.018 off=+8.36Hz tone_snr=10.3dB decoded
+    [16/55] M256_r1_K7_f12_s1            keyed=12.15s rms=0.0767 peak=0.360 sync=0.021 off=+8.03Hz tone_snr=9.7dB crc_fail
+    [17/55] M256_r1_K7_f12_s1            keyed=12.15s rms=0.0745 peak=0.345 sync=0.022 off=+8.34Hz tone_snr=10.2dB decoded
+    [18/55] M256_r1_K7_f12_s1            keyed=12.15s rms=0.0737 peak=0.349 sync=0.024 off=+8.26Hz tone_snr=10.0dB decoded
+    [19/55] M256_r1_K7_f12_s1            keyed=12.15s rms=0.0762 peak=0.346 sync=0.021 off=+8.04Hz tone_snr=10.2dB decoded
+    [20/55] M256_r1_K7_f12_s1            keyed=12.15s rms=0.0757 peak=0.350 sync=0.025 off=+8.58Hz tone_snr=10.3dB decoded
+    [21/55] M256_r1_K7_f12_s1            keyed=12.15s rms=0.0726 peak=0.379 sync=0.022 off=+8.39Hz tone_snr=10.2dB decoded
+    [22/55] M256_r1_K7_f12_s1            keyed=12.15s rms=0.0756 peak=0.338 sync=0.014 off=+8.17Hz tone_snr=10.4dB decoded
+    [23/55] M256_r1_K7_f12_s1            keyed=12.15s rms=0.0764 peak=0.356 sync=0.021 off=+8.31Hz tone_snr=10.4dB decoded
+    [24/55] M256_r1_K7_f12_s1            keyed=12.15s rms=0.0769 peak=0.334 sync=0.020 off=+8.56Hz tone_snr=9.9dB decoded
+    [25/55] M256_r1_K7_f12_s1            keyed=12.15s rms=0.0711 peak=0.342 sync=0.021 off=+8.05Hz tone_snr=10.5dB decoded
+    [26/55] M256_r1_K7_f12_s1            keyed=12.15s rms=0.0744 peak=0.367 sync=0.026 off=+8.06Hz tone_snr=10.2dB decoded
+    [27/55] M256_r1_K7_f12_s1            keyed=12.15s rms=0.0752 peak=0.342 sync=0.025 off=+8.23Hz tone_snr=10.2dB decoded
+    [28/55] M256_r1_K7_f12_s1            keyed=12.15s rms=0.0721 peak=0.334 sync=0.021 off=+7.54Hz tone_snr=9.9dB decoded
+    [29/55] M256_r1_K7_f12_s1            keyed=12.15s rms=0.0737 peak=0.342 sync=0.023 off=+8.34Hz tone_snr=10.4dB decoded
+    [30/55] M256_r1_K7_f12_s1            keyed=12.15s rms=0.0741 peak=0.361 sync=0.024 off=+8.16Hz tone_snr=10.2dB decoded
+    [31/55] M256_r1_K7_f12_s1            keyed=12.15s rms=0.0738 peak=0.385 sync=0.019 off=+8.01Hz tone_snr=10.0dB decoded
+    [32/55] M256_r1_K7_f12_s1            keyed=12.15s rms=0.0749 peak=0.358 sync=0.023 off=+8.04Hz tone_snr=10.5dB decoded
+    [33/55] M256_r1_K7_f12_s1            keyed=12.15s rms=0.0748 peak=0.327 sync=0.024 off=+8.39Hz tone_snr=10.0dB decoded
+    [34/55] M256_r1_K7_f12_s1            keyed=12.15s rms=0.0749 peak=0.335 sync=0.026 off=+8.11Hz tone_snr=10.5dB decoded
+    [35/55] M256_r1_K7_f12_s1            keyed=12.15s rms=0.0747 peak=0.342 sync=0.023 off=+8.21Hz tone_snr=10.6dB decoded
+    [36/55] M256_r1_K7_f12_s1            keyed=12.15s rms=0.0739 peak=0.417 sync=0.020 off=+8.38Hz tone_snr=10.1dB decoded
+    [37/55] M256_r1_K7_f12_s1            keyed=12.15s rms=0.0750 peak=0.338 sync=0.027 off=+8.49Hz tone_snr=9.9dB decoded
+    [38/55] M256_r1_K7_f12_s1            keyed=12.15s rms=0.0741 peak=0.336 sync=0.026 off=+8.41Hz tone_snr=9.6dB decoded
+    [39/55] M256_r1_K7_f12_s1            keyed=12.15s rms=0.0758 peak=0.370 sync=0.023 off=+8.19Hz tone_snr=10.6dB decoded
+    [40/55] M256_r1_K7_f12_s1            keyed=12.15s rms=0.0747 peak=0.376 sync=0.023 off=+8.49Hz tone_snr=10.4dB decoded
+    [41/55] M256_r1_K7_f12_s1            keyed=12.15s rms=0.0767 peak=0.348 sync=0.017 off=+7.69Hz tone_snr=10.8dB crc_fail
+    [42/55] M256_r1_K7_f12_s1            keyed=12.15s rms=0.0752 peak=0.365 sync=0.023 off=+8.65Hz tone_snr=10.2dB decoded
+    [43/55] M256_r1_K7_f12_s1            keyed=12.15s rms=0.0761 peak=0.346 sync=0.027 off=+8.03Hz tone_snr=11.2dB crc_fail
+    [44/55] M256_r1_K7_f12_s1            keyed=12.15s rms=0.0738 peak=0.346 sync=0.020 off=+8.26Hz tone_snr=10.3dB crc_fail
+    [45/55] M256_r1_K7_f12_s1            keyed=12.15s rms=0.0769 peak=0.371 sync=0.029 off=+8.22Hz tone_snr=10.0dB crc_fail
+    [46/55] M256_r1_K7_f12_s1            keyed=12.15s rms=0.0747 peak=0.362 sync=0.019 off=+8.42Hz tone_snr=10.1dB decoded
+    [47/55] M256_r1_K7_f12_s1            keyed=12.15s rms=0.0701 peak=0.347 sync=0.024 off=+8.16Hz tone_snr=10.1dB crc_fail
+    [48/55] M256_r1_K7_f12_s1            keyed=12.15s rms=0.0755 peak=0.345 sync=0.026 off=+8.53Hz tone_snr=10.0dB crc_fail
+    [49/55] M256_r1_K7_f12_s1            keyed=12.15s rms=0.0722 peak=0.370 sync=0.026 off=+8.03Hz tone_snr=10.3dB crc_fail
+    [50/55] M256_r1_K7_f12_s1            keyed=12.15s rms=0.0735 peak=0.363 sync=0.022 off=+8.33Hz tone_snr=11.0dB crc_fail
+    [51/55] M256_r1_K7_f12_s1            keyed=12.15s rms=0.0760 peak=0.339 sync=0.018 off=+7.96Hz tone_snr=11.8dB crc_fail
+    [52/55] M256_r1_K7_f12_s1            keyed=12.15s rms=0.0747 peak=0.338 sync=0.019 off=+8.00Hz tone_snr=10.6dB crc_fail
+    [53/55] M256_r1_K7_f12_s1            keyed=12.15s rms=0.0707 peak=0.364 sync=0.020 off=+8.41Hz tone_snr=11.9dB crc_fail
+    [54/55] M256_r1_K7_f12_s1            keyed=12.15s rms=0.0745 peak=0.343 sync=0.027 off=+8.29Hz tone_snr=10.1dB decoded
+    [55/55] M256_r1_K7_f12_s1            keyed=12.15s rms=0.0739 peak=0.343 sync=0.025 off=+8.40Hz tone_snr=10.2dB crc_fail
+
+wrote experiments\hf16_mfsk_lowsnr\hardware\confirm_m256\result.json
+
+summary:
+  M256_r1_K7_f12_s1                38/55 net=  28.7bps sync=0.023 tone_snr=10.3dB
