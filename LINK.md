@@ -272,16 +272,27 @@ CHAT OFF
 BW<n>
 ```
 
-`ABORT` is currently identical to `DISCONNECT`, except that (matching real
-VARA) it sends its `OK` acknowledgment before tearing the connection down,
-not after. Unknown or malformed commands are logged and receive no error
-response. `LISTEN ON` starts an incoming session worker if one is not
+`DISCONNECT` and `ABORT` both acknowledge with `OK` immediately and later emit
+`DISCONNECTED` when the radio teardown completes. They differ in treatment of
+application data already accepted by the service: `DISCONNECT` sends that
+queued data before starting the normal DISC handshake, while `ABORT` discards
+it and starts the same handshake immediately. The captures only exercise
+`ABORT` and do not establish real VARA's distinction, so the `DISCONNECT`
+drain behavior is a conservative, provisional choice. Both paths clear
+session stream queues so bytes cannot leak into a later connection. Unknown
+or malformed commands are logged and receive no error response. `LISTEN ON`
+starts an incoming session worker if one is not
 already running. After the radio connection is established, that worker
-accepts one data-port TCP connection. `CHAT ON`/`CHAT OFF` are accepted and
-acknowledged but currently have no effect beyond recording the last-set mode
-on the server (`chat_mode`); `BW<n>` (no space before the number, e.g.
+accepts one data-port TCP connection. Exactly `CHAT ON` or `CHAT OFF` is
+accepted and acknowledged; other values or extra arguments remain on the
+unknown-command path. The accepted forms currently have no effect beyond
+recording the last-set mode on the server (`chat_mode`); `BW<n>` (no space before the number, e.g.
 `BW2300`) similarly records the requested bandwidth in Hz (`bandwidth_hz`)
-without yet changing any other behavior.
+without yet changing any other behavior. A real-implementation chat capture
+carried records as `<decimal byte count><space><payload>` in both directions,
+but it does not prove whether VARA interprets that prefix or merely transports
+framing supplied by the chat applications. Whale deliberately remains a raw
+byte-stream adapter until that responsibility is established.
 
 The command port can emit these CR-terminated status lines:
 
@@ -302,11 +313,28 @@ what was observed of real VARA. The `<bandwidth>` field on `CONNECTED` is
 whatever a prior `BW<n>` command recorded (`bandwidth_hz`), or `0` if the
 client never sent one -- see "Current limitations" below.
 
-`BUFFER <n>` is sent once after each write on the data port. `n` is always
-`0`: whale has no cheap, test-verifiable notion of bytes still queued for
-over-the-air transmission (the outbound queue inside `ModemService` drains
-asynchronously and doesn't correspond to RF backlog), so this is a known
-simplification rather than a real buffer depth -- see "Current limitations"
+An outbound `CONNECT` is acknowledged with `OK` when its asynchronous attempt
+is accepted for processing. If the link exhausts its retry budget, it returns
+to `IDLE` and the command port subsequently emits `CONNECT FAILED`; no data-port
+connection is accepted. The link-to-service-to-VARA-adapter propagation of
+that outcome is covered by tests. Neither available real-VARA capture contains
+a failed call, however, so the exact spelling and timing of `CONNECT FAILED`
+remain a provisional compatibility choice pending a targeted capture.
+
+For an incoming connection armed by `LISTEN ON`, whale emits
+`CONNECTED <local_call> <caller_call> <bandwidth>` and then accepts the data
+connection exactly as it does for an outbound connection. This local/peer
+ordering is the symmetric extension of the captured outbound form, not a
+claim about observed LISTEN-side VARA behavior: neither available capture
+contains an incoming connection.
+
+`BUFFER 0` is sent after a successful link send when the service's accepted
+application-data queue is empty. It is not sent merely because the TCP data
+port accepted a chunk. This matches the captured ordering after a data-bearing
+TX burst without assigning an unobserved unit or meaning to nonzero values.
+The link's internal ARQ work may already be complete at that point, so this is
+an empty-boundary compatibility signal, not a claimed measurement of VARA's
+internal RF backlog -- see "Current limitations"
 below.
 
 `IAMALIVE` is an unsolicited keepalive sent roughly every 60 seconds for the
@@ -343,13 +371,27 @@ is an implementation detail and must not be used for application framing.
   this code rather than hostile input.
 - `BW<n>` and `CHAT ON`/`CHAT OFF` are accepted and acknowledged with `OK`
   and their values recorded (`bandwidth_hz`, `chat_mode`), but neither
-  currently changes any other observable behavior. Compression, WINLINK
-  extensions, and most of the rest of the real VARA command/status surface
-  are not implemented.
-- `BUFFER <n>` is always sent as `BUFFER 0` after a data-port write. This
-  matches the one data point observed of real VARA, but whale does not track
-  an actual outbound backlog, so the value carries no real buffer-depth
-  meaning beyond "a write happened."
+  currently changes any other observable behavior. In particular, whale
+  neither adds nor removes the length prefix observed in the pure-chat
+  capture; callers can send that framing over the raw stream themselves.
+  Tests cover byte-for-byte transport in both directions with `CHAT ON`, with
+  `CHAT OFF`, and when no `CHAT` command was sent.
+  Compression, WINLINK-session extensions, and most of the rest of the real
+  VARA command/status surface are not implemented. The captures do not
+  establish a compression command's spelling, arguments, acknowledgement, scope, or
+  whether compression transforms data-port bytes. Whale therefore leaves
+  such commands on the unknown-command path and does not reply `OK`: falsely
+  acknowledging a guessed form could make a client send data under an
+  incompatible assumption. Likewise, neither capture contains a command or
+  status identifiable as WINLINK-specific. Until a paired ordinary/WINLINK
+  capture establishes its tokens, replies, lifetime/reset behavior, and data
+  semantics, WINLINK extensions deliberately receive no `OK`, change no
+  adapter state, and remain unsupported. The adapter test suite fixes this
+  fail-closed boundary without proposing an unevidenced wire token.
+- Whale emits only the observed `BUFFER 0`, after a successful link send has
+  drained its application-data queue. All five capture observations were zero,
+  so the unit, update cadence while nonempty, and legal nonzero range remain
+  unknown and whale does not fabricate them.
 - The `<bandwidth>` argument on `CONNECTED` falls back to `0` when the client
   never sent `BW<n>`. `whale.policy.ChannelPolicy` (the channel the station
   was started with) carries no bandwidth-like field, and `StationServer`

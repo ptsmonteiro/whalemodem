@@ -128,6 +128,10 @@ class ModemService:
     def disconnect(self) -> None:
         self._commands.put(("disconnect", None))
 
+    def abort(self) -> None:
+        """End the session without transmitting queued application data."""
+        self._commands.put(("abort", None))
+
     def write(self, data: bytes, timeout: float | None = None) -> None:
         if not data:
             return
@@ -161,8 +165,50 @@ class ModemService:
                 self._link.connect(destination)
             elif command == "disconnect":
                 self._listening = False
+                self._flush_outbound()
                 self._link.disconnect()
+                self._discard_stream_queues()
+            elif command == "abort":
+                self._listening = False
+                self._discard_queue(self._outbound)
+                self._link.disconnect()
+                self._discard_stream_queues()
         return True
+
+    @staticmethod
+    def _discard_queue(items: queue.Queue) -> None:
+        while True:
+            try:
+                items.get_nowait()
+            except queue.Empty:
+                return
+
+    def _discard_stream_queues(self) -> None:
+        # Stream bytes belong to one radio session and must never cross into
+        # the next connection, regardless of how this session ended.
+        self._discard_queue(self._outbound)
+        self._discard_queue(self._inbound)
+
+    def _flush_outbound(self) -> None:
+        chunks = []
+        while True:
+            try:
+                chunks.append(self._outbound.get_nowait())
+            except queue.Empty:
+                break
+        if chunks and self._link.state == "CONNECTED":
+            self._send_outbound(b"".join(chunks))
+
+    def _send_outbound(self, data: bytes) -> None:
+        """Complete one link send and report when the application queue drains.
+
+        The event deliberately carries no byte/frame count.  The VARA adapter
+        can map a confirmed empty boundary to the only captured status value,
+        ``BUFFER 0``, without inventing semantics for nonzero values.
+        """
+        self._link.send_message(data)
+        if self._outbound.empty():
+            self._emit("OUTBOUND_DRAINED")
 
     def _service_connected(self) -> None:
         try:
@@ -176,7 +222,7 @@ class ModemService:
                     chunks.append(self._outbound.get_nowait())
                 except queue.Empty:
                     break
-            self._link.send_message(b"".join(chunks))
+            self._send_outbound(b"".join(chunks))
             return
         message = self._link.recv_message(timeout=self._poll_interval)
         if message is not None:

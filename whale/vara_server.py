@@ -10,8 +10,8 @@ Commands (each line, '\r' or '\n' terminated):
     LISTEN ON                  accept an incoming CONNECT
     LISTEN OFF                 stop accepting incoming CONNECTs
     CONNECT <mycall> <dstcall> initiate a connection
-    DISCONNECT                 tear down the current connection
-    ABORT                      alias for DISCONNECT
+    DISCONNECT                 send queued data, then tear down the connection
+    ABORT                      discard queued data, then tear down immediately
     CHAT ON / CHAT OFF         set chat mode (accepted; no behavior change yet)
     BW<n>                      set bandwidth in Hz, e.g. BW2300 (no space)
 
@@ -26,13 +26,16 @@ Status lines pushed back on the command port:
                                 fall back on -- see _on_modem_event)
     CONNECT FAILED
     DISCONNECTED
-    BUFFER <n>                 sent after a data-port write; n is always 0 --
-                                a known simplification, see _data_reader_loop
+    BUFFER 0                   sent after queued application data finishes a
+                                link send; nonzero semantics are unconfirmed
     IAMALIVE                   unsolicited keepalive, sent roughly every 60s
                                 for the life of the server, connected or not
 
-Not implemented from real VARA's API: compression modes, WINLINK-specific
-extensions. This is a v1 built for one thing -- two of our own stations
+Not implemented from real VARA's API: compression modes or WINLINK-session
+extensions (the available captures establish neither command syntax nor
+semantics). They remain on the unknown-command path: no state is changed and
+no success acknowledgement is sent. This is
+a v1 built for one thing -- two of our own stations
 exchanging bytes -- using VARA's API shape because that shape (two ports,
 connect/data-stream/disconnect) is a well-understood target, not because
 we're driving real VARA software.
@@ -93,6 +96,11 @@ class StationServer:
             self._send_status("PTT ON" if kw.get("on") else "PTT OFF")
         elif name == "CONNECTED":
             # Real VARA: CONNECTED <mycall> <dstcall> <bandwidth>. whale has
+            # only outbound-caller capture evidence for that ordering. For
+            # an incoming connection, Link supplies the accepting station as
+            # mycall and the caller as peer; use the same local/peer shape
+            # until an accepting-side capture establishes otherwise.
+            #
             # no channel-derived bandwidth to offer here (StationServer isn't
             # handed the ChannelPolicy, and ChannelPolicy carries no
             # bandwidth-like field to read even if it were), so this falls
@@ -104,6 +112,11 @@ class StationServer:
         elif name == "DISCONNECTED":
             self._send_status("DISCONNECTED")
             self._close_data_connection()
+        elif name == "OUTBOUND_DRAINED":
+            # All five captured BUFFER reports were zero and followed the
+            # data-bearing TX burst.  Do not invent uncaptured units or a
+            # nonzero range; translate only the service's empty boundary.
+            self._send_status("BUFFER 0")
         if name == "CONNECTED":
             with self._data_lock:
                 if not self._data_accepting:
@@ -145,12 +158,6 @@ class StationServer:
                 self.service.write(chunk)
             except ConnectionError:
                 return
-            # Real VARA sends BUFFER <n> after an outbound data burst. whale
-            # has no cheap, test-verifiable notion of bytes still queued for
-            # transmission (the service's outbound queue drains asynchronously
-            # and doesn't correspond to over-the-air backlog), so this always
-            # reports 0 -- a known simplification, see LINK.md.
-            self._send_status("BUFFER 0")
 
     def _data_writer_loop(self, conn):
         while True:
@@ -221,8 +228,16 @@ class StationServer:
             # peer finishes. Send OK first so the ordering matches regardless
             # of how long service.disconnect() takes.
             self._send_status("OK")
-            self.service.disconnect()
-        elif cmd == "CHAT" and len(parts) >= 2:
+            if cmd == "ABORT":
+                self.service.abort()
+            else:
+                self.service.disconnect()
+        elif (cmd == "CHAT" and len(parts) == 2
+              and parts[1].upper() in ("ON", "OFF")):
+            # CHAT ON is observed and CHAT OFF is retained as its conventional
+            # symmetric setting.  Neither setting transforms stream bytes:
+            # the captures cannot establish whether the chat application's
+            # decimal length prefix is interpreted by VARA at all.
             self.chat_mode = parts[1].upper() == "ON"
             self._send_status("OK")
         elif cmd.startswith("BW") and len(cmd) > 2 and cmd[2:].isdigit():
