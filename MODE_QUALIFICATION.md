@@ -5,8 +5,9 @@ experimental, optional, or default Whalemodem mode registry. It applies per
 channel policy: qualification on `vhf-fm` does not qualify a mode for
 `hf-ssb`. The objective is a reproducible decision about whether one waveform
 delivers useful data inside its declared channel envelope. Whole-ladder
-adaptation and connection lifecycle behavior are separate qualification
-scopes; a failure there does not retroactively make the waveform unqualified.
+adaptation and connection lifecycle behavior are protocol/system verification
+scopes, not waveform-mode qualification. A failure there does not make the
+waveform or its target-rung result unqualified.
 
 Qualification is scoped to one of the fixed rung contracts in
 [SPEED_LADDERS.md](SPEED_LADDERS.md). A mode fills a rung only when it meets
@@ -239,8 +240,9 @@ The evidence is divided into three independent scopes:
 1. **Waveform/mode qualification** (sections 1-5) asks whether one fixed mode
    works inside its declared channel envelope. It controls the mode's
    Experimental/Optional/Default registry evidence status.
-2. **Ladder qualification** (section 6) asks whether ordered modes add useful
-   speed and coverage and whether selection, fallback, and re-climb work.
+2. **Ladder qualification** (section 6) asks whether the ordered modes add
+   useful speed and coverage. Mode selection, fallback, and re-climb are link
+   protocol behavior covered by section 7, not qualifications of a mode.
 3. **Complete modem/system qualification** (section 7) covers connection,
    negotiation, bidirectional ARQ recovery, disconnect, adapters, radio
    control, and sustained operation.
@@ -256,8 +258,7 @@ Every mode must have deterministic tests for:
 
 1. zero-, representative-, and maximum-length payload round trips, plus
    refusal of an oversize payload without truncation;
-2. encoded duration, sample rate, payload capacity, mode ID, registry order,
-   control-mode choice, and adjacent `ModeRegistry.step()` behavior;
+2. encoded duration, sample rate, payload capacity, and mode ID;
 3. acquisition with valid leading/trailing audio and the mode's supported
    timing, frequency, clock, filter, noise, fading, clipping, and interference
    ranges;
@@ -414,14 +415,15 @@ target; otherwise the rung fails.
 ### 6. Ladder qualification
 
 Ladder qualification combines already qualified modes and tests the policy's
-ordering and adaptation. Use `scripts/benchmark_sessions.py` with clean and
+ordering and coverage. Use `scripts/benchmark_sessions.py` with clean and
 transition points, asymmetric forward/reverse paths, and at least 10,000
-verified bytes per direction. Demonstrate a lower-rung-only passing point,
+verified bytes per direction. Demonstrate a lower-rung-only passing point and
 at least two shared passing points where the faster rung improves median
-useful throughput by at least 25%, fallback from every faster rung, and later
-re-climb after conditions recover. Retain per-direction mode histories and
+useful throughput by at least 25%. Retain per-direction mode histories and
 time in mode. These results qualify the ladder and never change the component
-modes' waveform verdicts.
+modes' waveform verdicts. Selection, fallback, and re-climb are link-protocol
+behaviors verified as part of section 7; they are not gates for a mode or its
+target rung.
 
 `benchmark_simulated_channels.py`, `benchmark_sessions.py`, and
 `sweep_modes.py` calculate the needed useful-throughput quantities. **Gap:**
@@ -777,11 +779,10 @@ cyclic prefix. Its measured envelope is thus narrower than the mildest
 standard Watterson preset. That is useful boundary evidence, but only the
 complete Level 4 contract determines whether it can fill the target rung.
 
-Two further results from that sweep bear on any future promotion. Frame
-integrity held completely -- not one corrupt frame passed CRC32 in 10,400
-fading trials -- but the EVM health metric the AWGN campaign proposed as a
-fallback trigger caught only 45 to 71 percent of failures in the
-delay-dominated regime, so a demotion policy built on it would sit at high
-frame error rates believing the link was healthy. Section 3's requirement for
-fallback from every faster rung should therefore be read as needing decode
-outcome, not EVM, as the primary demotion signal.
+One further result is relevant to link-protocol design but not to this mode's
+qualification. Frame integrity held completely -- not one corrupt frame
+passed CRC32 in 10,400 fading trials -- but the EVM health metric proposed as
+a fallback trigger caught only 45 to 71 percent of failures in the
+delay-dominated regime. A demotion policy should therefore use decode outcome,
+not EVM, as its primary signal. This observation imposes no promotion gate on
+the waveform.
