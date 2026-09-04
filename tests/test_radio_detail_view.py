@@ -67,7 +67,7 @@ def test_navigation_up_down_through_backend_specific_rows():
     assert view.ptt_backend == "serial-line"
     rows = view._rows()
     keys = [r.key for r in rows]
-    assert keys == ["name", "description", "audio_name", "ptt_backend",
+    assert keys == ["name", "description", "audio_input_name", "audio_output_name", "ptt_backend",
                      "port", "line", "baud", "active_high", "save", "cancel"]
 
     view.selected = 0
@@ -130,7 +130,7 @@ def test_adding_fresh_seeds_blank_description_from_name():
 
 
 def test_editing_existing_radio_name_does_not_overwrite_existing_description():
-    radio = Radio("old", "My IC-705", "IC-705", "vox", {})
+    radio = Radio("old", "My IC-705", "IC-705", "IC-705", "vox", {})
     view = _new_view(existing=("old", radio))
     _select_row(view, "name")
     _enter(view)
@@ -146,8 +146,9 @@ def test_editing_existing_radio_name_does_not_overwrite_existing_description():
 def test_backend_cycling_changes_visible_rows():
     view = _new_view()
     assert view.ptt_backend == "vox"
-    assert [r.key for r in view._rows() if r.key not in ("name", "description", "audio_name",
-                                                           "ptt_backend", "save", "cancel")] == []
+    assert [r.key for r in view._rows() if r.key not in ("name", "description", "audio_input_name",
+                                                           "audio_output_name", "ptt_backend",
+                                                           "save", "cancel")] == []
 
     _select_row(view, "ptt_backend")
     _enter(view)
@@ -209,10 +210,22 @@ def _fill_text(view, key, text):
     _enter(view)
 
 
+def _fill_audio(view, name="Card"):
+    """Sets both audio device fields directly to `name`.
+
+    audio_input_name/audio_output_name are picker-only rows with no
+    text-edit mode (see the picker-mechanics tests further down), so tests
+    that only care about *other* fields' validation set the form state
+    directly here rather than driving a picker through the UI.
+    """
+    view.audio_input_name = name
+    view.audio_output_name = name
+
+
 def test_save_fails_on_empty_name():
     view = _new_view()
     _fill_text(view, "description", "desc")
-    _fill_text(view, "audio_name", "Card")
+    _fill_audio(view, "Card")
     _select_row(view, "save")
     result = _enter(view)
     assert result is NOTHING
@@ -223,7 +236,7 @@ def test_save_fails_on_name_collision_with_other_names():
     view = _new_view(other_names=["taken"])
     _fill_text(view, "name", "taken")
     _fill_text(view, "description", "desc")
-    _fill_text(view, "audio_name", "Card")
+    _fill_audio(view, "Card")
     _select_row(view, "save")
     result = _enter(view)
     assert result is NOTHING
@@ -235,7 +248,7 @@ def test_save_fails_on_missing_serial_line_port():
     view = _new_view()
     _fill_text(view, "name", "ht")
     _fill_text(view, "description", "desc")
-    _fill_text(view, "audio_name", "Card")
+    _fill_audio(view, "Card")
     _goto_backend(view, "serial-line")
     _select_row(view, "save")
     result = _enter(view)
@@ -247,7 +260,7 @@ def test_save_fails_on_missing_icom_civ_usb_id():
     view = _new_view()
     _fill_text(view, "name", "ic705")
     _fill_text(view, "description", "desc")
-    _fill_text(view, "audio_name", "Card")
+    _fill_audio(view, "Card")
     _goto_backend(view, "icom-civ")
     _select_row(view, "save")
     result = _enter(view)
@@ -259,7 +272,7 @@ def test_save_fails_on_bad_baud():
     view = _new_view()
     _fill_text(view, "name", "ht")
     _fill_text(view, "description", "desc")
-    _fill_text(view, "audio_name", "Card")
+    _fill_audio(view, "Card")
     _goto_backend(view, "serial-line")
     _fill_text(view, "port", "COM5")
     _fill_text(view, "baud", "not-a-number")
@@ -274,7 +287,7 @@ def test_save_fails_on_bad_icom_address():
     view = _new_view()
     _fill_text(view, "name", "ic705")
     _fill_text(view, "description", "desc")
-    _fill_text(view, "audio_name", "Card")
+    _fill_audio(view, "Card")
     _goto_backend(view, "icom-civ")
     _fill_text(view, "usb_id", "0C26:0036")
     _fill_text(view, "address", "not-hex-either")
@@ -298,14 +311,14 @@ def test_full_valid_save_vox():
     view = _new_view(on_done=on_done)
     _fill_text(view, "name", "handheld")
     _fill_text(view, "description", "Handheld VOX radio")
-    _fill_text(view, "audio_name", "USB Audio")
+    _fill_audio(view, "USB Audio")
     _select_row(view, "save")
     result = _enter(view)
 
     assert result is POP
     assert captured["old_name"] is None
     assert captured["new_name"] == "handheld"
-    assert captured["radio"] == Radio("handheld", "Handheld VOX radio", "USB Audio", "vox", {})
+    assert captured["radio"] == Radio("handheld", "Handheld VOX radio", "USB Audio", "USB Audio", "vox", {})
 
 
 def test_full_valid_save_icom_civ_hex_address():
@@ -317,7 +330,7 @@ def test_full_valid_save_icom_civ_hex_address():
     view = _new_view(on_done=on_done)
     _fill_text(view, "name", "ic705")
     _fill_text(view, "description", "IC-705")
-    _fill_text(view, "audio_name", "IC-705")
+    _fill_audio(view, "IC-705")
     _goto_backend(view, "icom-civ")
     _fill_text(view, "usb_id", "0C26:0036")
     _fill_text(view, "radio_name", "IC-705")
@@ -330,7 +343,7 @@ def test_full_valid_save_icom_civ_hex_address():
     assert old_name is None
     assert new_name == "ic705"
     assert radio == Radio(
-        "ic705", "IC-705", "IC-705", "icom-civ",
+        "ic705", "IC-705", "IC-705", "IC-705", "icom-civ",
         {"usb_id": "0C26:0036", "radio_name": "IC-705", "address": 164},
     )
     assert isinstance(radio.ptt_config["address"], int)
@@ -345,7 +358,7 @@ def test_full_valid_save_serial_line_defaults_baud_and_line():
     view = _new_view(on_done=on_done)
     _fill_text(view, "name", "ht")
     _fill_text(view, "description", "HT via Digirig")
-    _fill_text(view, "audio_name", "USB Audio")
+    _fill_audio(view, "USB Audio")
     _goto_backend(view, "serial-line")
     _fill_text(view, "port", "COM5")
     _select_row(view, "save")
@@ -365,7 +378,7 @@ def test_full_valid_save_hamlib_omits_blank_optional_fields():
     view = _new_view(on_done=on_done)
     _fill_text(view, "name", "ft991a")
     _fill_text(view, "description", "FT-991A")
-    _fill_text(view, "audio_name", "USB Audio")
+    _fill_audio(view, "USB Audio")
     _goto_backend(view, "hamlib")
     _fill_text(view, "model", "3081")
     _select_row(view, "save")
@@ -396,13 +409,13 @@ def test_esc_pops_without_calling_on_done():
 # -- RadioListView._apply_edit --
 
 def _list_view(names, default=None, selected=0):
-    radios = {name: Radio(name, "d", "Card", "vox", {}) for name in names}
+    radios = {name: Radio(name, "d", "Card", "Card", "vox", {}) for name in names}
     return RadioListView(path="unused.toml", radios=radios, default=default, selected=selected)
 
 
 def test_apply_edit_add_inserts_under_new_name():
     view = _list_view(["a"])
-    new_radio = Radio("b", "desc", "Card", "vox", {})
+    new_radio = Radio("b", "desc", "Card", "Card", "vox", {})
     view._apply_edit(None, "b", new_radio)
     assert view.radios["b"] == new_radio
     assert view.radios.keys() == {"a", "b"}
@@ -411,7 +424,7 @@ def test_apply_edit_add_inserts_under_new_name():
 
 def test_apply_edit_edit_without_rename_replaces_in_place():
     view = _list_view(["a", "b"], default="a")
-    updated = Radio("a", "new desc", "Card2", "vox", {})
+    updated = Radio("a", "new desc", "Card2", "Card2", "vox", {})
     view._apply_edit("a", "a", updated)
     assert view.radios["a"] == updated
     assert view.radios.keys() == {"a", "b"}
@@ -420,7 +433,7 @@ def test_apply_edit_edit_without_rename_replaces_in_place():
 
 def test_apply_edit_edit_with_rename_moves_entry():
     view = _list_view(["a", "b"], default="b")
-    updated = Radio("renamed", "desc", "Card", "vox", {})
+    updated = Radio("renamed", "desc", "Card", "Card", "vox", {})
     view._apply_edit("a", "renamed", updated)
     assert view.radios.keys() == {"renamed", "b"}
     assert "a" not in view.radios
@@ -429,7 +442,7 @@ def test_apply_edit_edit_with_rename_moves_entry():
 
 def test_apply_edit_rename_of_current_default_carries_default_along():
     view = _list_view(["a", "b"], default="a")
-    updated = Radio("renamed", "desc", "Card", "vox", {})
+    updated = Radio("renamed", "desc", "Card", "Card", "vox", {})
     view._apply_edit("a", "renamed", updated)
     assert view.radios.keys() == {"renamed", "b"}
     assert view.default == "renamed"  # must not dangle
@@ -543,52 +556,199 @@ def test_list_picker_enter_on_empty_filtered_list_is_noop():
 
 # -- hardware-backed fields: real degrade paths --
 
-def test_audio_preview_degrades_when_list_devices_raises(monkeypatch):
-    def boom(*a, **k):
-        raise LookupError("no host API matching 'core audio'")
-    monkeypatch.setattr(audio_io, "find_devices", boom)
-    monkeypatch.setattr(audio_io, "list_devices", boom)
+def _device(index, name, max_input_channels=0, max_output_channels=0):
+    return audio_io.AudioDevice(index=index, name=name, host_api="Core Audio",
+                                 max_input_channels=max_input_channels,
+                                 max_output_channels=max_output_channels,
+                                 default_samplerate=48000.0)
+
+
+def test_audio_input_picker_lists_only_input_devices_and_selects(monkeypatch):
+    seen_kind = []
+
+    def fake_list_devices(kind=None):
+        seen_kind.append(kind)
+        return [_device(0, "USB Audio CODEC", max_input_channels=2)]
+
+    monkeypatch.setattr(audio_io, "list_devices", fake_list_devices)
 
     view = _new_view()
-    view.audio_name = "USB Audio"
-    assert view._audio_preview() == "device list unavailable"
+    _select_row(view, "audio_input_name")
+    result = view.handle_key(ord("p"))
+    from whale.radio_config_tui import Push
+    assert isinstance(result, Push)
+    assert seen_kind == ["input"]
+    picker = result.view
+
+    picker.handle_key(curses.KEY_ENTER)
+    assert view.audio_input_name == "USB Audio CODEC"
+    assert view.audio_output_name == ""  # the other field is untouched
 
 
-def test_audio_preview_reports_match_counts(monkeypatch):
-    Device = audio_io.AudioDevice
-    devices = [
-        Device(index=0, name="USB Audio CODEC", host_api="Core Audio",
-               max_input_channels=2, max_output_channels=0, default_samplerate=48000.0),
-        Device(index=1, name="Built-in Mic", host_api="Core Audio",
-               max_input_channels=1, max_output_channels=0, default_samplerate=48000.0),
-    ]
-    monkeypatch.setattr(audio_io, "find_devices",
-                         lambda name, kind: [0] if kind == "input" else [])
-    monkeypatch.setattr(audio_io, "list_devices", lambda kind=None: devices)
+def test_audio_output_picker_lists_only_output_devices_and_selects(monkeypatch):
+    seen_kind = []
+
+    def fake_list_devices(kind=None):
+        seen_kind.append(kind)
+        return [_device(0, "USB Audio CODEC", max_output_channels=2)]
+
+    monkeypatch.setattr(audio_io, "list_devices", fake_list_devices)
 
     view = _new_view()
-    view.audio_name = "USB"
-    preview = view._audio_preview()
-    assert "input: 1 match (USB Audio CODEC)" in preview
-    assert "output: 0 matches" in preview
+    _select_row(view, "audio_output_name")
+    result = view.handle_key(ord("p"))
+    from whale.radio_config_tui import Push
+    assert isinstance(result, Push)
+    assert seen_kind == ["output"]
+    picker = result.view
+
+    picker.handle_key(curses.KEY_ENTER)
+    assert view.audio_output_name == "USB Audio CODEC"
+    assert view.audio_input_name == ""  # the other field is untouched
 
 
-def test_audio_picker_shows_status_and_manual_entry_still_works_when_list_devices_raises(monkeypatch):
-    def boom(*a, **k):
+def test_audio_input_picker_degrades_to_status_when_list_devices_raises(monkeypatch):
+    def boom(kind=None):
         raise LookupError("no PortAudio host API")
     monkeypatch.setattr(audio_io, "list_devices", boom)
 
     view = _new_view()
-    _select_row(view, "audio_name")
+    _select_row(view, "audio_input_name")
     result = view.handle_key(ord("p"))
     assert result is NOTHING
     assert "device list unavailable" in view.status
+    # Unlike the text-field pickers, there is no manual-entry fallback here --
+    # the field stays picker-only and unedited.
+    assert view.editing_field is None
+    assert view.audio_input_name == ""
 
-    # Manual typed entry still works after the picker degrade.
-    _enter(view)
-    _type(view, "USB Audio")
-    _enter(view)
-    assert view.audio_name == "USB Audio"
+
+def test_audio_output_picker_degrades_to_status_when_list_devices_raises(monkeypatch):
+    def boom(kind=None):
+        raise LookupError("no PortAudio host API")
+    monkeypatch.setattr(audio_io, "list_devices", boom)
+
+    view = _new_view()
+    _select_row(view, "audio_output_name")
+    result = view.handle_key(ord("p"))
+    assert result is NOTHING
+    assert "device list unavailable" in view.status
+    assert view.editing_field is None
+
+
+def test_enter_and_p_on_audio_device_row_both_open_the_picker_not_text_edit(monkeypatch):
+    """Device rows have no text-edit mode at all -- Enter and 'p' must behave
+    identically, both opening the picker directly."""
+    monkeypatch.setattr(audio_io, "list_devices",
+                         lambda kind=None: [_device(0, "USB Audio CODEC", max_input_channels=2)])
+    from whale.radio_config_tui import Push
+
+    view = _new_view()
+    _select_row(view, "audio_input_name")
+    result = _enter(view)
+    assert isinstance(result, Push)
+    assert view.editing_field is None
+
+    view = _new_view()
+    _select_row(view, "audio_input_name")
+    result = view.handle_key(ord("p"))
+    assert isinstance(result, Push)
+    assert view.editing_field is None
+
+
+# -- availability indicator: the four outcomes --
+
+def test_device_availability_blank_field_shows_no_marker():
+    view = _new_view()
+    row = _select_row(view, "audio_input_name")
+    assert view._device_availability(row) == ""
+
+
+def test_device_availability_present_device_shows_no_marker(monkeypatch):
+    monkeypatch.setattr(audio_io, "list_devices",
+                         lambda kind=None: [_device(0, "USB Audio CODEC", max_input_channels=2)])
+
+    view = _new_view()
+    view.audio_input_name = "USB Audio CODEC"
+    row = _select_row(view, "audio_input_name")
+    assert view._device_availability(row) == ""
+
+
+def test_device_availability_stale_device_shows_not_found_marker(monkeypatch):
+    monkeypatch.setattr(audio_io, "list_devices",
+                         lambda kind=None: [_device(0, "Built-in Mic", max_input_channels=1)])
+
+    view = _new_view()
+    view.audio_input_name = "USB Audio CODEC (unplugged)"
+    row = _select_row(view, "audio_input_name")
+    assert view._device_availability(row) == " [not found]"
+
+
+def test_device_availability_lookup_error_is_distinct_from_not_found(monkeypatch):
+    def boom(kind=None):
+        raise LookupError("no host API matching 'core audio'")
+    monkeypatch.setattr(audio_io, "list_devices", boom)
+
+    view = _new_view()
+    view.audio_input_name = "USB Audio CODEC"
+    row = _select_row(view, "audio_input_name")
+    marker = view._device_availability(row)
+    assert marker == " (availability unknown)"
+    # A failed check must never render the same as a confirmed-absent device.
+    assert "not found" not in marker
+
+
+class _CapturingScreen(_FakeScreen):
+    """Like _FakeScreen, but remembers what was drawn on each row -- needed
+    to verify the availability marker actually reaches rendered text, since
+    _FakeScreen.addnstr() is otherwise a no-op."""
+
+    def __init__(self, height=24, width=80):
+        super().__init__(height, width)
+        self.lines: dict[int, str] = {}
+
+    def addnstr(self, y, x, text, n, attr=0):
+        self.lines[y] = text
+
+
+def test_render_shows_not_found_marker_for_stale_device(monkeypatch):
+    monkeypatch.setattr(audio_io, "list_devices",
+                         lambda kind=None: [_device(0, "Built-in Mic", max_input_channels=1)])
+
+    view = _new_view()
+    view.audio_input_name = "Ghost Device"
+    screen = _CapturingScreen()
+    view.render(screen)
+    rendered = " ".join(screen.lines.values())
+    assert "Ghost Device" in rendered
+    assert "[not found]" in rendered
+
+
+def test_render_shows_no_marker_for_present_device(monkeypatch):
+    monkeypatch.setattr(audio_io, "list_devices",
+                         lambda kind=None: [_device(0, "USB Audio CODEC", max_input_channels=2)])
+
+    view = _new_view()
+    view.audio_input_name = "USB Audio CODEC"
+    screen = _CapturingScreen()
+    view.render(screen)
+    rendered = " ".join(screen.lines.values())
+    assert "[not found]" not in rendered
+    assert "availability unknown" not in rendered
+
+
+def test_render_shows_availability_unknown_not_not_found_when_list_devices_raises(monkeypatch):
+    def boom(kind=None):
+        raise LookupError("no PortAudio host API")
+    monkeypatch.setattr(audio_io, "list_devices", boom)
+
+    view = _new_view()
+    view.audio_input_name = "USB Audio CODEC"
+    screen = _CapturingScreen()
+    view.render(screen)
+    rendered = " ".join(screen.lines.values())
+    assert "(availability unknown)" in rendered
+    assert "[not found]" not in rendered
 
 
 def test_hamlib_picker_shows_status_and_manual_model_entry_still_works_when_unavailable(monkeypatch):

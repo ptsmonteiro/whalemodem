@@ -7,13 +7,14 @@ in [TESTING.md](TESTING.md) before keying a transmitter.
 
 Hardware is selected from a TOML inventory. Copy `radios.example.toml`, edit
 it for the local station, and pass it with `--radio-config PATH`, or set
-`WHALE_RADIO_CONFIG`. Each entry names an audio-device substring and one PTT
-backend with its backend-specific settings.
+`WHALE_RADIO_CONFIG`. Each entry names an audio input device, an audio
+output device, and one PTT backend with its backend-specific settings.
 
 ```toml
 [radios.station-a]
 description = "Icom controlled over CI-V"
-audio_name = "IC-705"
+audio.input = "IC-705"
+audio.output = "IC-705"
 ptt.backend = "icom-civ"
 ptt.usb_id = "0C26:0036"
 ptt.radio_name = "IC-705"
@@ -51,14 +52,19 @@ Add/edit form: `↑`/`↓` or `j`/`k` to move between fields, `Enter` to start
 editing a text field or cycle a selector/toggle field, `Space` also cycles
 a selector/toggle field, `Esc` to cancel (a mid-edit `Esc` reverts just that
 field; from the form itself it discards the whole add/edit and returns to
-the list). The Audio name field shows a live match count against connected
-devices and, along with the serial-port and hamlib-model fields underneath
-whichever PTT backend is selected, supports `p` to pick from the real
-hardware/data instead of typing blind -- typing the value by hand always
-works too, including when no sound card, serial port, or libhamlib is
-available to browse. Select `Save` to validate and write the entry back
-into the in-memory inventory (still not on disk until `s` on the list
-view), or `Cancel` to discard the form.
+the list). The Audio input and Audio output fields are picker-only -- there
+is no manual typing for these two, `Enter` or `p` always opens a list of the
+currently connected input/output devices to choose from. If the stored
+device for either field is not among the currently connected devices (radio
+powered off, USB unplugged, etc), the field shows a `[not found]` marker
+next to it; this is informational only and never blocks `Save`. The
+port, USB ID, and model fields underneath whichever PTT backend is selected
+also support `p` to pick from the real hardware/data instead of typing
+blind, but for those, unlike audio input/output, typing the value by hand
+always works too, including when no serial port or libhamlib is available
+to browse. Select `Save` to validate and write the entry back into the
+in-memory inventory (still not on disk until `s` on the list view), or
+`Cancel` to discard the form.
 
 ## Audio backend
 
@@ -72,9 +78,11 @@ shared-mixer API that adds latency and jitter:
 | macOS | Core Audio | -- |
 | Linux | ALSA | PulseAudio, JACK |
 
-`audio_name` in the inventory is matched against device names *within* that
-host API, so it must be a substring PortAudio reports for the card under
-that API specifically (check with `python -m sounddevice`).
+`audio.input`/`audio.output` in the inventory are each matched against
+device names *within* that host API, so they must be a substring PortAudio
+reports for the card under that API specifically (check with
+`python -m sounddevice`, or use `whalemodem-configure`'s picker, which
+lists them for you and writes the exact name back).
 
 Set `WHALE_AUDIO_HOST_API` to override the default -- for example, a Linux
 station that must go through PulseAudio or JACK instead of raw ALSA (a USB
@@ -123,7 +131,8 @@ vendored version.
 
 ```toml
 [radios.rigctl]
-audio_name = "USB Audio CODEC"
+audio.input = "USB Audio CODEC"
+audio.output = "USB Audio CODEC"
 ptt.backend = "hamlib"
 ptt.model = 3073        # rig model number; see `rigctl -l` (or hamlib.list_rig_models())
 ptt.device = "/dev/ttyUSB0"

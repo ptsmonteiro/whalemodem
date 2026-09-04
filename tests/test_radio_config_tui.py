@@ -4,8 +4,9 @@ from whale.hw.radios import Radio, load_radios
 from whale.radio_config_tui import NOTHING, QUIT, RadioListView
 
 
-def _radio(name, description="d", audio_name="AudioCard", ptt_backend="vox"):
-    return Radio(name, description, audio_name, ptt_backend, {})
+def _radio(name, description="d", audio_input_name="AudioCard", audio_output_name="AudioCard",
+           ptt_backend="vox"):
+    return Radio(name, description, audio_input_name, audio_output_name, ptt_backend, {})
 
 
 def _view(names, default=None, selected=0):
@@ -172,12 +173,14 @@ def test_full_load_mutate_save_round_trip(tmp_path):
         'default_radio = "shack-icom"\n\n'
         "[radios.shack-icom]\n"
         'description = "Shack IC-7300"\n'
-        'audio_name = "IC-7300"\n'
+        'audio.input = "IC-7300"\n'
+        'audio.output = "IC-7300"\n'
         'ptt.backend = "icom-civ"\n'
         "ptt.address = 148\n\n"
         "[radios.portable]\n"
         'description = "Portable HT"\n'
-        'audio_name = "USB Audio"\n'
+        'audio.input = "USB Audio"\n'
+        'audio.output = "USB Audio"\n'
         'ptt.backend = "serial-line"\n'
         'ptt.port = "COM5"\n'
         'ptt.line = "rts"\n\n'

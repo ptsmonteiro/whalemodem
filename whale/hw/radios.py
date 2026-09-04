@@ -16,7 +16,8 @@ from .ptt_backends import PttCapabilities, available_backends, open_backend
 class Radio:
     name: str
     description: str
-    audio_name: str
+    audio_input_name: str
+    audio_output_name: str
     ptt_backend: str
     ptt_config: Mapping[str, Any] = field(default_factory=dict)
 
@@ -25,7 +26,7 @@ class Radio:
         return available_backends()[self.ptt_backend].capabilities
 
     def devices(self):
-        return (audio_io.find_device(self.audio_name, "output"), audio_io.find_device(self.audio_name, "input"))
+        return (audio_io.find_device(self.audio_output_name, "output"), audio_io.find_device(self.audio_input_name, "input"))
 
     def ptt(self):
         return open_backend(self.ptt_backend, self.ptt_config)
@@ -37,12 +38,13 @@ class RadioInventory:
 
 def _radio(name: str, value: Mapping[str, Any]) -> Radio:
     ptt_value = value.get("ptt", {})
+    audio_value = value.get("audio", {})
     try:
-        backend, audio_name = ptt_value["backend"], value["audio_name"]
+        backend, audio_input, audio_output = ptt_value["backend"], audio_value["input"], audio_value["output"]
     except (KeyError, TypeError):
-        raise ValueError(f"radio {name!r} requires audio_name and ptt.backend") from None
+        raise ValueError(f"radio {name!r} requires audio.input, audio.output, and ptt.backend") from None
     config = {key: item for key, item in ptt_value.items() if key != "backend"}
-    return Radio(name, value.get("description", name), audio_name, backend, config)
+    return Radio(name, value.get("description", name), audio_input, audio_output, backend, config)
 
 def load_radios(path: str | os.PathLike[str]) -> RadioInventory:
     """Load ``[radios.NAME]`` tables and the optional ``default_radio`` key from a TOML inventory.
@@ -73,9 +75,9 @@ def load_radios(path: str | os.PathLike[str]) -> RadioInventory:
 # Compatibility inventory for the original bench. Installations should use
 # an external file selected by --radio-config or WHALE_RADIO_CONFIG.
 RADIOS = {
-    "ic705": Radio("ic705", "IC-705 (VHF), CI-V PTT", "IC-705", "icom-civ", {"usb_id": "0C26:0036", "radio_name": "IC-705", "address": ptt.IC705_DEFAULT_ADDR}),
-    "ic7300": Radio("ic7300", "IC-7300 (HF), CI-V PTT", "IC-7300", "icom-civ", {"usb_id": "10C4:EA60", "radio_name": "IC-7300", "address": ptt.IC7300_DEFAULT_ADDR}),
-    "ht": Radio("ht", "HT via serial-interface RTS", "USB Audio Device", "serial-line", {"port": "COM5", "line": "rts"}),
+    "ic705": Radio("ic705", "IC-705 (VHF), CI-V PTT", "IC-705", "IC-705", "icom-civ", {"usb_id": "0C26:0036", "radio_name": "IC-705", "address": ptt.IC705_DEFAULT_ADDR}),
+    "ic7300": Radio("ic7300", "IC-7300 (HF), CI-V PTT", "IC-7300", "IC-7300", "icom-civ", {"usb_id": "10C4:EA60", "radio_name": "IC-7300", "address": ptt.IC7300_DEFAULT_ADDR}),
+    "ht": Radio("ht", "HT via serial-interface RTS", "USB Audio Device", "USB Audio Device", "serial-line", {"port": "COM5", "line": "rts"}),
 }
 
 def radio_inventory(path: str | os.PathLike[str] | None = None) -> RadioInventory:
@@ -127,7 +129,8 @@ def save_radios(path: str | os.PathLike[str], inventory: RadioInventory) -> None
     for name, radio in inventory.radios.items():
         lines.append(f"[radios.{_toml_key(name)}]")
         lines.append(f"description = {_toml_string(radio.description)}")
-        lines.append(f"audio_name = {_toml_string(radio.audio_name)}")
+        lines.append(f"audio.input = {_toml_string(radio.audio_input_name)}")
+        lines.append(f"audio.output = {_toml_string(radio.audio_output_name)}")
         lines.append(f"ptt.backend = {_toml_string(radio.ptt_backend)}")
         for key, value in radio.ptt_config.items():
             lines.append(f"ptt.{_toml_key(key)} = {_toml_value(value)}")

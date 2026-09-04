@@ -308,7 +308,7 @@ class RadioTransport:
         exception is the one already in flight.
         """
         try:
-            index = audio_io.find_device(self.radio.audio_name, "output")
+            index = audio_io.find_device(self.radio.audio_output_name, "output")
         except Exception as exc:
             # LookupError (the card is genuinely gone or now ambiguous), or
             # anything PortAudio throws while enumerating a sick bus.

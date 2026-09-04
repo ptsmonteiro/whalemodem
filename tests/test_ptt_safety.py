@@ -197,7 +197,7 @@ def _fake_transport(ptt_obj, out_device=7):
     card and a serial port. Only the transmit path is exercised here.
     """
     t = object.__new__(transport.RadioTransport)
-    t.radio = types.SimpleNamespace(name="fake", audio_name="Fake Audio CODEC")
+    t.radio = types.SimpleNamespace(name="fake", audio_output_name="Fake Audio CODEC")
     t.out_device = out_device
     t.in_device = None
     t.ptt = ptt_obj

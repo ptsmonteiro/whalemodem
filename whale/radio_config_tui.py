@@ -157,7 +157,8 @@ class RadioListView:
                     break
                 radio = self.radios[name]
                 marker = "*" if name == effective_default else " "
-                line = f"{marker} {name}  {radio.description}  [{radio.audio_name}]  ptt={radio.ptt_backend}"
+                line = (f"{marker} {name}  {radio.description}  "
+                        f"in={radio.audio_input_name} out={radio.audio_output_name}  ptt={radio.ptt_backend}")
                 attr = curses.A_REVERSE if index == self.selected else 0
                 _safe_addnstr(stdscr, row, 0, line, attr)
                 row += 1
@@ -422,8 +423,8 @@ class _Row:
 
     key: str
     label: str
-    kind: str  # "text" | "selector" | "backend_selector" | "bool" | "action"
-    picker: str | None = None  # None | "audio" | "serial" | "serial_icom" | "hamlib"
+    kind: str  # "text" | "selector" | "backend_selector" | "bool" | "action" | "device"
+    picker: str | None = None  # None | "audio_input" | "audio_output" | "serial" | "serial_icom" | "hamlib"
 
 
 # Backend-specific rows, in the exact field order/requiredness the real
@@ -503,7 +504,7 @@ class RadioDetailView:
     """
 
     BACKEND_ORDER = ["vox", "serial-line", "icom-civ", "hamlib"]
-    _TOP_LEVEL_FIELDS = {"name", "description", "audio_name"}
+    _TOP_LEVEL_FIELDS = {"name", "description", "audio_input_name", "audio_output_name"}
 
     def __init__(self, existing: tuple[str, Radio] | None, other_names: list[str],
                  on_done: Callable[[str | None, str, Radio], None] | None) -> None:
@@ -514,7 +515,8 @@ class RadioDetailView:
         radio = existing[1] if existing else None
         self.name = radio.name if radio else ""
         self.description = radio.description if radio else ""
-        self.audio_name = radio.audio_name if radio else ""
+        self.audio_input_name = radio.audio_input_name if radio else ""
+        self.audio_output_name = radio.audio_output_name if radio else ""
         self.ptt_backend = radio.ptt_backend if (radio and radio.ptt_backend in self.BACKEND_ORDER) else "vox"
 
         self.backend_config: dict[str, dict[str, Any]] = {
@@ -532,7 +534,8 @@ class RadioDetailView:
         rows = [
             _Row("name", "Name", "text"),
             _Row("description", "Description", "text"),
-            _Row("audio_name", "Audio name", "text", picker="audio"),
+            _Row("audio_input_name", "Audio input", "device", picker="audio_input"),
+            _Row("audio_output_name", "Audio output", "device", picker="audio_output"),
             _Row("ptt_backend", "PTT backend", "backend_selector"),
         ]
         rows.extend(_BACKEND_ROWS[self.ptt_backend])
@@ -578,13 +581,10 @@ class RadioDetailView:
                 line = f"{marker} {row.label}"
             else:
                 line = f"{marker} {row.label}: {self._display_value(row)}"
+                if row.kind == "device":
+                    line += self._device_availability(row)
             _safe_addnstr(stdscr, row_y, 0, line, attr)
             row_y += 1
-            if row.key == "audio_name":
-                preview = self._audio_preview()
-                if preview and row_y < height - 2:
-                    _safe_addnstr(stdscr, row_y, 2, preview)
-                    row_y += 1
 
         _safe_addnstr(stdscr, height - 1, 0, self.status or self._help_line())
 
@@ -604,34 +604,33 @@ class RadioDetailView:
             return "yes" if value else "no"
         return "" if value is None else str(value)
 
-    def _audio_preview(self) -> str:
-        """Live find_devices() match summary for the audio_name field.
+    def _device_availability(self, row: _Row) -> str:
+        """Plain-ASCII marker showing whether a stored device row's value is
+        among the *currently enumerated* devices for its direction.
 
-        Informational only -- never blocks Save -- and degrades cleanly when
-        no PortAudio host API is available (routine in a sandbox/CI with no
-        sound card; see audio_io._host_api_index()).
+        Informational only -- never blocks Save, a radio might simply not be
+        plugged in right now. Three renderable outcomes, kept visually
+        distinct:
+
+          - field empty, or the stored name is among the current devices:
+            no marker at all.
+          - field non-empty but the name is not currently enumerated: " [not
+            found]" -- a real, checked absence.
+          - the enumeration itself failed with LookupError (no PortAudio
+            host API at all -- routine in a sandbox/CI with no sound card;
+            see audio_io._host_api_index()): " (availability unknown)",
+            deliberately different from "[not found]" so a machine with no
+            sound card at all doesn't look like every device is missing.
         """
-        name = self.audio_name.strip()
+        kind = "input" if row.picker == "audio_input" else "output"
+        name = str(self._get_value(row.key) or "").strip()
         if not name:
             return ""
         try:
-            input_matches = audio_io.find_devices(name, "input")
-            output_matches = audio_io.find_devices(name, "output")
-            devices = audio_io.list_devices()
+            current = {d.name for d in audio_io.list_devices(kind=kind)}
         except LookupError:
-            return "device list unavailable"
-        by_index = {d.index: d.name for d in devices}
-
-        def describe(kind: str, indices: list[int]) -> str:
-            count = len(indices)
-            if count == 0:
-                return f"{kind}: 0 matches"
-            names = ", ".join(by_index.get(i, "?") for i in indices)
-            plural = "match" if count == 1 else "matches"
-            ambiguous = " (ambiguous)" if count > 1 else ""
-            return f"{kind}: {count} {plural} ({names}){ambiguous}"
-
-        return f"{describe('input', input_matches)}  {describe('output', output_matches)}"
+            return " (availability unknown)"
+        return "" if name in current else " [not found]"
 
     # -- key handling (pure logic, no curses drawing calls) --
 
@@ -666,6 +665,8 @@ class RadioDetailView:
         if row.kind == "text":
             self._start_edit(row.key)
             return NOTHING
+        if row.kind == "device":
+            return self._handle_picker(row)
         if row.kind == "backend_selector":
             self._cycle_backend()
             return NOTHING
@@ -692,8 +693,10 @@ class RadioDetailView:
         return NOTHING
 
     def _handle_picker(self, row: _Row) -> KeyResult:
-        if row.picker == "audio":
-            return self._push_audio_picker(row.key)
+        if row.picker == "audio_input":
+            return self._push_audio_picker(row.key, "input")
+        if row.picker == "audio_output":
+            return self._push_audio_picker(row.key, "output")
         if row.picker == "serial":
             return self._push_serial_picker(row.key)
         if row.picker == "serial_icom":
@@ -751,9 +754,9 @@ class RadioDetailView:
 
     # -- hardware pickers (each degrades to a status message, never crashes) --
 
-    def _push_audio_picker(self, key: str) -> KeyResult:
+    def _push_audio_picker(self, key: str, kind: str) -> KeyResult:
         try:
-            devices = audio_io.list_devices()
+            devices = audio_io.list_devices(kind=kind)
         except LookupError as exc:
             self.status = f"device list unavailable: {exc}"
             return NOTHING
@@ -765,7 +768,8 @@ class RadioDetailView:
         def on_select(device: audio_io.AudioDevice) -> None:
             self._set_value(key, device.name)
 
-        return Push(ListPickerView("Audio devices", devices, format_item, on_select,
+        title = "Audio input devices" if kind == "input" else "Audio output devices"
+        return Push(ListPickerView(title, devices, format_item, on_select,
                                     search_key=lambda d: d.name))
 
     def _serial_ports_or_status(self) -> list[ptt.SerialPort] | None:
@@ -841,9 +845,13 @@ class RadioDetailView:
         if not description:
             errors.append("description is required")
 
-        audio_name = self.audio_name.strip()
-        if not audio_name:
-            errors.append("audio name is required")
+        audio_input_name = self.audio_input_name.strip()
+        if not audio_input_name:
+            errors.append("audio input is required")
+
+        audio_output_name = self.audio_output_name.strip()
+        if not audio_output_name:
+            errors.append("audio output is required")
 
         ptt_config = self._build_ptt_config(errors)
 
@@ -851,8 +859,9 @@ class RadioDetailView:
             self.status = "; ".join(errors)
             return NOTHING
 
-        radio = Radio(name=name, description=description, audio_name=audio_name,
-                      ptt_backend=self.ptt_backend, ptt_config=ptt_config)
+        radio = Radio(name=name, description=description, audio_input_name=audio_input_name,
+                      audio_output_name=audio_output_name, ptt_backend=self.ptt_backend,
+                      ptt_config=ptt_config)
         if self.on_done is not None:
             self.on_done(self.old_name, name, radio)
         return POP
