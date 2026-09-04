@@ -1,6 +1,12 @@
 # Copy this file anywhere, edit it, and pass --radio-config PATH. The legacy
 # ic705/ic7300/ht names remain available when no inventory is selected.
 
+# Optional: the radio used when --radio is omitted. Must name one of the
+# [radios.*] tables below, and must come before any table header. A file
+# with only one [radios.*] table defaults to it implicitly even without
+# this key.
+# default_radio = "shack-icom"
+
 [radios.shack-icom]
 description = "Icom controlled over CI-V"
 audio_name = "IC-705"

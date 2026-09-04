@@ -24,6 +24,11 @@ The server's `--radio` value is the inventory key (`station-a` above), not an
 audio-device name. When no inventory is selected, the legacy `ic705`,
 `ic7300`, and `ht` definitions remain available for the original bench.
 
+An optional top-level `default_radio = "station-a"` key, placed before any
+`[radios.*]` table, names the radio to use when none is given explicitly. A
+file with only one `[radios.*]` table defaults to it implicitly even
+without `default_radio`.
+
 ## Audio backend
 
 Radios' USB sound cards are opened through whichever PortAudio host API sits

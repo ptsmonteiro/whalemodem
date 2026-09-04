@@ -65,6 +65,104 @@ ptt.backend = "vox"
     assert radio.ptt().key(True)
 
 
+def test_single_radio_file_defaults_implicitly(tmp_path: Path):
+    """No default_radio and exactly one [radios.*] table: that radio is default."""
+    path = tmp_path / "radios.toml"
+    path.write_text('''
+[radios.field]
+audio_name = "Codec"
+ptt.backend = "vox"
+''')
+    inventory = radios.load_radios(path)
+    assert inventory.default == "field"
+    assert radios.get_radio(None, path).name == "field"
+
+
+def test_default_radio_resolves(tmp_path: Path):
+    path = tmp_path / "radios.toml"
+    path.write_text('''
+default_radio = "b"
+
+[radios.a]
+audio_name = "Codec A"
+ptt.backend = "vox"
+
+[radios.b]
+audio_name = "Codec B"
+ptt.backend = "vox"
+''')
+    inventory = radios.load_radios(path)
+    assert inventory.default == "b"
+    assert radios.get_radio(None, path).name == "b"
+    # explicit names are unaffected by the default
+    assert radios.get_radio("a", path).name == "a"
+
+
+def test_unknown_default_radio_raises(tmp_path: Path):
+    path = tmp_path / "radios.toml"
+    path.write_text('''
+default_radio = "nope"
+
+[radios.a]
+audio_name = "Codec A"
+ptt.backend = "vox"
+''')
+    with pytest.raises(ValueError):
+        radios.load_radios(path)
+
+
+def test_no_default_among_multiple_radios_raises_on_none(tmp_path: Path):
+    path = tmp_path / "radios.toml"
+    path.write_text('''
+[radios.a]
+audio_name = "Codec A"
+ptt.backend = "vox"
+
+[radios.b]
+audio_name = "Codec B"
+ptt.backend = "vox"
+''')
+    inventory = radios.load_radios(path)
+    assert inventory.default is None
+    with pytest.raises(ValueError):
+        radios.get_radio(None, path)
+
+
+def test_save_and_load_round_trips_multi_radio_inventory(tmp_path: Path):
+    path = tmp_path / "radios.toml"
+    original = radios.RadioInventory(
+        {
+            "shack-icom": radios.Radio(
+                "shack-icom", "Icom controlled over CI-V", "IC-705", "icom-civ",
+                {"usb_id": "0C26:0036", "radio_name": "IC-705", "address": 0xA4},
+            ),
+            "rigctl": radios.Radio(
+                "rigctl", "rigctl", "USB Audio CODEC", "hamlib",
+                {"model": 3073, "device": "/dev/ttyUSB0", "baud": 115200},
+            ),
+            "digirig": radios.Radio(
+                "digirig", "digirig", "USB Audio Device", "serial-line",
+                {"port": "/dev/ttyUSB0", "line": "rts", "active_high": False, "timeout": 0.5},
+            ),
+        },
+        default="shack-icom",
+    )
+    radios.save_radios(path, original)
+    loaded = radios.load_radios(path)
+    assert loaded == original
+
+
+def test_save_radios_quotes_non_bare_keys(tmp_path: Path):
+    path = tmp_path / "radios.toml"
+    original = radios.RadioInventory(
+        {"my radio": radios.Radio("my radio", "has a space", "Codec", "vox", {})},
+        default="my radio",
+    )
+    radios.save_radios(path, original)
+    loaded = radios.load_radios(path)
+    assert loaded == original
+
+
 def test_application_backend_registration():
     class Controller:
         key_state_unknown = False
