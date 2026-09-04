@@ -35,19 +35,30 @@ without `default_radio`.
 whalemodem-configure --radio-config radios.toml
 ```
 
-A curses terminal UI for the inventory file, currently limited to viewing,
-setting the default, and deleting entries -- it does not yet add or edit
-radios (that needs a real audio-device/serial-port/hamlib-model editor,
-which is follow-up work once the wizard grows a detail view). Point it at
-`--radio-config PATH` or set `WHALE_RADIO_CONFIG`; with neither, it defaults
-to `radios.toml` in the current directory. Pointing it at a path that
-doesn't exist yet starts from an empty inventory (nothing is written until
-you save); pointing it at an existing-but-malformed file exits with an
-error rather than overwriting it.
+A curses terminal UI for the inventory file: list, add, edit, set the
+default, and delete radios. Point it at `--radio-config PATH` or set
+`WHALE_RADIO_CONFIG`; with neither, it defaults to `radios.toml` in the
+current directory. Pointing it at a path that doesn't exist yet starts from
+an empty inventory (nothing is written until you save); pointing it at an
+existing-but-malformed file exits with an error rather than overwriting it.
 
-Keys: `↑`/`↓` or `j`/`k` to move, `d` to set the selected radio as default,
-`x` (or Delete) to remove it (with a `y`/`n` confirmation), `s` to save, `q`
-to quit (prompting to save first if there are unsaved changes).
+List keys: `↑`/`↓` or `j`/`k` to move, `a` to add a radio, `Enter` to edit
+the selected one, `d` to set it as default, `x` (or Delete) to remove it
+(with a `y`/`n` confirmation), `s` to save, `q` to quit (prompting to save
+first if there are unsaved changes).
+
+Add/edit form: `↑`/`↓` or `j`/`k` to move between fields, `Enter` to start
+editing a text field or cycle a selector/toggle field, `Space` also cycles
+a selector/toggle field, `Esc` to cancel (a mid-edit `Esc` reverts just that
+field; from the form itself it discards the whole add/edit and returns to
+the list). The Audio name field shows a live match count against connected
+devices and, along with the serial-port and hamlib-model fields underneath
+whichever PTT backend is selected, supports `p` to pick from the real
+hardware/data instead of typing blind -- typing the value by hand always
+works too, including when no sound card, serial port, or libhamlib is
+available to browse. Select `Save` to validate and write the entry back
+into the in-memory inventory (still not on disk until `s` on the list
+view), or `Cancel` to discard the form.
 
 ## Audio backend
 

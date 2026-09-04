@@ -206,3 +206,33 @@ def test_full_load_mutate_save_round_trip(tmp_path):
     assert reloaded.radios["portable"].description == "Portable HT"
     assert reloaded.radios["portable"].ptt_backend == "serial-line"
     assert reloaded.radios["portable"].ptt_config == {"port": "COM5", "line": "rts"}
+
+
+class _FakeScreen:
+    """Enough of a curses window for render() to run with no real terminal."""
+
+    def __init__(self, height=24, width=80):
+        self._height, self._width = height, width
+
+    def getmaxyx(self):
+        return (self._height, self._width)
+
+    def addnstr(self, y, x, text, n, attr=0):
+        pass
+
+
+def test_render_does_not_crash_empty_or_populated_or_pending():
+    screen = _FakeScreen()
+    _view([]).render(screen)
+    view = _view(["a", "b"], default="a")
+    view.render(screen)
+    view.handle_key(ord("x"))
+    view.render(screen)  # delete-confirm status line
+    view.handle_key(ord("n"))
+    view.handle_key(ord("d"))
+    view.handle_key(ord("q"))
+    view.render(screen)  # quit-confirm status line
+
+
+def test_render_does_not_crash_on_a_terminal_too_small():
+    _view(["a"]).render(_FakeScreen(height=2, width=10))
