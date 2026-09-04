@@ -1,9 +1,9 @@
-# HR0-A point-3 implementation handoff
+# HR1-A point-3 implementation handoff
 
 > **Point-4 update (2026-08-31):** the capacity diagnosis requested below is
-> complete in [`REDESIGN.md`](REDESIGN.md).  HR0-A remains frozen in `hr0.py`
-> as the control.  The experiment-local, wire-incompatible HR0-B candidate is
-> implemented in `hr0b.py`; its retained bounded screen delivered 19/20
+> complete in [`REDESIGN.md`](REDESIGN.md).  HR1-A remains frozen in `hr1.py`
+> as the control.  The experiment-local, wire-incompatible HR1-B candidate is
+> implemented in `hr1b.py`; its retained bounded screen delivered 19/20
 > oracle-aligned frames at -24 dB and projects 18.157 bit/s for a clean full
 > DATA/tiny-ACK exchange, below the fixed 20 bit/s Level 0 target. The current
 > handoff is go only to a small
@@ -15,9 +15,9 @@
 
 ## Status and decision
 
-The standalone HR0-A full-frame experiment is implemented in [`hr0.py`](hr0.py)
+The standalone HR1-A full-frame experiment is implemented in [`hr1.py`](hr1.py)
 and is loadable by the matched benchmark as
-`experiments.hr0.hr0:HR0`. It is deliberately absent from `whale/`, the HF
+`experiments.hr1.hr1:HR1`. It is deliberately absent from `whale/`, the HF
 registry, negotiation, and the production mode-ID space.
 
 **Redesign before the full boundary campaign.** The bounded receiver, checked
@@ -38,7 +38,7 @@ that merely replacing the binary convolutional code cannot close the gap. At
 the five last-two oracle samples had 38.7--41.6% hard coded-bit error and only
 3--5 correct pilots of 13 (chance is 0.8125). That does not yet satisfy
 `DESIGN.md`'s condition that uncoded tone metrics support a stronger decoder.
-The bounded screen rejected A's target rate and produced the HR0-B revision
+The bounded screen rejected A's target rate and produced the HR1-B revision
 described in `REDESIGN.md`; the full campaign remains deferred. The guarded
 geometry remains useful as the control: clean acquisition works with
 timing offsets, +/-143 Hz tested CFO, and +/-100 ppm tested sample-clock error,
@@ -106,7 +106,7 @@ wrong class is rejected without trying a full decoder.
 
 ## Real acquisition and bounded work
 
-`HR0.decode()` accepts only finite one-dimensional 12 kHz audio. It considers
+`HR1.decode()` accepts only finite one-dimensional 12 kHz audio. It considers
 at most the first 16 seconds and searches class-word starts only in the first
 2 seconds. For a full-length capture, the fixed coarse grid is:
 
@@ -142,14 +142,14 @@ repository bits, interleaver, framing, FEC, MFSK, HC0, and common-HF-lead
 implementations. These point-3 resolutions are frozen in the code:
 
 - `DESIGN.md` says an intended 6 kHz analysis rate, while the actual
-  `WaveformMode` contract and shared receive front end supply 12 kHz. HR0-A
+  `WaveformMode` contract and shared receive front end supply 12 kHz. HR1-A
   therefore uses 96-sample 8 ms observations at 12 kHz. Tone centers and
   orthogonality are unchanged; no production decimator was modified.
 - The design specifies packet PN whitening but not its seed. This revision
   reuses HC0's `0x0C4B1`, preserving the repository convention and making the
   wire deterministic.
-- There is no production HR0 common-lead label and point 3 forbids assigning
-  one. The budgeted 128 ms lead is therefore an experiment-only cycling HR0
+- There is no production HR1 common-lead label and point 3 forbids assigning
+  one. The budgeted 128 ms lead is therefore an experiment-only cycling HR1
   tone sequence with a 5 ms ramp. It is not interpreted as a production mode
   hint. Class-word acquisition remains authoritative.
 - The 2 ms coarse and 0.25 ms fine timing resolutions are unchanged. Fine
@@ -187,17 +187,17 @@ From the repository root, using the required environment:
 
 ```sh
 /Users/pedro/miniconda3/envs/gnuradio/bin/python -m py_compile \
-  experiments/hr0/hr0.py experiments/hr0/benchmark.py \
-  experiments/hr0/test_hr0.py experiments/hr0/test_benchmark.py
+  experiments/hr1/hr1.py experiments/hr1/benchmark.py \
+  experiments/hr1/test_hr1.py experiments/hr1/test_benchmark.py
 
 /Users/pedro/miniconda3/envs/gnuradio/bin/pytest -q \
-  experiments/hr0/test_hr0.py experiments/hr0/test_benchmark.py
+  experiments/hr1/test_hr1.py experiments/hr1/test_benchmark.py
 
 /Users/pedro/miniconda3/envs/gnuradio/bin/python \
-  experiments/hr0/benchmark.py sweep \
-  --modes experiments.hr0.hr0:HR0 --model awgn --points 20 \
+  experiments/hr1/benchmark.py sweep \
+  --modes experiments.hr1.hr1:HR1 --model awgn --points 20 \
   --trials 1 --workers 1 --save-failures 0 \
-  --out /tmp/hr0_point3_smoke.json
+  --out /tmp/hr1_point3_smoke.json
 ```
 
 At the point-3 handoff, the focused suite reported `30 passed`; the relevant

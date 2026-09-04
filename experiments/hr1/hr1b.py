@@ -1,6 +1,6 @@
-"""HR0-B oracle candidate: guarded coded 16-MFSK with symbol metrics.
+"""HR1-B oracle candidate: guarded coded 16-MFSK with symbol metrics.
 
-This remains experiment-local.  Compared with HR0-A it transmits silence in
+This remains experiment-local.  Compared with HR1-A it transmits silence in
 the discarded 8 ms guard, uses a shorter balanced class word, and replaces
 independent bit metrics with a GF(16) convolutional inner code.  The full
 class adds a shortened RS(96,70) outer code; the tiny ACK class uses a faster
@@ -16,27 +16,27 @@ from functools import cached_property
 import numpy as np
 from scipy.special import i0e
 
-from experiments.hr0 import hr0
+from experiments.hr1 import hr1
 from whale import framing, rx_audio, waveform
 from whale.dsp.bits import pn_bits
 
 
-TX_SAMPLE_RATE = hr0.TX_SAMPLE_RATE
-RX_SAMPLE_RATE = hr0.RX_SAMPLE_RATE
-OBS_TX_SAMPLES = hr0.OBS_TX_SAMPLES
-OBS_RX_SAMPLES = hr0.OBS_RX_SAMPLES
-SYMBOL_TX_SAMPLES = hr0.SYMBOL_TX_SAMPLES
-SYMBOL_RX_SAMPLES = hr0.SYMBOL_RX_SAMPLES
-SYMBOL_SECONDS = hr0.SYMBOL_SECONDS
-TONE_COUNT = hr0.TONE_COUNT
-TONE_HZ = hr0.TONE_HZ
-RX_TONE_BINS = hr0.RX_TONE_BINS
-TX_AMPLITUDE = hr0.TX_AMPLITUDE
+TX_SAMPLE_RATE = hr1.TX_SAMPLE_RATE
+RX_SAMPLE_RATE = hr1.RX_SAMPLE_RATE
+OBS_TX_SAMPLES = hr1.OBS_TX_SAMPLES
+OBS_RX_SAMPLES = hr1.OBS_RX_SAMPLES
+SYMBOL_TX_SAMPLES = hr1.SYMBOL_TX_SAMPLES
+SYMBOL_RX_SAMPLES = hr1.SYMBOL_RX_SAMPLES
+SYMBOL_SECONDS = hr1.SYMBOL_SECONDS
+TONE_COUNT = hr1.TONE_COUNT
+TONE_HZ = hr1.TONE_HZ
+RX_TONE_BINS = hr1.RX_TONE_BINS
+TX_AMPLITUDE = hr1.TX_AMPLITUDE
 ACTIVE_RAMP_TX_SAMPLES = 24  # 0.5 ms raised-cosine-squared edge
-LEAD_TX_SAMPLES = hr0.LEAD_TX_SAMPLES
-LEAD_RX_SAMPLES = hr0.LEAD_RX_SAMPLES
-TAIL_TX_SAMPLES = hr0.TAIL_TX_SAMPLES
-TAIL_RX_SAMPLES = hr0.TAIL_RX_SAMPLES
+LEAD_TX_SAMPLES = hr1.LEAD_TX_SAMPLES
+LEAD_RX_SAMPLES = hr1.LEAD_RX_SAMPLES
+TAIL_TX_SAMPLES = hr1.TAIL_TX_SAMPLES
+TAIL_RX_SAMPLES = hr1.TAIL_RX_SAMPLES
 MAX_PHYSICAL_PAYLOAD_BYTES = 64
 CHUNK_SIZE = MAX_PHYSICAL_PAYLOAD_BYTES - framing.AIR_HEADER_BYTES
 TINY_MAX_PAYLOAD_BYTES = 12
@@ -67,14 +67,14 @@ TINY_FRAME_SECONDS = TINY_FRAME_TX_SAMPLES / TX_SAMPLE_RATE
 CLEAN_SESSION_SECONDS = FULL_FRAME_SECONDS + TINY_FRAME_SECONDS + 0.6
 CLEAN_SESSION_RATE = 54 * 8 / CLEAN_SESSION_SECONDS
 
-COARSE_TIMING_SAMPLES = hr0.COARSE_TIMING_SAMPLES
-FINE_TIMING_SAMPLES = hr0.FINE_TIMING_SAMPLES
-CFO_STEP_HZ = hr0.CFO_STEP_HZ
-CFO_HYPOTHESES = hr0.CFO_HYPOTHESES
-MAX_ACQUISITION_START_SAMPLES = hr0.MAX_ACQUISITION_START_SAMPLES
+COARSE_TIMING_SAMPLES = hr1.COARSE_TIMING_SAMPLES
+FINE_TIMING_SAMPLES = hr1.FINE_TIMING_SAMPLES
+CFO_STEP_HZ = hr1.CFO_STEP_HZ
+CFO_HYPOTHESES = hr1.CFO_HYPOTHESES
+MAX_ACQUISITION_START_SAMPLES = hr1.MAX_ACQUISITION_START_SAMPLES
 MAX_CAPTURE_SAMPLES = 24 * RX_SAMPLE_RATE
-MAX_CANDIDATES = hr0.MAX_CANDIDATES
-RAW_CANDIDATES_PER_CLASS_CFO = hr0.RAW_CANDIDATES_PER_CLASS_CFO
+MAX_CANDIDATES = hr1.MAX_CANDIDATES
+RAW_CANDIDATES_PER_CLASS_CFO = hr1.RAW_CANDIDATES_PER_CLASS_CFO
 ACQUISITION_THRESHOLD = 0.012
 EXPERIMENTAL_MODE_ID = 241
 
@@ -388,7 +388,7 @@ def encode_tones(payload: bytes) -> tuple[int, np.ndarray]:
                               _whitener(packet_bytes))
         protected = _rs_encode(whitened)
     else:
-        raise ValueError("payload exceeds HR0-B full class")
+        raise ValueError("payload exceeds HR1-B full class")
     nibbles = np.empty(2 * len(protected) + 2, dtype=np.uint8)
     raw = np.frombuffer(protected, dtype=np.uint8)
     nibbles[:-2:2], nibbles[1:-2:2] = raw >> 4, raw & 15
@@ -448,15 +448,15 @@ def _modulate_symbols(tones: np.ndarray) -> np.ndarray:
 
 
 def encode(payload: bytes, *, include_head: bool = True,
-           head_seconds: float = hr0.LEAD_SECONDS) -> np.ndarray:
+           head_seconds: float = hr1.LEAD_SECONDS) -> np.ndarray:
     if head_seconds < 0:
         raise ValueError("head duration must not be negative")
     lead_samples = 0 if not include_head else max(
         LEAD_TX_SAMPLES,
-        int(np.ceil(head_seconds / hr0.OBSERVATION_SECONDS)) * OBS_TX_SAMPLES)
+        int(np.ceil(head_seconds / hr1.OBSERVATION_SECONDS)) * OBS_TX_SAMPLES)
     class_id, tones = encode_tones(payload)
-    lead = hr0._modulate_observations(
-        hr0._lead_tones(lead_samples), OBS_TX_SAMPLES, TX_SAMPLE_RATE)
+    lead = hr1._modulate_observations(
+        hr1._lead_tones(lead_samples), OBS_TX_SAMPLES, TX_SAMPLE_RATE)
     if len(lead):
         fade = min(240, len(lead))
         lead[:fade] *= np.linspace(0, 1, fade)
@@ -484,7 +484,7 @@ def _symbol_costs(correlations: np.ndarray,
     # The two active observations are phase-continuous in AWGN.  Coherent
     # pair combining recovers the 3 dB that independent noncoherent products
     # throw away at this very low rate.  The 8 ms pair is still much shorter
-    # than HR0-A's 24 ms coherent warning; Watterson smoke tests decide whether
+    # than HR1-A's 24 ms coherent warning; Watterson smoke tests decide whether
     # this remains acceptable at the 30 Hz registry extreme.
     combined = np.sum(correlations, axis=1)
     source0 = correlations if reference is None else reference
@@ -677,8 +677,8 @@ def decode(audio: np.ndarray, **_kwargs) -> dict:
 
 
 @dataclass(frozen=True)
-class Hr0BMode:
-    name: str = "hr0-b-exp"
+class Hr1BMode:
+    name: str = "hr1-b-exp"
     mode_id: int = EXPERIMENTAL_MODE_ID
     chunk_size: int = CHUNK_SIZE
     confidence_threshold: float = ACQUISITION_THRESHOLD
@@ -691,10 +691,10 @@ class Hr0BMode:
 
     @property
     def head_match_allowance_seconds(self) -> float:
-        return hr0.OBSERVATION_SECONDS
+        return hr1.OBSERVATION_SECONDS
 
     def encode(self, payload: bytes, *, include_head: bool = True,
-               head_seconds: float = hr0.LEAD_SECONDS) -> np.ndarray:
+               head_seconds: float = hr1.LEAD_SECONDS) -> np.ndarray:
         return encode(payload, include_head=include_head,
                       head_seconds=head_seconds)
 
@@ -706,13 +706,13 @@ class Hr0BMode:
             return TINY_FRAME_SECONDS
         if payload_len <= MAX_PHYSICAL_PAYLOAD_BYTES:
             return FULL_FRAME_SECONDS
-        raise ValueError("payload exceeds HR0-B full class")
+        raise ValueError("payload exceeds HR1-B full class")
 
 
-HR0B = Hr0BMode()
+HR1B = Hr1BMode()
 
 
-assert isinstance(HR0B, waveform.WaveformMode)
+assert isinstance(HR1B, waveform.WaveformMode)
 assert FULL_BODY_SYMBOLS == 776 and TINY_BODY_SYMBOLS == 114
 assert FULL_FRAME_SECONDS == 19.54 and TINY_FRAME_SECONDS == 3.652
 assert CLEAN_SESSION_RATE > 18.0

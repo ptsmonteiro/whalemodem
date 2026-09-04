@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Deterministic arithmetic screen for the HR0 first-pass architecture.
+"""Deterministic arithmetic screen for the HR1 first-pass architecture.
 
 This is intentionally not a modem or a channel simulation.  It makes the
 rate, delay/Doppler ratios, frame classes, and SNR/Eb/N0 conversions in
@@ -87,7 +87,7 @@ GEOMETRIES = (
              23.0, 23.0, 32, 32),
     Geometry("one-of-32 MFSK example", "one-of-32 MFSK", 32,
              46.875, 46.875, 5, 1),
-    Geometry("HR0-A", "guarded one-of-16 MFSK", 16,
+    Geometry("HR1-A", "guarded one-of-16 MFSK", 16,
              1.0 / 0.024, 125.0, 4, 1),
 )
 
@@ -133,18 +133,18 @@ def report() -> dict:
     clean_exchange_seconds = full.keyed_seconds + tiny.keyed_seconds + 2 * 0.3
     clean_session_rate = useful_data_bits / clean_exchange_seconds
     return {
-        "schema": "whalemodem.hr0.architecture-screen.v1",
+        "schema": "whalemodem.hr1.architecture-screen.v1",
         "assumptions": {
             "nyquist_noise_bandwidth_hz": NYQUIST_BANDWIDTH_HZ,
             "max_watterson_delay_seconds": MAX_WATTERSON_DELAY_SECONDS,
             "max_watterson_frequency_spread_hz_2sigma": MAX_WATTERSON_SPREAD_HZ,
             "air_header_bytes": 10,
             "hf_turnaround_each_direction_seconds": 0.3,
-            "hr0_tone_observation_seconds": 0.008,
-            "hr0_guarded_tone_dwell_seconds": 0.024,
+            "hr1_tone_observation_seconds": 0.008,
+            "hr1_guarded_tone_dwell_seconds": 0.024,
         },
         "geometries": geometries,
-        "hr0_frame_classes": frames,
+        "hr1_frame_classes": frames,
         "budgets": {
             "full_data_body_bytes": 54,
             "full_frame_useful_bit_rate": full_frame_rate,

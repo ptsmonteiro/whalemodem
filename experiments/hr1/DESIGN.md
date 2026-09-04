@@ -1,21 +1,21 @@
-# HR0 point 2: architecture screen and first-pass design
+# HR1 point 2: architecture screen and first-pass design
 
 ## Decision and claim boundary
 
-**Go to an oracle-aligned screen with HR0-A**, a guarded, sequential,
+**Go to an oracle-aligned screen with HR1-A**, a guarded, sequential,
 constant-envelope 16-MFSK waveform with a rate-1/3 convolutional code,
 whole-frame interleaving, time-varying tone labeling, periodic known tones,
 and three fixed frame classes. It is not a 32-carrier waveform and it is not
 32-FSK.
 
-This is an architecture decision, not a robustness result. No HR0 waveform,
+This is an architecture decision, not a robustness result. No HR1 waveform,
 receiver, Monte Carlo boundary, radio result, or VARA comparison exists yet.
 `PLAN.md` remains the qualification protocol. In particular, the published
 VARA row gives only 23 symbols/s, 32 carriers, FSK, and 18 bit/s net; it does
 not disclose enough to reconstruct its modulation, code, framing, or SNR
 threshold.
 
-The first screen should stop or pivot unless HR0-A is simultaneously capable
+The first screen should stop or pivot unless HR1-A is simultaneously capable
 of:
 
 - the `-24 dB` canonical-AWGN target with a real 54-byte DATA body;
@@ -51,12 +51,12 @@ mode/adapter, `whale.dsp.mfsk`, `whale.dsp.fec`, `whale.dsp.framing`,
   rate-1/3 experiment can reuse their framing and vectorized Viterbi ideas,
   but cannot be represented by the production classes unchanged.
 - The MFSK `ToneBank` currently makes tone dwell, FFT interval, symbol rate,
-  and tone spacing the same number. HR0-A deliberately separates a 24 ms
+  and tone spacing the same number. HR1-A deliberately separates a 24 ms
   tone dwell from 8 ms observations and therefore needs a small experimental
   kernel rather than a misleading `ToneBank` configuration.
 
 The retained HC0 notes place its clean-AWGN edge near -16 dB, but point 1 did
-not turn that note into a new HR0 result. The HC0 boundary campaign required
+not turn that note into a new HR1 result. The HC0 boundary campaign required
 by `PLAN.md` remains the baseline for any later relative claim.
 
 ## “32 carriers” is not “32-FSK”
@@ -71,7 +71,7 @@ These descriptions imply different signals:
 If the VARA row means 32 parallel one-bit FSK subchannels, the geometry has a
 nominal 736 coded bit/s before its undisclosed redundancy and overhead. If it
 meant one-of-32 MFSK at 23 symbols/s, it would have only 115 coded bit/s. The
-vendor row does not authorize choosing either interpretation as fact. HR0's
+vendor row does not authorize choosing either interpretation as fact. HR1's
 32-carrier comparison below is therefore an explicit hypothetical geometry,
 not a claim about VARA's wire format.
 
@@ -90,14 +90,14 @@ an SSB transmitter can still add compression, filtering, and nonlinearities.
 | DSSS with BPSK/CPFSK chips | Processing gain can trade bandwidth for low information rate; a constant-envelope chip waveform is possible | A RAKE can combine the 7 ms spread, but the 30 Hz channel changes phase during long spreading symbols; CW immunity depends on processing and front-end headroom | Code/timing search, multipath hypotheses, and coherent/noncoherent combining are substantially new to this repository | Ranked alternate 4; no clear finite-frame advantage over coded hopping MFSK yet. |
 | Chirp/CSS | Constant envelope, whole-band energy, good acquisition candidates | Delay and Doppler move/smear dechirped bins; at long symbols 30 Hz spans several bins, while shorter symbols reduce processing gain. Strong CW can survive dechirping as structured interference | New chirp generation, ambiguity search, and multipath peak handling; CPU is bounded with FFTs but not yet shared | Ranked alternate 3 if MFSK suffers frequency-selective erasures that excision/FEC cannot absorb. |
 | Repetition only | Predictable 3 dB per doubled duration in AWGN | Provides time diversity only if copies see different fades; literal repetition can correlate failures and is inefficient against stationary CW/notches | Simplest combiner and bounded work | Use only as a diagnostic or incremental-redundancy branch, not as the primary code. |
-| Frequency diversity / hopping hybrid | No AWGN gain by itself; duplicate branches cost rate, while label hopping is free | Time-varying tone labels randomize error values; persistent-tone excision turns one/two CW interferers into about 1/16 or 2/16 erasures. Explicit duplicate branches add notch diversity | Small extension to MFSK metrics; stays one tone at a time | Label hopping and excision are in HR0-A. Dual-copy diversity is ranked alternate 2. |
+| Frequency diversity / hopping hybrid | No AWGN gain by itself; duplicate branches cost rate, while label hopping is free | Time-varying tone labels randomize error values; persistent-tone excision turns one/two CW interferers into about 1/16 or 2/16 erasures. Explicit duplicate branches add notch diversity | Small extension to MFSK metrics; stays one tone at a time | Label hopping and excision are in HR1-A. Dual-copy diversity is ranked alternate 2. |
 
 The parallel geometry's high-latitude warning is a screening ratio, not proof
 of failure: a detailed receiver could use wider spacing, ICI equalization, or
 joint detection. Those changes would no longer be the literal 23 Hz geometry
 being used as the reference.
 
-## Frozen first-pass candidate: HR0-A
+## Frozen first-pass candidate: HR1-A
 
 ### Signaling geometry
 
@@ -124,7 +124,7 @@ does not trust the interval in which the delayed path can still carry the
 previous tone. Keeping it energized preserves a single-tone envelope and
 avoids a 33% on/off duty cycle with a worse spectral skirt. The whole keyed
 interval still counts in waveform SNR and energy/bit, so discarded receive
-energy is honestly charged to HR0-A.
+energy is honestly charged to HR1-A.
 
 The outer centers leave approximately 375 Hz below and 150 Hz above the last
 tone inside a 0--2,400 Hz view. Hard tone changes have sidelobes, so nominal
@@ -170,7 +170,7 @@ pattern and that transmitted tones remain spread across the band.
 ### Lead, acquisition, and class indication
 
 - Retain 128 ms as the rate-budget lead floor. The current common-HF lead can
-  eventually advertise HR0, but it stays advisory and no production label or
+  eventually advertise HR1, but it stays advisory and no production label or
   mode ID is assigned in point 2.
 - Follow it with 80 guarded tone symbols (1.920 seconds). The three frame
   classes use distinct balanced class words. Construct each word as five
@@ -299,15 +299,15 @@ merely to improve its isolated FER.
 
 1. **HC0-grid 16-MFSK plus stronger coding/incremental redundancy.** It reuses
    almost the entire receiver and has no new occupied-bandwidth question.
-   Pivot here if HR0-A loses at least 2 dB to its guard/short-observation
+   Pivot here if HR1-A loses at least 2 dB to its guard/short-observation
    structure without gaining at least 3 dB over HC0 in disturbed fading.
    Its known red flag is the 7 ms delay occupying 66% of an HC0 symbol.
-2. **HR0-A with a second time/frequency-diverse copy or incremental parity.**
+2. **HR1-A with a second time/frequency-diverse copy or incremental parity.**
    Keep one tone at a time and place the extra branch in a disjoint tone/time
    permutation. Pivot if CW/notch/selective-fade failures dominate while the
    measured clean session rate has enough surplus. Reject if it takes the
    long-session rate below 20 bit/s.
-3. **Short-block rate-1/3 or rate-1/4 LDPC/polar outer code on the HR0-A
+3. **Short-block rate-1/3 or rate-1/4 LDPC/polar outer code on the HR1-A
    geometry.** Pivot if oracle symbol metrics are healthy but the frozen
    `(171,133,165)` code misses the AWGN target by more than 1 dB or shows an
    error floor. It ranks below the convolutional baseline only because no
@@ -327,7 +327,7 @@ merely to improve its isolated FER.
 
 ## Falsifiable point-2 handoff
 
-**Go** to point 3's oracle and bounded experimental receiver work for HR0-A,
+**Go** to point 3's oracle and bounded experimental receiver work for HR1-A,
 with these stops:
 
 - **Redesign the code** if the oracle-aligned full frame does not meet the
@@ -340,7 +340,7 @@ with these stops:
 - **Redesign framing/ARQ** if real acquisition plus tiny ACKs cannot project
   at least 20 bit/s at the target FER. Do not call the 34.275 bit/s full-frame
   number a session result.
-- **Stop HR0-A** if a bounded real receiver cannot keep acquisition at least
+- **Stop HR1-A** if a bounded real receiver cannot keep acquisition at least
   as reliable as checked payload delivery, or if it cannot beat the newly
   measured HC0 disturbed boundary by 3 dB without dropping below 20 bit/s.
 - **Stop the current family search** if no constant-envelope orthogonal or
@@ -351,10 +351,10 @@ with these stops:
 Exact point-2 files and checks:
 
 ```sh
-python experiments/hr0/architecture_screen.py
-python -m py_compile experiments/hr0/architecture_screen.py
-git diff --check -- experiments/hr0/DESIGN.md \
-  experiments/hr0/architecture_screen.py
+python experiments/hr1/architecture_screen.py
+python -m py_compile experiments/hr1/architecture_screen.py
+git diff --check -- experiments/hr1/DESIGN.md \
+  experiments/hr1/architecture_screen.py
 ```
 
 `architecture_screen.py` is arithmetic only. It reproduces frame sizes,

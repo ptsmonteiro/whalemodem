@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
-"""Matched, replayable frame benchmark for HC0 and HR0 candidates.
+"""Matched, replayable frame benchmark for HC0 and HR1 candidates.
 
-This runner is intentionally experiment-local.  It does not register HR0 or
+This runner is intentionally experiment-local.  It does not register HR1 or
 change a production channel.  A future candidate can be supplied as
 ``package.module:OBJECT`` when it exposes the ordinary WaveformMode surface.
 The default frozen workload is the historic 64-byte full DATA frame; explicit
@@ -42,7 +42,7 @@ from whale.trials import (TrialOutcome, classify_decode,
                           common_decoder_metrics)
 
 
-SCHEMA_ID = "whalemodem.hr0.frame_benchmark"
+SCHEMA_ID = "whalemodem.hr1.frame_benchmark"
 SCHEMA_VERSION = 2
 SAMPLE_RATE = 48_000
 PHYSICAL_PAYLOAD_BYTES = 64
@@ -616,7 +616,7 @@ def sweep(args) -> int:
 def replay(args) -> int:
     artifact = json.loads(args.artifact.read_text())
     if artifact.get("schema_id") != SCHEMA_ID:
-        raise ValueError("not an HR0 frame benchmark artifact")
+        raise ValueError("not an HR1 frame benchmark artifact")
     expected = artifact["trials"][args.record_index]
     task = {
         "mode_selector": expected["mode_selector"],
@@ -675,7 +675,7 @@ def parse_args(argv=None):
     run.add_argument("--seed", type=int, default=DEFAULT_MASTER_SEED)
     run.add_argument("--payload-bytes", type=int,
                      default=PHYSICAL_PAYLOAD_BYTES,
-                     help="physical checked payload bytes (12 selects HR0-B tiny class)")
+                     help="physical checked payload bytes (12 selects HR1-B tiny class)")
     run.add_argument("--useful-application-bytes", type=int,
                      help="bytes counted as useful; defaults to payload minus air header")
     run.add_argument("--workload-name", default="full_data")

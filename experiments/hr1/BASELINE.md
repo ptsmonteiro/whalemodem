@@ -1,18 +1,18 @@
-# HR0 HC0 baseline: exploratory frame boundaries
+# HR1 HC0 baseline: exploratory frame boundaries
 
 ## Handoff
 
-**Go to HR0-A's oracle and bounded receiver work.**  The HC0 baseline now has
+**Go to HR1-A's oracle and bounded receiver work.**  The HC0 baseline now has
 a reusable matched-trial harness and an exploratory edge under every
 registered Watterson preset.  The result is not promotion evidence: every
 point has 30 trials, so even 30/30 has a 95% Wilson lower bound of only
-0.886.  No HR0 waveform or production registry behavior was added.
+0.886.  No HR1 waveform or production registry behavior was added.
 
 The measurements support the existing design direction:
 
 - HC0 delivered 30/30 full frames at -16 dB canonical AWGN and 12/30 at
   -17 dB.  Payload/FEC failure, not acquisition, caused all 18 losses at
-  -17 dB.  HR0-A's -24 dB AWGN target is therefore about 8 dB below the
+  -17 dB.  HR1-A's -24 dB AWGN target is therefore about 8 dB below the
   last perfect exploratory HC0 point.
 - In canonical `mid_latitude_disturbed`, HC0 delivered 30/30 at -11 dB and
   24/30 at -12 dB.  Acquisition remained 28/30 at -12 dB; four of those
@@ -28,7 +28,7 @@ The measurements support the existing design direction:
   3,390 trials.  Every failed seed has a one-command replay; representative
   failures also have compressed captures.
 
-The point-3 stop remains: redesign HR0-A's geometry if the guarded receiver
+The point-3 stop remains: redesign HR1-A's geometry if the guarded receiver
 still loses at least 3 dB on disturbed NVIS or disturbed high latitude
 relative to disturbed mid latitude.  HC0's results do not justify weakening
 that criterion; they make the 7 ms/30 Hz test more important.
@@ -87,7 +87,7 @@ two 30-trial samples are not paired estimates of normalization gain.
   `whale.qualification.channel_factory()` leaves `SnrSpec` bounds unset, so
   after Watterson its AWGN stage includes the delayed output extension in the
   default full-array reference (up to 336 extra samples for a 7 ms preset).
-  This harness follows the newer HR0 protocol's explicit interval while
+  This harness follows the newer HR1 protocol's explicit interval while
   retaining the production stage order and per-frame post-fade normalization.
   Artifacts record the bounds, so these results must not be silently merged
   with old default-bound artifacts.
@@ -212,28 +212,28 @@ The fixed-N0 stage is local and conspicuously named
 All commands were run from the repository root with master seed `20260830`.
 
 ```sh
-/Users/pedro/miniconda3/envs/gnuradio/bin/python experiments/hr0/benchmark.py sweep --model awgn --points -10 -12 -14 -15 -16 -17 -18 -20 --trials 30 --workers 8 --save-failures 3 --out experiments/hr0/results/hc0_awgn_exploration_20260830.json
+/Users/pedro/miniconda3/envs/gnuradio/bin/python experiments/hr1/benchmark.py sweep --model awgn --points -10 -12 -14 -15 -16 -17 -18 -20 --trials 30 --workers 8 --save-failures 3 --out experiments/hr1/results/hc0_awgn_exploration_20260830.json
 
-/Users/pedro/miniconda3/envs/gnuradio/bin/python experiments/hr0/benchmark.py sweep --model watterson_canonical --watterson-preset mid_latitude_disturbed --points -5 -8 -10 -12 -14 -16 -18 -20 -22 -24 --trials 30 --workers 8 --save-failures 3 --out experiments/hr0/results/hc0_watterson_mid_latitude_disturbed_exploration_20260830.json
-/Users/pedro/miniconda3/envs/gnuradio/bin/python experiments/hr0/benchmark.py sweep --model watterson_canonical --watterson-preset mid_latitude_disturbed --points -11 -13 -15 --trials 30 --workers 8 --save-failures 2 --out experiments/hr0/results/hc0_watterson_mid_latitude_disturbed_refinement_20260830.json
+/Users/pedro/miniconda3/envs/gnuradio/bin/python experiments/hr1/benchmark.py sweep --model watterson_canonical --watterson-preset mid_latitude_disturbed --points -5 -8 -10 -12 -14 -16 -18 -20 -22 -24 --trials 30 --workers 8 --save-failures 3 --out experiments/hr1/results/hc0_watterson_mid_latitude_disturbed_exploration_20260830.json
+/Users/pedro/miniconda3/envs/gnuradio/bin/python experiments/hr1/benchmark.py sweep --model watterson_canonical --watterson-preset mid_latitude_disturbed --points -11 -13 -15 --trials 30 --workers 8 --save-failures 2 --out experiments/hr1/results/hc0_watterson_mid_latitude_disturbed_refinement_20260830.json
 
-/Users/pedro/miniconda3/envs/gnuradio/bin/python experiments/hr0/benchmark.py sweep --model watterson_canonical --watterson-preset mid_latitude_disturbed_nvis --points -5 -8 -10 -12 -14 -16 -18 -20 -22 -24 --trials 30 --workers 8 --save-failures 3 --out experiments/hr0/results/hc0_watterson_mid_latitude_disturbed_nvis_exploration_20260830.json
-/Users/pedro/miniconda3/envs/gnuradio/bin/python experiments/hr0/benchmark.py sweep --model watterson_canonical --watterson-preset mid_latitude_disturbed_nvis --points 0 5 10 20 30 --trials 30 --workers 8 --save-failures 2 --out experiments/hr0/results/hc0_watterson_mid_latitude_disturbed_nvis_extension_20260830.json
+/Users/pedro/miniconda3/envs/gnuradio/bin/python experiments/hr1/benchmark.py sweep --model watterson_canonical --watterson-preset mid_latitude_disturbed_nvis --points -5 -8 -10 -12 -14 -16 -18 -20 -22 -24 --trials 30 --workers 8 --save-failures 3 --out experiments/hr1/results/hc0_watterson_mid_latitude_disturbed_nvis_exploration_20260830.json
+/Users/pedro/miniconda3/envs/gnuradio/bin/python experiments/hr1/benchmark.py sweep --model watterson_canonical --watterson-preset mid_latitude_disturbed_nvis --points 0 5 10 20 30 --trials 30 --workers 8 --save-failures 2 --out experiments/hr1/results/hc0_watterson_mid_latitude_disturbed_nvis_extension_20260830.json
 
-/Users/pedro/miniconda3/envs/gnuradio/bin/python experiments/hr0/benchmark.py sweep --model watterson_canonical --watterson-preset high_latitude_disturbed --points -5 -8 -10 -12 -14 -16 -18 -20 -22 -24 0 5 --trials 30 --workers 8 --save-failures 3 --out experiments/hr0/results/hc0_watterson_high_latitude_disturbed_exploration_20260830.json
-/Users/pedro/miniconda3/envs/gnuradio/bin/python experiments/hr0/benchmark.py sweep --model watterson_canonical --watterson-preset high_latitude_disturbed --points 10 20 30 --trials 30 --workers 8 --save-failures 2 --out experiments/hr0/results/hc0_watterson_high_latitude_disturbed_extension_20260830.json
+/Users/pedro/miniconda3/envs/gnuradio/bin/python experiments/hr1/benchmark.py sweep --model watterson_canonical --watterson-preset high_latitude_disturbed --points -5 -8 -10 -12 -14 -16 -18 -20 -22 -24 0 5 --trials 30 --workers 8 --save-failures 3 --out experiments/hr1/results/hc0_watterson_high_latitude_disturbed_exploration_20260830.json
+/Users/pedro/miniconda3/envs/gnuradio/bin/python experiments/hr1/benchmark.py sweep --model watterson_canonical --watterson-preset high_latitude_disturbed --points 10 20 30 --trials 30 --workers 8 --save-failures 2 --out experiments/hr1/results/hc0_watterson_high_latitude_disturbed_extension_20260830.json
 
 for preset in low_latitude_quiet low_latitude_moderate low_latitude_disturbed mid_latitude_quiet mid_latitude_moderate high_latitude_quiet high_latitude_moderate; do
-  /Users/pedro/miniconda3/envs/gnuradio/bin/python experiments/hr0/benchmark.py sweep --model watterson_canonical --watterson-preset "$preset" --points -5 -8 -12 -16 -20 -24 0 5 --trials 30 --workers 8 --save-failures 1 --out "experiments/hr0/results/hc0_watterson_${preset}_exploration_20260830.json" || exit
+  /Users/pedro/miniconda3/envs/gnuradio/bin/python experiments/hr1/benchmark.py sweep --model watterson_canonical --watterson-preset "$preset" --points -5 -8 -12 -16 -20 -24 0 5 --trials 30 --workers 8 --save-failures 1 --out "experiments/hr1/results/hc0_watterson_${preset}_exploration_20260830.json" || exit
 done
 
-/Users/pedro/miniconda3/envs/gnuradio/bin/python experiments/hr0/benchmark.py sweep --model watterson_fixed_n0 --watterson-preset mid_latitude_disturbed --points 0 -5 -8 -10 -12 -14 --trials 30 --workers 8 --save-failures 3 --out experiments/hr0/results/hc0_watterson_fixed_n0_mid_latitude_disturbed_exploration_20260830.json
+/Users/pedro/miniconda3/envs/gnuradio/bin/python experiments/hr1/benchmark.py sweep --model watterson_fixed_n0 --watterson-preset mid_latitude_disturbed --points 0 -5 -8 -10 -12 -14 --trials 30 --workers 8 --save-failures 3 --out experiments/hr1/results/hc0_watterson_fixed_n0_mid_latitude_disturbed_exploration_20260830.json
 ```
 
 Example failed-seed replay, verified after the campaign:
 
 ```sh
-/Users/pedro/miniconda3/envs/gnuradio/bin/python experiments/hr0/benchmark.py replay --artifact experiments/hr0/results/hc0_awgn_exploration_20260830.json --record-index 150
+/Users/pedro/miniconda3/envs/gnuradio/bin/python experiments/hr1/benchmark.py replay --artifact experiments/hr1/results/hc0_awgn_exploration_20260830.json --record-index 150
 ```
 
 The replay returned `matched: true` and reproduced the `payload_failed`
@@ -248,9 +248,9 @@ failure captures in adjacent `_captures` directories.
 
 ```sh
 /Users/pedro/miniconda3/envs/gnuradio/bin/python -m py_compile \
-  experiments/hr0/benchmark.py experiments/hr0/test_benchmark.py
+  experiments/hr1/benchmark.py experiments/hr1/test_benchmark.py
 /Users/pedro/miniconda3/envs/gnuradio/bin/pytest -q \
-  experiments/hr0/test_benchmark.py
+  experiments/hr1/test_benchmark.py
 ```
 
 The focused result was `7 passed`.  Relevant HC0/channel/qualification tests

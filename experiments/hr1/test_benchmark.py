@@ -2,7 +2,7 @@ import json
 
 import pytest
 
-from experiments.hr0 import benchmark
+from experiments.hr1 import benchmark
 
 
 def test_seed_derivation_is_mode_independent_and_point_order_independent():
@@ -90,7 +90,7 @@ def test_sweep_artifact_replays_by_record_index(tmp_path):
 def test_tiny_workload_artifact_is_distinct_and_replayable(tmp_path):
     output = tmp_path / "tiny.json"
     args = benchmark.parse_args([
-        "sweep", "--modes", "experiments.hr0.hr0b:HR0B",
+        "sweep", "--modes", "experiments.hr1.hr1b:HR1B",
         "--model", "awgn", "--points", "20", "--trials", "1",
         "--workers", "1", "--save-failures", "0",
         "--payload-bytes", "12", "--useful-application-bytes", "2",

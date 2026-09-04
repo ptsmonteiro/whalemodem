@@ -1,11 +1,11 @@
-# HR0-B small real-receiver boundary screen
+# HR1-B small real-receiver boundary screen
 
 ## Decision
 
-**Redesign before the full campaign.** Preserve HR0-B's full-frame result as
+**Redesign before the full campaign.** Preserve HR1-B's full-frame result as
 evidence that the guarded GF(16)+RS physical layer is promising, but redesign
 the tiny ACK/framing/ARQ budget and the frame duration before doing
-`PLAN.md`'s statistical campaign. Do not register HR0-B in production.
+`PLAN.md`'s statistical campaign. Do not register HR1-B in production.
 
 The full class has a real-receiver AWGN transition between -24 and -23 dB and
 has no high-SNR impairment floor in the three requested disturbed Watterson
@@ -69,10 +69,10 @@ disturbed NVIS under a strict 30/30 screen convention, and -20/-21 dB
 disturbed high. Thirty trials cannot establish a qualification boundary:
 even 30/30 has only a 0.886 Wilson 95% lower bound.
 
-Compared only as exploratory repository simulations, HR0-B's disturbed-mid
+Compared only as exploratory repository simulations, HR1-B's disturbed-mid
 30/30 point at -19 dB is 8 dB below HC0's last 30/30 point at -11 dB. HC0
 also had a checked-body structural floor in both 7 ms presets at +30 dB,
-whereas HR0-B crossed them near -17 and -20 dB. This strongly supports the
+whereas HR1-B crossed them near -17 and -20 dB. This strongly supports the
 guarded full-class geometry, but it is not a radios or VARA comparison.
 
 ## Tiny ACK and retry-weighted throughput
@@ -136,14 +136,14 @@ contains a one-command deterministic replay.
 
 ## Production timing and buffer check
 
-HR0-B remains non-integrable without a deliberate production redesign:
+HR1-B remains non-integrable without a deliberate production redesign:
 
 - `whale.transport.RX_BUFFER_SECONDS` is 10.0 s (120,000 samples at 12 kHz),
   while the largest received full capture here was 234,580 samples, 19.548 s.
   A production snapshot would discard roughly the first 9.55 s before the
   frame completed.
-- `HF_SSB.max_useful_frame_seconds` is 8.0 s. HR0-B's 19.540 s full keying
-  exceeds it by 11.540 s, although HR0-B's experiment-local decoder permits a
+- `HF_SSB.max_useful_frame_seconds` is 8.0 s. HR1-B's 19.540 s full keying
+  exceeds it by 11.540 s, although HR1-B's experiment-local decoder permits a
   bounded 24 s capture.
 - The production decode loop polls every 0.15 s and tries all candidate modes.
   This screen measured one candidate on completed captures, not the idle and
@@ -166,4 +166,4 @@ the small AWGN/Watterson screen.
 
 Final campaign decision: **REDESIGN**. Do not run the full all-preset,
 fixed-N0, continuous-fade, absent-window, interference, session, minimum-host,
-or radio campaign on HR0-B revision B.
+or radio campaign on HR1-B revision B.

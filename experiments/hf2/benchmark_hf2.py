@@ -36,7 +36,7 @@ class Hf2BenchMode:
     """Bench-only `WaveformMode` adapter over `hf2.modulate`/`hf2.demodulate`.
 
     `mode_id=242` marks this as unregistered/placeholder (following
-    `experiments/hr0/hr0.py`'s 240 and `hr0b.py`'s 241): HF2 is not on any
+    `experiments/hr1/hr1.py`'s 240 and `hr1b.py`'s 241): HF2 is not on any
     `ModeRegistry` yet (PLAN.md step 6 is a later, separate promotion).
     `whale.qualification.trial_seed` also requires a non-negative mode_id.
     `chunk_size` is `hf2.MAX_PAYLOAD_BYTES` -- HF2's frame is self-contained

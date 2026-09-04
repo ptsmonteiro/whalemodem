@@ -1,4 +1,4 @@
-# HR0 point 4: capacity diagnosis and HR0-B redesign
+# HR1 point 4: capacity diagnosis and HR1-B redesign
 
 > **Point-5 update (2026-08-31):** the small real-receiver screen requested
 > by this handoff is complete in [`SCREEN.md`](SCREEN.md). Revision B's full
@@ -10,20 +10,20 @@
 
 ## Point-4 decision (executed)
 
-**Go with HR0-B to a small real-receiver AWGN/Watterson boundary screen; do
-not run the full campaign yet.**  HR0-A is preserved as revision A in
-`hr0.py`.  Revision B is experiment-only in `hr0b.py`; it is not registered
+**Go with HR1-B to a small real-receiver AWGN/Watterson boundary screen; do
+not run the full campaign yet.**  HR1-A is preserved as revision A in
+`hr1.py`.  Revision B is experiment-only in `hr1b.py`; it is not registered
 in `whale/`, has no stable mode ID, and is not a production or VARA parity
 claim.
 
-The frozen 200,000-sample soft-information screen explains HR0-A's miss:
+The frozen 200,000-sample soft-information screen explains HR1-A's miss:
 at -24 dB whole-keying waveform SNR, its last-two-observation channel carries
 only 0.786 coded-modulation bit/tone, while the checked wire asks for 1.333.
 The independent bit interface is worse: exact BICM gives 0.389 bit/tone and
 the implemented max-log proxy gives 0.353.  No replacement binary code can
 repair that rate deficit at the same geometry and airtime.
 
-HR0-B changes the interface and energy allocation rather than weakening the
+HR1-B changes the interface and energy allocation rather than weakening the
 historical experiment target. Its full class delivered 19/20 held-out
 oracle-aligned checked frames at -24 dB, 20/20 at -23 dB, and 0/20 at -25 dB.
 Its bounded real acquisition
@@ -40,9 +40,9 @@ It was produced with:
 
 ```sh
 /Users/pedro/miniconda3/envs/gnuradio/bin/python \
-  experiments/hr0/redesign_screen.py \
+  experiments/hr1/redesign_screen.py \
   --information-samples 200000 --awgn-trials 20 \
-  --out experiments/hr0/results/hr0b_redesign_screen_20260830.json
+  --out experiments/hr1/results/hr0b_redesign_screen_20260830.json
 ```
 
 The information channel is one-of-M orthogonal signaling with unknown,
@@ -54,9 +54,9 @@ scaled max-energy/max-log GMI.  Fixed Monte Carlo seeds and a fixed
 smokes use the repository `SnrSpec(WAVEFORM)` contract over the exact full
 keying and the ordinary 48 kHz to 12 kHz receive front end.
 
-## Why HR0-A misses by about 6 dB
+## Why HR1-A misses by about 6 dB
 
-HR0-A's tiny five-seed smoke put its practical transition around -19 to
+HR1-A's tiny five-seed smoke put its practical transition around -19 to
 -18 dB even with aligned timing.  The following accounting separates the
 contributors without pretending that five trials locate an exact boundary.
 
@@ -70,7 +70,7 @@ contributors without pretending that five trials locate an exact boundary.
 | Required coded rate | 568 / 426 = 1.333 checked bits/tone | It exceeds even all-three CM information (1.358) once finite-frame margin is required, and exceeds all-three exact BICM (0.804) outright. |
 | Finite termination | 8 / 568 inputs; 0.062 dB | Small but explicit rate loss. |
 | Finite blocklength proxy | all-three CM dispersion 3.411 bit2; normal 10%-error backoff at 426 tones is about 0.115 bit/tone | The approximate finite-block ceiling is 1.244, below the requested 1.333 even with optimal symbol coding. This is a proxy, not a theorem for the implemented code. |
-| Code/decoder residual | all-three exact BICM crosses 1.333 between -23 and -22 dB; HR0-A's tiny empirical edge is -19/-18 dB | Roughly 3 dB or more remains in the finite K=7 convolutional code/decoder after the asymptotic demapper threshold. The five-trial smoke cannot split that residual more precisely. |
+| Code/decoder residual | all-three exact BICM crosses 1.333 between -23 and -22 dB; HR1-A's tiny empirical edge is -19/-18 dB | Roughly 3 dB or more remains in the finite K=7 convolutional code/decoder after the asymptotic demapper threshold. The five-trial smoke cannot split that residual more precisely. |
 
 The arithmetic also explains why merely adding a stronger binary
 convolutional, LDPC, or polar code was rejected.  At -24 dB, the bitwise
@@ -99,18 +99,18 @@ alternatives machine-readably.
   not represented as a hidden bandwidth win.
 - A 32 ms or longer dwell improves AWGN guard efficiency but requires either
   coherent combining over a larger fraction of the 30 Hz fade or fewer code
-  symbols in the session budget.  HR0-B instead coherently combines only the
+  symbols in the session budget.  HR1-B instead coherently combines only the
   last two 8 ms observations.  The +20 dB Watterson smoke verifies wiring,
   but a near-boundary 7 ms/30 Hz screen is still mandatory.
 
 ### Coding and energy allocation
 
-HR0-B uses a two-memory, rate-1/4 GF(16) convolutional inner code for full
+HR1-B uses a two-memory, rate-1/4 GF(16) convolutional inner code for full
 frames.  A trellis branch consumes the complete 16-tone likelihood, avoiding
 the BICM loss.  A shortened RS(96,70) outer code corrects up to 13 erroneous
 bytes left by the inner decoder.  The full inner code protects 96 bytes plus
 two terminating GF(16) symbols in 776 tone symbols: 0.990 entropy bit/tone at
-the inner boundary.  The exact HR0-B clean observation proxy at -24 dB is
+the inner boundary.  The exact HR1-B clean observation proxy at -24 dB is
 1.311 bit/tone; a 10%-error normal approximation over 776 tones is 1.227,
 leaving a useful screening margin over 0.990.
 
@@ -129,7 +129,7 @@ less protected than full DATA and exists to preserve ACK latency.  Incremental
 parity or repeated ACKs remain an ARQ option if the tiny-class boundary is too
 high; they are not counted in the clean rate.
 
-## HR0-B wire revision and rate
+## HR1-B wire revision and rate
 
 Revision B is intentionally wire-incompatible with A:
 
@@ -143,7 +143,7 @@ Revision B is intentionally wire-incompatible with A:
   symbols, and the rate-1/3 GF(16) trellis; and
 - PN tone masks randomize both classes without changing energy.
 
-| Quantity | HR0-B value |
+| Quantity | HR1-B value |
 | :--- | ---: |
 | Full body | 776 tones / 18.624 s |
 | Full complete keying | 19.540 s |
@@ -155,12 +155,12 @@ Revision B is intentionally wire-incompatible with A:
 
 The 0.157 bit/s surplus is very small.  It is a clean projection, not a
 measured session rate, and any ordinary retransmission rate will pull the
-session below 20 bit/s. HR0-B therefore advances only to a boundary screen;
+session below 20 bit/s. HR1-B therefore advances only to a boundary screen;
 it is not ready for session or production promotion.
 
 ## Implemented receiver and bounded work
 
-`hr0b.py` preserves A and exposes `experiments.hr0.hr0b:HR0B`.  The receiver:
+`hr1b.py` preserves A and exposes `experiments.hr1.hr1b:HR1B`.  The receiver:
 
 - searches at most 1,001 timing cells, 27 CFO cells, and two classes: 54,054
   coarse cells;
@@ -197,7 +197,7 @@ or VARA comparison has been run. The 18.157 bit/s figure is below the fixed
 
 ## Handoff
 
-Proceed sequentially with a **small HR0-B real-receiver screen**, not the full
+Proceed sequentially with a **small HR1-B real-receiver screen**, not the full
 300-trial campaign:
 
 1. Run 30 exploratory real-receiver frames at -25, -24, -23, and -22 dB
@@ -213,7 +213,7 @@ Proceed sequentially with a **small HR0-B real-receiver screen**, not the full
    acquisition threshold on training seeds, run held-out absent-window tests,
    and then return to `PLAN.md`'s statistical campaign.
 
-Current decision: **go HR0-B to the next small screen**.  A failure of the
+Current decision: **go HR1-B to the next small screen**.  A failure of the
 tiny-class/session gate is a framing/ARQ redesign; a 7 ms/30 Hz floor is a
 geometry redesign; failure of real AWGN near -24 dB after acquisition is
 a stop for this GF(16)+RS revision.  The target must not be weakened.

@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Reproducible oracle/capacity screen for HR0-A and HR0-B.
+"""Reproducible oracle/capacity screen for HR1-A and HR1-B.
 
 The information estimates use the exact phase-marginal likelihood of an
 orthogonal noncoherent MFSK observation.  They are screening proxies, not a
@@ -22,12 +22,12 @@ if str(ROOT) not in sys.path:
 import numpy as np
 from scipy.special import i0e, logsumexp
 
-from experiments.hr0 import benchmark, hr0, hr0b
+from experiments.hr1 import benchmark, hr1, hr1b
 from whale import rx_audio
 from whale.channel import AwgnChannel, SnrKind, SnrSpec, WattersonChannel
 
 
-SCHEMA = "whalemodem.hr0.redesign-screen.v1"
+SCHEMA = "whalemodem.hr1.redesign-screen.v1"
 HELD_OUT_MASTER_SEED = 0x48523042
 
 
@@ -89,19 +89,19 @@ def held_out_awgn(snr_db: float, trials: int) -> dict:
     outcomes = []
     for trial in range(trials):
         seed = benchmark.derive_seed(
-            HELD_OUT_MASTER_SEED, "hr0b-held-out-awgn",
+            HELD_OUT_MASTER_SEED, "hr1b-held-out-awgn",
             f"awgn|-|{snr_db}", trial + 1)
         payload = np.random.default_rng(seed).bytes(64)
-        transmitted = hr0b.HR0B.encode(payload)
-        noise_seed = benchmark.derive_seed(seed, "noise", "hr0b", trial + 1)
+        transmitted = hr1b.HR1B.encode(payload)
+        noise_seed = benchmark.derive_seed(seed, "noise", "hr1b", trial + 1)
         spec = SnrSpec(snr_db, SnrKind.WAVEFORM, reference_start=0,
                        reference_stop=len(transmitted))
         noisy = AwgnChannel(48_000, spec, noise_seed).process(transmitted).audio
-        decoded = hr0b.decode_aligned(
+        decoded = hr1b.decode_aligned(
             _capture(noisy),
-            preamble_start=(hr0b.LEAD_RX_SAMPLES
+            preamble_start=(hr1b.LEAD_RX_SAMPLES
                             + rx_audio.FILTER_DELAY_DECODE_SAMPLES),
-            class_id=hr0b.FULL_CLASS)
+            class_id=hr1b.FULL_CLASS)
         outcomes.append({
             "trial": trial + 1, "derived_seed": seed,
             "decoded": decoded.get("payload") == payload,
@@ -117,16 +117,16 @@ def held_out_watterson_wiring(preset: str, trials: int = 3) -> dict:
     outcomes = []
     for trial in range(trials):
         seed = benchmark.derive_seed(
-            HELD_OUT_MASTER_SEED, "hr0b-held-out-watterson",
+            HELD_OUT_MASTER_SEED, "hr1b-held-out-watterson",
             f"{preset}|20", trial + 1)
         payload = np.random.default_rng(seed).bytes(64)
-        transmitted = hr0b.HR0B.encode(payload)
+        transmitted = hr1b.HR1B.encode(payload)
         faded = WattersonChannel.from_preset(
             48_000, preset, seed ^ 0x57415454).process(transmitted).audio
         spec = SnrSpec(20.0, SnrKind.WAVEFORM, reference_start=0,
                        reference_stop=len(transmitted))
         noisy = AwgnChannel(48_000, spec, seed ^ 0x4157474E).process(faded).audio
-        decoded = hr0b.HR0B.decode(_capture(noisy))
+        decoded = hr1b.HR1B.decode(_capture(noisy))
         outcomes.append({"trial": trial + 1, "derived_seed": seed,
                          "decoded": decoded.get("payload") == payload,
                          "failure": decoded.get("failure"),
@@ -138,27 +138,27 @@ def held_out_watterson_wiring(preset: str, trials: int = 3) -> dict:
 
 def report(*, information_samples: int, awgn_trials: int) -> dict:
     snr_linear = 10 ** (-24 / 10)
-    # HR0-A is essentially continuously keyed.  Its last-two receiver gets
+    # HR1-A is essentially continuously keyed.  Its last-two receiver gets
     # 16 ms; the all-three clean oracle gets 24 ms.
     a_last2_esn0 = snr_linear * 24_000 * 0.016
     a_all3_esn0 = snr_linear * 24_000 * 0.024
-    b_waveform = hr0b.HR0B.encode(bytes(range(64))).astype(np.float64)
-    b_symbol = hr0b._modulate_symbols(np.asarray([0])).astype(np.float64)
+    b_waveform = hr1b.HR1B.encode(bytes(range(64))).astype(np.float64)
+    b_symbol = hr1b._modulate_symbols(np.asarray([0])).astype(np.float64)
     b_esn0 = ((np.sum(b_symbol ** 2) / 48_000) * snr_linear * 24_000
               / np.mean(b_waveform ** 2))
     information = {
-        "hr0a_last_two": noncoherent_information(
+        "hr1a_last_two": noncoherent_information(
             16, a_last2_esn0, samples=information_samples, seed=1001),
-        "hr0a_all_three_clean_oracle": noncoherent_information(
+        "hr1a_all_three_clean_oracle": noncoherent_information(
             16, a_all3_esn0, samples=information_samples, seed=1002),
-        "hr0b_coherent_trusted_pair": noncoherent_information(
+        "hr1b_coherent_trusted_pair": noncoherent_information(
             16, b_esn0, samples=information_samples, seed=1003),
         "tone_count_comparison_last_two": [
             noncoherent_information(m, a_last2_esn0,
                                     samples=information_samples, seed=1100 + m)
             for m in (8, 16, 32)
         ],
-        "hr0a_all_three_bicm_threshold_grid": [
+        "hr1a_all_three_bicm_threshold_grid": [
             {"waveform_snr_db": point,
              **noncoherent_information(
                  16, a_all3_esn0 * 10 ** ((point + 24) / 10),
@@ -166,22 +166,22 @@ def report(*, information_samples: int, awgn_trials: int) -> dict:
             for point in (-24, -23, -22, -21, -20)
         ],
     }
-    a_required = hr0.FEC_INPUT_BITS / hr0.DATA_SYMBOLS
+    a_required = hr1.FEC_INPUT_BITS / hr1.DATA_SYMBOLS
     overhead = {
         "guard_loss_db": 10 * math.log10(3 / 2),
         "preamble_pilot_lead_tail_energy_fraction": (
-            1 - hr0.DATA_SYMBOLS * hr0.SYMBOL_SECONDS / hr0.FRAME_SECONDS),
+            1 - hr1.DATA_SYMBOLS * hr1.SYMBOL_SECONDS / hr1.FRAME_SECONDS),
         "preamble_pilot_lead_tail_loss_db": 10 * math.log10(
-            hr0.FRAME_SECONDS / (hr0.DATA_SYMBOLS * hr0.SYMBOL_SECONDS)),
+            hr1.FRAME_SECONDS / (hr1.DATA_SYMBOLS * hr1.SYMBOL_SECONDS)),
         "checked_framing_loss_db_useful432_to_fec568": 10 * math.log10(
-            hr0.FEC_INPUT_BITS / (54 * 8)),
+            hr1.FEC_INPUT_BITS / (54 * 8)),
         "termination_pad_finite_frame_loss_db": 10 * math.log10(
-            hr0.FEC_INPUT_BITS / (hr0.FEC_INPUT_BITS - 8)),
-        "hr0a_required_checked_bits_per_data_symbol": a_required,
-        "hr0a_session_rate_projection_bps": 23.894,
-        "hr0b_full_frame_seconds": hr0b.FULL_FRAME_SECONDS,
-        "hr0b_tiny_frame_seconds": hr0b.TINY_FRAME_SECONDS,
-        "hr0b_clean_session_rate_projection_bps": hr0b.CLEAN_SESSION_RATE,
+            hr1.FEC_INPUT_BITS / (hr1.FEC_INPUT_BITS - 8)),
+        "hr1a_required_checked_bits_per_data_symbol": a_required,
+        "hr1a_session_rate_projection_bps": 23.894,
+        "hr1b_full_frame_seconds": hr1b.FULL_FRAME_SECONDS,
+        "hr1b_tiny_frame_seconds": hr1b.TINY_FRAME_SECONDS,
+        "hr1b_clean_session_rate_projection_bps": hr1b.CLEAN_SESSION_RATE,
     }
     occupied = benchmark._occupied_bandwidth_99(
         b_waveform, 48_000)
@@ -189,7 +189,7 @@ def report(*, information_samples: int, awgn_trials: int) -> dict:
         "schema": SCHEMA,
         "claim_scope": "bounded_redesign_screen_not_qualification",
         "held_out_master_seed": HELD_OUT_MASTER_SEED,
-        "candidate_source": benchmark.source_metadata(hr0b.HR0B),
+        "candidate_source": benchmark.source_metadata(hr1b.HR1B),
         "git": benchmark._git_metadata(),
         "environment": benchmark._environment(),
         "snr_convention": {
@@ -221,7 +221,7 @@ def report(*, information_samples: int, awgn_trials: int) -> dict:
                  "decision": "defer_doppler_and_16ms_guard_cost"},
             ],
             "coding": [
-                {"name": "HR0-A binary rate-1/3 convolutional",
+                {"name": "HR1-A binary rate-1/3 convolutional",
                  "decision": "reject_information_interface_and_code_loss"},
                 {"name": "exact binary likelihood plus stronger binary code",
                  "decision": "reject_same_airtime_bicm_rate_deficit"},
@@ -235,7 +235,7 @@ def report(*, information_samples: int, awgn_trials: int) -> dict:
                  "decision": "retain_future_option_not_in_clean_wire"},
             ],
         },
-        "hr0b": {
+        "hr1b": {
             "wire_revision": "B",
             "full_inner": "GF16 memory-2 rate 1/4",
             "full_outer": "shortened RS(96,70), corrects 13 bytes",
@@ -251,7 +251,7 @@ def report(*, information_samples: int, awgn_trials: int) -> dict:
                                "high_latitude_disturbed")
             ],
         },
-        "decision": "go_hr0b_to_small_real_receiver_boundary_screen",
+        "decision": "go_hr1b_to_small_real_receiver_boundary_screen",
     }
 
 

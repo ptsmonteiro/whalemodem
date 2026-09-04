@@ -1,7 +1,7 @@
-"""HR0-A: standalone guarded 16-MFSK robustness experiment.
+"""HR1-A: standalone guarded 16-MFSK robustness experiment.
 
 This module intentionally does not register a production mode.  It implements
-the ordinary :class:`whale.waveform.WaveformMode` surface so the matched HR0
+the ordinary :class:`whale.waveform.WaveformMode` surface so the matched HR1
 benchmark can exercise a real, bounded receiver while the wire format remains
 free to change.
 """
@@ -305,7 +305,7 @@ def _modulate_observations(tones: np.ndarray, observation_samples: int,
 def _modulate_frame(payload: bytes, *, class_id: int = FULL_CLASS,
                     lead_samples: int = LEAD_TX_SAMPLES) -> np.ndarray:
     if not 0 <= class_id < len(CLASS_WORDS):
-        raise ValueError("unknown HR0 frame class")
+        raise ValueError("unknown HR1 frame class")
     if lead_samples < 0 or lead_samples % OBS_TX_SAMPLES:
         raise ValueError("lead must be a non-negative whole 8 ms observation")
     lead = _modulate_observations(
@@ -618,8 +618,8 @@ def encode(payload: bytes, *, include_head: bool = True,
 
 
 @dataclass(frozen=True)
-class Hr0Mode:
-    name: str = "hr0-a-exp"
+class Hr1Mode:
+    name: str = "hr1-a-exp"
     mode_id: int = EXPERIMENTAL_MODE_ID
     chunk_size: int = CHUNK_SIZE
     confidence_threshold: float = ACQUISITION_THRESHOLD
@@ -644,15 +644,15 @@ class Hr0Mode:
 
     def airtime(self, payload_len: int) -> float:
         if payload_len > MAX_PHYSICAL_PAYLOAD_BYTES:
-            raise ValueError("payload exceeds the full HR0-A class")
+            raise ValueError("payload exceeds the full HR1-A class")
         return FRAME_SECONDS
 
 
-HR0 = Hr0Mode()
+HR1 = Hr1Mode()
 
 
 def _check_constants() -> None:
-    assert isinstance(HR0, waveform.WaveformMode)
+    assert isinstance(HR1, waveform.WaveformMode)
     assert OBS_TX_SAMPLES / TX_SAMPLE_RATE == OBSERVATION_SECONDS
     assert OBS_RX_SAMPLES / RX_SAMPLE_RATE == OBSERVATION_SECONDS
     assert FEC_INPUT_BITS == 568 and CODED_BITS == 1704

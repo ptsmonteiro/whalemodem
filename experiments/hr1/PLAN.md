@@ -1,8 +1,8 @@
-# HR0: simulation-first plan for the most robust HF rung
+# HR1: simulation-first plan for the most robust HF rung
 
 ## Purpose and status
 
-HR0 is a working name for an experimental HF Level 0/control waveform whose
+HR1 is a working name for an experimental HF Level 0/control waveform whose
 first priority is verified delivery across the fixed Level 0 envelope in
 [`SPEED_LADDERS.md`](../../SPEED_LADDERS.md). Rate is secondary, but it must
 still reach the 20 bit/s useful-application floor. The experiment also tests
@@ -13,7 +13,7 @@ The external reference is limited to the vendor-published VARA HF standard-mode
 row: 23 symbols/s, 32 carriers, FSK, and 18 bit/s net. This repository has no
 VARA waveform, decoder, channel capture, or measured VARA threshold. The row is
 therefore a **rate and geometry reference, not robustness evidence**. No result
-from this experiment may say that HR0 beats, matches, or works below VARA until
+from this experiment may say that HR1 beats, matches, or works below VARA until
 both implementations are exercised through the same calibrated audio/channel
 boundary or through controlled radios.
 
@@ -38,7 +38,7 @@ adds no encoder, decoder, mode ID, registry entry, or production behavior.
   seeded channel per frame, then adds AWGN whose power is calculated from that
   frame's post-Watterson mean signal power. This is reproducible and valid for
   comparison with retained results, but per-frame noise normalization partly
-  removes absolute slow-fade depth. HR0 must retain that canonical curve and
+  removes absolute slow-fade depth. HR1 must retain that canonical curve and
   add a fixed-noise-density, continuous-fading campaign before claiming
   resistance to deep fades.
 
@@ -107,8 +107,8 @@ These are experiment targets, not current claims:
 
 | Target | Required result |
 | --- | --- |
-| Baseline | Reproduce HC0 and locate its AWGN and each Watterson boundary with the same harness, payload, seeds policy, and gates used for HR0. |
-| Minimum value | HR0's qualified boundary is at least 3 dB below HC0 in `mid_latitude_disturbed`, with a point where HR0 passes and HC0 fails. |
+| Baseline | Reproduce HC0 and locate its AWGN and each Watterson boundary with the same harness, payload, seeds policy, and gates used for HR1. |
+| Minimum value | HR1's qualified boundary is at least 3 dB below HC0 in `mid_latitude_disturbed`, with a point where HR1 passes and HC0 fails. |
 | Primary robustness stretch | Pass at -24 dB canonical AWGN and -20 dB fixed-N0 `mid_latitude_disturbed`, while maintaining at least 20 bit/s long-transfer session throughput. This is additional coverage beyond the fixed Level 0 envelope. |
 | Geographic coverage | Declare and pass an explicit boundary for every F.1487 preset, including `mid_latitude_disturbed_nvis` and `high_latitude_disturbed`; do not substitute the three mid-latitude presets for the complete registry. |
 | Stretch | Pass -24 dB fixed-N0 `mid_latitude_disturbed` and -20 dB fixed-N0 `high_latitude_disturbed`, or document the measured physical/algorithmic limit. |
@@ -117,7 +117,7 @@ These are experiment targets, not current claims:
 
 Failure of the stretch numbers is useful if the campaign locates a stable
 boundary and attributes the loss. Do not redefine the fixed Level 0 target
-after seeing the data. HR0 cannot fill Level 0 unless it spans the complete
+after seeing the data. HR1 cannot fill Level 0 unless it spans the complete
 target envelope, meets the throughput floor, and adds the distinct robust
 point required by `MODE_QUALIFICATION.md`.
 
@@ -133,18 +133,18 @@ run specified combined stresses and full sessions.
   full DATA body; record the extra 10-byte checked air header separately.
 - Measure exact energy per useful bit, occupied 99% power bandwidth, peak,
   RMS, crest factor, keyed time, decoder work, and memory for HC0 and every
-  HR0 candidate.
+  HR1 candidate.
 - Use an oracle-aligned demodulation/coding curve only to reject bad ideas.
   Then add real acquisition, timing, CFO, clock, integrity, and bounded search
   before any candidate can win.
 - Re-run HC0 on canonical AWGN at `-10, -12, -14, -15, -16, -17, -18, -20`
   dB and on each Watterson preset at a coarse `-5` to `-24` dB grid. Refine
-  in 1 dB steps around every transition. This baseline must precede an HR0
+  in 1 dB steps around every transition. This baseline must precede an HR1
   superiority claim because retained HC0 evidence does not locate its floor.
 
 ### 2. AWGN floor and acquisition separation
 
-Screen HR0 at `-30, -27, -24, -22, -20, -18, -16, -12` dB, then refine the
+Screen HR1 at `-30, -27, -24, -22, -20, -18, -16, -12` dB, then refine the
 10--90% transition in 1 dB steps. At every point report separately:
 
 - acquisition probability (candidate found above its frozen threshold);
@@ -273,7 +273,7 @@ Required directional pairs include:
 - a weak return path that loses ACKs while DATA is received;
 - transient deep fade, lost DATA, lost ACK, corrupted DATA, and transport
   failure, followed by exact recovery without duplicate bytes;
-- HR0-only sessions and the complete ladder, proving fallback to HR0 and later
+- HR1-only sessions and the complete ladder, proving fallback to HR1 and later
   climb independently in both directions.
 
 The gate is 100% exact bidirectional delivery and clean disconnect, with the
@@ -304,9 +304,9 @@ single-session feasibility.
 
 ## Reproducibility and artifacts
 
-Development artifacts live under `experiments/hr0/results/`; eventual
+Development artifacts live under `experiments/hr1/results/`; eventual
 promotion artifacts belong under
-`logs/mode_qualification/hf-ssb/hr0/<date>/`. Each retained run must include:
+`logs/mode_qualification/hf-ssb/hr1/<date>/`. Each retained run must include:
 
 - immutable schema version, exact command, UTC times, master/derived seeds,
   trial count, worker count, Git commit and dirty paths;
@@ -333,7 +333,7 @@ new candidate revision and cannot be merged with earlier trials.
 Execute each point only after its predecessor leaves a written handoff:
 
 1. **Freeze this protocol and baseline HC0.** Implement only missing benchmark
-   support (not HR0), locate HC0's true AWGN/Watterson edges, and record the
+   support (not HR1), locate HC0's true AWGN/Watterson edges, and record the
    canonical-versus-fixed-N0 distinction.
 2. **Screen waveform/FEC/interleaver families with an oracle.** Keep only
    candidates analytically capable of the rate/energy target and surviving
@@ -359,7 +359,7 @@ ladder until the experimental gates pass.
 
 ## Claim boundary while no radios or VARA implementation exist
 
-Simulation can establish reproducible performance of HC0 and HR0 under the
+Simulation can establish reproducible performance of HC0 and HR1 under the
 repository's precisely described channel models, including a measured SNR
 boundary, useful-bit Eb/N0 calculation, impairment envelope, relative HC0
 gain, session behavior, and development-host resource cost.
@@ -371,6 +371,6 @@ hardware reliability. It also cannot establish VARA parity from the
 published 18 bit/s row, infer VARA's Watterson threshold, or compare latency,
 FER, acquisition, occupied spectrum, and CPU without running VARA under the
 same conditions. Until those measurements exist, the strongest honest result
-is: "HR0 passes the stated Whalemodem simulation gate at X dB and gains Y dB
+is: "HR1 passes the stated Whalemodem simulation gate at X dB and gains Y dB
 over HC0 at Z useful rate." Hardware and VARA-comparative claims remain
 unmeasured.
