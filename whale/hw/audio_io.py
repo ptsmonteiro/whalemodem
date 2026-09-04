@@ -15,11 +15,49 @@ transmitter up. See the un-keying notes in ptt.py for the bench incident that
 forced it.
 """
 
+import ctypes
+import ctypes.util
 import logging
 import os
 import sys
 import threading
 import time
+from pathlib import Path
+
+
+def _preload_bundled_portaudio() -> None:
+    # The sounddevice wheel only bundles PortAudio on Windows/macOS (see the
+    # module docstring's ALSA/WASAPI/CoreAudio rationale) -- on Linux it does
+    # its own dynamic lookup of libportaudio.so.2 at import time and relies on
+    # a system package (docs/HARDWARE.md: `apt install libportaudio2`). A
+    # frozen, standalone Linux build has no such system package to find, so it
+    # must preload its own vendored copy here, before sounddevice's own
+    # lookup runs, or the "no Python/system deps required" point of freezing
+    # would be silently defeated by this one missing library.
+    if not (getattr(sys, "frozen", False) and sys.platform.startswith("linux")):
+        return
+    bundled = Path(sys._MEIPASS) / "_vendor_portaudio" / "libportaudio.so.2"
+    if not bundled.exists():
+        return
+    ctypes.CDLL(str(bundled), mode=ctypes.RTLD_GLOBAL)
+    # sounddevice itself locates PortAudio via ctypes.util.find_library(),
+    # which on Linux depends on `ldconfig`'s cache (or a `gcc`/`ld` fallback)
+    # to discover a library outside the default search path -- none of which
+    # is guaranteed on a bare deployment target, and the preload above (which
+    # only makes the library available in the process, not discoverable by
+    # name) does nothing to help that lookup. Point find_library straight at
+    # our vendored copy instead of relying on that discovery chain.
+    _orig_find_library = ctypes.util.find_library
+
+    def _find_bundled_or_fallback(name, _orig=_orig_find_library):
+        if name == "portaudio":
+            return str(bundled)
+        return _orig(name)
+
+    ctypes.util.find_library = _find_bundled_or_fallback
+
+
+_preload_bundled_portaudio()
 
 import numpy as np
 import sounddevice as sd

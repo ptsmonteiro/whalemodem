@@ -17,6 +17,9 @@ dependencies = [
 [project.optional-dependencies]
 test = ["pytest"]
 
+[project.scripts]
+whalemodem-server = "whale.vara_server:main"
+
 [tool.setuptools]
 packages = ["whale", "whale.hw", "whale.modes"]
 

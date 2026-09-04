@@ -3,6 +3,7 @@ from pathlib import Path
 import pytest
 
 from whale.hw import hamlib, ptt_backends, radios
+from whale.hw._platform_tags import platform_tag
 
 
 def test_builtin_backend_inventory():
@@ -36,7 +37,7 @@ def test_hamlib_backend_prefers_the_bundled_library():
     """On any of the six bundled platforms, this must not fall back to a
     system install -- that's the entire point of vendoring the binaries.
     """
-    tag = hamlib._platform_tag()
+    tag = platform_tag()
     if tag is None:
         pytest.skip("this platform is not one whalemodem bundles hamlib for")
     ptt_backends.open_backend("hamlib", {"model": 1}).close()

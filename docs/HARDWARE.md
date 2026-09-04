@@ -103,6 +103,65 @@ ptt.baud = 115200
 supports (port options, `ptt_type` for radios keyed via a control line
 instead of CAT, etc).
 
+## Standalone builds
+
+For an end user who doesn't want to set up Python, a venv, or `pip install`
+at all, whalemodem can be frozen into a standalone, no-Python-required
+onedir bundle with PyInstaller -- a folder containing the
+`whalemodem-server` executable plus its own Python runtime, numpy/scipy,
+and (vendored the same way `hamlib` is vendored above) hamlib and, on
+Linux, PortAudio. It is a folder you download and run directly, not yet an
+installer, system package, or service -- nothing registers it to start on
+boot, and there is no upgrade mechanism beyond replacing the folder. The
+same command-line flags shown under
+[Starting a station](#starting-a-station) apply, just against the frozen
+executable instead of `python -m whale.vara_server`:
+
+```console
+whalemodem-server/whalemodem-server --radio-config radios.toml --radio station-a \
+  --mycall STA1 --cmd-port 8300 --data-port 8301
+```
+
+Building one is covered in `packaging/pyinstaller/README.md`; that
+procedure, not this section, is the source of truth for the actual build
+steps. In short: install the build-only `pyinstaller` dependency, then run
+`pyinstaller packaging/pyinstaller/whalemodem.spec` from the repo root. The
+build must run natively on each target OS/architecture -- no
+cross-compilation -- since the spec bundles the build host's own vendored
+hamlib (and, on Linux, PortAudio) binaries.
+
+**Residual dependency on Linux.** Freezing removes the Python interpreter,
+pip, and the need for a system hamlib/PortAudio install, but it does not
+make a Linux bundle dependency-free: the vendored `libportaudio.so.2`
+(Debian's own build) itself dynamically loads ALSA's `libasound.so.2` and
+JACK's `libjack.so.0` at runtime, confirmed via `readelf -d` and
+`apt-cache depends libportaudio2` against the vendored package. A
+standalone Linux build therefore still needs `libasound2` (`libasound2t64`
+on Debian trixie and current Raspberry Pi OS) and `libjack-jackd2-0` (or
+equivalent) present on the target system -- these are not vendored and are
+not eliminated by freezing. Both packages ship by default on essentially
+any Linux with a working audio stack, including Raspberry Pi OS, but this
+is a genuine gap against "no dependencies at all," not a cosmetic one, and
+should be checked for on a bare or minimal target rather than assumed.
+macOS and Windows builds have no equivalent gap: the `sounddevice` wheel
+already bundles PortAudio itself on those platforms.
+
+**Validation status.** Only linux-x86_64 has actually been built and
+exercised so far, inside Docker, without real audio or rig hardware
+attached: `whalemodem-server --help` running to completion plus native
+import/load checks for `whale.hw.hamlib` and `whale.hw.audio_io`, not a
+full radio session. The other five platforms (linux-aarch64, linux-armv7,
+macos-arm64, macos-x86_64, windows-x86_64) are built by the
+`.github/workflows/standalone-builds.yml` CI matrix but have not yet run
+on real GitHub Actions or on real hardware. As with every mode covered by
+this project's [current status](../README.md#current-status),
+"builds and imports cleanly" is not the same claim as "verified" --
+standalone builds for any platform other than the one smoke-tested here
+should be treated as unvalidated until they have actually run on that
+target OS/architecture, and the Linux/Raspberry-Pi-class path specifically
+still needs a real audio-plus-rig hardware pass before it is used for
+anything beyond a bench trial.
+
 ## Starting a station
 
 For VHF FM:

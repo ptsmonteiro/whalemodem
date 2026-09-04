@@ -40,22 +40,9 @@ import platform
 from pathlib import Path
 from typing import Mapping
 
+from whale.hw._platform_tags import platform_tag
+
 _VENDOR_ROOT = Path(__file__).resolve().parent / "_vendor" / "hamlib"
-
-
-def _platform_tag() -> str | None:
-    system, machine = platform.system(), platform.machine().lower()
-    if system == "Darwin":
-        return {"arm64": "macos-arm64", "x86_64": "macos-x86_64"}.get(machine)
-    if system == "Linux":
-        return {
-            "x86_64": "linux-x86_64",
-            "aarch64": "linux-aarch64",
-            "armv7l": "linux-armv7",
-        }.get(machine)
-    if system == "Windows":
-        return {"amd64": "windows-x86_64"}.get(machine)
-    return None
 
 
 def _load_bundled():
@@ -68,7 +55,7 @@ def _load_bundled():
     """
     if os.environ.get("WHALEMODEM_SYSTEM_HAMLIB"):
         return None, None
-    tag = _platform_tag()
+    tag = platform_tag()
     if tag is None:
         return None, None
     vendor_dir = _VENDOR_ROOT / tag
