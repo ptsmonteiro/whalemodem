@@ -24,19 +24,84 @@ The server's `--radio` value is the inventory key (`station-a` above), not an
 audio-device name. When no inventory is selected, the legacy `ic705`,
 `ic7300`, and `ht` definitions remain available for the original bench.
 
+## Audio backend
+
+Radios' USB sound cards are opened through whichever PortAudio host API sits
+closest to the hardware on the running OS, rather than a higher-level
+shared-mixer API that adds latency and jitter:
+
+| OS | Host API used | Avoided |
+| --- | --- | --- |
+| Windows | WASAPI | MME, DirectSound |
+| macOS | Core Audio | -- |
+| Linux | ALSA | PulseAudio, JACK |
+
+`audio_name` in the inventory is matched against device names *within* that
+host API, so it must be a substring PortAudio reports for the card under
+that API specifically (check with `python -m sounddevice`).
+
+Set `WHALE_AUDIO_HOST_API` to override the default -- for example, a Linux
+station that must go through PulseAudio or JACK instead of raw ALSA (a USB
+card already claimed by another process, or a station mixing radio audio
+with other sources), or a Windows card that will not open under WASAPI and
+needs MME or DirectSound instead. The value is matched as a
+case-insensitive substring against `python -m sounddevice`'s host API names.
+
+Linux additionally needs PortAudio's own shared library installed
+(`apt install libportaudio2` or equivalent); the `sounddevice` wheel bundles
+it on Windows and macOS but not on Linux.
+
 ## PTT backends
 
 | Backend | Use |
 | --- | --- |
 | `icom-civ` | Icom CI-V control |
 | `serial-line` | RTS or DTR on a serial interface |
-| `hamlib` | Hamlib-compatible control |
+| `hamlib` | Hamlib-supported rig control |
 | `vox` | Audio-triggered transmit control |
 
 External packages can register GPIO, CAT, USB-interface, or other backends
 through the `whalemodem.ptt_backends` Python entry-point group. A backend
 implements `PttBackend` from `whale.hw.ptt_backends`; embedded applications
 may also call `register_backend()` directly.
+
+### `hamlib`
+
+Binds directly to `libhamlib` via ctypes (`whale/hw/hamlib.py`) and keeps one
+`RIG*` handle open for the life of the backend, rather than shelling out to
+`rigctl` per PTT toggle -- a process spawn plus a fresh rig handshake on every
+key() is dead air this project's adaptive-timing goals are meant to remove.
+
+**No separate hamlib install is needed.** Prebuilt libhamlib (+ libusb)
+binaries are vendored under `whale/hw/_vendor/hamlib/` for macOS
+(arm64/x86_64), Linux (x86_64/aarch64/armv7), and Windows (x86_64); the
+loader picks the right one for the running platform automatically. Sources,
+exact versions, and license texts are in
+`whale/hw/_vendor/hamlib/SOURCES.md`; `scripts/vendor_hamlib.py` refreshes
+them for a hamlib version bump. On an unlisted platform (or if the bundled
+copy fails to load), it falls back to a system install
+(`brew install hamlib` / `apt install libhamlib4`). Set
+`WHALEMODEM_SYSTEM_HAMLIB=1` to force the system search even where a bundled
+copy exists -- e.g. to pick up a rig model added to hamlib after the
+vendored version.
+
+```toml
+[radios.rigctl]
+audio_name = "USB Audio CODEC"
+ptt.backend = "hamlib"
+ptt.model = 3073        # rig model number; see `rigctl -l`
+ptt.device = "/dev/ttyUSB0"
+ptt.baud = 115200
+# ptt.civaddr = 148      # Icom rigs only
+# ptt.timeout = 2.0      # seconds; also bounds hamlib's internal retry loop
+# ptt.retry = 3
+# ptt.conf = { ptt_type = "RTS" }   # any other rig_token_lookup() token
+```
+
+`ptt.conf` is a passthrough to `rig_set_conf()`, the same mechanism behind
+`rigctl -C`; run `rigctl -m <model> -L` to see every token a given rig
+supports (port options, `ptt_type` for radios keyed via a control line
+instead of CAT, etc).
 
 ## Starting a station
 

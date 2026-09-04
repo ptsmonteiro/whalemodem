@@ -8,10 +8,13 @@ from __future__ import annotations
 from dataclasses import dataclass
 from importlib import metadata
 import inspect
-import subprocess
+import logging
+import threading
 from typing import Any, Mapping, Protocol, runtime_checkable
 
-from . import ptt
+from . import hamlib, ptt
+
+_log = logging.getLogger(__name__)
 
 
 @dataclass(frozen=True)
@@ -116,31 +119,71 @@ class VoxBackend:
 
 
 class HamlibController:
-    def __init__(self, command, timeout):
-        self.command, self.timeout, self.key_state_unknown = command, timeout, False
+    """Keys PTT through a persistent hamlib RIG* handle (see whale.hw.hamlib).
+
+    Same asymmetric key(on) contract as IcomCivPtt/LinePtt in whale.hw.ptt:
+    keying on may raise (the caller's `finally` still un-keys), keying off
+    never raises and retries before giving up so a bad transaction can't
+    leave the transmitter stuck keyed with nothing left trying to drop it.
+    """
+    def __init__(self, rig: hamlib.Rig):
+        self._rig = rig
+        self._lock = threading.RLock()
+        self.key_state_unknown = False
+
     def key(self, on: bool) -> bool:
+        with self._lock:
+            return self._key_on() if on else self._key_off()
+
+    def _key_on(self) -> bool:
         try:
-            subprocess.run([*self.command, "T", "1" if on else "0"], check=True,
-                           capture_output=True, text=True, timeout=self.timeout)
+            self._rig.set_ptt(True)
         except Exception:
             self.key_state_unknown = True
-            if on:
-                raise
-            return False
+            raise
         self.key_state_unknown = False
         return True
-    def close(self) -> None: self.key(False)
+
+    def _key_off(self) -> bool:
+        for attempt in range(1, ptt.UNKEY_ATTEMPTS + 1):
+            try:
+                self._rig.set_ptt(False)
+                self.key_state_unknown = False
+                return True
+            except Exception as exc:
+                _log.warning("hamlib PTT OFF attempt %d/%d failed: %s",
+                             attempt, ptt.UNKEY_ATTEMPTS, exc)
+        _log.error("hamlib PTT OFF was never confirmed; THE TRANSMITTER MAY STILL BE KEYED.")
+        self.key_state_unknown = True
+        return False
+
+    def close(self) -> None:
+        try:
+            self.key(False)
+        finally:
+            try:
+                self._rig.close()
+            except Exception as exc:
+                _log.warning("closing hamlib rig failed: %s", exc)
 
 
 class HamlibBackend:
     name = "hamlib"
     capabilities = PttCapabilities(acknowledgement=True)
     def open(self, config):
-        command = [str(config.get("executable", "rigctl"))]
-        for option, flag in (("model", "-m"), ("device", "-r"), ("baud", "-s")):
-            if option in config:
-                command.extend((flag, str(config[option])))
-        return HamlibController(command, float(config.get("timeout", 2.0)))
+        model = int(_required(config, "model"))
+        conf = {}
+        if "device" in config:
+            conf["rig_pathname"] = str(config["device"])
+        if "baud" in config:
+            conf["serial_speed"] = str(int(config["baud"]))
+        if "civaddr" in config:
+            conf["civaddr"] = str(config["civaddr"])
+        timeout = float(config.get("timeout", 2.0))
+        conf.setdefault("timeout", str(int(timeout * 1000)))
+        conf.setdefault("retry", str(int(config.get("retry", 3))))
+        conf.update({str(key): str(value) for key, value in config.get("conf", {}).items()})
+        return HamlibController(hamlib.Rig(model, conf))
 
 
 for _backend in (SerialLineBackend(), IcomCivBackend(), VoxBackend(), HamlibBackend()):

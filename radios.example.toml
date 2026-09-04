@@ -18,7 +18,7 @@ ptt.line = "rts" # or "dtr"
 [radios.rigctl]
 audio_name = "USB Audio CODEC"
 ptt.backend = "hamlib"
-ptt.model = 1
+ptt.model = 3073 # rig model number; see `rigctl -l`, or `rigctl -m 1` for the no-hardware dummy rig
 ptt.device = "/dev/ttyUSB0"
 ptt.baud = 115200
 
