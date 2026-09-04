@@ -54,6 +54,44 @@ def test_hamlib_backend_rejects_unknown_model():
         pytest.skip("libhamlib is not installed and this platform isn't one whalemodem bundles for")
 
 
+def test_list_rig_models_includes_a_known_stable_entry():
+    """Hamlib's built-in Dummy rig (model 1) is always registered once
+    rig_load_all_backends() runs, so it's a stable anchor to check the
+    rig_caps-prefix decode against, independent of hamlib version.
+    """
+    try:
+        models = hamlib.list_rig_models()
+    except OSError:
+        pytest.skip("libhamlib is not installed and this platform isn't one whalemodem bundles for")
+    assert len(models) > 100  # order of hundreds; hamlib 4.7.2 has 312
+    dummy = [m for m in models if m.model == 1]
+    assert len(dummy) == 1
+    assert dummy[0].manufacturer == "Hamlib"
+    assert dummy[0].model_name == "Dummy"
+    assert dummy[0].status == "Stable"
+
+
+def test_list_rig_models_is_stable_across_repeated_calls():
+    """Exercises the "load backends at most once" caching: a second call
+    must not error, and must not duplicate every entry.
+    """
+    try:
+        first = hamlib.list_rig_models()
+        second = hamlib.list_rig_models()
+    except OSError:
+        pytest.skip("libhamlib is not installed and this platform isn't one whalemodem bundles for")
+    assert len(second) == len(first)
+
+
+def test_list_rig_models_is_sorted_by_manufacturer_then_model_name():
+    try:
+        models = hamlib.list_rig_models()
+    except OSError:
+        pytest.skip("libhamlib is not installed and this platform isn't one whalemodem bundles for")
+    keys = [(m.manufacturer.lower(), m.model_name.lower()) for m in models]
+    assert keys == sorted(keys)
+
+
 def test_toml_radio_inventory(tmp_path: Path):
     path = tmp_path / "radios.toml"
     path.write_text('''

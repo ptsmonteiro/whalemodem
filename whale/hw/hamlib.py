@@ -37,6 +37,7 @@ import ctypes
 import ctypes.util
 import os
 import platform
+from dataclasses import dataclass
 from pathlib import Path
 from typing import Mapping
 
@@ -153,6 +154,42 @@ def _load_library():
 _lib = None
 
 
+class _RigCapsPrefix(ctypes.Structure):
+    """The leading fields of `struct rig_caps` (hamlib/rig.h), and no more.
+
+    rig_caps has hundreds of fields, and most of it carries the same
+    ABI-fragility warning as rig_state (see module docstring). This prefix is
+    the exception: rig.h documents it as order-stable -- "Don't move or add
+    fields around without bumping the version numbers -- DLL or shared
+    library replacement depends on order" -- because rig_list_foreach(),
+    which rigctl -l and every hamlib GUI frontend use to enumerate the rig
+    database, walks it exactly this way. ctypes only needs the fields we
+    declare to compute correct offsets for them; the untouched remainder of
+    the real struct past this prefix is never read.
+    """
+
+    _fields_ = [
+        ("rig_model", ctypes.c_uint32),
+        ("model_name", ctypes.c_char_p),
+        ("mfg_name", ctypes.c_char_p),
+        ("version", ctypes.c_char_p),
+        ("copyright", ctypes.c_char_p),
+        ("status", ctypes.c_int),
+    ]
+
+
+# enum rig_status_e (hamlib/rig.h); human-readable for RigModel.status.
+_RIG_STATUS_NAMES = {
+    0: "Alpha", 1: "Untested", 2: "Beta", 3: "Stable", 4: "Buggy",
+}
+
+_RigListForeachCB = ctypes.CFUNCTYPE(
+    ctypes.c_int, ctypes.POINTER(_RigCapsPrefix), ctypes.c_void_p
+)
+
+_backends_loaded = False
+
+
 def _hamlib():
     global _lib
     if _lib is None:
@@ -173,9 +210,16 @@ def _hamlib():
         lib.rig_set_conf.argtypes = [ctypes.c_void_p, ctypes.c_long, ctypes.c_char_p]
         lib.rig_set_debug.restype = None
         lib.rig_set_debug.argtypes = [ctypes.c_int]
+        lib.rig_load_all_backends.restype = ctypes.c_int
+        lib.rig_load_all_backends.argtypes = []
+        lib.rig_list_foreach.restype = ctypes.c_int
+        lib.rig_list_foreach.argtypes = [_RigListForeachCB, ctypes.c_void_p]
         # Left uncalled, hamlib's own default is RIG_DEBUG_TRACE, which
         # writes a torrent of per-call trace lines to stderr on every PTT
         # toggle. rigctl itself sets WARN unless run with -v; match that.
+        # This also silences rig_load_all_backends()'s own per-backend init
+        # trace lines below (verified empirically -- at TRACE it's noisy,
+        # at WARN it's silent).
         lib.rig_set_debug(RIG_DEBUG_WARN)
         _lib = lib
     return _lib
@@ -221,3 +265,51 @@ class Rig:
         finally:
             self._lib.rig_cleanup(self._handle)
             self._handle = None
+
+
+@dataclass(frozen=True)
+class RigModel:
+    """One rig hamlib knows how to drive, for a wizard's manufacturer/model
+    picker -- so `ptt.model` (radios.example.toml) need not be looked up by
+    hand via `rigctl -l`."""
+
+    model: int
+    manufacturer: str
+    model_name: str
+    version: str
+    status: str
+
+
+def _ensure_backends_loaded(lib) -> None:
+    global _backends_loaded
+    if not _backends_loaded:
+        lib.rig_load_all_backends()
+        _backends_loaded = True
+
+
+def list_rig_models() -> list[RigModel]:
+    """Lists every rig hamlib's loaded backends know how to drive.
+
+    Unfiltered by status (including Alpha/Untested) -- like list_devices()/
+    list_serial_ports(), filtering or flagging low-confidence entries is a
+    UI-layer decision, not this layer's job. Sorted by (manufacturer,
+    model_name), case-insensitive, for a sane picker.
+    """
+    lib = _hamlib()
+    _ensure_backends_loaded(lib)
+
+    models: list[RigModel] = []
+
+    def collect(caps_ptr, _data):
+        caps = caps_ptr.contents
+        models.append(RigModel(
+            model=caps.rig_model,
+            manufacturer=(caps.mfg_name or b"").decode("utf-8", "replace"),
+            model_name=(caps.model_name or b"").decode("utf-8", "replace"),
+            version=(caps.version or b"").decode("utf-8", "replace"),
+            status=_RIG_STATUS_NAMES.get(caps.status, str(caps.status)),
+        ))
+        return 1  # nonzero: keep iterating (same convention rigctl.c uses)
+
+    lib.rig_list_foreach(_RigListForeachCB(collect), None)
+    return sorted(models, key=lambda m: (m.manufacturer.lower(), m.model_name.lower()))

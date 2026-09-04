@@ -94,7 +94,7 @@ vendored version.
 [radios.rigctl]
 audio_name = "USB Audio CODEC"
 ptt.backend = "hamlib"
-ptt.model = 3073        # rig model number; see `rigctl -l`
+ptt.model = 3073        # rig model number; see `rigctl -l` (or hamlib.list_rig_models())
 ptt.device = "/dev/ttyUSB0"
 ptt.baud = 115200
 # ptt.civaddr = 148      # Icom rigs only
