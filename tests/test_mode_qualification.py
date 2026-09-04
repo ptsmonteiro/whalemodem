@@ -5,6 +5,7 @@ import whale.mode_qualification as qualification
 from whale.mode_qualification import (MANIFEST, QualificationLevel,
                                       QualificationEntry,
                                       qualification_level, registry)
+from whale.qualification import net_data_frame_metrics
 
 
 @pytest.mark.parametrize("policy", ("vhf-fm", "hf-ssb"))
@@ -51,3 +52,23 @@ def test_unknown_level_and_policy_are_rejected():
         registry("vhf-fm", "qualified-ish")
     with pytest.raises(ValueError, match="channel policy"):
         registry("moon-bounce")
+
+
+def test_net_data_frame_throughput_excludes_air_header_and_session_traffic():
+    class Mode:
+        chunk_size = 90
+        tx_sample_rate = 1_000
+
+        @staticmethod
+        def encode(payload):
+            assert len(payload) == 100  # 10-byte air header + DATA chunk
+            return bytes(2_000)
+
+    assert net_data_frame_metrics(Mode()) == {
+        "data_chunk_bytes": 90,
+        "physical_payload_bytes": 100,
+        "encoded_samples": 2_000,
+        "tx_sample_rate": 1_000,
+        "frame_seconds": 2.0,
+        "net_throughput_bps": 360.0,
+    }

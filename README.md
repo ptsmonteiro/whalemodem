@@ -55,9 +55,10 @@ the [testing guide](docs/TESTING.md) covers the other test workflows.
 - The end-to-end connect, bidirectional byte transfer, verification, and
   disconnect path is implemented. Software full-stack tests cover VHF FM and
   HF SSB; retained captures and bench runs cover parts of both radio paths.
-- Every shipped mode remains provisionally qualified. Evidence gaps include
-  additional radio pairs, useful-throughput overlap measurements, and low-end
-  resource measurements.
+- Every shipped mode remains provisionally qualified. Waveform evidence gaps
+  include retained-direction frame campaigns, per-frame net-throughput,
+  and resource measurements. Ladder overlap/adaptation and complete-system
+  hardware recovery are tracked separately.
 - The local API is only the subset needed by the acceptance scenario, ARQ is
   stop-and-wait, and HF clear-channel assessment is missing. HF operation is
   therefore for controlled bench tests, not unattended use on a shared band.
@@ -66,8 +67,9 @@ See [MODE_QUALIFICATION.md](MODE_QUALIFICATION.md) for the evidence audit.
 
 ## Next steps
 
-- Close mode-qualification gaps, starting with reproducible bidirectional
-  hardware campaigns and useful-throughput overlap measurements.
+- Close waveform-qualification gaps with retained-direction hardware frames
+  and per-frame net-throughput measurements; qualify ladder adaptation and
+  complete-system hardware sessions independently.
 - Add HF clear-channel assessment.
 - Measure CPU, memory, latency, and audio dropouts on a low-end target.
 - Expand and test VARA API compatibility, then improve throughput and radio

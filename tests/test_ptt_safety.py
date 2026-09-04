@@ -201,6 +201,7 @@ def _fake_transport(ptt_obj, out_device=7):
     t.out_device = out_device
     t.in_device = None
     t.ptt = ptt_obj
+    t.receive_only = False
     t._chunks = __import__("collections").deque()
     t._chunks_len = 0
     t._buf_lock = threading.Lock()
@@ -549,6 +550,33 @@ def test_transport_close_survives_a_ptt_that_cannot_unkey():
     print("test_transport_close_survives_a_ptt_that_cannot_unkey OK")
 
 
+# -- receive-only transports -------------------------------------------
+#
+# The other direction of the same concern: not "did the un-key happen" but
+# "can this radio be keyed at all". A one-way bench has a radio that must
+# never transmit, and receive_only makes that structural -- no PTT object
+# exists, so there is nothing to key even if a caller asks.
+
+
+def test_a_receive_only_transport_refuses_to_send():
+    t = _fake_transport(None)
+    t.receive_only = True
+    try:
+        t.send(np.zeros(16, dtype=np.float32))
+    except RuntimeError as exc:
+        assert "must not transmit" in str(exc), exc
+    else:
+        raise AssertionError("a receive-only transport transmitted")
+
+
+def test_a_receive_only_transport_closes_without_a_ptt():
+    # close() un-keys through self.ptt; with no PTT there is nothing to
+    # un-key, and it must not fall over trying.
+    t = _fake_transport(None)
+    t.receive_only = True
+    t.close()
+
+
 if __name__ == "__main__":
     test_unkey_retries_until_the_radio_answers()
     test_unkey_falls_back_to_a_blind_write_when_nothing_answers()
@@ -571,4 +599,6 @@ if __name__ == "__main__":
     test_send_reresolves_a_moved_output_device_between_attempts()
     test_reresolving_a_vanished_device_keeps_the_old_index()
     test_transport_close_survives_a_ptt_that_cannot_unkey()
+    test_a_receive_only_transport_refuses_to_send()
+    test_a_receive_only_transport_closes_without_a_ptt()
     print("all PTT safety tests OK")

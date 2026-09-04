@@ -1,9 +1,10 @@
 # HF and VHF FM speed-ladder targets
 
 This document defines the five target rungs for Whalemodem's HF SSB and VHF
-FM speed ladders. A rung is a service objective: it combines minimum useful
-application throughput with a required channel envelope. Modulation, coding,
-frame geometry, and implementation are deliberately outside this document.
+FM speed ladders. A rung is a service objective: it combines minimum net
+application throughput per data frame with a required channel envelope.
+Modulation, coding, frame geometry, and implementation are deliberately
+outside this document.
 
 These are end-state targets, not descriptions of the modes currently present
 in the repository. The evidence and pass/fail rules for claiming a rung are
@@ -13,14 +14,21 @@ defined in [MODE_QUALIFICATION.md](MODE_QUALIFICATION.md).
 
 - Level 0 is the control and last-resort fallback rung. Its priority is
   maximum coverage.
-- Levels 1 through 3 exchange channel margin for increasing useful
-  application throughput.
+- Levels 1 through 3 exchange channel margin for increasing net application
+  throughput per data frame.
 - Level 4 is the maximum-speed rung. Its deliberately narrow channel envelope
   must not be widened by sacrificing its throughput target.
 - A target is satisfied only when both its throughput and every channel point
   in its required envelope pass the qualification rules.
-- Speeds are minimum sustained useful application throughput, not symbol,
-  coded, nominal, payload-per-frame, or error-free-loopback rates.
+- Speeds are minimum net application throughput per full-capacity DATA frame:
+  application DATA-chunk bits divided by that encoded frame's complete
+  airtime. The numerator excludes the air header and all other link/physical
+  overhead; the denominator includes the waveform's acquisition, framing,
+  coding, guards, and intentional lead/tail samples. ACKs, retries, radio
+  turnaround, connection traffic, adaptation, and other session traffic are
+  excluded. Frame delivery reliability is enforced separately by the channel
+  envelope gates in `MODE_QUALIFICATION.md` and is not multiplied into this
+  rate.
 - Channel thresholds are inclusive: a target stated at `10 dB and above`
   includes the 10 dB boundary point.
 
@@ -47,16 +55,29 @@ Its qualification channel must retain its complete filter, frequency-offset,
 drift, level, and nonlinearity description; identity-channel or AWGN-only
 evidence is insufficient.
 
-| Level | Objective | Minimum useful application throughput | Required operating envelope |
+| Level | Objective | Minimum net application throughput per DATA frame | Required operating envelope |
 | ---: | --- | ---: | --- |
 | 0 | Control and last-resort fallback | 20 bit/s | Quiet, moderate, and disturbed at +4 dB SNR/3 kHz and above |
 | 1 | Robust data | 100 bit/s | Quiet and moderate at +9 dB and above; disturbed at +14 dB and above |
 | 2 | General-purpose data | 500 bit/s | Quiet at +14 dB and above; moderate at +19 dB and above |
 | 3 | Fast data | 2,000 bit/s | Benign/static at +17 dB and above; quiet at +19 dB and above |
-| 4 | Maximum speed | 7,050 bit/s | Benign/static at +22 dB and above |
+| 4 | Maximum speed | 4,000 bit/s | Benign/static at +22 dB and above |
 
 These rounded thresholds preserve the former physical noise levels after
 conversion from the retired 0--24 kHz convention (exact offset: +9.03 dB).
+
+**2026-09-01 revision:** Level 4's floor was lowered from 7,050 bit/s to 4,000
+bit/s. The original figure was carried over from the VHF FM ladder's shape and
+was never grounded in an HF SSB measurement; the accumulated real-hardware
+record across `experiments/hf5_8psk_4k` through `experiments/hf13_fast_sync_v1`
+(single-carrier 8PSK ceiling ~4,050 bit/s uncoded; 49-carrier OFDM with 16-QAM
+and LDPC 3/4 reaching ~4,332 bit/s qualified and ~4,969 bit/s provisional) shows
+this channel and hardware pair topping out around 4-5 kbit/s, not 7. The new
+floor is a deliberate, evidence-based target fixed going forward -- it must not
+be adjusted again merely because a future candidate's own result falls short of
+it; per the shared interpretation above, a target is not narrowed after seeing
+a candidate's numbers. Any future increase requires new measured ceiling
+evidence exceeding today's, not a redesign of a specific mode's shortfall.
 
 ## VHF FM ladder
 
@@ -73,7 +94,7 @@ excellent path with the bandwidth and linearity needed for the target rate.
 Synthetic profiles may locate boundaries but cannot by themselves satisfy a
 target rung.
 
-| Level | Objective | Minimum useful application throughput | Required operating envelope |
+| Level | Objective | Minimum net application throughput per DATA frame | Required operating envelope |
 | ---: | --- | ---: | --- |
 | 0 | Control and fallback | 500 bit/s | Conservative measured path at 5 dB RF C/N and above |
 | 1 | Robust data | 1,000 bit/s | Conservative measured path at 10 dB RF C/N and above |

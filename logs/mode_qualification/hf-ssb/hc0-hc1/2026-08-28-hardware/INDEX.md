@@ -31,9 +31,9 @@ not a qualifying frame Monte Carlo or hardware gate result.
 
 Together: 17/17 ic7300->ic705, 0/3 ic705->ic7300. HC1 has exact saved-capture
 replay in only one direction; the other direction failed every attempted
-trial at acquisition. This is the hardware evidence behind
-`MODE_QUALIFICATION.md`'s "documented weak-direction failure" note for HC1's
-bidirectional hardware frame gate -- it fails that gate as currently written.
+trial at acquisition. Under the current retained-direction criterion,
+ic7300->ic705 is HC1's better usable retained leg. Its 17/17 result is
+provisional because it is below the 40-frame minimum.
 
 ## 2026-08-30 operator note on the weak ic705->ic7300 leg
 
@@ -59,10 +59,11 @@ envelope excludes.
 The consequence for qualification is that this session does not measure
 HC1's declared envelope at all: the weak leg was not a channel condition
 under test but a bench misconfiguration. The 0/3 result is therefore treated
-as an invalid run rather than a failed direction, and HC1's bidirectional
-hardware frame gate is `unmeasured` pending a re-run with both stations on
-antennas and the transmit configuration recorded. HC0's 11/11 on that leg
-remains valid evidence and is, if anything, strengthened by it.
+as an invalid characterization run rather than a failed retained direction.
+It remains documented but does not enter the retained ic7300->ic705 leg's
+Wilson interval or verdict. HC1's retained-direction hardware frame gate is
+`provisional` pending at least 40 frames with the transmit configuration
+recorded. HC0's 11/11 on the weak leg remains valid historical evidence.
 
 ## Missing configuration metadata
 

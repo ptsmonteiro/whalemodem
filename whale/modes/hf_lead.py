@@ -28,10 +28,20 @@ MIN_ENERGY_FRACTION = 0.60
 MAX_CANDIDATE_BOUNDARIES = 32
 
 # Balanced, band-spanning permutations selected by the signature128 screen.
+#
+# Later rows follow the same shape: six tones out of the 16-tone HC0 bank,
+# spread across the band and distinct from the other rows so `candidates()`
+# does not confuse the labels.
 BLOCKS = np.asarray(((9, 6, 12, 15, 0, 3),
-                     (12, 3, 15, 6, 9, 0)), dtype=np.int64)
+                     (12, 3, 15, 6, 9, 0),
+                     (2, 11, 5, 14, 8, 0),
+                     (7, 13, 1, 10, 4, 15),
+                     (1, 14, 5, 11, 8, 2)), dtype=np.int64)
 HC0_LABEL = 0
 HC1_LABEL = 1
+HF2_LABEL = 2
+HF3_LABEL = 3
+HR0_LABEL = 4
 
 
 @dataclass(frozen=True)

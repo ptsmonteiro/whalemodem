@@ -469,7 +469,7 @@ def _decode_timing(body):
 
 
 def _derive_timing(head_duration_byte):
-    if not 0 < head_duration_byte <= 255:
+    if not 0 <= head_duration_byte <= 255:
         raise ValueError("invalid calibration measurement")
     head_loss = CALIBRATION_SECONDS * (255 - head_duration_byte) / 255
     return min(CALIBRATION_SECONDS,

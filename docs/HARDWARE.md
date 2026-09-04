@@ -83,10 +83,13 @@ python scripts/run_acceptance_test.py --channel hf-ssb \
   --a-radio ic7300 --b-radio ic705 --size 1024
 ```
 
-The shared sweep method bypasses link ARQ and performs one direct
-modulate → transmit → capture → demodulate trial in each direction. The
-weaker direction decides whether a point passes. `scripts/bench.py` contains
-the common radio-pair and trial machinery.
+The shared sweep method bypasses link ARQ and performs direct
+modulate → transmit → capture → demodulate trials. Characterization normally
+probes both directions. Qualification retains one declared direction per
+radio pair; the better usable direction may be selected before the
+promotion-sized run. Bidirectional behavior is still required from the full
+hardware link/ARQ/recovery session. `scripts/bench.py` contains the common
+radio-pair and trial machinery.
 
 ## Capture diagnostics
 

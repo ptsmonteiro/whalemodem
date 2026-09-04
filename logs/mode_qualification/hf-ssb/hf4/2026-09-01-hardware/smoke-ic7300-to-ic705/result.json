@@ -1,0 +1,17 @@
+{
+  "mode": "hf4",
+  "payload_bytes": 7368,
+  "trials": 1,
+  "a": "ic7300",
+  "b": "ic705",
+  "ic7300->ic705": [
+    {
+      "trial": 1,
+      "decoded": false,
+      "confidence": 0.28067233827818455,
+      "start_index": 55635,
+      "synced": false
+    }
+  ],
+  "ic705->ic7300": []
+}

@@ -46,9 +46,14 @@ MANIFEST = (
     QualificationEntry("vhf-fm", 1, QualificationLevel.DEFAULT),
     QualificationEntry("vhf-fm", 2, QualificationLevel.DEFAULT),
     QualificationEntry("vhf-fm", 3, QualificationLevel.DEFAULT),
+    QualificationEntry("vhf-fm", 8, QualificationLevel.EXPERIMENTAL),
     QualificationEntry("vhf-fm", 6, QualificationLevel.EXPERIMENTAL),
     QualificationEntry("hf-ssb", 5, QualificationLevel.DEFAULT),
     QualificationEntry("hf-ssb", 4, QualificationLevel.DEFAULT),
+    QualificationEntry("hf-ssb", 10, QualificationLevel.DEFAULT),
+    QualificationEntry("hf-ssb", 7, QualificationLevel.DEFAULT),
+    QualificationEntry("hf-ssb", 9, QualificationLevel.EXPERIMENTAL),
+    QualificationEntry("hf-ssb", 11, QualificationLevel.DEFAULT),
 )
 
 
@@ -69,13 +74,25 @@ def registry(policy: str, level: QualificationLevel | str =
     if policy == "vhf-fm":
         from . import afsk
         from .modes.vf3_mode import VF3
+        from .modes.vf4_mode import VF4
         from .modes.vf6_mode import VF6
         base = afsk.default_registry() if budget is None else afsk.default_registry(budget)
-        candidates, control = tuple(base.modes) + (VF3, VF6), base.control
+        candidates, control = tuple(base.modes) + (VF3, VF4, VF6), base.control
     elif policy == "hf-ssb":
+        from .modes.hr0_mode import HR0
         from .modes.hc0_mode import HC0
         from .modes.hc1_mode import HC1
-        candidates, control = (HC0, HC1), HC0
+        from .modes.hf2_mode import HF2
+        from .modes.hf4_mode import HF4
+        candidates, control = (HR0, HC0, HC1, HF2, HF4), HR0
+        # HF3 remains an experiment-backed adapter and optional development
+        # dependency; a normal/default station must not import it merely to
+        # construct the production HF ladder. HF2 and HF4 are manifest
+        # DEFAULT modes (see MANIFEST above) and so are always
+        # importable/selectable.
+        if requested >= QualificationLevel.EXPERIMENTAL:
+            from .modes.hf3_mode import HF3
+            candidates += (HF3,)
     else:
         raise ValueError(f"unknown channel policy {policy!r}")
 

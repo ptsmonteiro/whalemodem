@@ -1,0 +1,142 @@
+[
+  {
+    "trial": 1,
+    "capture": "C:\\Users\\ptsm\\Projects\\whalemodem\\experiments\\hf13_fast_sync_v1\\captures\\hf13_capture_20260901T181057Z_001.npz",
+    "keyed_seconds": 6.075731992721558,
+    "rx_samples_12k": 85080,
+    "payload_bytes": 2988,
+    "config": {
+      "baud": 1500.0,
+      "bits_per_symbol": 3,
+      "packet_bytes": 2994,
+      "pilot_interval": 150
+    },
+    "seed": 20260901
+  },
+  {
+    "trial": 2,
+    "capture": "C:\\Users\\ptsm\\Projects\\whalemodem\\experiments\\hf13_fast_sync_v1\\captures\\hf13_capture_20260901T181057Z_002.npz",
+    "keyed_seconds": 6.072636842727661,
+    "rx_samples_12k": 85200,
+    "payload_bytes": 2988,
+    "config": {
+      "baud": 1500.0,
+      "bits_per_symbol": 3,
+      "packet_bytes": 2994,
+      "pilot_interval": 150
+    },
+    "seed": 20260901
+  },
+  {
+    "trial": 3,
+    "capture": "C:\\Users\\ptsm\\Projects\\whalemodem\\experiments\\hf13_fast_sync_v1\\captures\\hf13_capture_20260901T181057Z_003.npz",
+    "keyed_seconds": 6.076356649398804,
+    "rx_samples_12k": 85200,
+    "payload_bytes": 2988,
+    "config": {
+      "baud": 1500.0,
+      "bits_per_symbol": 3,
+      "packet_bytes": 2994,
+      "pilot_interval": 150
+    },
+    "seed": 20260901
+  },
+  {
+    "trial": 4,
+    "capture": "C:\\Users\\ptsm\\Projects\\whalemodem\\experiments\\hf13_fast_sync_v1\\captures\\hf13_capture_20260901T181057Z_004.npz",
+    "keyed_seconds": 6.072345495223999,
+    "rx_samples_12k": 85080,
+    "payload_bytes": 2988,
+    "config": {
+      "baud": 1500.0,
+      "bits_per_symbol": 3,
+      "packet_bytes": 2994,
+      "pilot_interval": 150
+    },
+    "seed": 20260901
+  },
+  {
+    "trial": 5,
+    "capture": "C:\\Users\\ptsm\\Projects\\whalemodem\\experiments\\hf13_fast_sync_v1\\captures\\hf13_capture_20260901T181057Z_005.npz",
+    "keyed_seconds": 6.072851896286011,
+    "rx_samples_12k": 85200,
+    "payload_bytes": 2988,
+    "config": {
+      "baud": 1500.0,
+      "bits_per_symbol": 3,
+      "packet_bytes": 2994,
+      "pilot_interval": 150
+    },
+    "seed": 20260901
+  },
+  {
+    "trial": 6,
+    "capture": "C:\\Users\\ptsm\\Projects\\whalemodem\\experiments\\hf13_fast_sync_v1\\captures\\hf13_capture_20260901T181057Z_006.npz",
+    "keyed_seconds": 6.072342872619629,
+    "rx_samples_12k": 85080,
+    "payload_bytes": 2988,
+    "config": {
+      "baud": 1500.0,
+      "bits_per_symbol": 3,
+      "packet_bytes": 2994,
+      "pilot_interval": 150
+    },
+    "seed": 20260901
+  },
+  {
+    "trial": 7,
+    "capture": "C:\\Users\\ptsm\\Projects\\whalemodem\\experiments\\hf13_fast_sync_v1\\captures\\hf13_capture_20260901T181057Z_007.npz",
+    "keyed_seconds": 6.071870565414429,
+    "rx_samples_12k": 85080,
+    "payload_bytes": 2988,
+    "config": {
+      "baud": 1500.0,
+      "bits_per_symbol": 3,
+      "packet_bytes": 2994,
+      "pilot_interval": 150
+    },
+    "seed": 20260901
+  },
+  {
+    "trial": 8,
+    "capture": "C:\\Users\\ptsm\\Projects\\whalemodem\\experiments\\hf13_fast_sync_v1\\captures\\hf13_capture_20260901T181057Z_008.npz",
+    "keyed_seconds": 6.083773612976074,
+    "rx_samples_12k": 85440,
+    "payload_bytes": 2988,
+    "config": {
+      "baud": 1500.0,
+      "bits_per_symbol": 3,
+      "packet_bytes": 2994,
+      "pilot_interval": 150
+    },
+    "seed": 20260901
+  },
+  {
+    "trial": 9,
+    "capture": "C:\\Users\\ptsm\\Projects\\whalemodem\\experiments\\hf13_fast_sync_v1\\captures\\hf13_capture_20260901T181057Z_009.npz",
+    "keyed_seconds": 6.072852373123169,
+    "rx_samples_12k": 85200,
+    "payload_bytes": 2988,
+    "config": {
+      "baud": 1500.0,
+      "bits_per_symbol": 3,
+      "packet_bytes": 2994,
+      "pilot_interval": 150
+    },
+    "seed": 20260901
+  },
+  {
+    "trial": 10,
+    "capture": "C:\\Users\\ptsm\\Projects\\whalemodem\\experiments\\hf13_fast_sync_v1\\captures\\hf13_capture_20260901T181057Z_010.npz",
+    "keyed_seconds": 6.072000741958618,
+    "rx_samples_12k": 85200,
+    "payload_bytes": 2988,
+    "config": {
+      "baud": 1500.0,
+      "bits_per_symbol": 3,
+      "packet_bytes": 2994,
+      "pilot_interval": 150
+    },
+    "seed": 20260901
+  }
+]

@@ -56,6 +56,26 @@ def full_packet_bytes(mode) -> int:
     return framing.AIR_HEADER_BYTES + mode.chunk_size
 
 
+def net_data_frame_metrics(mode) -> dict[str, float | int]:
+    """Return the qualification throughput metrics for one full DATA frame.
+
+    Throughput is application chunk bits divided by complete encoded frame
+    airtime.  Session traffic and channel delivery outcomes are deliberately
+    outside this mode-geometry measurement.
+    """
+    packet_bytes = full_packet_bytes(mode)
+    encoded_samples = len(mode.encode(bytes(packet_bytes)))
+    frame_seconds = encoded_samples / mode.tx_sample_rate
+    return {
+        "data_chunk_bytes": mode.chunk_size,
+        "physical_payload_bytes": packet_bytes,
+        "encoded_samples": encoded_samples,
+        "tx_sample_rate": mode.tx_sample_rate,
+        "frame_seconds": frame_seconds,
+        "net_throughput_bps": 8 * mode.chunk_size / frame_seconds,
+    }
+
+
 def trial_seed(master_seed: int, mode_id: int, point_index: int, trial: int) -> int:
     """Stable independent seed, unaffected by which other points are selected."""
 

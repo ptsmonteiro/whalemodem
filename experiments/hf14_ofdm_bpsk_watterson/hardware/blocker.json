@@ -1,0 +1,56 @@
+{
+  "note": "Historical record of the initial blocked attempt. The receiver recovered later on 2026-09-03 and the planned hardware screen was completed; see ../RESULTS.md and the sibling resume/rank/control artifact directories. Do not combine this invalid dry run with those valid frames.",
+  "date_utc": "2026-09-03",
+  "status": "historical_resolved",
+  "blocker": "IC-705 (the receiver) produces no receive audio and NGs every CI-V command; radio-side state, not code.",
+  "transmit_side": {
+    "radio": "ic7300",
+    "ptt": "ok, CI-V over CP210x on COM3",
+    "keyed_seconds_observed": 0.53,
+    "verdict": "working"
+  },
+  "receive_side": {
+    "radio": "ic705",
+    "civ": {
+      "port": "COM6",
+      "address": 6164,
+      "address_hex": "0xA4",
+      "reply_to_0x03_and_0x1900": "fefee0a4fafd",
+      "meaning": "NG (0xFA) at every baud tested (9600/19200/38400/115200)",
+      "verdict": "alive but refusing all commands"
+    },
+    "audio_rms_by_input_device": {
+      "3": {"idle": 1.462e-05, "while_ic7300_transmitting": 1.463e-05, "peak": 6.104e-05},
+      "15": {"idle": 1.463e-05, "while_ic7300_transmitting": 1.463e-05, "peak": 6.104e-05},
+      "31": {"idle": 4.007e-07, "while_ic7300_transmitting": 2.763e-07, "peak": 5.069e-06,
+             "note": "this is the endpoint RadioTransport selects"}
+    },
+    "reference_ic7300_receiver_idle_rms": {"1": 9.901e-02, "13": 1.085e-01, "33": 6.936e-02},
+    "verdict": "silent; level is unchanged by the IC-7300 actually transmitting, so it is a muted stream rather than a weak signal"
+  },
+  "dry_run": {
+    "config": "rank 1: fft_size 240, cp_len 36, bps 1, packet_bytes 70, pilot_interval 8, pilot_comb_stride 0, equalizer gain",
+    "trials": 1,
+    "decoded": 0,
+    "outcome": "crc_fail",
+    "capture_rms": 2.574258689801926e-09,
+    "capture_peak": 4.77491646222461e-08,
+    "channel_snr_db": null,
+    "per_bin_snr_db_min": null,
+    "reported_confidence": 0.810,
+    "reported_freq_offset_hz": -3.8431752058000628,
+    "confidence_and_offset_are_artefacts": "the preamble correlator is normalised, so it returns a plausible peak on denormal-scale numeric noise; channel_snr_db is null because demodulate() hit its |gain0| < 1e-9 guard. Neither number is a measurement of anything.",
+    "artifacts": ["dryrun_rank1/result.json", "dryrun_rank1/captures/trial01.npy"]
+  },
+  "not_run": [
+    "candidate 1: fft240 cp36 pilot_interval 8, 10 trials",
+    "candidate 2: fft240 cp36 pilot_interval 4, 10 trials",
+    "candidate 3: fft400 cp50 pilot_interval 8, 10 trials",
+    "candidate 4: fft600 cp38 pilot_interval 8, 10 trials",
+    "control point: fft120 (~100 Hz spacing), 10 trials"
+  ],
+  "commands_run": [
+    "python experiments/hf10_ofdm49_v6/hardware_test.py --a ic7300 --b ic705 --fft-size 240 --cp-len 36 --bps 1 --packet-bytes 70 --pilot-interval 8 --pilot-comb-stride 0 --equalizer gain --trials 1 --save-captures --label \"hf14 dry run rank1\" --output-dir experiments/hf14_ofdm_bpsk_watterson/hardware/dryrun_rank1"
+  ],
+  "to_resume": "Switch the IC-705 on / set SET > Connectors > CI-V > CI-V USB Port to 'Unlink from [REMOTE]' / check its USB AF output level and squelch, then verify a bare capture on its input device reads a band-noise RMS near the IC-7300's ~0.1 before keying anything."
+}

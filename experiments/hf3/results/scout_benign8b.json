@@ -1,0 +1,3664 @@
+{
+  "schema": "whalemodem.hf3-benchmark.v1",
+  "qualification_evidence": true,
+  "completed_utc": "2026-08-31T19:37:28.750339+00:00",
+  "seed": 1,
+  "trials_per_point": 20,
+  "model": "benign_static",
+  "watterson_preset": null,
+  "points_db": [
+    8.0
+  ],
+  "summaries": [
+    {
+      "model": "benign_static",
+      "watterson_preset": null,
+      "point_db": 8.0,
+      "label": "benign_static, waveform SNR 8 dB",
+      "trials": 20,
+      "acquisition": {
+        "count": 20,
+        "total": 20,
+        "rate": 1.0,
+        "wilson_95": [
+          0.8388748419471806,
+          1.0
+        ]
+      },
+      "frame_success": {
+        "count": 10,
+        "total": 20,
+        "rate": 0.5,
+        "wilson_95": [
+          0.2992980081982123,
+          0.7007019918017877
+        ]
+      },
+      "frame_error_rate": {
+        "count": 10,
+        "total": 20,
+        "rate": 0.5,
+        "wilson_95": [
+          0.2992980081982123,
+          0.7007019918017877
+        ]
+      },
+      "error_count": 0,
+      "payload_bytes": 438,
+      "frame_seconds": 1.348,
+      "useful_bps": 1299.7032640949556
+    }
+  ],
+  "trials": [
+    {
+      "trial": 1,
+      "direction": "benign_static, waveform SNR 8 dB",
+      "mode_id": 243,
+      "mode_name": "hf3",
+      "payload_bytes": 438,
+      "outcome": "payload_failed",
+      "tx_samples": 64704,
+      "tx_sample_rate": 48000,
+      "rx_samples": 17137,
+      "rx_sample_rate": 12000,
+      "keyed_seconds": 1.348,
+      "channel_measurements": {
+        "stage_0": {
+          "filter": "bandpass",
+          "low_hz": 250.0,
+          "high_hz": 3100.0,
+          "order": 6
+        },
+        "stage_1": {
+          "frequency_offset_start_hz": 0.4,
+          "frequency_offset_stop_hz": 0.402696,
+          "drift_hz_per_second": 0.002
+        },
+        "stage_2": {
+          "sample_clock_error_ppm": 3.0,
+          "actual_sample_clock_error_ppm": 2.9999999999752447,
+          "resample_ratio": [
+            1000003,
+            1000000
+          ]
+        },
+        "stage_3": {
+          "paths": 2,
+          "path_realized_mean_powers": [
+            2.549891743300664,
+            0.028944944344395585
+          ],
+          "elapsed_seconds": 1.3480208333333332,
+          "max_delay_samples": 2
+        },
+        "stage_4": {
+          "voltage_gain": 0.7943282347242815,
+          "gain_db": -2.0,
+          "input_power": 0.04706089658456393,
+          "output_power": 0.029693416691455036
+        },
+        "stage_5": {
+          "clip_limit": 0.97,
+          "clipped_samples": 0,
+          "clipped_fraction": 0.0
+        },
+        "stage_6": {
+          "waveform_snr_db": 8.0,
+          "realized_waveform_snr_db": 8.007464770787767,
+          "signal_power": 0.029693416691455036,
+          "noise_power": 0.0046980073918024496,
+          "reference_samples": [
+            0,
+            64707
+          ]
+        },
+        "stage_7": {
+          "filter": "bandpass",
+          "low_hz": 250.0,
+          "high_hz": 3100.0,
+          "order": 6
+        },
+        "drain": {
+          "stage_0": {
+            "input_samples": 0,
+            "tail_samples": 1886,
+            "relative_tolerance": 1e-06,
+            "max_tail_seconds": 1.0
+          },
+          "stage_1": {
+            "frequency_offset_start_hz": 0.402696,
+            "frequency_offset_stop_hz": 0.4027745833333334,
+            "drift_hz_per_second": 0.002
+          },
+          "stage_2": {
+            "sample_clock_error_ppm": 3.0,
+            "actual_sample_clock_error_ppm": 2.9999999999752447,
+            "resample_ratio": [
+              1000003,
+              1000000
+            ]
+          },
+          "stage_3": {
+            "paths": 2,
+            "path_realized_mean_powers": [
+              2.559699495208007,
+              0.02902489001234334
+            ],
+            "elapsed_seconds": 1.3873333333333333,
+            "max_delay_samples": 2
+          },
+          "stage_4": {
+            "voltage_gain": 0.7943282347242815,
+            "gain_db": -2.0,
+            "input_power": 1.28793071974015e-10,
+            "output_power": 8.126293019502741e-11
+          },
+          "stage_5": {
+            "clip_limit": 0.97,
+            "clipped_samples": 0,
+            "clipped_fraction": 0.0
+          },
+          "stage_6": {
+            "waveform_snr_db": 8.0,
+            "realized_waveform_snr_db": 8.116060116621034,
+            "signal_power": 8.126293019502741e-11,
+            "noise_power": 1.2539680364086854e-11,
+            "reference_samples": [
+              0,
+              1889
+            ]
+          },
+          "stage_7": {
+            "input_samples": 1889,
+            "tail_samples": 1886,
+            "relative_tolerance": 1e-06,
+            "max_tail_seconds": 1.0
+          }
+        }
+      },
+      "decoder_metrics": {
+        "confidence": 0.9816179877640506,
+        "failure": "CRC mismatch",
+        "cfo_hz": 0.38161603355258256,
+        "clock_offset_ppm": -123.6637886730395,
+        "crc_ok": false,
+        "present_carriers": 36,
+        "carrier_snr_db": [
+          17.947094184225424,
+          19.963285350237257,
+          20.187108719386778,
+          22.255217625429907,
+          19.92004726606507,
+          21.524613379313816,
+          20.12490851904234,
+          21.587717117049937,
+          24.340496530328075,
+          20.99695867629759,
+          17.8758224738436,
+          18.73319019989879,
+          18.90597102423435,
+          21.316405916055214,
+          22.24150004233853,
+          26.576065772392372,
+          20.095584485437094,
+          20.927544976419604,
+          13.484610984349255,
+          19.206921388072345,
+          21.485074306095186,
+          17.433544903679568,
+          20.833705112571018,
+          20.99151631916598,
+          19.73100182610021,
+          23.95850227418235,
+          19.946373635136112,
+          18.40111111751627,
+          23.763981695882865,
+          16.821390085762207,
+          23.31099930925095,
+          20.817706654173037,
+          20.53655555187385,
+          19.540542982140316,
+          16.761374169606718,
+          21.34802051645761
+        ],
+        "decoded_length": 438,
+        "start_index": 1560,
+        "end_index": 16200,
+        "capture_rms": 0.16871804423408132,
+        "capture_peak": 0.6967670917510986
+      },
+      "capture": null,
+      "error": null,
+      "decoded": false
+    },
+    {
+      "trial": 2,
+      "direction": "benign_static, waveform SNR 8 dB",
+      "mode_id": 243,
+      "mode_name": "hf3",
+      "payload_bytes": 438,
+      "outcome": "decoded",
+      "tx_samples": 64704,
+      "tx_sample_rate": 48000,
+      "rx_samples": 17137,
+      "rx_sample_rate": 12000,
+      "keyed_seconds": 1.348,
+      "channel_measurements": {
+        "stage_0": {
+          "filter": "bandpass",
+          "low_hz": 250.0,
+          "high_hz": 3100.0,
+          "order": 6
+        },
+        "stage_1": {
+          "frequency_offset_start_hz": 0.4,
+          "frequency_offset_stop_hz": 0.402696,
+          "drift_hz_per_second": 0.002
+        },
+        "stage_2": {
+          "sample_clock_error_ppm": 3.0,
+          "actual_sample_clock_error_ppm": 2.9999999999752447,
+          "resample_ratio": [
+            1000003,
+            1000000
+          ]
+        },
+        "stage_3": {
+          "paths": 2,
+          "path_realized_mean_powers": [
+            0.18629955359402184,
+            0.009739227704840576
+          ],
+          "elapsed_seconds": 1.3480208333333332,
+          "max_delay_samples": 2
+        },
+        "stage_4": {
+          "voltage_gain": 0.7943282347242815,
+          "gain_db": -2.0,
+          "input_power": 0.0059245267510097815,
+          "output_power": 0.0037381234592688663
+        },
+        "stage_5": {
+          "clip_limit": 0.97,
+          "clipped_samples": 0,
+          "clipped_fraction": 0.0
+        },
+        "stage_6": {
+          "waveform_snr_db": 8.0,
+          "realized_waveform_snr_db": 8.011771857751262,
+          "signal_power": 0.0037381234592688663,
+          "noise_power": 0.0005908489321779404,
+          "reference_samples": [
+            0,
+            64707
+          ]
+        },
+        "stage_7": {
+          "filter": "bandpass",
+          "low_hz": 250.0,
+          "high_hz": 3100.0,
+          "order": 6
+        },
+        "drain": {
+          "stage_0": {
+            "input_samples": 0,
+            "tail_samples": 1886,
+            "relative_tolerance": 1e-06,
+            "max_tail_seconds": 1.0
+          },
+          "stage_1": {
+            "frequency_offset_start_hz": 0.402696,
+            "frequency_offset_stop_hz": 0.4027745833333334,
+            "drift_hz_per_second": 0.002
+          },
+          "stage_2": {
+            "sample_clock_error_ppm": 3.0,
+            "actual_sample_clock_error_ppm": 2.9999999999752447,
+            "resample_ratio": [
+              1000003,
+              1000000
+            ]
+          },
+          "stage_3": {
+            "paths": 2,
+            "path_realized_mean_powers": [
+              0.18635804257091387,
+              0.009811420496118101
+            ],
+            "elapsed_seconds": 1.3873333333333333,
+            "max_delay_samples": 2
+          },
+          "stage_4": {
+            "voltage_gain": 0.7943282347242815,
+            "gain_db": -2.0,
+            "input_power": 1.2695055737588682e-12,
+            "output_power": 8.010038155983745e-13
+          },
+          "stage_5": {
+            "clip_limit": 0.97,
+            "clipped_samples": 0,
+            "clipped_fraction": 0.0
+          },
+          "stage_6": {
+            "waveform_snr_db": 8.0,
+            "realized_waveform_snr_db": 8.090757801498354,
+            "signal_power": 8.010038155983745e-13,
+            "noise_power": 1.2432509641708496e-13,
+            "reference_samples": [
+              0,
+              1889
+            ]
+          },
+          "stage_7": {
+            "input_samples": 1889,
+            "tail_samples": 1886,
+            "relative_tolerance": 1e-06,
+            "max_tail_seconds": 1.0
+          }
+        }
+      },
+      "decoder_metrics": {
+        "confidence": 0.980938707375655,
+        "cfo_hz": 0.40705040287006733,
+        "clock_offset_ppm": -25.29486586493987,
+        "crc_ok": true,
+        "present_carriers": 36,
+        "carrier_snr_db": [
+          21.71334358701874,
+          26.01711933612057,
+          21.541386121262004,
+          23.129027335174325,
+          21.61819519998739,
+          22.513350511726475,
+          19.440024514373274,
+          21.87658170029701,
+          23.283121565613598,
+          20.257140014545293,
+          29.048009031525392,
+          18.82935097508308,
+          25.0151877801197,
+          21.22436041512698,
+          21.072945673957694,
+          22.179781116765923,
+          24.130499798999825,
+          22.364187387550967,
+          11.729389198151054,
+          27.423164186403135,
+          21.565479908881958,
+          20.616570646636877,
+          19.978722536842987,
+          20.13875205997596,
+          20.6874430201134,
+          20.186100279295257,
+          19.849132915344097,
+          20.349573502482706,
+          18.41319841476803,
+          22.213308258380003,
+          28.303758756806477,
+          21.155444090834457,
+          17.885728916029837,
+          17.56938795388984,
+          25.225623675930663,
+          18.96123850674433
+        ],
+        "decoded_length": 438,
+        "start_index": 1560,
+        "end_index": 16200,
+        "capture_rms": 0.06011702634737621,
+        "capture_peak": 0.23002226650714874
+      },
+      "capture": null,
+      "error": null,
+      "decoded": true
+    },
+    {
+      "trial": 3,
+      "direction": "benign_static, waveform SNR 8 dB",
+      "mode_id": 243,
+      "mode_name": "hf3",
+      "payload_bytes": 438,
+      "outcome": "payload_failed",
+      "tx_samples": 64704,
+      "tx_sample_rate": 48000,
+      "rx_samples": 17137,
+      "rx_sample_rate": 12000,
+      "keyed_seconds": 1.348,
+      "channel_measurements": {
+        "stage_0": {
+          "filter": "bandpass",
+          "low_hz": 250.0,
+          "high_hz": 3100.0,
+          "order": 6
+        },
+        "stage_1": {
+          "frequency_offset_start_hz": 0.4,
+          "frequency_offset_stop_hz": 0.402696,
+          "drift_hz_per_second": 0.002
+        },
+        "stage_2": {
+          "sample_clock_error_ppm": 3.0,
+          "actual_sample_clock_error_ppm": 2.9999999999752447,
+          "resample_ratio": [
+            1000003,
+            1000000
+          ]
+        },
+        "stage_3": {
+          "paths": 2,
+          "path_realized_mean_powers": [
+            0.058535753173666216,
+            0.023491473135936632
+          ],
+          "elapsed_seconds": 1.3480208333333332,
+          "max_delay_samples": 2
+        },
+        "stage_4": {
+          "voltage_gain": 0.7943282347242815,
+          "gain_db": -2.0,
+          "input_power": 0.00045704866468518037,
+          "output_power": 0.0002883781955448008
+        },
+        "stage_5": {
+          "clip_limit": 0.97,
+          "clipped_samples": 0,
+          "clipped_fraction": 0.0
+        },
+        "stage_6": {
+          "waveform_snr_db": 8.0,
+          "realized_waveform_snr_db": 7.998104486932684,
+          "signal_power": 0.0002883781955448008,
+          "noise_power": 4.572481650533046e-05,
+          "reference_samples": [
+            0,
+            64707
+          ]
+        },
+        "stage_7": {
+          "filter": "bandpass",
+          "low_hz": 250.0,
+          "high_hz": 3100.0,
+          "order": 6
+        },
+        "drain": {
+          "stage_0": {
+            "input_samples": 0,
+            "tail_samples": 1886,
+            "relative_tolerance": 1e-06,
+            "max_tail_seconds": 1.0
+          },
+          "stage_1": {
+            "frequency_offset_start_hz": 0.402696,
+            "frequency_offset_stop_hz": 0.4027745833333334,
+            "drift_hz_per_second": 0.002
+          },
+          "stage_2": {
+            "sample_clock_error_ppm": 3.0,
+            "actual_sample_clock_error_ppm": 2.9999999999752447,
+            "resample_ratio": [
+              1000003,
+              1000000
+            ]
+          },
+          "stage_3": {
+            "paths": 2,
+            "path_realized_mean_powers": [
+              0.060126294901098054,
+              0.023623902467826786
+            ],
+            "elapsed_seconds": 1.3873333333333333,
+            "max_delay_samples": 2
+          },
+          "stage_4": {
+            "voltage_gain": 0.7943282347242815,
+            "gain_db": -2.0,
+            "input_power": 1.213204174667742e-12,
+            "output_power": 7.654800395054102e-13
+          },
+          "stage_5": {
+            "clip_limit": 0.97,
+            "clipped_samples": 0,
+            "clipped_fraction": 0.0
+          },
+          "stage_6": {
+            "waveform_snr_db": 8.0,
+            "realized_waveform_snr_db": 8.107127803614247,
+            "signal_power": 7.654800395054102e-13,
+            "noise_power": 1.1836439707975285e-13,
+            "reference_samples": [
+              0,
+              1889
+            ]
+          },
+          "stage_7": {
+            "input_samples": 1889,
+            "tail_samples": 1886,
+            "relative_tolerance": 1e-06,
+            "max_tail_seconds": 1.0
+          }
+        }
+      },
+      "decoder_metrics": {
+        "confidence": 0.9791905963945571,
+        "failure": "CRC mismatch",
+        "cfo_hz": 0.4133874130005082,
+        "clock_offset_ppm": 179.8746017062391,
+        "crc_ok": false,
+        "present_carriers": 36,
+        "carrier_snr_db": [
+          22.567326541579376,
+          19.291688986067776,
+          23.822604103778314,
+          25.481719285023114,
+          20.719308857347023,
+          21.64498087903498,
+          22.309636825628463,
+          19.244079768611147,
+          25.95653275775137,
+          21.542507842659518,
+          23.190375466311274,
+          21.90007541292861,
+          20.031392783929114,
+          22.253429476619484,
+          24.982025299770978,
+          24.093489055359644,
+          22.333114459033702,
+          19.90389037862372,
+          10.720210126752622,
+          20.4892392686952,
+          21.15595995681579,
+          18.787836465201934,
+          19.012223964230223,
+          20.899201371307953,
+          23.787705580681354,
+          19.475956525659416,
+          19.534738970751324,
+          19.392580509954072,
+          17.298210909172813,
+          19.054850487327492,
+          17.409818033358007,
+          17.180741361302065,
+          21.257990628892852,
+          16.188264519563475,
+          17.621225910414832,
+          22.368698626997222
+        ],
+        "decoded_length": 438,
+        "start_index": 1569,
+        "end_index": 16209,
+        "capture_rms": 0.016682255957318426,
+        "capture_peak": 0.0640861913561821
+      },
+      "capture": null,
+      "error": null,
+      "decoded": false
+    },
+    {
+      "trial": 4,
+      "direction": "benign_static, waveform SNR 8 dB",
+      "mode_id": 243,
+      "mode_name": "hf3",
+      "payload_bytes": 438,
+      "outcome": "payload_failed",
+      "tx_samples": 64704,
+      "tx_sample_rate": 48000,
+      "rx_samples": 17137,
+      "rx_sample_rate": 12000,
+      "keyed_seconds": 1.348,
+      "channel_measurements": {
+        "stage_0": {
+          "filter": "bandpass",
+          "low_hz": 250.0,
+          "high_hz": 3100.0,
+          "order": 6
+        },
+        "stage_1": {
+          "frequency_offset_start_hz": 0.4,
+          "frequency_offset_stop_hz": 0.402696,
+          "drift_hz_per_second": 0.002
+        },
+        "stage_2": {
+          "sample_clock_error_ppm": 3.0,
+          "actual_sample_clock_error_ppm": 2.9999999999752447,
+          "resample_ratio": [
+            1000003,
+            1000000
+          ]
+        },
+        "stage_3": {
+          "paths": 2,
+          "path_realized_mean_powers": [
+            0.003672421304334857,
+            0.035660844253786274
+          ],
+          "elapsed_seconds": 1.3480208333333332,
+          "max_delay_samples": 2
+        },
+        "stage_4": {
+          "voltage_gain": 0.7943282347242815,
+          "gain_db": -2.0,
+          "input_power": 0.0012158793780285844,
+          "output_power": 0.0007671679810958618
+        },
+        "stage_5": {
+          "clip_limit": 0.97,
+          "clipped_samples": 0,
+          "clipped_fraction": 0.0
+        },
+        "stage_6": {
+          "waveform_snr_db": 8.0,
+          "realized_waveform_snr_db": 8.02221712541147,
+          "signal_power": 0.0007671679810958618,
+          "noise_power": 0.00012096751414019027,
+          "reference_samples": [
+            0,
+            64707
+          ]
+        },
+        "stage_7": {
+          "filter": "bandpass",
+          "low_hz": 250.0,
+          "high_hz": 3100.0,
+          "order": 6
+        },
+        "drain": {
+          "stage_0": {
+            "input_samples": 0,
+            "tail_samples": 1886,
+            "relative_tolerance": 1e-06,
+            "max_tail_seconds": 1.0
+          },
+          "stage_1": {
+            "frequency_offset_start_hz": 0.402696,
+            "frequency_offset_stop_hz": 0.4027745833333334,
+            "drift_hz_per_second": 0.002
+          },
+          "stage_2": {
+            "sample_clock_error_ppm": 3.0,
+            "actual_sample_clock_error_ppm": 2.9999999999752447,
+            "resample_ratio": [
+              1000003,
+              1000000
+            ]
+          },
+          "stage_3": {
+            "paths": 2,
+            "path_realized_mean_powers": [
+              0.004081216989774362,
+              0.03560141478676788
+            ],
+            "elapsed_seconds": 1.3873333333333333,
+            "max_delay_samples": 2
+          },
+          "stage_4": {
+            "voltage_gain": 0.7943282347242815,
+            "gain_db": -2.0,
+            "input_power": 2.8058340055825416e-13,
+            "output_power": 1.7703614761742367e-13
+          },
+          "stage_5": {
+            "clip_limit": 0.97,
+            "clipped_samples": 0,
+            "clipped_fraction": 0.0
+          },
+          "stage_6": {
+            "waveform_snr_db": 8.0,
+            "realized_waveform_snr_db": 7.7826184183178615,
+            "signal_power": 1.7703614761742367e-13,
+            "noise_power": 2.9498511961847793e-14,
+            "reference_samples": [
+              0,
+              1889
+            ]
+          },
+          "stage_7": {
+            "input_samples": 1889,
+            "tail_samples": 1886,
+            "relative_tolerance": 1e-06,
+            "max_tail_seconds": 1.0
+          }
+        }
+      },
+      "decoder_metrics": {
+        "confidence": 0.9800305485779662,
+        "failure": "CRC mismatch",
+        "cfo_hz": -0.4865876146287399,
+        "clock_offset_ppm": -240.9034844279989,
+        "crc_ok": false,
+        "present_carriers": 36,
+        "carrier_snr_db": [
+          15.864450762772126,
+          18.19544717949547,
+          13.442745267421266,
+          12.37866233888461,
+          12.421772171755563,
+          16.660543450051392,
+          16.000471417897007,
+          14.989913765984127,
+          17.403776778636445,
+          14.810839427704977,
+          16.6390485573752,
+          17.765484734720417,
+          17.23978485511587,
+          16.00963377722035,
+          15.596103900484444,
+          13.662931716562516,
+          11.8085544801943,
+          16.51878676028857,
+          9.476687408784532,
+          19.176605220866758,
+          20.024538937127847,
+          13.680964029758481,
+          13.585510434635566,
+          11.626444258647437,
+          17.457341084853624,
+          12.549657775792761,
+          12.285822080861621,
+          11.916275073814017,
+          11.641483429674937,
+          14.312466291355314,
+          11.263371991310445,
+          13.182704616098073,
+          12.591069839393567,
+          10.469717628374557,
+          11.831558684374425,
+          11.487572266165527
+        ],
+        "decoded_length": 438,
+        "start_index": 1560,
+        "end_index": 16200,
+        "capture_rms": 0.02720841344670641,
+        "capture_peak": 0.11847002804279327
+      },
+      "capture": null,
+      "error": null,
+      "decoded": false
+    },
+    {
+      "trial": 5,
+      "direction": "benign_static, waveform SNR 8 dB",
+      "mode_id": 243,
+      "mode_name": "hf3",
+      "payload_bytes": 438,
+      "outcome": "decoded",
+      "tx_samples": 64704,
+      "tx_sample_rate": 48000,
+      "rx_samples": 17137,
+      "rx_sample_rate": 12000,
+      "keyed_seconds": 1.348,
+      "channel_measurements": {
+        "stage_0": {
+          "filter": "bandpass",
+          "low_hz": 250.0,
+          "high_hz": 3100.0,
+          "order": 6
+        },
+        "stage_1": {
+          "frequency_offset_start_hz": 0.4,
+          "frequency_offset_stop_hz": 0.402696,
+          "drift_hz_per_second": 0.002
+        },
+        "stage_2": {
+          "sample_clock_error_ppm": 3.0,
+          "actual_sample_clock_error_ppm": 2.9999999999752447,
+          "resample_ratio": [
+            1000003,
+            1000000
+          ]
+        },
+        "stage_3": {
+          "paths": 2,
+          "path_realized_mean_powers": [
+            0.09710056626940505,
+            0.0025318032161181503
+          ],
+          "elapsed_seconds": 1.3480208333333332,
+          "max_delay_samples": 2
+        },
+        "stage_4": {
+          "voltage_gain": 0.7943282347242815,
+          "gain_db": -2.0,
+          "input_power": 0.002852481018444086,
+          "output_power": 0.0017997937496516579
+        },
+        "stage_5": {
+          "clip_limit": 0.97,
+          "clipped_samples": 0,
+          "clipped_fraction": 0.0
+        },
+        "stage_6": {
+          "waveform_snr_db": 8.0,
+          "realized_waveform_snr_db": 7.994335471312313,
+          "signal_power": 0.0017997937496516579,
+          "noise_power": 0.000285620379675973,
+          "reference_samples": [
+            0,
+            64707
+          ]
+        },
+        "stage_7": {
+          "filter": "bandpass",
+          "low_hz": 250.0,
+          "high_hz": 3100.0,
+          "order": 6
+        },
+        "drain": {
+          "stage_0": {
+            "input_samples": 0,
+            "tail_samples": 1886,
+            "relative_tolerance": 1e-06,
+            "max_tail_seconds": 1.0
+          },
+          "stage_1": {
+            "frequency_offset_start_hz": 0.402696,
+            "frequency_offset_stop_hz": 0.4027745833333334,
+            "drift_hz_per_second": 0.002
+          },
+          "stage_2": {
+            "sample_clock_error_ppm": 3.0,
+            "actual_sample_clock_error_ppm": 2.9999999999752447,
+            "resample_ratio": [
+              1000003,
+              1000000
+            ]
+          },
+          "stage_3": {
+            "paths": 2,
+            "path_realized_mean_powers": [
+              0.09677804383551361,
+              0.0025481895422238723
+            ],
+            "elapsed_seconds": 1.3873333333333333,
+            "max_delay_samples": 2
+          },
+          "stage_4": {
+            "voltage_gain": 0.7943282347242815,
+            "gain_db": -2.0,
+            "input_power": 2.2756492231874315e-12,
+            "output_power": 1.4358375067315082e-12
+          },
+          "stage_5": {
+            "clip_limit": 0.97,
+            "clipped_samples": 0,
+            "clipped_fraction": 0.0
+          },
+          "stage_6": {
+            "waveform_snr_db": 8.0,
+            "realized_waveform_snr_db": 8.150462616719805,
+            "signal_power": 1.4358375067315082e-12,
+            "noise_power": 2.1981586400823947e-13,
+            "reference_samples": [
+              0,
+              1889
+            ]
+          },
+          "stage_7": {
+            "input_samples": 1889,
+            "tail_samples": 1886,
+            "relative_tolerance": 1e-06,
+            "max_tail_seconds": 1.0
+          }
+        }
+      },
+      "decoder_metrics": {
+        "confidence": 0.981229980615923,
+        "cfo_hz": 0.380351778224479,
+        "clock_offset_ppm": 231.26734505087887,
+        "crc_ok": true,
+        "present_carriers": 36,
+        "carrier_snr_db": [
+          27.841427298074915,
+          19.64678012543851,
+          20.62090619752084,
+          23.396047013691614,
+          23.00324703455274,
+          23.60504252292538,
+          22.594181840480427,
+          23.378736559216303,
+          21.92211870028447,
+          19.843957096634163,
+          20.255707748902502,
+          19.498989938917674,
+          20.145201079945426,
+          22.130998712518842,
+          18.443680839878848,
+          22.909675310863335,
+          27.607433607981456,
+          18.46305950815787,
+          14.551263621837055,
+          21.136933160150647,
+          19.635274458485366,
+          22.660939204986576,
+          23.429854010128185,
+          24.053283971431174,
+          22.89828201303674,
+          21.990670815560346,
+          21.323532360562332,
+          24.49978215800136,
+          25.740363297217396,
+          18.742776140320288,
+          20.615105467177237,
+          20.634610700658065,
+          24.01849121410875,
+          20.604576316016505,
+          23.589198900182865,
+          18.290687737048646
+        ],
+        "decoded_length": 438,
+        "start_index": 1564,
+        "end_index": 16204,
+        "capture_rms": 0.04178117423186731,
+        "capture_peak": 0.16726507246494293
+      },
+      "capture": null,
+      "error": null,
+      "decoded": true
+    },
+    {
+      "trial": 6,
+      "direction": "benign_static, waveform SNR 8 dB",
+      "mode_id": 243,
+      "mode_name": "hf3",
+      "payload_bytes": 438,
+      "outcome": "payload_failed",
+      "tx_samples": 64704,
+      "tx_sample_rate": 48000,
+      "rx_samples": 17137,
+      "rx_sample_rate": 12000,
+      "keyed_seconds": 1.348,
+      "channel_measurements": {
+        "stage_0": {
+          "filter": "bandpass",
+          "low_hz": 250.0,
+          "high_hz": 3100.0,
+          "order": 6
+        },
+        "stage_1": {
+          "frequency_offset_start_hz": 0.4,
+          "frequency_offset_stop_hz": 0.402696,
+          "drift_hz_per_second": 0.002
+        },
+        "stage_2": {
+          "sample_clock_error_ppm": 3.0,
+          "actual_sample_clock_error_ppm": 2.9999999999752447,
+          "resample_ratio": [
+            1000003,
+            1000000
+          ]
+        },
+        "stage_3": {
+          "paths": 2,
+          "path_realized_mean_powers": [
+            0.275914935979044,
+            0.0259549899111059
+          ],
+          "elapsed_seconds": 1.3480208333333332,
+          "max_delay_samples": 2
+        },
+        "stage_4": {
+          "voltage_gain": 0.7943282347242815,
+          "gain_db": -2.0,
+          "input_power": 0.010146522442071971,
+          "output_power": 0.006402022501089045
+        },
+        "stage_5": {
+          "clip_limit": 0.97,
+          "clipped_samples": 0,
+          "clipped_fraction": 0.0
+        },
+        "stage_6": {
+          "waveform_snr_db": 8.0,
+          "realized_waveform_snr_db": 7.962620474291863,
+          "signal_power": 0.006402022501089045,
+          "noise_power": 0.0010234229431680085,
+          "reference_samples": [
+            0,
+            64707
+          ]
+        },
+        "stage_7": {
+          "filter": "bandpass",
+          "low_hz": 250.0,
+          "high_hz": 3100.0,
+          "order": 6
+        },
+        "drain": {
+          "stage_0": {
+            "input_samples": 0,
+            "tail_samples": 1886,
+            "relative_tolerance": 1e-06,
+            "max_tail_seconds": 1.0
+          },
+          "stage_1": {
+            "frequency_offset_start_hz": 0.402696,
+            "frequency_offset_stop_hz": 0.4027745833333334,
+            "drift_hz_per_second": 0.002
+          },
+          "stage_2": {
+            "sample_clock_error_ppm": 3.0,
+            "actual_sample_clock_error_ppm": 2.9999999999752447,
+            "resample_ratio": [
+              1000003,
+              1000000
+            ]
+          },
+          "stage_3": {
+            "paths": 2,
+            "path_realized_mean_powers": [
+              0.27718604148866877,
+              0.02582545020963002
+            ],
+            "elapsed_seconds": 1.3873333333333333,
+            "max_delay_samples": 2
+          },
+          "stage_4": {
+            "voltage_gain": 0.7943282347242815,
+            "gain_db": -2.0,
+            "input_power": 2.2325610609841977e-11,
+            "output_power": 1.4086507245798048e-11
+          },
+          "stage_5": {
+            "clip_limit": 0.97,
+            "clipped_samples": 0,
+            "clipped_fraction": 0.0
+          },
+          "stage_6": {
+            "waveform_snr_db": 8.0,
+            "realized_waveform_snr_db": 8.121759329360689,
+            "signal_power": 1.4086507245798048e-11,
+            "noise_power": 2.170837874354298e-12,
+            "reference_samples": [
+              0,
+              1889
+            ]
+          },
+          "stage_7": {
+            "input_samples": 1889,
+            "tail_samples": 1886,
+            "relative_tolerance": 1e-06,
+            "max_tail_seconds": 1.0
+          }
+        }
+      },
+      "decoder_metrics": {
+        "confidence": 0.9816624296376265,
+        "failure": "CRC mismatch",
+        "cfo_hz": 0.4040557124883144,
+        "clock_offset_ppm": 17.264749717339868,
+        "crc_ok": false,
+        "present_carriers": 36,
+        "carrier_snr_db": [
+          23.354911996106146,
+          22.962811416029943,
+          23.216893764262107,
+          19.275424447097315,
+          19.900808446483104,
+          21.214934678761903,
+          17.47552112047614,
+          22.7469471747998,
+          24.542936452042138,
+          22.63795452785281,
+          21.28833796881974,
+          23.233353523984263,
+          20.693728480077883,
+          21.457661567898917,
+          23.202934559919388,
+          18.84837535361949,
+          20.12485850689918,
+          20.657262564545107,
+          18.498948442676046,
+          21.01848337778832,
+          19.09715091339394,
+          21.245637917117133,
+          24.43266776834301,
+          18.95188289068297,
+          25.729147027490402,
+          18.73783209413993,
+          16.16836068728893,
+          20.473154937999652,
+          22.65999475139413,
+          23.746045231250875,
+          22.865195519167727,
+          18.414086923610324,
+          25.757957968730235,
+          20.76229409262087,
+          25.7811841232721,
+          21.53010458405834
+        ],
+        "decoded_length": 438,
+        "start_index": 1560,
+        "end_index": 16200,
+        "capture_rms": 0.07846766198301075,
+        "capture_peak": 0.32085105776786804
+      },
+      "capture": null,
+      "error": null,
+      "decoded": false
+    },
+    {
+      "trial": 7,
+      "direction": "benign_static, waveform SNR 8 dB",
+      "mode_id": 243,
+      "mode_name": "hf3",
+      "payload_bytes": 438,
+      "outcome": "payload_failed",
+      "tx_samples": 64704,
+      "tx_sample_rate": 48000,
+      "rx_samples": 17137,
+      "rx_sample_rate": 12000,
+      "keyed_seconds": 1.348,
+      "channel_measurements": {
+        "stage_0": {
+          "filter": "bandpass",
+          "low_hz": 250.0,
+          "high_hz": 3100.0,
+          "order": 6
+        },
+        "stage_1": {
+          "frequency_offset_start_hz": 0.4,
+          "frequency_offset_stop_hz": 0.402696,
+          "drift_hz_per_second": 0.002
+        },
+        "stage_2": {
+          "sample_clock_error_ppm": 3.0,
+          "actual_sample_clock_error_ppm": 2.9999999999752447,
+          "resample_ratio": [
+            1000003,
+            1000000
+          ]
+        },
+        "stage_3": {
+          "paths": 2,
+          "path_realized_mean_powers": [
+            0.7256557060650408,
+            0.0018454089113703336
+          ],
+          "elapsed_seconds": 1.3480208333333332,
+          "max_delay_samples": 2
+        },
+        "stage_4": {
+          "voltage_gain": 0.7943282347242815,
+          "gain_db": -2.0,
+          "input_power": 0.01763786983586351,
+          "output_power": 0.011128742898746805
+        },
+        "stage_5": {
+          "clip_limit": 0.97,
+          "clipped_samples": 0,
+          "clipped_fraction": 0.0
+        },
+        "stage_6": {
+          "waveform_snr_db": 8.0,
+          "realized_waveform_snr_db": 7.996322040713004,
+          "signal_power": 0.011128742898746805,
+          "noise_power": 0.0017652812371145327,
+          "reference_samples": [
+            0,
+            64707
+          ]
+        },
+        "stage_7": {
+          "filter": "bandpass",
+          "low_hz": 250.0,
+          "high_hz": 3100.0,
+          "order": 6
+        },
+        "drain": {
+          "stage_0": {
+            "input_samples": 0,
+            "tail_samples": 1886,
+            "relative_tolerance": 1e-06,
+            "max_tail_seconds": 1.0
+          },
+          "stage_1": {
+            "frequency_offset_start_hz": 0.402696,
+            "frequency_offset_stop_hz": 0.4027745833333334,
+            "drift_hz_per_second": 0.002
+          },
+          "stage_2": {
+            "sample_clock_error_ppm": 3.0,
+            "actual_sample_clock_error_ppm": 2.9999999999752447,
+            "resample_ratio": [
+              1000003,
+              1000000
+            ]
+          },
+          "stage_3": {
+            "paths": 2,
+            "path_realized_mean_powers": [
+              0.7214699738242359,
+              0.0017914278632455006
+            ],
+            "elapsed_seconds": 1.3873333333333333,
+            "max_delay_samples": 2
+          },
+          "stage_4": {
+            "voltage_gain": 0.7943282347242815,
+            "gain_db": -2.0,
+            "input_power": 2.571044160024116e-13,
+            "output_power": 1.622219111232579e-13
+          },
+          "stage_5": {
+            "clip_limit": 0.97,
+            "clipped_samples": 0,
+            "clipped_fraction": 0.0
+          },
+          "stage_6": {
+            "waveform_snr_db": 8.0,
+            "realized_waveform_snr_db": 8.019718155556125,
+            "signal_power": 1.622219111232579e-13,
+            "noise_power": 2.5593972438242007e-14,
+            "reference_samples": [
+              0,
+              1889
+            ]
+          },
+          "stage_7": {
+            "input_samples": 1889,
+            "tail_samples": 1886,
+            "relative_tolerance": 1e-06,
+            "max_tail_seconds": 1.0
+          }
+        }
+      },
+      "decoder_metrics": {
+        "confidence": 0.9805054398919019,
+        "failure": "CRC mismatch",
+        "cfo_hz": 0.3645176005794566,
+        "clock_offset_ppm": 32.52197039777968,
+        "crc_ok": false,
+        "present_carriers": 36,
+        "carrier_snr_db": [
+          16.193789853690607,
+          19.811569715940113,
+          20.630381570503992,
+          24.283943660750886,
+          21.495985006750516,
+          19.882113653784682,
+          18.673244531410603,
+          18.79605760890599,
+          23.342283619565556,
+          23.60724946905038,
+          20.85316712352053,
+          23.69097796712643,
+          22.514501695519265,
+          17.68839316320577,
+          21.409696906198697,
+          20.084819483223466,
+          23.013986450912917,
+          21.14761226696727,
+          13.296933535051558,
+          17.86059063031297,
+          21.600107140477984,
+          23.1959382478542,
+          18.56956382954746,
+          21.492361062412584,
+          25.513231235019425,
+          19.762909748783294,
+          21.149994814746936,
+          21.029748033916547,
+          19.031668680367005,
+          26.379969742328587,
+          21.940100953652546,
+          22.10221161895479,
+          27.209494790754288,
+          22.809401565059314,
+          19.23195355445799,
+          19.510102258654364
+        ],
+        "decoded_length": 438,
+        "start_index": 1560,
+        "end_index": 16200,
+        "capture_rms": 0.1034865831357556,
+        "capture_peak": 0.42880013585090637
+      },
+      "capture": null,
+      "error": null,
+      "decoded": false
+    },
+    {
+      "trial": 8,
+      "direction": "benign_static, waveform SNR 8 dB",
+      "mode_id": 243,
+      "mode_name": "hf3",
+      "payload_bytes": 438,
+      "outcome": "decoded",
+      "tx_samples": 64704,
+      "tx_sample_rate": 48000,
+      "rx_samples": 17137,
+      "rx_sample_rate": 12000,
+      "keyed_seconds": 1.348,
+      "channel_measurements": {
+        "stage_0": {
+          "filter": "bandpass",
+          "low_hz": 250.0,
+          "high_hz": 3100.0,
+          "order": 6
+        },
+        "stage_1": {
+          "frequency_offset_start_hz": 0.4,
+          "frequency_offset_stop_hz": 0.402696,
+          "drift_hz_per_second": 0.002
+        },
+        "stage_2": {
+          "sample_clock_error_ppm": 3.0,
+          "actual_sample_clock_error_ppm": 2.9999999999752447,
+          "resample_ratio": [
+            1000003,
+            1000000
+          ]
+        },
+        "stage_3": {
+          "paths": 2,
+          "path_realized_mean_powers": [
+            0.9229055360449883,
+            0.0032654793386446552
+          ],
+          "elapsed_seconds": 1.3480208333333332,
+          "max_delay_samples": 2
+        },
+        "stage_4": {
+          "voltage_gain": 0.7943282347242815,
+          "gain_db": -2.0,
+          "input_power": 0.0177450718510253,
+          "output_power": 0.011196382787351659
+        },
+        "stage_5": {
+          "clip_limit": 0.97,
+          "clipped_samples": 0,
+          "clipped_fraction": 0.0
+        },
+        "stage_6": {
+          "waveform_snr_db": 8.0,
+          "realized_waveform_snr_db": 7.977994873757374,
+          "signal_power": 0.011196382787351659,
+          "noise_power": 0.0017835210954964926,
+          "reference_samples": [
+            0,
+            64707
+          ]
+        },
+        "stage_7": {
+          "filter": "bandpass",
+          "low_hz": 250.0,
+          "high_hz": 3100.0,
+          "order": 6
+        },
+        "drain": {
+          "stage_0": {
+            "input_samples": 0,
+            "tail_samples": 1886,
+            "relative_tolerance": 1e-06,
+            "max_tail_seconds": 1.0
+          },
+          "stage_1": {
+            "frequency_offset_start_hz": 0.402696,
+            "frequency_offset_stop_hz": 0.4027745833333334,
+            "drift_hz_per_second": 0.002
+          },
+          "stage_2": {
+            "sample_clock_error_ppm": 3.0,
+            "actual_sample_clock_error_ppm": 2.9999999999752447,
+            "resample_ratio": [
+              1000003,
+              1000000
+            ]
+          },
+          "stage_3": {
+            "paths": 2,
+            "path_realized_mean_powers": [
+              0.919084920668715,
+              0.0032140114872807367
+            ],
+            "elapsed_seconds": 1.3873333333333333,
+            "max_delay_samples": 2
+          },
+          "stage_4": {
+            "voltage_gain": 0.7943282347242815,
+            "gain_db": -2.0,
+            "input_power": 8.761647205442984e-12,
+            "output_power": 5.528225306265774e-12
+          },
+          "stage_5": {
+            "clip_limit": 0.97,
+            "clipped_samples": 0,
+            "clipped_fraction": 0.0
+          },
+          "stage_6": {
+            "waveform_snr_db": 8.0,
+            "realized_waveform_snr_db": 7.947690846855196,
+            "signal_power": 5.528225306265774e-12,
+            "noise_power": 8.867815524367656e-13,
+            "reference_samples": [
+              0,
+              1889
+            ]
+          },
+          "stage_7": {
+            "input_samples": 1889,
+            "tail_samples": 1886,
+            "relative_tolerance": 1e-06,
+            "max_tail_seconds": 1.0
+          }
+        }
+      },
+      "decoder_metrics": {
+        "confidence": 0.9825225732159218,
+        "cfo_hz": 0.38088041689791513,
+        "clock_offset_ppm": -69.8620104841197,
+        "crc_ok": true,
+        "present_carriers": 36,
+        "carrier_snr_db": [
+          24.95088651501884,
+          21.42937560521795,
+          23.478062234905547,
+          22.146388571267938,
+          18.070280873512374,
+          26.29571956637067,
+          19.359100840474017,
+          21.6026593459943,
+          17.269581549760254,
+          27.678556857265086,
+          22.484875039469237,
+          19.988659893116026,
+          21.367068632421486,
+          18.807997306294904,
+          20.708441726739416,
+          22.96397911983261,
+          25.670710316176436,
+          24.28893771016562,
+          12.262448533451076,
+          22.274252086856386,
+          25.154801672632367,
+          21.417587474500323,
+          21.73109163462522,
+          24.373692829408128,
+          25.01552739639212,
+          19.037051461435404,
+          20.722810490812623,
+          18.828799162671924,
+          25.956011162049357,
+          18.7971885881127,
+          23.88226098163934,
+          22.299060286163023,
+          20.47397329299331,
+          24.398769118258098,
+          28.968726425479588,
+          19.8923379060157
+        ],
+        "decoded_length": 438,
+        "start_index": 1560,
+        "end_index": 16200,
+        "capture_rms": 0.10385512086794392,
+        "capture_peak": 0.41965100169181824
+      },
+      "capture": null,
+      "error": null,
+      "decoded": true
+    },
+    {
+      "trial": 9,
+      "direction": "benign_static, waveform SNR 8 dB",
+      "mode_id": 243,
+      "mode_name": "hf3",
+      "payload_bytes": 438,
+      "outcome": "payload_failed",
+      "tx_samples": 64704,
+      "tx_sample_rate": 48000,
+      "rx_samples": 17137,
+      "rx_sample_rate": 12000,
+      "keyed_seconds": 1.348,
+      "channel_measurements": {
+        "stage_0": {
+          "filter": "bandpass",
+          "low_hz": 250.0,
+          "high_hz": 3100.0,
+          "order": 6
+        },
+        "stage_1": {
+          "frequency_offset_start_hz": 0.4,
+          "frequency_offset_stop_hz": 0.402696,
+          "drift_hz_per_second": 0.002
+        },
+        "stage_2": {
+          "sample_clock_error_ppm": 3.0,
+          "actual_sample_clock_error_ppm": 2.9999999999752447,
+          "resample_ratio": [
+            1000003,
+            1000000
+          ]
+        },
+        "stage_3": {
+          "paths": 2,
+          "path_realized_mean_powers": [
+            0.1949685511646225,
+            0.031562926650979116
+          ],
+          "elapsed_seconds": 1.3480208333333332,
+          "max_delay_samples": 2
+        },
+        "stage_4": {
+          "voltage_gain": 0.7943282347242815,
+          "gain_db": -2.0,
+          "input_power": 0.0017711005770289381,
+          "output_power": 0.0011174888548438613
+        },
+        "stage_5": {
+          "clip_limit": 0.97,
+          "clipped_samples": 0,
+          "clipped_fraction": 0.0
+        },
+        "stage_6": {
+          "waveform_snr_db": 8.0,
+          "realized_waveform_snr_db": 7.978527320694994,
+          "signal_power": 0.0011174888548438613,
+          "noise_power": 0.00017798789562553562,
+          "reference_samples": [
+            0,
+            64707
+          ]
+        },
+        "stage_7": {
+          "filter": "bandpass",
+          "low_hz": 250.0,
+          "high_hz": 3100.0,
+          "order": 6
+        },
+        "drain": {
+          "stage_0": {
+            "input_samples": 0,
+            "tail_samples": 1886,
+            "relative_tolerance": 1e-06,
+            "max_tail_seconds": 1.0
+          },
+          "stage_1": {
+            "frequency_offset_start_hz": 0.402696,
+            "frequency_offset_stop_hz": 0.4027745833333334,
+            "drift_hz_per_second": 0.002
+          },
+          "stage_2": {
+            "sample_clock_error_ppm": 3.0,
+            "actual_sample_clock_error_ppm": 2.9999999999752447,
+            "resample_ratio": [
+              1000003,
+              1000000
+            ]
+          },
+          "stage_3": {
+            "paths": 2,
+            "path_realized_mean_powers": [
+              0.19380935415202782,
+              0.03156560739614702
+            ],
+            "elapsed_seconds": 1.3873333333333333,
+            "max_delay_samples": 2
+          },
+          "stage_4": {
+            "voltage_gain": 0.7943282347242815,
+            "gain_db": -2.0,
+            "input_power": 5.622925901165181e-13,
+            "output_power": 3.5478262245541773e-13
+          },
+          "stage_5": {
+            "clip_limit": 0.97,
+            "clipped_samples": 0,
+            "clipped_fraction": 0.0
+          },
+          "stage_6": {
+            "waveform_snr_db": 8.0,
+            "realized_waveform_snr_db": 7.921050465848691,
+            "signal_power": 3.5478262245541773e-13,
+            "noise_power": 5.726078439814601e-14,
+            "reference_samples": [
+              0,
+              1889
+            ]
+          },
+          "stage_7": {
+            "input_samples": 1889,
+            "tail_samples": 1886,
+            "relative_tolerance": 1e-06,
+            "max_tail_seconds": 1.0
+          }
+        }
+      },
+      "decoder_metrics": {
+        "confidence": 0.9826145992646582,
+        "failure": "CRC mismatch",
+        "cfo_hz": 0.4147027513596227,
+        "clock_offset_ppm": -196.73784561619917,
+        "crc_ok": false,
+        "present_carriers": 36,
+        "carrier_snr_db": [
+          19.463242971041677,
+          23.452739474982515,
+          19.335974905134524,
+          22.561585938137377,
+          20.906277651632614,
+          22.224875258794235,
+          25.55735758212436,
+          21.43596374325346,
+          20.21482336762263,
+          22.60214862535266,
+          17.38566385188141,
+          18.85691262354347,
+          21.704153353877736,
+          18.97056531831376,
+          19.149045950793287,
+          27.85932751829783,
+          22.781876289657227,
+          20.590202640263776,
+          11.34616272187831,
+          16.004528701620885,
+          19.828796850772147,
+          19.694741218435762,
+          17.33095389976643,
+          17.81300037277072,
+          21.590463155547983,
+          25.84896015313963,
+          25.040897987093715,
+          19.62919768286266,
+          19.04203443527974,
+          18.010601879079136,
+          19.123710121944548,
+          21.444797086698593,
+          18.929180863894334,
+          19.65182384025535,
+          20.213461698700247,
+          21.82679014221521
+        ],
+        "decoded_length": 438,
+        "start_index": 1559,
+        "end_index": 16199,
+        "capture_rms": 0.03275712433084603,
+        "capture_peak": 0.1585713028907776
+      },
+      "capture": null,
+      "error": null,
+      "decoded": false
+    },
+    {
+      "trial": 10,
+      "direction": "benign_static, waveform SNR 8 dB",
+      "mode_id": 243,
+      "mode_name": "hf3",
+      "payload_bytes": 438,
+      "outcome": "payload_failed",
+      "tx_samples": 64704,
+      "tx_sample_rate": 48000,
+      "rx_samples": 17137,
+      "rx_sample_rate": 12000,
+      "keyed_seconds": 1.348,
+      "channel_measurements": {
+        "stage_0": {
+          "filter": "bandpass",
+          "low_hz": 250.0,
+          "high_hz": 3100.0,
+          "order": 6
+        },
+        "stage_1": {
+          "frequency_offset_start_hz": 0.4,
+          "frequency_offset_stop_hz": 0.402696,
+          "drift_hz_per_second": 0.002
+        },
+        "stage_2": {
+          "sample_clock_error_ppm": 3.0,
+          "actual_sample_clock_error_ppm": 2.9999999999752447,
+          "resample_ratio": [
+            1000003,
+            1000000
+          ]
+        },
+        "stage_3": {
+          "paths": 2,
+          "path_realized_mean_powers": [
+            0.08524505932819011,
+            0.006164207898146163
+          ],
+          "elapsed_seconds": 1.3480208333333332,
+          "max_delay_samples": 2
+        },
+        "stage_4": {
+          "voltage_gain": 0.7943282347242815,
+          "gain_db": -2.0,
+          "input_power": 0.0026403296517956043,
+          "output_power": 0.0016659352925945503
+        },
+        "stage_5": {
+          "clip_limit": 0.97,
+          "clipped_samples": 0,
+          "clipped_fraction": 0.0
+        },
+        "stage_6": {
+          "waveform_snr_db": 8.0,
+          "realized_waveform_snr_db": 8.005070152981983,
+          "signal_power": 0.0016659352925945503,
+          "noise_power": 0.0002637248861136996,
+          "reference_samples": [
+            0,
+            64707
+          ]
+        },
+        "stage_7": {
+          "filter": "bandpass",
+          "low_hz": 250.0,
+          "high_hz": 3100.0,
+          "order": 6
+        },
+        "drain": {
+          "stage_0": {
+            "input_samples": 0,
+            "tail_samples": 1886,
+            "relative_tolerance": 1e-06,
+            "max_tail_seconds": 1.0
+          },
+          "stage_1": {
+            "frequency_offset_start_hz": 0.402696,
+            "frequency_offset_stop_hz": 0.4027745833333334,
+            "drift_hz_per_second": 0.002
+          },
+          "stage_2": {
+            "sample_clock_error_ppm": 3.0,
+            "actual_sample_clock_error_ppm": 2.9999999999752447,
+            "resample_ratio": [
+              1000003,
+              1000000
+            ]
+          },
+          "stage_3": {
+            "paths": 2,
+            "path_realized_mean_powers": [
+              0.08147601364110356,
+              0.006136358222484102
+            ],
+            "elapsed_seconds": 1.3873333333333333,
+            "max_delay_samples": 2
+          },
+          "stage_4": {
+            "voltage_gain": 0.7943282347242815,
+            "gain_db": -2.0,
+            "input_power": 9.868040182140127e-12,
+            "output_power": 6.226312134918993e-12
+          },
+          "stage_5": {
+            "clip_limit": 0.97,
+            "clipped_samples": 0,
+            "clipped_fraction": 0.0
+          },
+          "stage_6": {
+            "waveform_snr_db": 8.0,
+            "realized_waveform_snr_db": 8.043822435766346,
+            "signal_power": 6.226312134918993e-12,
+            "noise_power": 9.768967059566943e-13,
+            "reference_samples": [
+              0,
+              1889
+            ]
+          },
+          "stage_7": {
+            "input_samples": 1889,
+            "tail_samples": 1886,
+            "relative_tolerance": 1e-06,
+            "max_tail_seconds": 1.0
+          }
+        }
+      },
+      "decoder_metrics": {
+        "confidence": 0.9809278146947841,
+        "failure": "CRC mismatch",
+        "cfo_hz": 0.42210805442847427,
+        "clock_offset_ppm": -11.643668414020015,
+        "crc_ok": false,
+        "present_carriers": 36,
+        "carrier_snr_db": [
+          17.659841390228625,
+          26.345369500964004,
+          20.945929269238842,
+          20.216594549568228,
+          18.92868866067323,
+          22.79700061784062,
+          21.045189180883582,
+          24.490730946281587,
+          22.406428514519263,
+          24.896282719071294,
+          22.48873970879783,
+          18.48483572013256,
+          19.531022996917148,
+          17.09650737720179,
+          23.769964881819167,
+          17.546547444040087,
+          22.897739653828037,
+          18.458968615072713,
+          13.280807312688491,
+          22.359832610718872,
+          19.47724104156682,
+          17.13200614823758,
+          18.759488652703425,
+          24.598263802279213,
+          23.73193165450185,
+          18.34761141562048,
+          24.712547738358882,
+          21.995541423685417,
+          18.842477391150343,
+          22.309675631570546,
+          19.23996694930223,
+          16.477218015500124,
+          23.40616602220685,
+          16.776399953053257,
+          17.980007683472035,
+          23.72866308465023
+        ],
+        "decoded_length": 438,
+        "start_index": 1560,
+        "end_index": 16200,
+        "capture_rms": 0.040116639235452715,
+        "capture_peak": 0.15902288258075714
+      },
+      "capture": null,
+      "error": null,
+      "decoded": false
+    },
+    {
+      "trial": 11,
+      "direction": "benign_static, waveform SNR 8 dB",
+      "mode_id": 243,
+      "mode_name": "hf3",
+      "payload_bytes": 438,
+      "outcome": "payload_failed",
+      "tx_samples": 64704,
+      "tx_sample_rate": 48000,
+      "rx_samples": 17137,
+      "rx_sample_rate": 12000,
+      "keyed_seconds": 1.348,
+      "channel_measurements": {
+        "stage_0": {
+          "filter": "bandpass",
+          "low_hz": 250.0,
+          "high_hz": 3100.0,
+          "order": 6
+        },
+        "stage_1": {
+          "frequency_offset_start_hz": 0.4,
+          "frequency_offset_stop_hz": 0.402696,
+          "drift_hz_per_second": 0.002
+        },
+        "stage_2": {
+          "sample_clock_error_ppm": 3.0,
+          "actual_sample_clock_error_ppm": 2.9999999999752447,
+          "resample_ratio": [
+            1000003,
+            1000000
+          ]
+        },
+        "stage_3": {
+          "paths": 2,
+          "path_realized_mean_powers": [
+            0.1896832990119547,
+            0.002440810975688638
+          ],
+          "elapsed_seconds": 1.3480208333333332,
+          "max_delay_samples": 2
+        },
+        "stage_4": {
+          "voltage_gain": 0.7943282347242815,
+          "gain_db": -2.0,
+          "input_power": 0.004516777988202552,
+          "output_power": 0.002849894087837607
+        },
+        "stage_5": {
+          "clip_limit": 0.97,
+          "clipped_samples": 0,
+          "clipped_fraction": 0.0
+        },
+        "stage_6": {
+          "waveform_snr_db": 8.0,
+          "realized_waveform_snr_db": 7.97552708129486,
+          "signal_power": 0.002849894087837607,
+          "noise_power": 0.00045423020717686986,
+          "reference_samples": [
+            0,
+            64707
+          ]
+        },
+        "stage_7": {
+          "filter": "bandpass",
+          "low_hz": 250.0,
+          "high_hz": 3100.0,
+          "order": 6
+        },
+        "drain": {
+          "stage_0": {
+            "input_samples": 0,
+            "tail_samples": 1886,
+            "relative_tolerance": 1e-06,
+            "max_tail_seconds": 1.0
+          },
+          "stage_1": {
+            "frequency_offset_start_hz": 0.402696,
+            "frequency_offset_stop_hz": 0.4027745833333334,
+            "drift_hz_per_second": 0.002
+          },
+          "stage_2": {
+            "sample_clock_error_ppm": 3.0,
+            "actual_sample_clock_error_ppm": 2.9999999999752447,
+            "resample_ratio": [
+              1000003,
+              1000000
+            ]
+          },
+          "stage_3": {
+            "paths": 2,
+            "path_realized_mean_powers": [
+              0.18668449574654458,
+              0.002414663297347159
+            ],
+            "elapsed_seconds": 1.3873333333333333,
+            "max_delay_samples": 2
+          },
+          "stage_4": {
+            "voltage_gain": 0.7943282347242815,
+            "gain_db": -2.0,
+            "input_power": 4.009968272088449e-12,
+            "output_power": 2.5301187955734668e-12
+          },
+          "stage_5": {
+            "clip_limit": 0.97,
+            "clipped_samples": 0,
+            "clipped_fraction": 0.0
+          },
+          "stage_6": {
+            "waveform_snr_db": 8.0,
+            "realized_waveform_snr_db": 7.897867184563094,
+            "signal_power": 2.5301187955734668e-12,
+            "noise_power": 4.10538786667298e-13,
+            "reference_samples": [
+              0,
+              1889
+            ]
+          },
+          "stage_7": {
+            "input_samples": 1889,
+            "tail_samples": 1886,
+            "relative_tolerance": 1e-06,
+            "max_tail_seconds": 1.0
+          }
+        }
+      },
+      "decoder_metrics": {
+        "confidence": 0.9807505448289736,
+        "failure": "CRC mismatch",
+        "cfo_hz": -0.39576609039810373,
+        "clock_offset_ppm": -189.10923527597927,
+        "crc_ok": false,
+        "present_carriers": 36,
+        "carrier_snr_db": [
+          19.42318459150561,
+          15.903239508772291,
+          17.39174908368801,
+          16.877650773983305,
+          16.132996943970646,
+          20.842510757480497,
+          17.436133763823754,
+          11.793329032503646,
+          15.27010757078977,
+          16.868114336263822,
+          17.33171431301358,
+          20.96538566373246,
+          18.42424642162159,
+          15.754325495075843,
+          14.842888028415263,
+          16.951863351143302,
+          13.274243619203123,
+          17.90325501752719,
+          5.918132861522683,
+          16.26143643199297,
+          15.917448486479673,
+          13.980442731999476,
+          13.335323632152337,
+          11.258124760850253,
+          17.35683166000756,
+          13.494522624291319,
+          11.555486328837354,
+          15.903303138088038,
+          12.182493973915204,
+          16.864586883643916,
+          11.02332511179849,
+          11.397843895781747,
+          10.620155291318948,
+          11.68005064996104,
+          11.397855965442638,
+          14.23892323976369
+        ],
+        "decoded_length": 438,
+        "start_index": 1560,
+        "end_index": 16200,
+        "capture_rms": 0.0523294670007487,
+        "capture_peak": 0.23262733221054077
+      },
+      "capture": null,
+      "error": null,
+      "decoded": false
+    },
+    {
+      "trial": 12,
+      "direction": "benign_static, waveform SNR 8 dB",
+      "mode_id": 243,
+      "mode_name": "hf3",
+      "payload_bytes": 438,
+      "outcome": "payload_failed",
+      "tx_samples": 64704,
+      "tx_sample_rate": 48000,
+      "rx_samples": 17137,
+      "rx_sample_rate": 12000,
+      "keyed_seconds": 1.348,
+      "channel_measurements": {
+        "stage_0": {
+          "filter": "bandpass",
+          "low_hz": 250.0,
+          "high_hz": 3100.0,
+          "order": 6
+        },
+        "stage_1": {
+          "frequency_offset_start_hz": 0.4,
+          "frequency_offset_stop_hz": 0.402696,
+          "drift_hz_per_second": 0.002
+        },
+        "stage_2": {
+          "sample_clock_error_ppm": 3.0,
+          "actual_sample_clock_error_ppm": 2.9999999999752447,
+          "resample_ratio": [
+            1000003,
+            1000000
+          ]
+        },
+        "stage_3": {
+          "paths": 2,
+          "path_realized_mean_powers": [
+            1.2311966380347241,
+            0.002815205937754814
+          ],
+          "elapsed_seconds": 1.3480208333333332,
+          "max_delay_samples": 2
+        },
+        "stage_4": {
+          "voltage_gain": 0.7943282347242815,
+          "gain_db": -2.0,
+          "input_power": 0.027115488201008783,
+          "output_power": 0.017108715485450884
+        },
+        "stage_5": {
+          "clip_limit": 0.97,
+          "clipped_samples": 0,
+          "clipped_fraction": 0.0
+        },
+        "stage_6": {
+          "waveform_snr_db": 8.0,
+          "realized_waveform_snr_db": 8.029675498802522,
+          "signal_power": 0.017108715485450884,
+          "noise_power": 0.0026930837181538708,
+          "reference_samples": [
+            0,
+            64707
+          ]
+        },
+        "stage_7": {
+          "filter": "bandpass",
+          "low_hz": 250.0,
+          "high_hz": 3100.0,
+          "order": 6
+        },
+        "drain": {
+          "stage_0": {
+            "input_samples": 0,
+            "tail_samples": 1886,
+            "relative_tolerance": 1e-06,
+            "max_tail_seconds": 1.0
+          },
+          "stage_1": {
+            "frequency_offset_start_hz": 0.402696,
+            "frequency_offset_stop_hz": 0.4027745833333334,
+            "drift_hz_per_second": 0.002
+          },
+          "stage_2": {
+            "sample_clock_error_ppm": 3.0,
+            "actual_sample_clock_error_ppm": 2.9999999999752447,
+            "resample_ratio": [
+              1000003,
+              1000000
+            ]
+          },
+          "stage_3": {
+            "paths": 2,
+            "path_realized_mean_powers": [
+              1.2362872672768581,
+              0.002824821425411479
+            ],
+            "elapsed_seconds": 1.3873333333333333,
+            "max_delay_samples": 2
+          },
+          "stage_4": {
+            "voltage_gain": 0.7943282347242815,
+            "gain_db": -2.0,
+            "input_power": 2.2395510793497396e-11,
+            "output_power": 1.4130611280976742e-11
+          },
+          "stage_5": {
+            "clip_limit": 0.97,
+            "clipped_samples": 0,
+            "clipped_fraction": 0.0
+          },
+          "stage_6": {
+            "waveform_snr_db": 8.0,
+            "realized_waveform_snr_db": 8.06685474925136,
+            "signal_power": 1.4130611280976742e-11,
+            "noise_power": 2.2053395934578707e-12,
+            "reference_samples": [
+              0,
+              1889
+            ]
+          },
+          "stage_7": {
+            "input_samples": 1889,
+            "tail_samples": 1886,
+            "relative_tolerance": 1e-06,
+            "max_tail_seconds": 1.0
+          }
+        }
+      },
+      "decoder_metrics": {
+        "confidence": 0.9772158358809315,
+        "failure": "CRC mismatch",
+        "cfo_hz": 0.3752325908404397,
+        "clock_offset_ppm": -110.81560283687962,
+        "crc_ok": false,
+        "present_carriers": 36,
+        "carrier_snr_db": [
+          19.562779091297354,
+          22.45142251084491,
+          19.632406735056065,
+          22.401168079827784,
+          18.668341881945484,
+          23.890135329832848,
+          18.85157883394831,
+          20.1395902507615,
+          22.513759467584876,
+          20.08033634455076,
+          23.75723855646015,
+          23.206033091240265,
+          22.542362768088367,
+          20.10925357045147,
+          16.409920103420788,
+          20.662012523025673,
+          19.63259580017072,
+          19.134105851343794,
+          10.252873605504991,
+          22.926180079877092,
+          23.031205854426872,
+          19.757378382252814,
+          22.330501327905992,
+          17.37957603578303,
+          18.213776931968106,
+          22.33002216568401,
+          17.370658264403378,
+          18.907283867162267,
+          20.04393344297629,
+          19.529877742637957,
+          19.803547768116587,
+          23.053292745757336,
+          22.219419288402893,
+          17.259724181861085,
+          20.346393529573366,
+          23.733290078609237
+        ],
+        "decoded_length": 438,
+        "start_index": 1560,
+        "end_index": 16200,
+        "capture_rms": 0.12864475443549536,
+        "capture_peak": 0.5306538939476013
+      },
+      "capture": null,
+      "error": null,
+      "decoded": false
+    },
+    {
+      "trial": 13,
+      "direction": "benign_static, waveform SNR 8 dB",
+      "mode_id": 243,
+      "mode_name": "hf3",
+      "payload_bytes": 438,
+      "outcome": "decoded",
+      "tx_samples": 64704,
+      "tx_sample_rate": 48000,
+      "rx_samples": 17137,
+      "rx_sample_rate": 12000,
+      "keyed_seconds": 1.348,
+      "channel_measurements": {
+        "stage_0": {
+          "filter": "bandpass",
+          "low_hz": 250.0,
+          "high_hz": 3100.0,
+          "order": 6
+        },
+        "stage_1": {
+          "frequency_offset_start_hz": 0.4,
+          "frequency_offset_stop_hz": 0.402696,
+          "drift_hz_per_second": 0.002
+        },
+        "stage_2": {
+          "sample_clock_error_ppm": 3.0,
+          "actual_sample_clock_error_ppm": 2.9999999999752447,
+          "resample_ratio": [
+            1000003,
+            1000000
+          ]
+        },
+        "stage_3": {
+          "paths": 2,
+          "path_realized_mean_powers": [
+            0.46341313952705904,
+            0.014693688768893327
+          ],
+          "elapsed_seconds": 1.3480208333333332,
+          "max_delay_samples": 2
+        },
+        "stage_4": {
+          "voltage_gain": 0.7943282347242815,
+          "gain_db": -2.0,
+          "input_power": 0.008591972389919053,
+          "output_power": 0.005421167783002699
+        },
+        "stage_5": {
+          "clip_limit": 0.97,
+          "clipped_samples": 0,
+          "clipped_fraction": 0.0
+        },
+        "stage_6": {
+          "waveform_snr_db": 8.0,
+          "realized_waveform_snr_db": 7.992587612554769,
+          "signal_power": 0.005421167783002699,
+          "noise_power": 0.0008606648915385726,
+          "reference_samples": [
+            0,
+            64707
+          ]
+        },
+        "stage_7": {
+          "filter": "bandpass",
+          "low_hz": 250.0,
+          "high_hz": 3100.0,
+          "order": 6
+        },
+        "drain": {
+          "stage_0": {
+            "input_samples": 0,
+            "tail_samples": 1886,
+            "relative_tolerance": 1e-06,
+            "max_tail_seconds": 1.0
+          },
+          "stage_1": {
+            "frequency_offset_start_hz": 0.402696,
+            "frequency_offset_stop_hz": 0.4027745833333334,
+            "drift_hz_per_second": 0.002
+          },
+          "stage_2": {
+            "sample_clock_error_ppm": 3.0,
+            "actual_sample_clock_error_ppm": 2.9999999999752447,
+            "resample_ratio": [
+              1000003,
+              1000000
+            ]
+          },
+          "stage_3": {
+            "paths": 2,
+            "path_realized_mean_powers": [
+              0.4634761473889016,
+              0.014776468764405633
+            ],
+            "elapsed_seconds": 1.3873333333333333,
+            "max_delay_samples": 2
+          },
+          "stage_4": {
+            "voltage_gain": 0.7943282347242815,
+            "gain_db": -2.0,
+            "input_power": 4.636555855843687e-12,
+            "output_power": 2.9254687880655385e-12
+          },
+          "stage_5": {
+            "clip_limit": 0.97,
+            "clipped_samples": 0,
+            "clipped_fraction": 0.0
+          },
+          "stage_6": {
+            "waveform_snr_db": 8.0,
+            "realized_waveform_snr_db": 7.870998726591382,
+            "signal_power": 2.9254687880655385e-12,
+            "noise_power": 4.776343983190138e-13,
+            "reference_samples": [
+              0,
+              1889
+            ]
+          },
+          "stage_7": {
+            "input_samples": 1889,
+            "tail_samples": 1886,
+            "relative_tolerance": 1e-06,
+            "max_tail_seconds": 1.0
+          }
+        }
+      },
+      "decoder_metrics": {
+        "confidence": 0.9809590822178086,
+        "cfo_hz": 0.3962145927100351,
+        "clock_offset_ppm": -252.1456470346388,
+        "crc_ok": true,
+        "present_carriers": 36,
+        "carrier_snr_db": [
+          21.64437650075442,
+          17.10886729540318,
+          17.126804554801268,
+          21.041575740911913,
+          20.33600720627514,
+          21.280001784281634,
+          18.826079166918795,
+          20.61367225510085,
+          21.54746994925407,
+          19.984739446637164,
+          22.677397111191443,
+          23.505083736669853,
+          24.504980856119893,
+          18.99890363668001,
+          20.775760582045848,
+          21.877244108852423,
+          18.590296285195777,
+          19.203340409849112,
+          11.832395418387271,
+          21.606930707934893,
+          20.3975948199857,
+          21.70488454816877,
+          19.840881896209666,
+          20.220570453515364,
+          20.91202832362988,
+          18.064685127328364,
+          23.16416231820589,
+          20.410216819719924,
+          21.07385814503897,
+          22.611776446431286,
+          19.35151251254031,
+          21.908114227052845,
+          21.820348263622584,
+          17.889651472446616,
+          21.76310848745822,
+          17.925444603824666
+        ],
+        "decoded_length": 438,
+        "start_index": 1560,
+        "end_index": 16200,
+        "capture_rms": 0.07211228256230968,
+        "capture_peak": 0.28602835536003113
+      },
+      "capture": null,
+      "error": null,
+      "decoded": true
+    },
+    {
+      "trial": 14,
+      "direction": "benign_static, waveform SNR 8 dB",
+      "mode_id": 243,
+      "mode_name": "hf3",
+      "payload_bytes": 438,
+      "outcome": "decoded",
+      "tx_samples": 64704,
+      "tx_sample_rate": 48000,
+      "rx_samples": 17137,
+      "rx_sample_rate": 12000,
+      "keyed_seconds": 1.348,
+      "channel_measurements": {
+        "stage_0": {
+          "filter": "bandpass",
+          "low_hz": 250.0,
+          "high_hz": 3100.0,
+          "order": 6
+        },
+        "stage_1": {
+          "frequency_offset_start_hz": 0.4,
+          "frequency_offset_stop_hz": 0.402696,
+          "drift_hz_per_second": 0.002
+        },
+        "stage_2": {
+          "sample_clock_error_ppm": 3.0,
+          "actual_sample_clock_error_ppm": 2.9999999999752447,
+          "resample_ratio": [
+            1000003,
+            1000000
+          ]
+        },
+        "stage_3": {
+          "paths": 2,
+          "path_realized_mean_powers": [
+            0.37072820866209183,
+            0.027586083583444693
+          ],
+          "elapsed_seconds": 1.3480208333333332,
+          "max_delay_samples": 2
+        },
+        "stage_4": {
+          "voltage_gain": 0.7943282347242815,
+          "gain_db": -2.0,
+          "input_power": 0.012754259910955325,
+          "output_power": 0.00804739351890081
+        },
+        "stage_5": {
+          "clip_limit": 0.97,
+          "clipped_samples": 0,
+          "clipped_fraction": 0.0
+        },
+        "stage_6": {
+          "waveform_snr_db": 8.0,
+          "realized_waveform_snr_db": 7.979901245015789,
+          "signal_power": 0.00804739351890081,
+          "noise_power": 0.0012813421554137038,
+          "reference_samples": [
+            0,
+            64707
+          ]
+        },
+        "stage_7": {
+          "filter": "bandpass",
+          "low_hz": 250.0,
+          "high_hz": 3100.0,
+          "order": 6
+        },
+        "drain": {
+          "stage_0": {
+            "input_samples": 0,
+            "tail_samples": 1886,
+            "relative_tolerance": 1e-06,
+            "max_tail_seconds": 1.0
+          },
+          "stage_1": {
+            "frequency_offset_start_hz": 0.402696,
+            "frequency_offset_stop_hz": 0.4027745833333334,
+            "drift_hz_per_second": 0.002
+          },
+          "stage_2": {
+            "sample_clock_error_ppm": 3.0,
+            "actual_sample_clock_error_ppm": 2.9999999999752447,
+            "resample_ratio": [
+              1000003,
+              1000000
+            ]
+          },
+          "stage_3": {
+            "paths": 2,
+            "path_realized_mean_powers": [
+              0.3757185275907256,
+              0.027409879039420614
+            ],
+            "elapsed_seconds": 1.3873333333333333,
+            "max_delay_samples": 2
+          },
+          "stage_4": {
+            "voltage_gain": 0.7943282347242815,
+            "gain_db": -2.0,
+            "input_power": 8.591463125520833e-12,
+            "output_power": 5.4208464626139064e-12
+          },
+          "stage_5": {
+            "clip_limit": 0.97,
+            "clipped_samples": 0,
+            "clipped_fraction": 0.0
+          },
+          "stage_6": {
+            "waveform_snr_db": 8.0,
+            "realized_waveform_snr_db": 7.939707694936141,
+            "signal_power": 5.4208464626139064e-12,
+            "noise_power": 8.71156812572872e-13,
+            "reference_samples": [
+              0,
+              1889
+            ]
+          },
+          "stage_7": {
+            "input_samples": 1889,
+            "tail_samples": 1886,
+            "relative_tolerance": 1e-06,
+            "max_tail_seconds": 1.0
+          }
+        }
+      },
+      "decoder_metrics": {
+        "confidence": 0.9816364166187465,
+        "cfo_hz": 0.3852589042253289,
+        "clock_offset_ppm": 144.5420906567993,
+        "crc_ok": true,
+        "present_carriers": 36,
+        "carrier_snr_db": [
+          15.726058391615274,
+          20.22156789102648,
+          19.539126632827898,
+          20.49560748944694,
+          22.417435639678004,
+          19.638094913387924,
+          15.599392332278367,
+          23.733178576739352,
+          27.269479765869757,
+          23.78968136998813,
+          24.49363142245948,
+          22.765121862386227,
+          21.44379577286668,
+          20.259283780553424,
+          19.80629223918489,
+          18.99616646840737,
+          22.142417389067873,
+          23.937659882464104,
+          13.581525142089237,
+          19.42046305534435,
+          23.739692182360027,
+          19.990708075007255,
+          21.336245353500484,
+          18.113086837088733,
+          26.705020676316444,
+          21.767618498290133,
+          22.870050605990862,
+          21.797950781546543,
+          22.051972460470274,
+          23.191318158306913,
+          23.598125224888804,
+          23.50982927702041,
+          21.671167014016977,
+          19.936908385298015,
+          21.67209859057918,
+          22.136371847236532
+        ],
+        "decoded_length": 438,
+        "start_index": 1563,
+        "end_index": 16203,
+        "capture_rms": 0.08807100436766006,
+        "capture_peak": 0.43409597873687744
+      },
+      "capture": null,
+      "error": null,
+      "decoded": true
+    },
+    {
+      "trial": 15,
+      "direction": "benign_static, waveform SNR 8 dB",
+      "mode_id": 243,
+      "mode_name": "hf3",
+      "payload_bytes": 438,
+      "outcome": "decoded",
+      "tx_samples": 64704,
+      "tx_sample_rate": 48000,
+      "rx_samples": 17137,
+      "rx_sample_rate": 12000,
+      "keyed_seconds": 1.348,
+      "channel_measurements": {
+        "stage_0": {
+          "filter": "bandpass",
+          "low_hz": 250.0,
+          "high_hz": 3100.0,
+          "order": 6
+        },
+        "stage_1": {
+          "frequency_offset_start_hz": 0.4,
+          "frequency_offset_stop_hz": 0.402696,
+          "drift_hz_per_second": 0.002
+        },
+        "stage_2": {
+          "sample_clock_error_ppm": 3.0,
+          "actual_sample_clock_error_ppm": 2.9999999999752447,
+          "resample_ratio": [
+            1000003,
+            1000000
+          ]
+        },
+        "stage_3": {
+          "paths": 2,
+          "path_realized_mean_powers": [
+            0.2044533536447715,
+            0.05252986645870174
+          ],
+          "elapsed_seconds": 1.3480208333333332,
+          "max_delay_samples": 2
+        },
+        "stage_4": {
+          "voltage_gain": 0.7943282347242815,
+          "gain_db": -2.0,
+          "input_power": 0.0063810146549802,
+          "output_power": 0.004026147838032751
+        },
+        "stage_5": {
+          "clip_limit": 0.97,
+          "clipped_samples": 0,
+          "clipped_fraction": 0.0
+        },
+        "stage_6": {
+          "waveform_snr_db": 8.0,
+          "realized_waveform_snr_db": 7.991604571027353,
+          "signal_power": 0.004026147838032751,
+          "noise_power": 0.0006393361490517895,
+          "reference_samples": [
+            0,
+            64707
+          ]
+        },
+        "stage_7": {
+          "filter": "bandpass",
+          "low_hz": 250.0,
+          "high_hz": 3100.0,
+          "order": 6
+        },
+        "drain": {
+          "stage_0": {
+            "input_samples": 0,
+            "tail_samples": 1886,
+            "relative_tolerance": 1e-06,
+            "max_tail_seconds": 1.0
+          },
+          "stage_1": {
+            "frequency_offset_start_hz": 0.402696,
+            "frequency_offset_stop_hz": 0.4027745833333334,
+            "drift_hz_per_second": 0.002
+          },
+          "stage_2": {
+            "sample_clock_error_ppm": 3.0,
+            "actual_sample_clock_error_ppm": 2.9999999999752447,
+            "resample_ratio": [
+              1000003,
+              1000000
+            ]
+          },
+          "stage_3": {
+            "paths": 2,
+            "path_realized_mean_powers": [
+              0.20709874202335987,
+              0.05263920466812838
+            ],
+            "elapsed_seconds": 1.3873333333333333,
+            "max_delay_samples": 2
+          },
+          "stage_4": {
+            "voltage_gain": 0.7943282347242815,
+            "gain_db": -2.0,
+            "input_power": 1.30424121433449e-11,
+            "output_power": 8.229205329617989e-12
+          },
+          "stage_5": {
+            "clip_limit": 0.97,
+            "clipped_samples": 0,
+            "clipped_fraction": 0.0
+          },
+          "stage_6": {
+            "waveform_snr_db": 8.0,
+            "realized_waveform_snr_db": 8.33358561503429,
+            "signal_power": 8.229205329617989e-12,
+            "noise_power": 1.2078119917458733e-12,
+            "reference_samples": [
+              0,
+              1889
+            ]
+          },
+          "stage_7": {
+            "input_samples": 1889,
+            "tail_samples": 1886,
+            "relative_tolerance": 1e-06,
+            "max_tail_seconds": 1.0
+          }
+        }
+      },
+      "decoder_metrics": {
+        "confidence": 0.9816314693371623,
+        "cfo_hz": 0.3903658284628161,
+        "clock_offset_ppm": -15.257220680439874,
+        "crc_ok": true,
+        "present_carriers": 36,
+        "carrier_snr_db": [
+          20.899067602603473,
+          18.13365131370593,
+          24.28646458860699,
+          20.131606644057698,
+          22.832067117399607,
+          18.177243899198775,
+          22.759271361151026,
+          20.175205062298453,
+          19.54556328867961,
+          19.63310468952207,
+          26.929984408019408,
+          18.249302296660378,
+          18.79082379033983,
+          20.5497983796132,
+          20.895191241236848,
+          20.459499531208802,
+          22.462602256409888,
+          18.038074809877415,
+          11.933245574241258,
+          20.64094584903763,
+          20.083911200016797,
+          20.43503245760388,
+          16.59138599289474,
+          20.212175156238537,
+          20.72150417612795,
+          19.443586225965078,
+          25.111889616208845,
+          23.154607659214697,
+          20.39755408906872,
+          19.4730481671504,
+          19.007248721991544,
+          19.003009984174597,
+          22.936333656955807,
+          20.024280030140584,
+          22.529512263543378,
+          20.35317290061533
+        ],
+        "decoded_length": 438,
+        "start_index": 1571,
+        "end_index": 16211,
+        "capture_rms": 0.06231261809195099,
+        "capture_peak": 0.27080297470092773
+      },
+      "capture": null,
+      "error": null,
+      "decoded": true
+    },
+    {
+      "trial": 16,
+      "direction": "benign_static, waveform SNR 8 dB",
+      "mode_id": 243,
+      "mode_name": "hf3",
+      "payload_bytes": 438,
+      "outcome": "decoded",
+      "tx_samples": 64704,
+      "tx_sample_rate": 48000,
+      "rx_samples": 17137,
+      "rx_sample_rate": 12000,
+      "keyed_seconds": 1.348,
+      "channel_measurements": {
+        "stage_0": {
+          "filter": "bandpass",
+          "low_hz": 250.0,
+          "high_hz": 3100.0,
+          "order": 6
+        },
+        "stage_1": {
+          "frequency_offset_start_hz": 0.4,
+          "frequency_offset_stop_hz": 0.402696,
+          "drift_hz_per_second": 0.002
+        },
+        "stage_2": {
+          "sample_clock_error_ppm": 3.0,
+          "actual_sample_clock_error_ppm": 2.9999999999752447,
+          "resample_ratio": [
+            1000003,
+            1000000
+          ]
+        },
+        "stage_3": {
+          "paths": 2,
+          "path_realized_mean_powers": [
+            0.5783208520132553,
+            0.004566858442811701
+          ],
+          "elapsed_seconds": 1.3480208333333332,
+          "max_delay_samples": 2
+        },
+        "stage_4": {
+          "voltage_gain": 0.7943282347242815,
+          "gain_db": -2.0,
+          "input_power": 0.010580091440322929,
+          "output_power": 0.00667558603025002
+        },
+        "stage_5": {
+          "clip_limit": 0.97,
+          "clipped_samples": 0,
+          "clipped_fraction": 0.0
+        },
+        "stage_6": {
+          "waveform_snr_db": 8.0,
+          "realized_waveform_snr_db": 7.9929240934285914,
+          "signal_power": 0.00667558603025002,
+          "noise_power": 0.0010597342917387034,
+          "reference_samples": [
+            0,
+            64707
+          ]
+        },
+        "stage_7": {
+          "filter": "bandpass",
+          "low_hz": 250.0,
+          "high_hz": 3100.0,
+          "order": 6
+        },
+        "drain": {
+          "stage_0": {
+            "input_samples": 0,
+            "tail_samples": 1886,
+            "relative_tolerance": 1e-06,
+            "max_tail_seconds": 1.0
+          },
+          "stage_1": {
+            "frequency_offset_start_hz": 0.402696,
+            "frequency_offset_stop_hz": 0.4027745833333334,
+            "drift_hz_per_second": 0.002
+          },
+          "stage_2": {
+            "sample_clock_error_ppm": 3.0,
+            "actual_sample_clock_error_ppm": 2.9999999999752447,
+            "resample_ratio": [
+              1000003,
+              1000000
+            ]
+          },
+          "stage_3": {
+            "paths": 2,
+            "path_realized_mean_powers": [
+              0.5723358943789858,
+              0.004561330270567129
+            ],
+            "elapsed_seconds": 1.3873333333333333,
+            "max_delay_samples": 2
+          },
+          "stage_4": {
+            "voltage_gain": 0.7943282347242815,
+            "gain_db": -2.0,
+            "input_power": 1.4495090234254457e-12,
+            "output_power": 9.145783172067998e-13
+          },
+          "stage_5": {
+            "clip_limit": 0.97,
+            "clipped_samples": 0,
+            "clipped_fraction": 0.0
+          },
+          "stage_6": {
+            "waveform_snr_db": 8.0,
+            "realized_waveform_snr_db": 8.021971277485294,
+            "signal_power": 9.145783172067998e-13,
+            "noise_power": 1.4421942947434695e-13,
+            "reference_samples": [
+              0,
+              1889
+            ]
+          },
+          "stage_7": {
+            "input_samples": 1889,
+            "tail_samples": 1886,
+            "relative_tolerance": 1e-06,
+            "max_tail_seconds": 1.0
+          }
+        }
+      },
+      "decoder_metrics": {
+        "confidence": 0.9822006132640431,
+        "cfo_hz": 0.39872391807584495,
+        "clock_offset_ppm": 3.2120464590399695,
+        "crc_ok": true,
+        "present_carriers": 36,
+        "carrier_snr_db": [
+          22.165827417285037,
+          21.506679819765523,
+          19.91570161969109,
+          20.457205033975537,
+          17.935421440333997,
+          18.965547162538144,
+          19.02695554642111,
+          22.31905935620314,
+          25.58394055872053,
+          22.122978258681215,
+          21.64925542153607,
+          18.82727436367587,
+          24.12936664688715,
+          22.096221200925378,
+          22.299976981941455,
+          23.432250706417364,
+          21.092895411697455,
+          19.921256915599038,
+          14.51946095569173,
+          22.93496412158199,
+          24.23449278048073,
+          23.17872707880536,
+          18.23650161482228,
+          24.163890481952546,
+          19.261812999904862,
+          22.990767500722278,
+          21.039109701978724,
+          25.79119562446754,
+          26.815410180135608,
+          21.01117646212428,
+          22.722416399465292,
+          20.410675802371273,
+          25.966588226782395,
+          21.71688278777907,
+          20.041634653112585,
+          20.72773780596097
+        ],
+        "decoded_length": 438,
+        "start_index": 1560,
+        "end_index": 16200,
+        "capture_rms": 0.0802753185460808,
+        "capture_peak": 0.3656144142150879
+      },
+      "capture": null,
+      "error": null,
+      "decoded": true
+    },
+    {
+      "trial": 17,
+      "direction": "benign_static, waveform SNR 8 dB",
+      "mode_id": 243,
+      "mode_name": "hf3",
+      "payload_bytes": 438,
+      "outcome": "decoded",
+      "tx_samples": 64704,
+      "tx_sample_rate": 48000,
+      "rx_samples": 17137,
+      "rx_sample_rate": 12000,
+      "keyed_seconds": 1.348,
+      "channel_measurements": {
+        "stage_0": {
+          "filter": "bandpass",
+          "low_hz": 250.0,
+          "high_hz": 3100.0,
+          "order": 6
+        },
+        "stage_1": {
+          "frequency_offset_start_hz": 0.4,
+          "frequency_offset_stop_hz": 0.402696,
+          "drift_hz_per_second": 0.002
+        },
+        "stage_2": {
+          "sample_clock_error_ppm": 3.0,
+          "actual_sample_clock_error_ppm": 2.9999999999752447,
+          "resample_ratio": [
+            1000003,
+            1000000
+          ]
+        },
+        "stage_3": {
+          "paths": 2,
+          "path_realized_mean_powers": [
+            0.7967590020324712,
+            0.02195361830221919
+          ],
+          "elapsed_seconds": 1.3480208333333332,
+          "max_delay_samples": 2
+        },
+        "stage_4": {
+          "voltage_gain": 0.7943282347242815,
+          "gain_db": -2.0,
+          "input_power": 0.019711647728990807,
+          "output_power": 0.01243720822288103
+        },
+        "stage_5": {
+          "clip_limit": 0.97,
+          "clipped_samples": 0,
+          "clipped_fraction": 0.0
+        },
+        "stage_6": {
+          "waveform_snr_db": 8.0,
+          "realized_waveform_snr_db": 8.020542295003475,
+          "signal_power": 0.01243720822288103,
+          "noise_power": 0.0019618629963207702,
+          "reference_samples": [
+            0,
+            64707
+          ]
+        },
+        "stage_7": {
+          "filter": "bandpass",
+          "low_hz": 250.0,
+          "high_hz": 3100.0,
+          "order": 6
+        },
+        "drain": {
+          "stage_0": {
+            "input_samples": 0,
+            "tail_samples": 1886,
+            "relative_tolerance": 1e-06,
+            "max_tail_seconds": 1.0
+          },
+          "stage_1": {
+            "frequency_offset_start_hz": 0.402696,
+            "frequency_offset_stop_hz": 0.4027745833333334,
+            "drift_hz_per_second": 0.002
+          },
+          "stage_2": {
+            "sample_clock_error_ppm": 3.0,
+            "actual_sample_clock_error_ppm": 2.9999999999752447,
+            "resample_ratio": [
+              1000003,
+              1000000
+            ]
+          },
+          "stage_3": {
+            "paths": 2,
+            "path_realized_mean_powers": [
+              0.8003771788316552,
+              0.021843105552126398
+            ],
+            "elapsed_seconds": 1.3873333333333333,
+            "max_delay_samples": 2
+          },
+          "stage_4": {
+            "voltage_gain": 0.7943282347242815,
+            "gain_db": -2.0,
+            "input_power": 4.416668341506517e-12,
+            "output_power": 2.7867291690424616e-12
+          },
+          "stage_5": {
+            "clip_limit": 0.97,
+            "clipped_samples": 0,
+            "clipped_fraction": 0.0
+          },
+          "stage_6": {
+            "waveform_snr_db": 8.0,
+            "realized_waveform_snr_db": 7.786775400112672,
+            "signal_power": 2.7867291690424616e-12,
+            "noise_power": 4.638923636214415e-13,
+            "reference_samples": [
+              0,
+              1889
+            ]
+          },
+          "stage_7": {
+            "input_samples": 1889,
+            "tail_samples": 1886,
+            "relative_tolerance": 1e-06,
+            "max_tail_seconds": 1.0
+          }
+        }
+      },
+      "decoder_metrics": {
+        "confidence": 0.9812289048057559,
+        "cfo_hz": 0.38313636656641004,
+        "clock_offset_ppm": 70.26351629149961,
+        "crc_ok": true,
+        "present_carriers": 36,
+        "carrier_snr_db": [
+          24.456824999526155,
+          20.542121986081305,
+          20.577878438894608,
+          19.985709891012466,
+          24.811477811793985,
+          23.57510646503401,
+          23.838424891206103,
+          22.847406024286485,
+          20.7969406656996,
+          24.35437986556691,
+          24.489545106218785,
+          20.278774700971667,
+          17.89785959034164,
+          22.04550314090936,
+          16.40130669756863,
+          23.973972427560923,
+          21.936294419947657,
+          23.572113700081406,
+          13.438938622402652,
+          20.580280426017467,
+          20.055699325388268,
+          18.214261542199523,
+          18.94055249729106,
+          18.441607752200156,
+          20.958935705847274,
+          21.506575225277004,
+          23.460854816151016,
+          22.45863316801725,
+          20.618655344645266,
+          21.157844373578815,
+          18.220696727856808,
+          17.721578332827356,
+          22.714606511740406,
+          22.87744109554644,
+          26.564600361917037,
+          19.932939018082255
+        ],
+        "decoded_length": 438,
+        "start_index": 1560,
+        "end_index": 16200,
+        "capture_rms": 0.10933980412819742,
+        "capture_peak": 0.42370834946632385
+      },
+      "capture": null,
+      "error": null,
+      "decoded": true
+    },
+    {
+      "trial": 18,
+      "direction": "benign_static, waveform SNR 8 dB",
+      "mode_id": 243,
+      "mode_name": "hf3",
+      "payload_bytes": 438,
+      "outcome": "payload_failed",
+      "tx_samples": 64704,
+      "tx_sample_rate": 48000,
+      "rx_samples": 17137,
+      "rx_sample_rate": 12000,
+      "keyed_seconds": 1.348,
+      "channel_measurements": {
+        "stage_0": {
+          "filter": "bandpass",
+          "low_hz": 250.0,
+          "high_hz": 3100.0,
+          "order": 6
+        },
+        "stage_1": {
+          "frequency_offset_start_hz": 0.4,
+          "frequency_offset_stop_hz": 0.402696,
+          "drift_hz_per_second": 0.002
+        },
+        "stage_2": {
+          "sample_clock_error_ppm": 3.0,
+          "actual_sample_clock_error_ppm": 2.9999999999752447,
+          "resample_ratio": [
+            1000003,
+            1000000
+          ]
+        },
+        "stage_3": {
+          "paths": 2,
+          "path_realized_mean_powers": [
+            0.030218924901142377,
+            0.005891357842502912
+          ],
+          "elapsed_seconds": 1.3480208333333332,
+          "max_delay_samples": 2
+        },
+        "stage_4": {
+          "voltage_gain": 0.7943282347242815,
+          "gain_db": -2.0,
+          "input_power": 0.0013280110031895303,
+          "output_power": 0.000837918249119547
+        },
+        "stage_5": {
+          "clip_limit": 0.97,
+          "clipped_samples": 0,
+          "clipped_fraction": 0.0
+        },
+        "stage_6": {
+          "waveform_snr_db": 8.0,
+          "realized_waveform_snr_db": 7.999239599816608,
+          "signal_power": 0.000837918249119547,
+          "noise_power": 0.00013282434688166445,
+          "reference_samples": [
+            0,
+            64707
+          ]
+        },
+        "stage_7": {
+          "filter": "bandpass",
+          "low_hz": 250.0,
+          "high_hz": 3100.0,
+          "order": 6
+        },
+        "drain": {
+          "stage_0": {
+            "input_samples": 0,
+            "tail_samples": 1886,
+            "relative_tolerance": 1e-06,
+            "max_tail_seconds": 1.0
+          },
+          "stage_1": {
+            "frequency_offset_start_hz": 0.402696,
+            "frequency_offset_stop_hz": 0.4027745833333334,
+            "drift_hz_per_second": 0.002
+          },
+          "stage_2": {
+            "sample_clock_error_ppm": 3.0,
+            "actual_sample_clock_error_ppm": 2.9999999999752447,
+            "resample_ratio": [
+              1000003,
+              1000000
+            ]
+          },
+          "stage_3": {
+            "paths": 2,
+            "path_realized_mean_powers": [
+              0.031168383960931544,
+              0.00587427054780473
+            ],
+            "elapsed_seconds": 1.3873333333333333,
+            "max_delay_samples": 2
+          },
+          "stage_4": {
+            "voltage_gain": 0.7943282347242815,
+            "gain_db": -2.0,
+            "input_power": 2.5474537399813682e-14,
+            "output_power": 1.60733456703483e-14
+          },
+          "stage_5": {
+            "clip_limit": 0.97,
+            "clipped_samples": 0,
+            "clipped_fraction": 0.0
+          },
+          "stage_6": {
+            "waveform_snr_db": 8.0,
+            "realized_waveform_snr_db": 8.21174383472999,
+            "signal_power": 1.60733456703483e-14,
+            "noise_power": 2.4262296244272665e-15,
+            "reference_samples": [
+              0,
+              1889
+            ]
+          },
+          "stage_7": {
+            "input_samples": 1889,
+            "tail_samples": 1886,
+            "relative_tolerance": 1e-06,
+            "max_tail_seconds": 1.0
+          }
+        }
+      },
+      "decoder_metrics": {
+        "confidence": 0.981833462003187,
+        "failure": "CRC mismatch",
+        "cfo_hz": 0.40801180749736576,
+        "clock_offset_ppm": -32.12046459039996,
+        "crc_ok": false,
+        "present_carriers": 36,
+        "carrier_snr_db": [
+          18.688390324984066,
+          18.586082769682875,
+          19.929859672431416,
+          21.219549914224647,
+          20.689996220020056,
+          21.286170775093108,
+          17.74876089901328,
+          22.265543857112885,
+          23.09161070095297,
+          16.78483195252497,
+          20.993503146789205,
+          21.226956241933088,
+          24.99536172319688,
+          25.024122543417434,
+          17.85074225161496,
+          20.67342683376744,
+          21.626328665645214,
+          19.336071101716136,
+          17.33400690824666,
+          20.870072285541767,
+          20.642619350385843,
+          21.180215668578274,
+          18.353366518475617,
+          21.43291392033374,
+          19.73722390546345,
+          20.633764575560527,
+          19.866151301088433,
+          21.799672719525176,
+          23.1495809111288,
+          21.593480861326412,
+          17.64489151956656,
+          17.746774631882808,
+          19.157686415877443,
+          20.50814974117774,
+          24.901130405092236,
+          17.405429385459705
+        ],
+        "decoded_length": 438,
+        "start_index": 1560,
+        "end_index": 16200,
+        "capture_rms": 0.0284199994659848,
+        "capture_peak": 0.10912977904081345
+      },
+      "capture": null,
+      "error": null,
+      "decoded": false
+    },
+    {
+      "trial": 19,
+      "direction": "benign_static, waveform SNR 8 dB",
+      "mode_id": 243,
+      "mode_name": "hf3",
+      "payload_bytes": 438,
+      "outcome": "decoded",
+      "tx_samples": 64704,
+      "tx_sample_rate": 48000,
+      "rx_samples": 17137,
+      "rx_sample_rate": 12000,
+      "keyed_seconds": 1.348,
+      "channel_measurements": {
+        "stage_0": {
+          "filter": "bandpass",
+          "low_hz": 250.0,
+          "high_hz": 3100.0,
+          "order": 6
+        },
+        "stage_1": {
+          "frequency_offset_start_hz": 0.4,
+          "frequency_offset_stop_hz": 0.402696,
+          "drift_hz_per_second": 0.002
+        },
+        "stage_2": {
+          "sample_clock_error_ppm": 3.0,
+          "actual_sample_clock_error_ppm": 2.9999999999752447,
+          "resample_ratio": [
+            1000003,
+            1000000
+          ]
+        },
+        "stage_3": {
+          "paths": 2,
+          "path_realized_mean_powers": [
+            0.4647275739876567,
+            0.0016038009545529216
+          ],
+          "elapsed_seconds": 1.3480208333333332,
+          "max_delay_samples": 2
+        },
+        "stage_4": {
+          "voltage_gain": 0.7943282347242815,
+          "gain_db": -2.0,
+          "input_power": 0.009235610544136864,
+          "output_power": 0.005827275979740235
+        },
+        "stage_5": {
+          "clip_limit": 0.97,
+          "clipped_samples": 0,
+          "clipped_fraction": 0.0
+        },
+        "stage_6": {
+          "waveform_snr_db": 8.0,
+          "realized_waveform_snr_db": 8.006444262948376,
+          "signal_power": 0.005827275979740235,
+          "noise_power": 0.0009221915966827125,
+          "reference_samples": [
+            0,
+            64707
+          ]
+        },
+        "stage_7": {
+          "filter": "bandpass",
+          "low_hz": 250.0,
+          "high_hz": 3100.0,
+          "order": 6
+        },
+        "drain": {
+          "stage_0": {
+            "input_samples": 0,
+            "tail_samples": 1886,
+            "relative_tolerance": 1e-06,
+            "max_tail_seconds": 1.0
+          },
+          "stage_1": {
+            "frequency_offset_start_hz": 0.402696,
+            "frequency_offset_stop_hz": 0.4027745833333334,
+            "drift_hz_per_second": 0.002
+          },
+          "stage_2": {
+            "sample_clock_error_ppm": 3.0,
+            "actual_sample_clock_error_ppm": 2.9999999999752447,
+            "resample_ratio": [
+              1000003,
+              1000000
+            ]
+          },
+          "stage_3": {
+            "paths": 2,
+            "path_realized_mean_powers": [
+              0.4677739501687837,
+              0.0016464167047575908
+            ],
+            "elapsed_seconds": 1.3873333333333333,
+            "max_delay_samples": 2
+          },
+          "stage_4": {
+            "voltage_gain": 0.7943282347242815,
+            "gain_db": -2.0,
+            "input_power": 1.946798932797284e-11,
+            "output_power": 1.2283470183190272e-11
+          },
+          "stage_5": {
+            "clip_limit": 0.97,
+            "clipped_samples": 0,
+            "clipped_fraction": 0.0
+          },
+          "stage_6": {
+            "waveform_snr_db": 8.0,
+            "realized_waveform_snr_db": 8.03627387026615,
+            "signal_power": 1.2283470183190272e-11,
+            "noise_power": 1.930606166123317e-12,
+            "reference_samples": [
+              0,
+              1889
+            ]
+          },
+          "stage_7": {
+            "input_samples": 1889,
+            "tail_samples": 1886,
+            "relative_tolerance": 1e-06,
+            "max_tail_seconds": 1.0
+          }
+        }
+      },
+      "decoder_metrics": {
+        "confidence": 0.9826516388955164,
+        "cfo_hz": 0.4174087344269262,
+        "clock_offset_ppm": -250.13811799773893,
+        "crc_ok": true,
+        "present_carriers": 36,
+        "carrier_snr_db": [
+          22.117213171921275,
+          22.01708411063003,
+          22.34757500657565,
+          20.747775511444413,
+          16.894103591244015,
+          22.24160009138563,
+          20.97145885648104,
+          18.729599862067232,
+          24.263203741725242,
+          20.757555509830134,
+          20.115810531769,
+          21.34550021590752,
+          22.542576586950084,
+          20.919687219954408,
+          22.277501878165644,
+          22.040303935705516,
+          18.740944725395586,
+          19.59702646284587,
+          11.329667126396314,
+          21.263989690727865,
+          16.49744597966459,
+          18.340440104110673,
+          23.053149250915496,
+          20.585365493179857,
+          19.394484553576326,
+          19.86595159975346,
+          21.499562758961357,
+          19.9006213115945,
+          23.00485198330386,
+          18.93345071743382,
+          19.90480846338441,
+          20.98843734358222,
+          19.987813235092094,
+          18.560322874416684,
+          17.388720471176892,
+          20.836765936167666
+        ],
+        "decoded_length": 438,
+        "start_index": 1560,
+        "end_index": 16200,
+        "capture_rms": 0.07490096577294574,
+        "capture_peak": 0.310563325881958
+      },
+      "capture": null,
+      "error": null,
+      "decoded": true
+    },
+    {
+      "trial": 20,
+      "direction": "benign_static, waveform SNR 8 dB",
+      "mode_id": 243,
+      "mode_name": "hf3",
+      "payload_bytes": 438,
+      "outcome": "decoded",
+      "tx_samples": 64704,
+      "tx_sample_rate": 48000,
+      "rx_samples": 17137,
+      "rx_sample_rate": 12000,
+      "keyed_seconds": 1.348,
+      "channel_measurements": {
+        "stage_0": {
+          "filter": "bandpass",
+          "low_hz": 250.0,
+          "high_hz": 3100.0,
+          "order": 6
+        },
+        "stage_1": {
+          "frequency_offset_start_hz": 0.4,
+          "frequency_offset_stop_hz": 0.402696,
+          "drift_hz_per_second": 0.002
+        },
+        "stage_2": {
+          "sample_clock_error_ppm": 3.0,
+          "actual_sample_clock_error_ppm": 2.9999999999752447,
+          "resample_ratio": [
+            1000003,
+            1000000
+          ]
+        },
+        "stage_3": {
+          "paths": 2,
+          "path_realized_mean_powers": [
+            1.3502171084316246,
+            0.0046864421702721105
+          ],
+          "elapsed_seconds": 1.3480208333333332,
+          "max_delay_samples": 2
+        },
+        "stage_4": {
+          "voltage_gain": 0.7943282347242815,
+          "gain_db": -2.0,
+          "input_power": 0.030237983737492865,
+          "output_power": 0.019078876864731562
+        },
+        "stage_5": {
+          "clip_limit": 0.97,
+          "clipped_samples": 0,
+          "clipped_fraction": 0.0
+        },
+        "stage_6": {
+          "waveform_snr_db": 8.0,
+          "realized_waveform_snr_db": 7.960317961731832,
+          "signal_power": 0.019078876864731562,
+          "noise_power": 0.0030515536438141186,
+          "reference_samples": [
+            0,
+            64707
+          ]
+        },
+        "stage_7": {
+          "filter": "bandpass",
+          "low_hz": 250.0,
+          "high_hz": 3100.0,
+          "order": 6
+        },
+        "drain": {
+          "stage_0": {
+            "input_samples": 0,
+            "tail_samples": 1886,
+            "relative_tolerance": 1e-06,
+            "max_tail_seconds": 1.0
+          },
+          "stage_1": {
+            "frequency_offset_start_hz": 0.402696,
+            "frequency_offset_stop_hz": 0.4027745833333334,
+            "drift_hz_per_second": 0.002
+          },
+          "stage_2": {
+            "sample_clock_error_ppm": 3.0,
+            "actual_sample_clock_error_ppm": 2.9999999999752447,
+            "resample_ratio": [
+              1000003,
+              1000000
+            ]
+          },
+          "stage_3": {
+            "paths": 2,
+            "path_realized_mean_powers": [
+              1.3481529191214512,
+              0.0047301510369330765
+            ],
+            "elapsed_seconds": 1.3873333333333333,
+            "max_delay_samples": 2
+          },
+          "stage_4": {
+            "voltage_gain": 0.7943282347242815,
+            "gain_db": -2.0,
+            "input_power": 2.4123448767902048e-11,
+            "output_power": 1.522086644678499e-11
+          },
+          "stage_5": {
+            "clip_limit": 0.97,
+            "clipped_samples": 0,
+            "clipped_fraction": 0.0
+          },
+          "stage_6": {
+            "waveform_snr_db": 8.0,
+            "realized_waveform_snr_db": 7.823109519833629,
+            "signal_power": 1.522086644678499e-11,
+            "noise_power": 2.5126293203904593e-12,
+            "reference_samples": [
+              0,
+              1889
+            ]
+          },
+          "stage_7": {
+            "input_samples": 1889,
+            "tail_samples": 1886,
+            "relative_tolerance": 1e-06,
+            "max_tail_seconds": 1.0
+          }
+        }
+      },
+      "decoder_metrics": {
+        "confidence": 0.9821147257274208,
+        "cfo_hz": 0.42584516210132245,
+        "clock_offset_ppm": -122.05776544351959,
+        "crc_ok": true,
+        "present_carriers": 36,
+        "carrier_snr_db": [
+          21.955868393323968,
+          18.285700080192232,
+          21.0171687447773,
+          18.35014813355429,
+          24.680587670432605,
+          24.139644335860375,
+          20.98169981801665,
+          20.803163056584864,
+          24.03149659878872,
+          21.846723208467722,
+          24.257604814362335,
+          21.533433693345035,
+          18.757928329405754,
+          22.053054091472664,
+          22.162317170050834,
+          20.11547250725421,
+          28.80843740535007,
+          17.845350072499595,
+          15.347543980561989,
+          24.831131511036304,
+          19.49911598200933,
+          19.017728347076105,
+          23.48960226027842,
+          21.85372333544423,
+          22.021140538399095,
+          19.060949510273424,
+          25.449065468477357,
+          25.413582334904984,
+          20.755001836585567,
+          21.498233917467005,
+          22.244375677916825,
+          18.912169761935743,
+          21.863427715231445,
+          23.780208886493746,
+          16.920611997123412,
+          17.894471455422575
+        ],
+        "decoded_length": 438,
+        "start_index": 1560,
+        "end_index": 16200,
+        "capture_rms": 0.13598807309760255,
+        "capture_peak": 0.5297172665596008
+      },
+      "capture": null,
+      "error": null,
+      "decoded": true
+    }
+  ]
+}

@@ -1,0 +1,112 @@
+{
+ "utc": "2026-09-03T16:04:07.043721+00:00",
+ "tx": "ic705",
+ "rx": "ic7300",
+ "seed": 20260903,
+ "trials": 3,
+ "amplitude": 0.5,
+ "label": "post-reboot path health check",
+ "configs": [
+  {
+   "label": "M64_r1_K7_f6_s1",
+   "tone_count": 64,
+   "repeat": 1,
+   "constraint": 7,
+   "spacing_hz": 37.5,
+   "symbol_seconds": 0.02666666666666667,
+   "sync_symbols": 38,
+   "payload_symbols": 181,
+   "max_payload_bytes": 61,
+   "frame_seconds": 5.996666666666667,
+   "raw_bit_rate": 225.0,
+   "net_bit_rate": 81.37854363535297,
+   "describe": "M=64 spacing=37.50Hz symbol=26.7ms K=7 repeat=1 sync=38sym payload=181sym bytes=61 frame=6.00s raw=225bps net=81.4bps"
+  }
+ ],
+ "results": [
+  {
+   "label": "M64_r1_K7_f6_s1",
+   "summary": {
+    "total": 3,
+    "decoded": 0,
+    "decode_rate": 0.0,
+    "mean_sync_score": 0.024048676164736743,
+    "mean_tone_snr_db": 6.37929740882315,
+    "mean_offset_hz": 8.7973957353322,
+    "mean_capture_rms": 0.07673746517336337,
+    "max_capture_peak": 0.3467274606227875,
+    "clipped_trials": 0
+   },
+   "trials": [
+    {
+     "trial": 1,
+     "label": "M64_r1_K7_f6_s1",
+     "outcome": "crc_fail",
+     "decoded": false,
+     "keyed_seconds": 6.152242660522461,
+     "utc": "2026-09-03T16:04:18.079733+00:00",
+     "rx_samples": 88320,
+     "sync_score": 0.02201675390720078,
+     "offset_hz": 10.9186096110721,
+     "start_index": 2576,
+     "tone_snr_db": 6.364130731992519,
+     "capture_rms": 0.07717851640243077,
+     "capture_peak": 0.33790481090545654,
+     "capture_clipped": 0,
+     "payload_bytes": 61,
+     "amplitude": 0.5,
+     "capture_file": "M64_r1_K7_f6_s1_t01.npy"
+    },
+    {
+     "trial": 2,
+     "label": "M64_r1_K7_f6_s1",
+     "outcome": "crc_fail",
+     "decoded": false,
+     "keyed_seconds": 6.148552656173706,
+     "utc": "2026-09-03T16:04:27.563745+00:00",
+     "rx_samples": 88320,
+     "sync_score": 0.027191348197053707,
+     "offset_hz": 8.413307413947432,
+     "start_index": 2564,
+     "tone_snr_db": 6.586913627301519,
+     "capture_rms": 0.0767501186382516,
+     "capture_peak": 0.3403479754924774,
+     "capture_clipped": 0,
+     "payload_bytes": 61,
+     "amplitude": 0.5,
+     "capture_file": "M64_r1_K7_f6_s1_t02.npy"
+    },
+    {
+     "trial": 3,
+     "label": "M64_r1_K7_f6_s1",
+     "outcome": "crc_fail",
+     "decoded": false,
+     "keyed_seconds": 6.150074005126953,
+     "utc": "2026-09-03T16:04:37.056540+00:00",
+     "rx_samples": 88200,
+     "sync_score": 0.02293792638995575,
+     "offset_hz": 7.060270180977072,
+     "start_index": 2402,
+     "tone_snr_db": 6.186847867175413,
+     "capture_rms": 0.07628376047940773,
+     "capture_peak": 0.3467274606227875,
+     "capture_clipped": 0,
+     "payload_bytes": 61,
+     "amplitude": 0.5,
+     "capture_file": "M64_r1_K7_f6_s1_t03.npy"
+    }
+   ]
+  }
+ ],
+ "overall": {
+  "total": 3,
+  "decoded": 0,
+  "decode_rate": 0.0,
+  "mean_sync_score": 0.024048676164736743,
+  "mean_tone_snr_db": 6.37929740882315,
+  "mean_offset_hz": 8.7973957353322,
+  "mean_capture_rms": 0.07673746517336337,
+  "max_capture_peak": 0.3467274606227875,
+  "clipped_trials": 0
+ }
+}

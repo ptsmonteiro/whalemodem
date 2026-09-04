@@ -94,7 +94,7 @@ offset-corrected differential-QPSK OFDM and works on the strong HF bench
 direction. It failed on the weak direction because its acquisition confidence
 imposes an effective SNR floor.
 
-HC0 was therefore built as the robust control rung: non-coherent orthogonal
+HC0 was therefore built as the first robust control rung: non-coherent orthogonal
 16-FSK with a known-pattern detector and FEC. At equal transmitted RMS in
 band-limited white noise, the recorded comparison was:
 
@@ -105,7 +105,10 @@ band-limited white noise, the recorded comparison was:
 
 HC0 also has a lower crest factor, allowing greater average power through a
 peak-limited transmitter. HC1 remains the fast rung when the path supports it;
-HC0 is the control mode and fallback. Detailed geometry, synchronization, and
+HR0 is now the control mode below HC0. It spends up to 7.316 seconds on a
+128-FSK, soft K=9 frame to retain at least 20 bit/s while targeting -15 dB in
+a 3 kHz passband. That boundary is not yet qualified or radio-tested. HC0 is
+the next fallback and HC1 remains the faster rung. Detailed geometry, synchronization, and
 SNR definitions are in [FRAMING.md](../FRAMING.md).
 
 A 2026-08-30 qualification campaign

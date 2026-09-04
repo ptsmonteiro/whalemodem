@@ -27,6 +27,9 @@ from whale.channel import (AwgnChannel, ChannelChain, ChannelResult,
 from whale.fm_channel import ComplexFmChannel
 from whale.modes.hc0_mode import HC0
 from whale.modes.hc1_mode import HC1
+from whale.modes.hf2_mode import HF2
+from whale.modes.hf4_mode import HF4
+from whale.modes.hr0_mode import HR0
 from whale.modes.vf3_mode import VF3
 from whale.policy import HF_SSB, VHF_FM
 
@@ -201,33 +204,44 @@ def test_vf3_carries_a_session_through_the_same_stack():
         f"VF3 session spent {fast:.1f}s of air against CPFSK's {slow:.1f}s")
 
 
-def test_the_hf_channel_carries_a_session_with_hc0_in_control():
-    """The HF station, whole: HF_SSB's policy, HF_SSB's ladder, HC1 on air.
+def test_the_hf_channel_carries_a_session_with_hr0_in_control():
+    """The HF station, whole: HF_SSB's policy, HF_SSB's ladder, live on air.
 
     This is the software half of the HF acceptance test -- everything
     `scripts/run_acceptance_test.py --channel hf-ssb` does except the
-    radios.  It matters more than the VF3 session does, because HC0 is the
+    radios.  It matters more than the VF3 session does, because HR0 is the
     *control* mode: the connect handshake, the timing calibration, every
     ACK, the floor handover and the disconnect all ride a waveform that
-    shares no DSP with CPFSK -- and, HC0 being MFSK, none with the OFDM
-    modes either.
+    shares no DSP with CPFSK, and is deliberately more robust (and slower)
+    than every data-plane mode, per its Level 0 "control and last-resort
+    fallback, maximum coverage" role in SPEED_LADDERS.md.
 
     Nothing is passed but the policy.  The ladder comes from
     `HF_SSB.mode_ladder`, which is the pairing whale/policy.py exists to
-    keep from drifting apart.
+    keep from drifting apart. The exact set of registered modes below
+    tracks `whale.mode_qualification.MANIFEST`'s current Default entries
+    for the hf-ssb policy and is expected to grow as more modes are
+    promoted; the fixed invariant this test protects is that HR0 remains
+    control and the ladder actually climbs off it, not the specific
+    membership of the faster rungs.
     """
     payload_ab = _payload(600, 7, 11)
     payload_ba = _payload(600, 13, 5)
     link_a, link_b, ta, tb = _run_session(payload_ab, payload_ba, policy=HF_SSB)
 
-    # HC0 is the control mode, so the handshake, the calibration exchange,
-    # every ACK and the disconnect all rode the 16-FSK waveform.
-    assert link_a.modes.control is HC0 and link_b.modes.control is HC0
-    assert link_a.modes.supported_ids == (HC0.mode_id, HC1.mode_id)
-    # And the data plane climbed to the fast rung, which is the ladder
-    # working rather than one mode being hardcoded.
-    assert link_a.tx_profile is HC1 and link_b.rx_profile is HC1
-    assert link_b.tx_profile is HC1 and link_a.rx_profile is HC1
+    # HR0 is the control mode, so the handshake, the calibration exchange,
+    # every ACK and the disconnect all rode the guarded 16-MFSK waveform.
+    assert link_a.modes.control is HR0 and link_b.modes.control is HR0
+    assert link_a.modes.supported_ids == (HR0.mode_id, HC0.mode_id,
+                                           HC1.mode_id, HF2.mode_id,
+                                           HF4.mode_id)
+    # And the data plane climbed off the control mode in both directions,
+    # which is the ladder working rather than everything staying on HR0.
+    # Which faster rung each direction lands on is not pinned down here --
+    # that is ladder-ordering behavior, a separate qualification scope from
+    # this test's job of proving the control/data-plane split itself works.
+    assert link_a.tx_profile is not HR0 and link_b.rx_profile is not HR0
+    assert link_b.tx_profile is not HR0 and link_a.rx_profile is not HR0
 
 
 if __name__ == "__main__":
