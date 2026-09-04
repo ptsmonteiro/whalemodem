@@ -22,6 +22,7 @@ import os
 import sys
 import threading
 import time
+from dataclasses import dataclass
 from pathlib import Path
 
 
@@ -88,25 +89,72 @@ def _host_api_index():
         f"available: {available}. Set WHALE_AUDIO_HOST_API to override the default.")
 
 
-def find_device(name_substr, kind):
-    """Finds a device index on the selected host API by partial name and
-    direction ('input'/'output'). See _host_api_index() for which host API
-    that is on this platform."""
+def find_devices(name_substr, kind):
+    """Lists device indices on the selected host API by partial name and
+    direction ('input'/'output'). Unlike find_device(), never raises: 0, 1,
+    or many matches all come back as a plain (possibly empty) list."""
     hostapi = _host_api_index()
-    api_name = sd.query_hostapis()[hostapi]["name"]
     channel_key = "max_input_channels" if kind == "input" else "max_output_channels"
-    matches = [
+    return [
         i
         for i, d in enumerate(sd.query_devices())
         if d["hostapi"] == hostapi
         and name_substr.lower() in d["name"].lower()
         and d[channel_key] >= 1
     ]
+
+
+def find_device(name_substr, kind):
+    """Finds a device index on the selected host API by partial name and
+    direction ('input'/'output'). See _host_api_index() for which host API
+    that is on this platform."""
+    matches = find_devices(name_substr, kind)
+    api_name = sd.query_hostapis()[_host_api_index()]["name"]
     if not matches:
         raise LookupError(f"no {api_name} {kind} device matching {name_substr!r}")
     if len(matches) > 1:
         raise LookupError(f"ambiguous {api_name} {kind} device matches for {name_substr!r}: {matches}")
     return matches[0]
+
+
+@dataclass(frozen=True)
+class AudioDevice:
+    """One PortAudio device on the selected host API, for a wizard picker."""
+
+    index: int
+    name: str
+    host_api: str
+    max_input_channels: int
+    max_output_channels: int
+    default_samplerate: float
+
+
+def list_devices(kind=None):
+    """Lists every device on the selected host API, sorted by index.
+
+    kind="input"/"output" filters to devices with at least one channel in
+    that direction; kind=None (the default) returns every device on the host
+    API regardless of channel counts, for a wizard's unified picker table.
+    """
+    hostapi = _host_api_index()
+    api_name = sd.query_hostapis()[hostapi]["name"]
+    devices = []
+    for i, d in enumerate(sd.query_devices()):
+        if d["hostapi"] != hostapi:
+            continue
+        if kind == "input" and d["max_input_channels"] < 1:
+            continue
+        if kind == "output" and d["max_output_channels"] < 1:
+            continue
+        devices.append(AudioDevice(
+            index=i,
+            name=d["name"],
+            host_api=api_name,
+            max_input_channels=d["max_input_channels"],
+            max_output_channels=d["max_output_channels"],
+            default_samplerate=d["default_samplerate"],
+        ))
+    return sorted(devices, key=lambda dev: dev.index)
 
 
 def transmit(tx_signal, tx_device, ptt, samplerate=SAMPLE_RATE, ptt_lead=0.3, ptt_tail=0.2):
