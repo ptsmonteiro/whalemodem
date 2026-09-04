@@ -29,6 +29,26 @@ An optional top-level `default_radio = "station-a"` key, placed before any
 file with only one `[radios.*]` table defaults to it implicitly even
 without `default_radio`.
 
+### `whalemodem-configure`
+
+```console
+whalemodem-configure --radio-config radios.toml
+```
+
+A curses terminal UI for the inventory file, currently limited to viewing,
+setting the default, and deleting entries -- it does not yet add or edit
+radios (that needs a real audio-device/serial-port/hamlib-model editor,
+which is follow-up work once the wizard grows a detail view). Point it at
+`--radio-config PATH` or set `WHALE_RADIO_CONFIG`; with neither, it defaults
+to `radios.toml` in the current directory. Pointing it at a path that
+doesn't exist yet starts from an empty inventory (nothing is written until
+you save); pointing it at an existing-but-malformed file exits with an
+error rather than overwriting it.
+
+Keys: `↑`/`↓` or `j`/`k` to move, `d` to set the selected radio as default,
+`x` (or Delete) to remove it (with a `y`/`n` confirmation), `s` to save, `q`
+to quit (prompting to save first if there are unsaved changes).
+
 ## Audio backend
 
 Radios' USB sound cards are opened through whichever PortAudio host API sits

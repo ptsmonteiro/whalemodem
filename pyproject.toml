@@ -12,6 +12,7 @@ dependencies = [
     "scipy",
     "sounddevice",
     "pyserial",
+    "windows-curses; sys_platform == 'win32'",
 ]
 
 [project.optional-dependencies]
@@ -19,6 +20,7 @@ test = ["pytest"]
 
 [project.scripts]
 whalemodem-server = "whale.vara_server:main"
+whalemodem-configure = "whale.radio_config_tui:main"
 
 [tool.setuptools]
 packages = ["whale", "whale.hw", "whale.modes"]
