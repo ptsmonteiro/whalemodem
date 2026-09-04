@@ -32,11 +32,24 @@ GOLDEN = ROOT / "tests" / "data" / "vf3_capture_golden.json"
 # The DQPSK-era capture sets; see the module docstring.
 CAPTURE_SETS = ("final_dqpsk_both_3", "probe_dqpsk")
 
-# Result keys pinned as exact array digests.  Between them these cover every
-# stage the extraction touches: acquisition, timing regression, the header
-# channel fit, the soft-bit mapper and the Viterbi input.
-ARRAY_KEYS = ("carrier_snr_db", "symbol_evm_db", "raw_payload_bits",
-              "soft_payload_bits", "channel", "interference")
+# Result keys pinned as exact array digests, and those pinned as actual
+# values compared with a tolerance.  Between them these cover every stage the
+# extraction touches: acquisition, timing regression, the header channel fit,
+# the soft-bit mapper and the Viterbi input.
+#
+# Only `raw_payload_bits` -- the hard-decision Viterbi input -- is pinned
+# bit-exact: it is thresholded, so it is stable across LAPACK backends. The
+# rest (carrier_snr_db, symbol_evm_db, soft_payload_bits, channel,
+# interference) all derive from `whale.dsp.equalize.fit_header`'s per-carrier
+# `np.linalg.lstsq`, whose last few bits differ between LAPACK
+# implementations (e.g. Apple's Accelerate vs. OpenBLAS) even for identical
+# input -- confirmed directly by running the same fit under both. Pinning
+# those bit-exact made the suite fail on a different machine rather than on
+# a real regression, so they are pinned as values and compared with
+# `FLOAT_TOLERANCE` instead, the same way the SCALAR_KEYS below already are.
+EXACT_ARRAY_KEYS = ("raw_payload_bits",)
+TOLERANCE_ARRAY_KEYS = ("carrier_snr_db", "symbol_evm_db", "soft_payload_bits",
+                        "channel", "interference")
 
 # ...and the scalars, which are cheap to read in a diff when a digest moves.
 SCALAR_KEYS = ("confidence", "start_index", "sync_end_index", "end_index",
@@ -52,6 +65,21 @@ def digest(array: np.ndarray) -> str:
     return hashlib.sha256(
         f"{array.dtype.str}{array.shape}".encode() + array.tobytes()
     ).hexdigest()
+
+
+def serialize(array: np.ndarray) -> dict:
+    """JSON-round-trippable snapshot of a float or complex array's values."""
+    array = np.asarray(array)
+    if np.iscomplexobj(array):
+        return {"real": array.real.tolist(), "imag": array.imag.tolist()}
+    return {"real": array.tolist(), "imag": None}
+
+
+def deserialize(entry: dict) -> np.ndarray:
+    real = np.asarray(entry["real"], dtype=np.float64)
+    if entry["imag"] is None:
+        return real
+    return real + 1j * np.asarray(entry["imag"], dtype=np.float64)
 
 
 def capture_paths() -> list[pathlib.Path]:
@@ -70,7 +98,10 @@ def summarise(path: pathlib.Path) -> dict:
     entry: dict = {
         "payload_sha256": hashlib.sha256(expected).hexdigest(),
         "payload_bytes": len(expected),
-        "arrays": {key: digest(np.asarray(result[key])) for key in ARRAY_KEYS},
+        "arrays": {
+            **{key: digest(np.asarray(result[key])) for key in EXACT_ARRAY_KEYS},
+            **{key: serialize(result[key]) for key in TOLERANCE_ARRAY_KEYS},
+        },
     }
     for key in SCALAR_KEYS:
         value = result[key]
