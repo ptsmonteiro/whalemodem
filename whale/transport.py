@@ -17,6 +17,7 @@ whatever it captured immediately before/during/after our own TX instead.
 import collections
 import ctypes
 import logging
+import sys
 import threading
 import time
 
@@ -49,8 +50,12 @@ def _ensure_com_initialized():
     a WASAPI OutputStream from one reliably fails with PaErrorCode -9999
     (WdmSyncIoctl) on this machine -- 100% reproducible, regardless of which
     radio/device, order, or timing. One CoInitializeEx call per thread
-    before its first stream fixes it."""
-    if getattr(_com_ready, "done", False):
+    before its first stream fixes it.
+
+    WASAPI, and therefore COM, is Windows-only (see audio_io._DEFAULT_HOST_API);
+    on macOS/Linux this is a no-op rather than an AttributeError, since
+    ctypes.windll does not exist off Windows."""
+    if sys.platform != "win32" or getattr(_com_ready, "done", False):
         return
     ctypes.windll.ole32.CoInitializeEx(None, _COINIT_APARTMENTTHREADED)
     _com_ready.done = True

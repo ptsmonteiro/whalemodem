@@ -1,8 +1,12 @@
 """Audio device lookup and a TX-play/RX-record harness for over-the-air tests.
 
-The radios' USB sound cards are used via WASAPI (lower latency / more
-predictable buffering than MME or DirectSound on Windows). Which card belongs
-to which radio lives in radios.py, not here.
+The radios' USB sound cards are used through whichever PortAudio host API
+sits closest to the hardware on the running OS -- WASAPI on Windows, Core
+Audio on macOS, ALSA on Linux -- rather than a higher-level shared-mixer API
+(MME/DirectSound on Windows; a PulseAudio/JACK server sitting in front of
+ALSA on Linux) for lower and more predictable buffering. See _host_api_index()
+for the per-platform default and how to override it. Which card belongs to
+which radio lives in radios.py, not here.
 
 Copied from radiomodem's shark/hw/audio_io.py, since diverged: both keyed
 paths below now key *inside* their try block and un-key through ptt.unkey(),
@@ -12,6 +16,8 @@ forced it.
 """
 
 import logging
+import os
+import sys
 import threading
 import time
 
@@ -24,17 +30,32 @@ SAMPLE_RATE = 48000
 
 _log = logging.getLogger(__name__)
 
+# Per-platform default host API, matched by substring against
+# sd.query_hostapis()'s "name" field. Overridable with WHALE_AUDIO_HOST_API
+# for setups that need something other than the default -- a Linux station
+# deliberately routed through PulseAudio or JACK instead of raw ALSA, or a
+# Windows fallback to MME/DirectSound on a card that WASAPI won't open.
+_DEFAULT_HOST_API = {"win32": "wasapi", "darwin": "core audio"}.get(sys.platform, "alsa")
 
-def _wasapi_index():
-    for i, api in enumerate(sd.query_hostapis()):
-        if "wasapi" in api["name"].lower():
+
+def _host_api_index():
+    wanted = os.environ.get("WHALE_AUDIO_HOST_API", _DEFAULT_HOST_API).lower()
+    hostapis = sd.query_hostapis()
+    for i, api in enumerate(hostapis):
+        if wanted in api["name"].lower():
             return i
-    raise LookupError("no WASAPI host API found")
+    available = ", ".join(api["name"] for api in hostapis)
+    raise LookupError(
+        f"no host API matching {wanted!r} found (platform {sys.platform!r}); "
+        f"available: {available}. Set WHALE_AUDIO_HOST_API to override the default.")
 
 
 def find_device(name_substr, kind):
-    """Finds a WASAPI device index by partial name and direction ('input'/'output')."""
-    hostapi = _wasapi_index()
+    """Finds a device index on the selected host API by partial name and
+    direction ('input'/'output'). See _host_api_index() for which host API
+    that is on this platform."""
+    hostapi = _host_api_index()
+    api_name = sd.query_hostapis()[hostapi]["name"]
     channel_key = "max_input_channels" if kind == "input" else "max_output_channels"
     matches = [
         i
@@ -44,9 +65,9 @@ def find_device(name_substr, kind):
         and d[channel_key] >= 1
     ]
     if not matches:
-        raise LookupError(f"no WASAPI {kind} device matching {name_substr!r}")
+        raise LookupError(f"no {api_name} {kind} device matching {name_substr!r}")
     if len(matches) > 1:
-        raise LookupError(f"ambiguous WASAPI {kind} device matches for {name_substr!r}: {matches}")
+        raise LookupError(f"ambiguous {api_name} {kind} device matches for {name_substr!r}: {matches}")
     return matches[0]
 
 
