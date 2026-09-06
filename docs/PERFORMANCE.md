@@ -105,9 +105,17 @@ band-limited white noise, the recorded comparison was:
 
 HC0 also has a lower crest factor, allowing greater average power through a
 peak-limited transmitter. HC1 remains the fast rung when the path supports it;
-HR0 is now the control mode below HC0. It spends up to 7.316 seconds on a
-128-FSK, soft K=9 frame to retain at least 20 bit/s while targeting -15 dB in
-a 3 kHz passband. That boundary is not yet qualified or radio-tested. HC0 is
+HR0 is now the control mode below HC0. Its 128-FSK, soft K=9 waveform uses a
+3.508-second short frame for up to 12 waveform bytes (including DATA_ACK),
+and a 7.316-second full frame for up to 42 bytes. Short ACKs save 52% against
+the former always-full frame; full DATA retains 35.0 bit/s. These durations
+include the minimum common lead and tail. Both endpoints need the short-frame
+update. Neither size is yet qualified against the Level-0 channel envelope
+or radio-tested; short-frame fading robustness needs separate measurement.
+Focused short-frame regressions exercise two fixed seeds each on quiet,
+moderate, and disturbed mid-latitude Watterson channels at +4 dB SNR/3 kHz,
+plus noise with ±46 Hz offsets and a complete paired-audio HF session.
+These are bounded software checks, not statistical qualification. HC0 is
 the next fallback and HC1 remains the faster rung. Detailed geometry, synchronization, and
 SNR definitions are in [FRAMING.md](../FRAMING.md).
 

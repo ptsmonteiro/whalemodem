@@ -304,15 +304,38 @@ optional registry and carries no hardware, session, or ARQ evidence yet.
 HR0 is constant-envelope non-coherent 128-FSK at 17.857 baud. Its 128
 orthogonal tones occupy 2,285.7 Hz, each symbol is 2,688 samples at 48 kHz,
 and each carries seven Gray-mapped coded bits. Sixteen known sync symbols
-precede 112 payload symbols. A soft-decision rate-1/2 K=9 convolutional code,
-bit interleaver, whitened length field, and CRC32 protect up to 42 waveform
-bytes, or a 32-byte DATA chunk after the link air header. The fixed frame is
-7.316 seconds including the minimum common lead and tail, yielding 35.0
-bit/s at the DATA-chunk boundary before ARQ overhead. This exceeds the HF
-Level-0 20 bit/s floor while targeting decode at -15 dB waveform SNR.
+precede either 44 short-body or 112 full-body symbols. A soft-decision
+rate-1/2 K=9 convolutional code, bit interleaver, whitened length field, and
+CRC32 protect both sizes:
 
-The -15 dB boundary is a design target pending the required retained-channel
-qualification campaign and radio tests; it is not yet a measured claim.
+| Waveform payload | Body symbols | Airtime with minimum lead and tail |
+| --- | ---: | ---: |
+| 0–12 bytes (including DATA_ACK and empty controls) | 44 | 3.508 s |
+| 13–42 bytes | 112 | 7.316 s |
+
+The 12-byte DATA_ACK comprises the ten-byte air header and two-byte remainder.
+Its short frame saves 3.808 seconds (52%) per ACK. The full frame still carries
+a 32-byte DATA chunk, yielding 35.0 bit/s before ARQ overhead. Adaptive lead
+padding and radio turnaround add to these minimum durations.
+
+The short codec has 308 coded bits, multiplicative interleaver stride 131,
+and whitener seed `0x17A6E`; the existing full codec keeps 784 coded bits,
+stride 313, and seed `0x17A6D`. Both use the same sixteen-symbol sync. The
+receiver tries the short body first and accepts only a checked length and
+CRC32, then tries the full body if needed. An unsuccessful short hypothesis
+with an incomplete full body remains pending, so streaming RX cannot consume
+a full frame prematurely. There are at most two body-decoder attempts per
+acquisition. Airtime estimates select the same size as encoding.
+
+Updated receivers still accept the previous full frames, including padded
+short payloads. Older receivers cannot decode the new short frames; both
+endpoints must be updated for short-control operation. This extension retains
+mode ID 10 and does not negotiate a legacy-transmit option.
+
+Neither frame size has completed retained-channel qualification or radio
+acceptance. Keeping symbol energy, acquisition, and the K=9 code does not
+prove equal fading performance: the shorter interleaver must be qualified
+separately against the HF Level-0 envelope in `SPEED_LADDERS.md`.
 
 ### Common HF lead and frame signature
 

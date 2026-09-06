@@ -1,4 +1,4 @@
-"""HR0 fixed-length, non-coherent 128-FSK robust HF frame.
+"""HR0 short/full-length, non-coherent 128-FSK robust HF frame.
 
 The deliberately long orthogonal symbols buy processing gain while 128 tones
 recover seven coded bits per symbol.  The result stays inside the 2.3 kHz HF
@@ -45,9 +45,32 @@ CODEC = dsp.PacketCodec(
 )
 MAX_PAYLOAD_BYTES = CODEC.max_payload_bytes
 
+# A checked air header plus the two-byte DATA_ACK remainder fits in 12
+# bytes. Keep the symbol energy and code unchanged, but stop padding these
+# controls to the full DATA capacity. Both lengths share acquisition; CRC32
+# selects between at most two bounded body decodes (short first).
+SHORT_PAYLOAD_SYMBOLS = 44
+SHORT_CODEC = dsp.PacketCodec(
+    payload_bits=SHORT_PAYLOAD_SYMBOLS * BITS_PER_SYMBOL,
+    interleaver=dsp.interleave.multiplicative(
+        SHORT_PAYLOAD_SYMBOLS * BITS_PER_SYMBOL, 131),
+    whitener_seed=0x17A6E,
+    code=dsp.K9,
+)
+SHORT_MAX_PAYLOAD_BYTES = SHORT_CODEC.max_payload_bytes
+
+
+def payload_symbols(payload_len: int) -> int:
+    if not 0 <= payload_len <= MAX_PAYLOAD_BYTES:
+        raise ValueError(f"payload length must be between 0 and {MAX_PAYLOAD_BYTES}")
+    return (SHORT_PAYLOAD_SYMBOLS if payload_len <= SHORT_MAX_PAYLOAD_BYTES
+            else PAYLOAD_SYMBOLS)
+
 
 def modulate(payload: bytes) -> np.ndarray:
-    tones = np.concatenate((SYNC_PATTERN, BANK.symbols_from_bits(CODEC.encode(payload))))
+    symbols = payload_symbols(len(payload))
+    codec = SHORT_CODEC if symbols == SHORT_PAYLOAD_SYMBOLS else CODEC
+    tones = np.concatenate((SYNC_PATTERN, BANK.symbols_from_bits(codec.encode(payload))))
     body = mfsk.modulate(BANK, tones, TX_AMPLITUDE)
     return np.concatenate((body, np.zeros(TAIL_SAMPLES))).astype(np.float32)
 
@@ -102,25 +125,34 @@ def demodulate(audio: np.ndarray) -> dict:
     result["sync_end_index"] = start + SYNC_SYMBOLS * RX_SYMBOL_SAMPLES
     residual = mfsk.offset_hz(RX_BANK, working, start, SYNC_PATTERN)
     result["cfo_hz"] = coarse_hz + residual
-    values = mfsk.analyze(RX_BANK, working, result["sync_end_index"],
-                          PAYLOAD_SYMBOLS, residual)
-    if values is None:
-        result["failure"] = "frame truncated"
+    for symbols, codec in ((SHORT_PAYLOAD_SYMBOLS, SHORT_CODEC),
+                           (PAYLOAD_SYMBOLS, CODEC)):
+        values = mfsk.analyze(RX_BANK, working, result["sync_end_index"],
+                              symbols, residual)
+        if values is None:
+            # A failed short hypothesis may be the prefix of a full frame.
+            # Do not publish an end_index that would make streaming RX
+            # consume it before the full body has arrived.
+            result["failure"] = "frame truncated"
+            return result
+        magnitudes = np.abs(values)
+        payload, meta = codec.decode_soft(mfsk.soft_bits(RX_BANK, magnitudes))
+        if payload is None and symbols == SHORT_PAYLOAD_SYMBOLS:
+            continue
+        result["end_index"] = min(len(samples), start + (SYNC_SYMBOLS + symbols) *
+                                  RX_SYMBOL_SAMPLES + RX_TAIL_SAMPLES)
+        hard = RX_BANK.bits_from_symbols(np.argmax(magnitudes, axis=1))
+        result.update(meta)
+        result.update(payload=payload, synced=True, raw_payload_bits=hard,
+                      tone_magnitudes=magnitudes, payload_symbols=symbols)
         return result
-    result["end_index"] = min(len(samples), start + TOTAL_SYMBOLS *
-                              RX_SYMBOL_SAMPLES + RX_TAIL_SAMPLES)
-    magnitudes = np.abs(values)
-    hard = RX_BANK.bits_from_symbols(np.argmax(magnitudes, axis=1))
-    payload, meta = CODEC.decode_soft(mfsk.soft_bits(RX_BANK, magnitudes))
-    result.update(meta)
-    result.update(payload=payload, synced=True, raw_payload_bits=hard,
-                  tone_magnitudes=magnitudes)
-    return result
 
 
-def frame_seconds(lead_samples: int) -> float:
-    return (lead_samples + TOTAL_SYMBOLS * SYMBOL_SAMPLES + TAIL_SAMPLES) / SAMPLE_RATE
+def frame_seconds(lead_samples: int, payload_len: int = MAX_PAYLOAD_BYTES) -> float:
+    symbols = SYNC_SYMBOLS + payload_symbols(payload_len)
+    return (lead_samples + symbols * SYMBOL_SAMPLES + TAIL_SAMPLES) / SAMPLE_RATE
 
 
 assert BANK.bandwidth_hz <= 2_300.0
 assert MAX_PAYLOAD_BYTES == 42
+assert SHORT_MAX_PAYLOAD_BYTES == 12

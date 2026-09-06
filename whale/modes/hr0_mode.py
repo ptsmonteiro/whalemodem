@@ -35,8 +35,8 @@ class Hr0Codec:
         return result
 
     def airtime(self, payload_len: int, mode: "Hr0Mode") -> float:
-        del payload_len, mode
-        return hr0.frame_seconds(hf_lead.MIN_SAMPLES)
+        del mode
+        return hr0.frame_seconds(hf_lead.MIN_SAMPLES, payload_len)
 
 
 HR0_CODEC = Hr0Codec()

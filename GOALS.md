@@ -25,7 +25,9 @@ should be designed and judged against the objective for its own rung:
   maximum robustness.** These rungs must keep a link alive in the worst
   conditions the policy claims to serve, including disturbed HF paths and
   low signal-to-noise ratios. Speed is secondary; paying throughput for
-  margin is the correct trade here.
+  margin is the correct trade here. Short control packets must nevertheless
+  have short airtime: avoid full DATA-frame padding for ACKs, and measure
+  their latency and robustness separately from full-capacity throughput.
 - **Top rungs are optimized for maximum speed.** They are *expected* to
   require good channel conditions and to stop working outside them. A fast
   mode that fails on a poor channel is behaving as designed, provided a

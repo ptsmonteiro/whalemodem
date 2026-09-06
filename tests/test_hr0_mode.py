@@ -20,7 +20,7 @@ def test_hr0_geometry_meets_hf_level_zero_speed_contract():
     assert hr0.SYMBOL_SAMPLES == 2_688
     assert hr0.CODEC.code is hr0.dsp.K9
     assert HR0.chunk_size == hr0.MAX_PAYLOAD_BYTES - framing.AIR_HEADER_BYTES == 32
-    assert HR0.airtime(HR0.chunk_size) == pytest.approx(7.316)
+    assert HR0.airtime(framing.AIR_HEADER_BYTES + HR0.chunk_size) == pytest.approx(7.316)
     assert HR0.chunk_size * 8 / HR0.airtime(HR0.chunk_size) >= 20
 
 
@@ -64,3 +64,108 @@ def test_hr0_rejects_invalid_or_signal_free_input(bad):
 def test_hr0_payload_limit_is_enforced():
     with pytest.raises(ValueError, match="carries at most"):
         HR0.encode(bytes(hr0.MAX_PAYLOAD_BYTES + 1))
+
+
+@pytest.mark.parametrize("length", [0, 10, 12, 13, 42])
+def test_hr0_airtime_tracks_encoded_length_and_round_trips(length):
+    payload = bytes(range(length))
+    audio = HR0.encode(payload)
+    expected = 3.508 if length <= 12 else 7.316
+    assert HR0.airtime(length) == pytest.approx(expected)
+    assert len(audio) / HR0.tx_sample_rate == pytest.approx(expected)
+    assert HR0.decode(_capture(audio))["payload"] == payload
+
+
+def test_real_data_ack_uses_short_frame():
+    from whale import link
+
+    header, remainder = link._encode_air_header(
+        link.PT_DATA_ACK, HR0.mode_id, bytes([0, 1, HR0.mode_id, 0]))
+    payload = header + remainder
+    assert len(payload) == hr0.SHORT_MAX_PAYLOAD_BYTES == 12
+    assert HR0.airtime(len(payload)) < 0.5 * 7.316
+    assert HR0.decode(_capture(HR0.encode(payload)))["payload"] == payload
+
+
+def test_short_frame_ends_before_following_full_frame():
+    short = bytes(range(12))
+    full = bytes(range(42))
+    first = HR0.encode(short)
+    capture = _capture(np.concatenate((first, HR0.encode(full))))
+    # Streaming RX sees the short body before the next preamble is complete.
+    # Whole-buffer acquisition otherwise deliberately picks the strongest sync.
+    available = (len(first) + hf_lead.MIN_SAMPLES) // rx_audio.DECIMATION
+    result = HR0.decode(capture[:available])
+    assert result["payload"] == short
+    assert result["end_index"] == pytest.approx(
+        len(first) // rx_audio.DECIMATION + rx_audio.FILTER_DELAY_DECODE_SAMPLES,
+        abs=8)
+    assert HR0.decode(capture[result["end_index"]:])["payload"] == full
+
+
+def test_full_frame_prefix_is_pending_until_full_body_arrives():
+    payload = bytes(range(42))
+    capture = _capture(HR0.encode(payload))
+    prefix = capture[:round(HR0.airtime(12) * HR0.rx_sample_rate)]
+    result = HR0.decode(prefix)
+    assert result["payload"] is None
+    assert "end_index" not in result
+    assert HR0.decode(capture)["payload"] == payload
+
+
+def test_legacy_full_frame_with_short_payload_still_decodes():
+    from whale.dsp import mfsk
+
+    payload = bytes(range(12))
+    tones = np.concatenate((hr0.SYNC_PATTERN,
+                            hr0.BANK.symbols_from_bits(hr0.CODEC.encode(payload))))
+    audio = np.concatenate((hf_lead.modulate(hf_lead.HR0_LABEL),
+                            mfsk.modulate(hr0.BANK, tones, hr0.TX_AMPLITUDE),
+                            np.zeros(hr0.TAIL_SAMPLES)))
+    result = HR0.decode(_capture(audio))
+    assert result["payload"] == payload
+    assert result["payload_symbols"] == hr0.PAYLOAD_SYMBOLS
+
+
+@pytest.mark.parametrize("offset_hz", [-46, 0, 46])
+def test_short_ack_with_noise_and_frequency_offset(offset_hz):
+    from scipy.signal import hilbert
+
+    payload = bytes(range(12))
+    audio = HR0.encode(payload).astype(np.float64)
+    phase = 2j * np.pi * offset_hz * np.arange(len(audio)) / HR0.tx_sample_rate
+    shifted = np.real(hilbert(audio) * np.exp(phase))
+    # Same full-Nyquist noise convention as the existing full-frame smoke;
+    # -15 dB here is about -6 dB SNR/3 kHz, not a qualification claim.
+    noise_rms = np.sqrt(np.mean(audio ** 2)) / 10 ** (-15 / 20)
+    noisy = shifted + np.random.default_rng(20260906).normal(
+        0, noise_rms, len(audio))
+    result = HR0.decode(_capture(np.concatenate((np.zeros(4000), noisy))))
+    assert result["payload"] == payload
+
+
+def test_truncated_and_corrupt_short_bodies_do_not_deliver_payloads():
+    audio = HR0.encode(bytes(range(12)))
+    start = hf_lead.MIN_SAMPLES + hr0.SYNC_SYMBOLS * hr0.SYMBOL_SAMPLES
+    assert HR0.decode(_capture(audio[:start + hr0.SYMBOL_SAMPLES]))["payload"] is None
+    audio[start:] = 0
+    assert HR0.decode(_capture(audio))["payload"] is None
+
+
+@pytest.mark.channel_regression
+@pytest.mark.parametrize("preset", ["mid_latitude_quiet", "mid_latitude_moderate",
+                                    "mid_latitude_disturbed"])
+def test_short_ack_at_hf_level_zero_channel_smoke_points(preset):
+    from whale.channel import AwgnChannel, ChannelChain, SnrSpec, WattersonChannel
+    from whale.qualification import run_frame_trials
+
+    def channel(seed):
+        return ChannelChain((
+            WattersonChannel.from_preset(HR0.tx_sample_rate, preset, seed),
+            AwgnChannel(HR0.tx_sample_rate, SnrSpec(4.0), seed ^ 0x5A5A),
+        ))
+
+    records = run_frame_trials(
+        HR0, channel, 2, 20260906, point_index=0,
+        direction=f"{preset}, SNR/3 kHz 4 dB", payload_bytes=12)
+    assert all(record.decoded for record in records)
