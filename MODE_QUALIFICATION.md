@@ -975,3 +975,26 @@ The reported SNR values above are legacy estimator outputs: fitting each
 pilot to itself biases the residual-power estimate and they must not be
 treated as calibrated RF SNR. Low receive amplitude alone does not establish
 insufficient RF power or exclude analog compression.
+
+The retained HF17 diagnostic campaign saved nine 7300 -> 705 captures at
+verified digital TX peak 1.0. Three-carrier training-only gain smoothing
+reduced uncoded 64-QAM mean BER from 7.85% to 6.46%; phase-only oracle
+correction gave little improvement. The 7,114 bit/s application-rate coded
+candidate (972-byte packet, LDPC-3/4, pilots every eight symbols) still
+delivered 0/3, including replay with smoothing and repeated-preamble noise
+estimation. See [HF17 diagnostic results](experiments/hf17_diagnostics/README.md).
+
+HF17 distributed-pilot follow-up: five pilots and 44 data carriers with
+64-QAM/LDPC-3/4 offer 7,258 bit/s application capacity arithmetically. Correct
+comb references and per-symbol common amplitude/phase tracking plus narrow
+channel smoothing reduced mean BER from 8.15% (tracking off) to 4.67% on
+identical captures. Fresh-seed confirmation measured 4.70%, still 0/3 CRC
+delivery; matched smoothing-only replay achieved a better 4.14%. The tracking
+benefit is therefore mixed across batches and remains experimental.
+
+Confidence-weighted tracking subsequently shrank corrections toward unity
+when pilot disagreement made the fitted correction uncertain. It improved
+over tracking disabled with smoothing on both development batches. Fresh-seed
+7300 -> 705 confirmation measured 4.03% mean raw BER, versus 4.39% disabled
+and 4.71% full-strength tracking on identical captures. Delivery remains 0/3;
+this is a modest receiver improvement, not a qualified 7 kbit/s mode.

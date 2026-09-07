@@ -1,0 +1,78 @@
+{
+  "source": "logs\\mode_qualification\\hf-ssb\\hf17_ofdm64\\distributed-confidence\\result.json",
+  "application_bps": 7258.35294117647,
+  "rows": [
+    {
+      "trial": 1,
+      "tracking": "off",
+      "smoothing": 3,
+      "ber": 0.041087962962962965,
+      "decoded": false,
+      "codewords_converged": 21
+    },
+    {
+      "trial": 1,
+      "tracking": "common",
+      "smoothing": 3,
+      "ber": 0.042727623456790126,
+      "decoded": false,
+      "codewords_converged": 15
+    },
+    {
+      "trial": 1,
+      "tracking": "confidence",
+      "smoothing": 3,
+      "ber": 0.034191743827160496,
+      "decoded": false,
+      "codewords_converged": 22
+    },
+    {
+      "trial": 2,
+      "tracking": "off",
+      "smoothing": 3,
+      "ber": 0.05299961419753087,
+      "decoded": false,
+      "codewords_converged": 13
+    },
+    {
+      "trial": 2,
+      "tracking": "common",
+      "smoothing": 3,
+      "ber": 0.05888310185185185,
+      "decoded": false,
+      "codewords_converged": 7
+    },
+    {
+      "trial": 2,
+      "tracking": "confidence",
+      "smoothing": 3,
+      "ber": 0.05246913580246913,
+      "decoded": false,
+      "codewords_converged": 14
+    },
+    {
+      "trial": 3,
+      "tracking": "off",
+      "smoothing": 3,
+      "ber": 0.037760416666666664,
+      "decoded": false,
+      "codewords_converged": 20
+    },
+    {
+      "trial": 3,
+      "tracking": "common",
+      "smoothing": 3,
+      "ber": 0.03973765432098766,
+      "decoded": false,
+      "codewords_converged": 17
+    },
+    {
+      "trial": 3,
+      "tracking": "confidence",
+      "smoothing": 3,
+      "ber": 0.034095293209876545,
+      "decoded": false,
+      "codewords_converged": 22
+    }
+  ]
+}

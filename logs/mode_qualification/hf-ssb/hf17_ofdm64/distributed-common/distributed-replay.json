@@ -1,0 +1,198 @@
+{
+  "source": "logs\\mode_qualification\\hf-ssb\\hf17_ofdm64\\distributed-common\\result.json",
+  "application_bps": 7258.35294117647,
+  "rows": [
+    {
+      "trial": 1,
+      "tracking": "off",
+      "smoothing": 1,
+      "ber": 0.07730516975308642,
+      "decoded": false,
+      "codewords_converged": 3
+    },
+    {
+      "trial": 1,
+      "tracking": "off",
+      "smoothing": 3,
+      "ber": 0.06042631172839506,
+      "decoded": false,
+      "codewords_converged": 8
+    },
+    {
+      "trial": 1,
+      "tracking": "legacy",
+      "smoothing": 1,
+      "ber": 0.3361304012345679,
+      "decoded": false,
+      "codewords_converged": 0
+    },
+    {
+      "trial": 1,
+      "tracking": "legacy",
+      "smoothing": 3,
+      "ber": 0.33579282407407407,
+      "decoded": false,
+      "codewords_converged": 0
+    },
+    {
+      "trial": 1,
+      "tracking": "common",
+      "smoothing": 1,
+      "ber": 0.07542438271604938,
+      "decoded": false,
+      "codewords_converged": 1
+    },
+    {
+      "trial": 1,
+      "tracking": "common",
+      "smoothing": 3,
+      "ber": 0.05960648148148148,
+      "decoded": false,
+      "codewords_converged": 5
+    },
+    {
+      "trial": 1,
+      "tracking": "residual",
+      "smoothing": 1,
+      "ber": 0.08921682098765432,
+      "decoded": false,
+      "codewords_converged": 0
+    },
+    {
+      "trial": 1,
+      "tracking": "residual",
+      "smoothing": 3,
+      "ber": 0.09895833333333333,
+      "decoded": false,
+      "codewords_converged": 0
+    },
+    {
+      "trial": 2,
+      "tracking": "off",
+      "smoothing": 1,
+      "ber": 0.1275077160493827,
+      "decoded": false,
+      "codewords_converged": 0
+    },
+    {
+      "trial": 2,
+      "tracking": "off",
+      "smoothing": 3,
+      "ber": 0.12331211419753087,
+      "decoded": false,
+      "codewords_converged": 0
+    },
+    {
+      "trial": 2,
+      "tracking": "legacy",
+      "smoothing": 1,
+      "ber": 0.3809799382716049,
+      "decoded": false,
+      "codewords_converged": 0
+    },
+    {
+      "trial": 2,
+      "tracking": "legacy",
+      "smoothing": 3,
+      "ber": 0.3872492283950617,
+      "decoded": false,
+      "codewords_converged": 0
+    },
+    {
+      "trial": 2,
+      "tracking": "common",
+      "smoothing": 1,
+      "ber": 0.07798032407407407,
+      "decoded": false,
+      "codewords_converged": 1
+    },
+    {
+      "trial": 2,
+      "tracking": "common",
+      "smoothing": 3,
+      "ber": 0.056712962962962965,
+      "decoded": false,
+      "codewords_converged": 5
+    },
+    {
+      "trial": 2,
+      "tracking": "residual",
+      "smoothing": 1,
+      "ber": 0.09596836419753087,
+      "decoded": false,
+      "codewords_converged": 0
+    },
+    {
+      "trial": 2,
+      "tracking": "residual",
+      "smoothing": 3,
+      "ber": 0.09167631172839506,
+      "decoded": false,
+      "codewords_converged": 0
+    },
+    {
+      "trial": 3,
+      "tracking": "off",
+      "smoothing": 1,
+      "ber": 0.03983410493827161,
+      "decoded": false,
+      "codewords_converged": 22
+    },
+    {
+      "trial": 3,
+      "tracking": "off",
+      "smoothing": 3,
+      "ber": 0.02671682098765432,
+      "decoded": false,
+      "codewords_converged": 24
+    },
+    {
+      "trial": 3,
+      "tracking": "legacy",
+      "smoothing": 1,
+      "ber": 0.3346354166666667,
+      "decoded": false,
+      "codewords_converged": 0
+    },
+    {
+      "trial": 3,
+      "tracking": "legacy",
+      "smoothing": 3,
+      "ber": 0.33989197530864196,
+      "decoded": false,
+      "codewords_converged": 0
+    },
+    {
+      "trial": 3,
+      "tracking": "common",
+      "smoothing": 1,
+      "ber": 0.034722222222222224,
+      "decoded": false,
+      "codewords_converged": 24
+    },
+    {
+      "trial": 3,
+      "tracking": "common",
+      "smoothing": 3,
+      "ber": 0.023726851851851853,
+      "decoded": false,
+      "codewords_converged": 21
+    },
+    {
+      "trial": 3,
+      "tracking": "residual",
+      "smoothing": 1,
+      "ber": 0.04846643518518518,
+      "decoded": false,
+      "codewords_converged": 14
+    },
+    {
+      "trial": 3,
+      "tracking": "residual",
+      "smoothing": 3,
+      "ber": 0.06370563271604938,
+      "decoded": false,
+      "codewords_converged": 0
+    }
+  ]
+}
