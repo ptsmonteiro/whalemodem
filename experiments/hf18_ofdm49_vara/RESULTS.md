@@ -88,13 +88,19 @@ statistically tied. This is a preference, not a decisive margin, and the
 ~1.5 dB unexplained per-bin SNR deficit below is still the thing that
 would make it decisive if closed.
 
-## Bandwidth compliance and the shipped configuration (HF7)
+## Bandwidth and the shipped configuration (HF7)
 
-The 49-carrier arrangement measured above **fails the 2,300 Hz
-occupied-bandwidth ceiling** `SPEED_LADDERS.md` places on every HF rung:
-its 99%-power occupied bandwidth measures **2,444 Hz**. That is the same
-gate that made HF2 non-compliant and got it replaced by HF3, so the
-winning configuration above could not be shipped as-is.
+**Updated 2026-09-07:** the owner retired the 2,300 Hz occupied-bandwidth
+ceiling and redefined the HF channel as 300-2,700 Hz inclusive, gated on a
+2,500 Hz 99%-power width (`SPEED_LADDERS.md`). **The 49-carrier
+arrangement measured above is therefore what ships**: it fills the channel
+edge to edge and measures 2,444 Hz, inside the new gate. The section below
+records the 45-carrier trim that was built while the old ceiling stood; it
+is retained because it is the more reliable configuration and is the
+fallback if the FER gate has to be recovered.
+
+Under the retired ceiling the 49-carrier arrangement failed at 2,444 Hz
+against 2,300 Hz -- the same gate that made HF2 non-compliant.
 
 The fix was free, and then some. The 100-trial run's per-bin SNR census
 identified the **four weakest carriers of the 49 as the four lowest** --
@@ -123,18 +129,34 @@ rate-3/4 LDPC, interleaved, 4,368 B payload = 72 whole codewords):
 | net on air | 7,586 bps | 6,969 bps |
 
 **Dropping the four weakest carriers cost 8% of rate and halved the raw
-BER**, taking frame delivery to 50/50 with zero residual bit errors. The
-compliant configuration is both legal and more reliable than the one that
-won the comparison, which is the outcome the per-bin SNR census predicted
-and the reason the trim came off the low end rather than being split
-across both.
+BER**, taking frame delivery to 50/50 with zero residual bit errors --
+which is the outcome the per-bin SNR census predicted, and the reason the
+trim came off the low end rather than being split across both.
 
-At 7,187 bps net per DATA frame this clears the Level-4 target of
-4,000 bit/s by 80%.
+That difference matters beyond bandwidth, because the two configurations
+land on opposite sides of the 10% FER ceiling:
 
-**This configuration ships as HF7** (`whale/modes/hf7_mode.py`, mode_id
-14), the maximum-speed rung of the default HF ladder. What that does and
-does not claim is recorded in `MODE_QUALIFICATION.md`.
+| | 49-carrier (**ships as HF7**) | 45-carrier (retained fallback) |
+|---|---|---|
+| band | 300-2700 Hz, channel-filling | 500-2700 Hz |
+| occupied (99%-power) | 2,444 Hz | 2,253 Hz |
+| delivered | 94/100 | 50/50 |
+| FER 95% Wilson UB | **12.5% -- fails the 10% gate** | **7.1% -- passes** |
+| mean raw BER | 0.0130 | 0.0072 |
+| net per DATA frame | **7,805 bps** | 7,170.7 bps |
+
+Both clear the Level-4 target of 4,000 bit/s -- by 95% and 79%
+respectively. The shipped configuration is the faster one and the one that
+uses the whole channel; it is not the one that passes the frame-error
+gate. Every failure in both arms was a single non-converged LDPC codeword
+out of 78 (post-FEC BER 3e-5 to 1.6e-3), so the lever for recovering the
+gate at 49 carriers is FEC structure -- a stronger rate on one codeword,
+or per-codeword retransmission -- rather than link margin.
+
+**The 49-carrier configuration ships as HF7**
+(`whale/modes/hf7_mode.py`, mode_id 14), the maximum-speed rung of the
+default HF ladder. What that does and does not claim is recorded in
+`MODE_QUALIFICATION.md`.
 
 ---
 

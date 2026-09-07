@@ -168,9 +168,12 @@ for the bounded CI regression anchor at both required points.
 A 300-trial-per-payload statistical campaign measured 99%-power occupied
 bandwidth over representative and maximum payloads. Its distribution-free
 95.1% upper confidence bound on the population 99th percentile is
-**4,212.11-4,218.98 Hz, nearly double the 2,300 Hz ceiling; this gate
+**4,212.11-4,218.98 Hz, far past the 2,500 Hz ceiling; this gate
 fails**, and by a wide, non-marginal margin -- even the sample minimum
 across 300 trials (2,866-3,044 Hz) already exceeds the ceiling. The
+2026-09-07 revision that widened the HF channel to 300-2,700 Hz does not
+rescue this result: the occupied interval below runs roughly 480-4,100 Hz,
+outside the channel at both ends. The
 occupied interval runs roughly 480-4,100 Hz, far wider than HF2's nominal
 656.25-2,343.75 Hz carrier plan would predict, and much wider than HF3's
 comparable measurement (~1,775 Hz) despite both modes sharing the same
@@ -212,7 +215,7 @@ gates passed. HF2 was negotiated and transmitted automatically by default
 stations until the HF3 replacement. This decision
 overrides, and does not resolve, the occupied-bandwidth gate failure above:
 the 99%-power occupied bandwidth still measures ~4,212-4,219 Hz against the
-2,300 Hz ceiling, nearly double the limit, driven by both an over-ceiling top
+2,500 Hz ceiling, driven by both an over-channel top
 carrier (2,343.75 Hz) and unwindowed OFDM sidelobe leakage. This is not just
 an internal test threshold -- it is a real-world SSB channel-plan compliance
 concern: a station running HF2 at Default will routinely occupy spectrum
@@ -271,7 +274,7 @@ throughput criterion. See
 commands. A 300-trial-per-payload statistical campaign measured 99%-power
 occupied bandwidth over representative and maximum payloads. Its
 distribution-free 95.1% upper confidence bound on the population 99th
-percentile is 1,774.59 Hz, 525.41 Hz below the 2,300 Hz ceiling; this gate
+percentile is 1,774.59 Hz, well below the 2,500 Hz ceiling; this gate
 passes. See
 `logs/mode_qualification/hf-ssb/hf3/2026-09-01-bandwidth/INDEX.md`.
 Resource evidence remains unmeasured. A 2026-09-02 retained-direction
@@ -304,28 +307,42 @@ retained evidence does and does not establish.
 The waveform is `experiments/hf10_ofdm49_v6/ofdm49_v6.py` unmodified --
 the PHY HF6 already wraps -- at 50 Hz subcarrier spacing (`fft_size=240`),
 a 2 ms guard (`cp_len=24`), 32-QAM, rate-3/4 LDPC over an interleaved
-frame, 45 carriers spanning 500-2700 Hz, 4,368 B payload. Full derivation
+frame, 49 carriers spanning 300-2700 Hz, 4,732 B payload. Full derivation
 and every negative result behind those choices are in
 `experiments/hf18_ofdm49_vara/RESULTS.md`.
 
 What the retained evidence establishes:
 
-- **Occupied bandwidth passes.** 99%-power occupied bandwidth measures
-  2,253.1 Hz, 46.9 Hz inside the 2,300 Hz ceiling. This is a single
-  computed measurement over a maximum payload, **not** the 300-trial
-  statistical campaign with a distribution-free upper confidence bound
-  that HF3's passing bandwidth gate used; it is `provisional` by this
-  document's own vocabulary until that campaign is run.
-  `tests/test_hf7_mode.py` asserts the ceiling on every run.
-- **Per-frame net throughput: 7,187.2 bit/s** per full-capacity DATA
-  frame, by `SPEED_LADDERS.md`'s denominator (frame airtime, excluding the
-  air header from the numerator). The Level-4 target is 4,000 bit/s.
-- **Retained-direction hardware frames: 50/50 decoded**, zero residual bit
-  errors, mean raw BER 0.0072, IC-7300 to IC-705, 2026-09-07. 50 frames
-  meets the 40-frame minimum and the 95% Wilson upper bound on FER is
-  7.1%, inside the 10% ceiling, so **this gate passes for this direction**.
-  One direction, one session, one path. See
-  `logs/mode_qualification/hf-ssb/hf18/20260907T174338Z/result.json`.
+- **Occupied bandwidth passes, with no headroom left.** 99%-power occupied
+  bandwidth measures 2,444 Hz against the 2,500 Hz gate SPEED_LADDERS.md
+  sets for the 300-2,700 Hz HF channel, and the carriers sit exactly on
+  both channel edges. This is a single computed measurement over a maximum
+  payload, **not** the 300-trial statistical campaign with a
+  distribution-free upper confidence bound that HF3's bandwidth gate used;
+  it is `provisional` by this document's own vocabulary until that
+  campaign is run. `tests/test_hf7_mode.py` asserts both the width gate and
+  the carrier placement on every run.
+- **Per-frame net throughput: 7,805.0 bit/s** per full-capacity DATA
+  frame, by `SPEED_LADDERS.md`'s denominator (frame airtime, with the
+  10-byte air header excluded from the numerator). The Level-4 target is
+  4,000 bit/s.
+- **Retained-direction hardware frames: 94/100 decoded**, mean raw BER
+  0.0130, IC-7300 to IC-705, 2026-09-07. 100 frames clears the 40-frame
+  minimum, but the 95% Wilson upper bound on FER is **12.5%, above the 10%
+  ceiling, so this gate fails**. See
+  `logs/mode_qualification/hf-ssb/hf18/20260907T164157Z-ab100/`.
+
+  This is a deliberate trade, and it should not be quietly forgotten. A
+  45-carrier variant trimmed to 500-2700 Hz -- dropping the four carriers
+  the per-bin SNR census measured as the weakest of the 49 -- delivered
+  **50/50 with zero residual bit errors and a 7.1% FER upper bound, which
+  passes this gate**, at 7,170.7 bit/s. The owner chose the wider,
+  faster, less reliable configuration on 2026-09-07 when the 2,300 Hz
+  ceiling was retired. Recovering the passing FER gate at 49 carriers is
+  open work: the failures are single non-converged LDPC codewords out of
+  78, so the lever is FEC structure, not link margin. See
+  `logs/mode_qualification/hf-ssb/hf18/20260907T174338Z/result.json` for
+  the 45-carrier evidence.
 - **A 100-trial-per-arm interleaved comparison** against the 97-carrier
   geometry HF6 wraps found their frame delivery statistically
   indistinguishable (96/100 vs 94/100, Fisher p = 0.75) at matched air
@@ -509,7 +526,10 @@ evidence. Channel failures also do not prorate this number: FER, acquisition,
 and exact delivery are independent gates under sections 3 and 5.
 
 For HF, also measure 99%-power occupied bandwidth over representative and
-maximum payloads and retain an upper confidence bound below 2,300 Hz.
+maximum payloads and retain an upper confidence bound below 2,500 Hz, the
+gate SPEED_LADDERS.md sets for the 300-2,700 Hz HF channel. Also retain the
+occupied interval itself, not only its width: a mode may satisfy the width
+gate while sitting off-channel.
 
 **Gate:** the reproducible per-frame net throughput meets the declared floor,
 the frame passes the reliability gates throughout its required envelope, and

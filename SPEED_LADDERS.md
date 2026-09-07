@@ -35,7 +35,14 @@ defined in [MODE_QUALIFICATION.md](MODE_QUALIFICATION.md).
 
 ## HF SSB ladder
 
-All HF targets use no more than 2,300 Hz occupied bandwidth. SNR uses the
+All HF targets occupy the 300-2,700 Hz audio channel, inclusive: no active
+carrier or intentional signal energy is placed outside it. The measurable
+gate is a 99%-power occupied bandwidth of no more than 2,500 Hz. That
+allowance is deliberate and is not slack for a wider carrier plan: a
+waveform that fills the band edge to edge measures about 2,445 Hz, because
+the 99%-power interval of a 2,400 Hz-wide signal includes its transform
+skirts. A mode whose carriers sit inside 300-2,700 Hz but which measures
+past 2,500 Hz is radiating splatter and fails the gate. SNR uses the
 standard 3 kHz passband convention in [CHANNELS.md](CHANNELS.md): mean signal
 power over an explicitly recorded half-open reference interval divided by
 white-noise power in 3,000 Hz. Target
@@ -73,7 +80,9 @@ packet-delivery reliability at 3 dB less SNR than Level 1 data, approximately
 half the received signal power at fixed noise. This is not half the packet
 loss rate and does not imply half the airtime. The resulting target-rung
 boundaries are +6 dB for quiet/moderate and +11 dB for disturbed. The 20 bit/s
-full-DATA floor and 2,300 Hz bandwidth ceiling remain in force. FM is unchanged.
+full-DATA floor remains in force, now against the 300-2,700 Hz channel
+definition above rather than the retired 2,300 Hz width ceiling. FM is
+unchanged.
 
 Optimize actual short-control airtime subject to this requirement. A
 1–1.5-second complete ACK is the initial experimental design budget, not a
@@ -143,3 +152,14 @@ The measured presets are qualification fixtures, not generic claims about a
 radio model. Their source measurements, direction, equipment, settings, and
 derived channel parameters must be retained so another run can reproduce the
 claimed envelope.
+
+**2026-09-07 HF channel revision:** the owner replaced the former 2,300 Hz
+occupied-bandwidth ceiling with the 300-2,700 Hz channel definition above.
+The retired ceiling was narrower than the SSB passband the project's own
+radios actually pass, and it was costing measured throughput on the
+maximum-speed rung for no operational benefit on this channel plan. Every
+rung's throughput floor and operating envelope are unchanged; only the
+bandwidth constraint moved. Modes previously recorded as failing the
+bandwidth gate are not thereby re-qualified -- HF2, whose 99%-power occupied
+interval runs roughly 480-4,100 Hz, remains far outside the 300-2,700 Hz
+channel and still fails.

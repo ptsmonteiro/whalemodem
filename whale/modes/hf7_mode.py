@@ -1,4 +1,4 @@
-"""HF7: 45-carrier OFDM maximum-speed HF data mode.
+"""HF7: 49-carrier OFDM maximum-speed HF data mode.
 
 HF7 wires the configuration measured in `experiments/hf18_ofdm49_vara/`
 into the link's `WaveformMode` contract, mirroring `whale/modes/hf6_mode.py`'s
@@ -16,15 +16,14 @@ more bits per second of air time.
 Two numbers from that experiment shape this module and are worth stating
 where they will be read:
 
-  * **Occupied bandwidth is the binding constraint, not throughput.** The
-    49-carrier version that experiment measured spans 300-2700 Hz and has a
-    99%-power occupied bandwidth of 2,444 Hz, over the 2,300 Hz ceiling
-    `SPEED_LADDERS.md` places on every HF rung.  HF7 therefore drops the four
-    lowest subcarriers (300-450 Hz), which the same experiment's per-bin SNR
-    census identified as the four *weakest* of the 49 (13.7-18.1 dB against a
-    ~19.5 dB median), landing at 45 carriers over 500-2700 Hz and a measured
-    2,253 Hz occupied bandwidth.  The trim costs ~8% of rate and buys
-    compliance plus a slightly cleaner carrier set.
+  * **The carriers fill the HF channel edge to edge.**  49 carriers span
+    300-2700 Hz, which `SPEED_LADDERS.md` defines as the whole HF channel.
+    99%-power occupied bandwidth measures 2,444 Hz against that document's
+    2,500 Hz gate; the 44 Hz over the nominal 2,400 Hz band width is the
+    transform skirt of a signal that fills the band, not carriers placed
+    outside it.  This mode has no bandwidth headroom left to spend, so any
+    future rate increase has to come from the constellation, the code, or the
+    frame -- not from more carriers.
 
   * **Air time, not frame time.** This bench spends a fixed ~155 ms per
     keying on PTT ramp and tail, which `frame_seconds()` excludes.  The frame
@@ -60,16 +59,15 @@ PILOT_INTERVAL = 20
 INTERLEAVE = True
 NOISE_ESTIMATOR = "repeat"
 
-# 500-2700 Hz: 45 carriers, 2,253 Hz measured 99%-power occupied bandwidth,
-# 47 Hz inside the 2,300 Hz ceiling. See the module docstring for why the
-# trim comes off the low end.
-BAND_LO_HZ = 500.0
+# 300-2700 Hz: 49 carriers, the full HF channel, 2,444 Hz measured 99%-power
+# occupied bandwidth against a 2,500 Hz gate.
+BAND_LO_HZ = 300.0
 BAND_HI_HZ = 2700.0
 
-# 4,374 B packs exactly 72 rate-3/4 LDPC codewords (k=486 information bits),
-# wasting no coded bits, and puts the frame at ~4.86 s -- the size at which
-# the bench's fixed per-keying overhead falls to ~3% of air time.
-PACKET_BYTES = 4374
+# 4,738 B fills 78 rate-3/4 LDPC codewords (k=486 information bits) to within
+# 4 bits, and puts the frame at ~4.84 s -- the size at which the bench's fixed
+# per-keying overhead falls to ~3% of air time.
+PACKET_BYTES = 4738
 
 ACTIVE_BINS = tuple(hf7.bins_in_band(FFT_SIZE, BAND_LO_HZ, BAND_HI_HZ))
 HF7_PHY = hf7.OFDM49Mode(

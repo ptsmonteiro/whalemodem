@@ -7,9 +7,13 @@ from whale.mode_qualification import registry
 from whale.modes.hf7_mode import HF7, HF7_PHY, BAND_LO_HZ, BAND_HI_HZ
 from experiments.hf10_ofdm49_v6 import ofdm49_v6 as ofdm49
 
-# SPEED_LADDERS.md: every HF rung is capped at 2,300 Hz occupied bandwidth,
-# and MODE_QUALIFICATION.md measures it as the 99%-power interval.
-OCCUPIED_BANDWIDTH_CEILING_HZ = 2_300.0
+# SPEED_LADDERS.md: HF rungs occupy the 300-2,700 Hz channel, gated on a
+# 99%-power occupied bandwidth of no more than 2,500 Hz. The allowance over
+# the nominal 2,400 Hz band width covers the transform skirts of a waveform
+# that fills the band; it is not room for carriers outside it.
+OCCUPIED_BANDWIDTH_CEILING_HZ = 2_500.0
+HF_CHANNEL_LO_HZ = 300.0
+HF_CHANNEL_HI_HZ = 2_700.0
 LEVEL4_MIN_NET_BPS = 4_000.0
 
 
@@ -38,45 +42,47 @@ def test_hf7_clean_loopback_and_throughput():
     assert 8 * HF7.chunk_size / HF7.airtime(len(payload)) > LEVEL4_MIN_NET_BPS
 
 
-def test_hf7_occupied_bandwidth_is_inside_the_hf_ceiling():
-    """The gate HF2 failed and hf18's own 49-carrier version failed.
+def test_hf7_occupied_bandwidth_is_inside_the_hf_gate():
+    """HF7 fills the 300-2,700 Hz channel, so this pins the splatter gate.
 
-    The 49-carrier 300-2700 Hz arrangement measures ~2,444 Hz. HF7 drops the
-    four lowest (and, per the experiment's per-bin SNR census, weakest)
-    subcarriers to land inside the ceiling, so this is the assertion that
-    pins that trim in place.
+    The mode has no bandwidth headroom left: it measures ~2,444 Hz against a
+    2,500 Hz gate. A change that widens the skirts -- a shorter guard, a
+    harder drive level, a taper removed -- fails here rather than on the air.
     """
     payload = bytes((i * 31 + 7) & 0xFF
                     for i in range(HF7.chunk_size + framing.AIR_HEADER_BYTES))
     width = _occupied_bandwidth_hz(HF7.encode(payload))
     assert width < OCCUPIED_BANDWIDTH_CEILING_HZ, (
         f"HF7 occupies {width:.1f} Hz, over the "
-        f"{OCCUPIED_BANDWIDTH_CEILING_HZ:.0f} Hz HF ceiling")
+        f"{OCCUPIED_BANDWIDTH_CEILING_HZ:.0f} Hz HF gate")
 
-    untrimmed = ofdm49.OFDM49Mode(
-        fft_size=HF7_PHY.fft_size, cp_len=HF7_PHY.cp_len,
-        active_bins=tuple(ofdm49.bins_in_band(HF7_PHY.fft_size)),
-        bits_per_symbol=HF7_PHY.bits_per_symbol,
-        packet_bytes=HF7_PHY.packet_bytes, pilot_interval=HF7_PHY.pilot_interval,
-        fec_rate=HF7_PHY.fec_rate, interleave=HF7_PHY.interleave,
-        drive_scale=HF7_PHY.drive_scale)
-    assert _occupied_bandwidth_hz(untrimmed.modulate(
-        bytes(untrimmed.max_payload_bytes))) > OCCUPIED_BANDWIDTH_CEILING_HZ
+
+def test_hf7_carriers_stay_inside_the_hf_channel():
+    """Carrier placement, not just occupied width: SPEED_LADDERS.md defines
+    the HF channel as 300-2,700 Hz inclusive, and both edges are occupied."""
+    spacing = ofdm49.DESIGN_RATE / HF7_PHY.fft_size
+    carriers = [b * spacing for b in HF7_PHY.active_bins]
+    assert min(carriers) >= HF_CHANNEL_LO_HZ
+    assert max(carriers) <= HF_CHANNEL_HI_HZ
+    # Edge to edge: the band is fully used, which is the point of the mode.
+    assert min(carriers) == HF_CHANNEL_LO_HZ
+    assert max(carriers) == HF_CHANNEL_HI_HZ
 
 
 def test_hf7_carrier_layout_matches_the_measured_configuration():
-    assert HF7_PHY.n_active == 45
+    assert HF7_PHY.n_active == 49
     assert HF7_PHY.active_bins == tuple(
         ofdm49.bins_in_band(HF7_PHY.fft_size, BAND_LO_HZ, BAND_HI_HZ))
     spacing = ofdm49.DESIGN_RATE / HF7_PHY.fft_size
     assert spacing == 50.0
-    assert HF7_PHY.active_bins[0] * spacing == 500.0
+    assert HF7_PHY.active_bins[0] * spacing == 300.0
     assert HF7_PHY.active_bins[-1] * spacing == 2700.0
     # 2 ms guard: zero costs 6.7 dB of EVM on hardware, 5 ms costs 14% of rate.
     assert HF7_PHY.cp_len / ofdm49.DESIGN_RATE == 0.002
-    # The payload packs whole rate-3/4 LDPC codewords, wasting no coded bits.
-    assert HF7_PHY.n_codewords == 72
-    assert HF7_PHY.packet_bytes * 8 == 72 * 486
+    # The payload fills whole rate-3/4 LDPC codewords to within a byte, so
+    # almost no coded capacity is spent on padding.
+    assert HF7_PHY.n_codewords == 78
+    assert 0 <= 78 * 486 - HF7_PHY.packet_bytes * 8 < 8
 
 
 def test_hf7_rejects_oversize_payload():
