@@ -230,7 +230,7 @@ def test_the_hf_channel_carries_a_session_with_hr0_in_control():
     link_a, link_b, ta, tb = _run_session(payload_ab, payload_ba, policy=HF_SSB)
 
     # HR0 is the control mode, so the handshake, the calibration exchange,
-    # every ACK and the disconnect all rode the guarded 16-MFSK waveform.
+    # every ACK and the disconnect all rode the 32-FSK control waveform.
     assert link_a.modes.control is HR0 and link_b.modes.control is HR0
     assert link_a.modes.supported_ids == (HR0.mode_id, HC0.mode_id,
                                            HC1.mode_id, HF2.mode_id,

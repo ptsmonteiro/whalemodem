@@ -44,10 +44,10 @@ def experimental_registry(budget=None):
 
 
 def hf_registry(budget=None):
-    """The HF SSB ladder: HR0 control, then HC0 and HC1.
+    """The HF SSB ladder: HR0 control, then HC0, HC1, and HF3.
 
-    HR0 is the maximum-margin 128-FSK Level-0 control mode. HC0 and HC1 are
-    retained above it for progressively shorter keyings on supporting paths.
+    HR0 is the short-control 32-FSK Level-0 control mode. HC0, HC1, and HF3
+    are retained above it for progressively faster data on supporting paths.
 
     Separate from `default_registry` rather than an extension of it: the
     CPFSK profiles have no carrier-frequency estimate anywhere in them, so

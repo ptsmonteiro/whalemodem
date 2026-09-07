@@ -15,12 +15,12 @@ def _capture(audio):
 
 def test_hr0_geometry_meets_hf_level_zero_speed_contract():
     assert HR0.mode_id == 10
-    assert hr0.TONE_COUNT == 128
+    assert hr0.TONE_COUNT == 32
     assert hr0.BANK.bandwidth_hz <= 2_300
-    assert hr0.SYMBOL_SAMPLES == 2_688
+    assert hr0.SYMBOL_SAMPLES == 1_024
     assert hr0.CODEC.code is hr0.dsp.K9
     assert HR0.chunk_size == hr0.MAX_PAYLOAD_BYTES - framing.AIR_HEADER_BYTES == 32
-    assert HR0.airtime(framing.AIR_HEADER_BYTES + HR0.chunk_size) == pytest.approx(7.316)
+    assert HR0.airtime(framing.AIR_HEADER_BYTES + HR0.chunk_size) == pytest.approx(3.860)
     assert HR0.chunk_size * 8 / HR0.airtime(HR0.chunk_size) >= 20
 
 
@@ -35,15 +35,14 @@ def test_hr0_clean_round_trip_and_common_lead():
     assert result["head_blocks_observed"] >= hf_lead.MIN_BLOCKS
 
 
-def test_hr0_decodes_deterministic_full_band_awgn_at_minus_15_db():
-    """Pin the requested software boundary without claiming qualification."""
+def test_hr0_full_frame_at_revised_quiet_moderate_awgn_target():
+    """The replacement's nominal +6 dB/3 kHz target, not qualification."""
+    from whale.channel import AwgnChannel, SnrSpec
+
     payload = bytes(range(hr0.MAX_PAYLOAD_BYTES))
-    audio = np.asarray(HR0.encode(payload), np.float64)
-    signal_rms = np.sqrt(np.mean(audio ** 2))
-    noise_rms = signal_rms / 10.0 ** (-15.0 / 20.0)
-    noisy = audio + np.random.default_rng(20260901).normal(
-        0.0, noise_rms, len(audio))
-    assert HR0.decode(_capture(noisy))["payload"] == payload
+    audio = HR0.encode(payload)
+    noisy = AwgnChannel(HR0.tx_sample_rate, SnrSpec(6.0), 20260901).process(audio)
+    assert HR0.decode(_capture(noisy.audio))["payload"] == payload
 
 
 def test_hr0_is_new_hf_control_and_bottom_rung():
@@ -70,7 +69,7 @@ def test_hr0_payload_limit_is_enforced():
 def test_hr0_airtime_tracks_encoded_length_and_round_trips(length):
     payload = bytes(range(length))
     audio = HR0.encode(payload)
-    expected = 3.508 if length <= 12 else 7.316
+    expected = 1.812 if length <= 12 else 3.860
     assert HR0.airtime(length) == pytest.approx(expected)
     assert len(audio) / HR0.tx_sample_rate == pytest.approx(expected)
     assert HR0.decode(_capture(audio))["payload"] == payload
@@ -83,7 +82,7 @@ def test_real_data_ack_uses_short_frame():
         link.PT_DATA_ACK, HR0.mode_id, bytes([0, 1, HR0.mode_id, 0]))
     payload = header + remainder
     assert len(payload) == hr0.SHORT_MAX_PAYLOAD_BYTES == 12
-    assert HR0.airtime(len(payload)) < 0.5 * 7.316
+    assert HR0.airtime(len(payload)) < 0.52 * 3.508
     assert HR0.decode(_capture(HR0.encode(payload)))["payload"] == payload
 
 
@@ -113,7 +112,7 @@ def test_full_frame_prefix_is_pending_until_full_body_arrives():
     assert HR0.decode(capture)["payload"] == payload
 
 
-def test_legacy_full_frame_with_short_payload_still_decodes():
+def test_full_body_with_short_payload_still_decodes():
     from whale.dsp import mfsk
 
     payload = bytes(range(12))
@@ -155,7 +154,9 @@ def test_truncated_and_corrupt_short_bodies_do_not_deliver_payloads():
 @pytest.mark.channel_regression
 @pytest.mark.parametrize("preset", ["mid_latitude_quiet", "mid_latitude_moderate",
                                     "mid_latitude_disturbed"])
-def test_short_ack_at_hf_level_zero_channel_smoke_points(preset):
+def test_short_ack_at_original_hf_level_zero_channel_smoke_points(preset):
+    # Retain the original +4 dB regression despite the revised +6/+11 dB
+    # target; passing these few seeds does not establish a 3 dB HC0 margin.
     from whale.channel import AwgnChannel, ChannelChain, SnrSpec, WattersonChannel
     from whale.qualification import run_frame_trials
 
@@ -168,4 +169,45 @@ def test_short_ack_at_hf_level_zero_channel_smoke_points(preset):
     records = run_frame_trials(
         HR0, channel, 2, 20260906, point_index=0,
         direction=f"{preset}, SNR/3 kHz 4 dB", payload_bytes=12)
+    assert all(record.decoded for record in records)
+
+
+@pytest.mark.parametrize("length", [0, 12, 13, 42])
+@pytest.mark.parametrize("head_seconds", [None, 0.5])
+def test_production_hr0_matches_evaluated_margin32_waveform(length, head_seconds):
+    from experiments.hr0_fast_control.candidate import MARGIN32
+
+    payload = bytes(range(length))
+    expected = MARGIN32.encode(payload, head_seconds=head_seconds)
+    assert np.array_equal(HR0.encode(payload, head_seconds=head_seconds), expected)
+    assert HR0.decode(_capture(expected))["payload"] == payload
+    assert MARGIN32.decode(_capture(HR0.encode(payload)))["payload"] == payload
+
+
+def test_previous_128_fsk_body_is_not_accepted_as_new_hr0():
+    from experiments.hr0_fast_control.legacy_hr0_mode import HR0 as legacy
+
+    assert HR0.decode(_capture(legacy.encode(bytes(range(12)))))["payload"] is None
+
+
+def test_complete_corrupt_body_reports_consumable_end():
+    audio = HR0.encode(bytes(range(42)))
+    body_start = hf_lead.MIN_SAMPLES + hr0.SYNC_SYMBOLS * hr0.SYMBOL_SAMPLES
+    audio[body_start:] = 0
+    result = HR0.decode(_capture(audio))
+    assert result["payload"] is None
+    assert result["end_index"] > result["sync_end_index"]
+
+
+@pytest.mark.channel_regression
+@pytest.mark.parametrize("preset,snr", [("mid_latitude_quiet", 6.0),
+                                       ("mid_latitude_moderate", 6.0),
+                                       ("mid_latitude_disturbed", 11.0)])
+def test_replacement_full_frame_at_nominal_channel_smoke_points(preset, snr):
+    from whale.qualification import channel_factory, run_frame_trials
+
+    records = run_frame_trials(
+        HR0, channel_factory("watterson", snr, watterson_preset=preset),
+        2, 20260906, point_index=1, direction=f"{preset}, SNR/3 kHz {snr} dB",
+        payload_bytes=42)
     assert all(record.decoded for record in records)

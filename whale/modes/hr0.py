@@ -1,9 +1,9 @@
-"""HR0 short/full-length, non-coherent 128-FSK robust HF frame.
+"""HR0 short/full 32-FSK control waveform, promoted from MARGIN32.
 
-The deliberately long orthogonal symbols buy processing gain while 128 tones
-recover seven coded bits per symbol.  The result stays inside the 2.3 kHz HF
-contract, uses soft K=9 convolutional coding, and keeps a maximum-size frame
-below eight seconds including the common HF lead.
+The 2026-09-06 revision trades the previous 128-FSK margin for short ACK
+latency: 1.812 s for 12 bytes and 3.860 s for 42 bytes with the common lead.
+This is wire-incompatible with the previous mode-10 body. Both peers must
+upgrade; the frozen old waveform lives only in the comparison experiment.
 """
 
 from __future__ import annotations
@@ -16,45 +16,44 @@ from ..dsp import mfsk
 
 SAMPLE_RATE = 48_000
 RX_SAMPLE_RATE = rx_audio.DECODE_SAMPLE_RATE
-SYMBOL_SAMPLES = 2_688
+SYMBOL_SAMPLES = 1_024
 RX_SYMBOL_SAMPLES = SYMBOL_SAMPLES // rx_audio.DECIMATION
-FIRST_BIN = 7
-TONE_COUNT = 128
+FIRST_BIN = 12
+TONE_COUNT = 32
 BANK = mfsk.ToneBank(SAMPLE_RATE, SYMBOL_SAMPLES, FIRST_BIN, TONE_COUNT)
 RX_BANK = mfsk.ToneBank(RX_SAMPLE_RATE, RX_SYMBOL_SAMPLES, FIRST_BIN, TONE_COUNT)
 BITS_PER_SYMBOL = BANK.bits_per_symbol
 
 SYNC_SYMBOLS = 16
-PAYLOAD_SYMBOLS = 112
+PAYLOAD_SYMBOLS = 158
 PAYLOAD_BITS = PAYLOAD_SYMBOLS * BITS_PER_SYMBOL
 TOTAL_SYMBOLS = SYNC_SYMBOLS + PAYLOAD_SYMBOLS
 TAIL_SAMPLES = 960
 RX_TAIL_SAMPLES = TAIL_SAMPLES // rx_audio.DECIMATION
 TX_AMPLITUDE = 0.13 * np.sqrt(2.0)
-ACQUISITION_THRESHOLD = 0.035
-MAX_CFO_HZ = 50.0
+ACQUISITION_THRESHOLD = 0.10
 
 SYNC_PATTERN = np.repeat(
     BANK.symbols_from_bits(dsp.bits.pn_bits((SYNC_SYMBOLS // 2) *
                                            BITS_PER_SYMBOL, 0x1D35B)), 2)
 CODEC = dsp.PacketCodec(
     payload_bits=PAYLOAD_BITS,
-    interleaver=dsp.interleave.multiplicative(PAYLOAD_BITS, 313),
-    whitener_seed=0x17A6D,
+    interleaver=dsp.interleave.multiplicative(PAYLOAD_BITS, 301),
+    whitener_seed=0x17A98,
     code=dsp.K9,
 )
 MAX_PAYLOAD_BYTES = CODEC.max_payload_bytes
 
 # A checked air header plus the two-byte DATA_ACK remainder fits in 12
-# bytes. Keep the symbol energy and code unchanged, but stop padding these
-# controls to the full DATA capacity. Both lengths share acquisition; CRC32
+# bytes. Both sizes use the same symbol energy and code; short controls
+# avoid padding to the full DATA capacity. Both lengths share acquisition; CRC32
 # selects between at most two bounded body decodes (short first).
-SHORT_PAYLOAD_SYMBOLS = 44
+SHORT_PAYLOAD_SYMBOLS = 62
 SHORT_CODEC = dsp.PacketCodec(
     payload_bits=SHORT_PAYLOAD_SYMBOLS * BITS_PER_SYMBOL,
     interleaver=dsp.interleave.multiplicative(
-        SHORT_PAYLOAD_SYMBOLS * BITS_PER_SYMBOL, 131),
-    whitener_seed=0x17A6E,
+        SHORT_PAYLOAD_SYMBOLS * BITS_PER_SYMBOL, 119),
+    whitener_seed=0x17A7A,
     code=dsp.K9,
 )
 SHORT_MAX_PAYLOAD_BYTES = SHORT_CODEC.max_payload_bytes
@@ -83,20 +82,19 @@ def _base_result() -> dict:
 def demodulate(audio: np.ndarray) -> dict:
     result = _base_result()
     try:
-        samples = np.asarray(audio, dtype=np.float64).reshape(-1)
+        samples = np.asarray(audio, dtype=np.float64)
     except (TypeError, ValueError):
         result["failure"] = "invalid audio"
         return result
-    if not np.all(np.isfinite(samples)) or len(samples) < SYNC_SYMBOLS * RX_SYMBOL_SAMPLES:
+    if (samples.ndim != 1 or not np.all(np.isfinite(samples))
+            or len(samples) < SYNC_SYMBOLS * RX_SYMBOL_SAMPLES):
         result["failure"] = "invalid or short capture"
         return result
-    # HR0's 17.9 Hz tone spacing alone only gives an unambiguous residual
-    # estimate of +-8.9 Hz. Search the few whole-bin hypotheses needed by
-    # the common HF +-46 Hz contract, then estimate the residual normally.
+    # Search whole-tone offsets before estimating residual CFO, matching
+    # the experimental receiver and covering the common +/-46 Hz contract.
     analytic = hilbert(samples)
     index = np.arange(len(samples))
-    hypotheses = np.arange(-MAX_CFO_HZ, MAX_CFO_HZ + BANK.spacing_hz,
-                            BANK.spacing_hz)
+    hypotheses = (-BANK.spacing_hz, 0.0, BANK.spacing_hz)
     best = None
     for coarse_hz in hypotheses:
         corrected = np.real(analytic * np.exp(-2j * np.pi * coarse_hz * index /
@@ -116,8 +114,6 @@ def demodulate(audio: np.ndarray) -> dict:
     start = coarse * step
     if confidence >= ACQUISITION_THRESHOLD:
         start = mfsk.refine(RX_BANK, working, SYNC_PATTERN, start, radius=step)
-        confidence = max(confidence, mfsk.pattern_score(RX_BANK, working,
-                                                        SYNC_PATTERN, start))
     result.update(confidence=confidence, start_index=start)
     if confidence < ACQUISITION_THRESHOLD:
         result["failure"] = "preamble not found"
