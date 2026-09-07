@@ -79,7 +79,7 @@ def _compute_ber(truth_bits: np.ndarray, payload_len: int, rx_bits, *, length_by
 
 
 def run_direction(tx, rx, direction, mode, trials, seed, *, capture_tail, inter_trial,
-                  capture_dir=None):
+                  capture_dir=None, decoder_options=None):
     payload_bytes = mode.max_payload_bytes
     fec_text = mode.fec_rate or "none"
     print(f"\n  {direction}: {trials} x {payload_bytes} B, fft={mode.fft_size} "
@@ -95,6 +95,8 @@ def run_direction(tx, rx, direction, mode, trials, seed, *, capture_tail, inter_
         rng = np.random.default_rng(np.random.SeedSequence([seed, trial]))
         payload = rng.integers(0, 256, payload_bytes, dtype=np.uint8).tobytes()
         audio = mode.modulate(payload)
+        tx_peak = float(np.max(np.abs(audio)))
+        tx_rms = float(np.sqrt(np.mean(np.asarray(audio, dtype=float) ** 2)))
         truth_raw, truth_coded = mode.pack_and_encode_bits(payload)
 
         keyed = tx.send(audio)
@@ -111,7 +113,7 @@ def run_direction(tx, rx, direction, mode, trials, seed, *, capture_tail, inter_
         cap_peak = float(np.max(np.abs(cap))) if cap.size else None
         cap_clipped = int(np.sum(np.abs(cap) >= 0.999)) if cap.size else None
 
-        result = mode.demodulate(captured)
+        result = mode.demodulate(captured, **(decoder_options or {}))
         decoded_payload = result.get("payload")
         decoded = decoded_payload == payload
         if decoded:
@@ -146,6 +148,7 @@ def run_direction(tx, rx, direction, mode, trials, seed, *, capture_tail, inter_
         net_bps = (payload_bytes * 8) / mode.frame_seconds() if decoded else 0.0
         record = {
             "trial": trial, "direction": direction, "payload_bytes": payload_bytes,
+            "tx_peak": tx_peak, "tx_rms": tx_rms,
             "keyed_seconds": keyed, "rx_samples_12k": len(captured),
             "outcome": outcome, "confidence": result.get("confidence"),
             "freq_offset_hz": result.get("freq_offset_hz"),
@@ -221,6 +224,9 @@ def main(argv=None, *, pair_factory=bench.radio_pair):
     ap.add_argument("--packet-bytes", type=int, default=16)
     ap.add_argument("--pilot-interval", type=int, default=0)
     ap.add_argument("--pilot-comb-stride", type=int, default=0)
+    ap.add_argument("--comb-tracking", choices=("legacy", "common", "confidence", "residual", "off"), default="legacy")
+    ap.add_argument("--gain-smoothing", type=int, default=1)
+    ap.add_argument("--noise-estimator", choices=("legacy", "repeat"), default="legacy")
     ap.add_argument("--equalizer", choices=("gain", "phase_slope"), default="gain")
     ap.add_argument("--edge-guard-bins", type=int, default=0)
     ap.add_argument("--edge-taper", type=int, default=0)
@@ -228,7 +234,14 @@ def main(argv=None, *, pair_factory=bench.radio_pair):
                      help="IEEE 802.11n QC-LDPC rate applied to the packet "
                           "bit stream (experiments/qpsk29/ldpc.py); default "
                           "None = no FEC (v5's original behaviour)")
+    ap.add_argument("--interleave", action="store_true",
+                     help="spread each LDPC codeword over the whole frame so a "
+                          "time-localized burst is shared among all codewords "
+                          "instead of destroying a few; costs no airtime")
     ap.add_argument("--n-preamble-symbols", type=int, default=2)
+    ap.add_argument("--drive-scale", type=float, default=1.0,
+                    help="transmit waveform peak scale after normalization "
+                         "(1.0 = full-scale; watch capture clipping)")
     ap.add_argument("--trials", type=int, default=DEFAULT_TRIALS)
     ap.add_argument("--seed", type=int, default=20260901)
     ap.add_argument("--direction", choices=("ab", "ba"), default="ab",
@@ -265,11 +278,14 @@ def main(argv=None, *, pair_factory=bench.radio_pair):
                               packet_bytes=args.packet_bytes,
                               pilot_interval=args.pilot_interval,
                               n_preamble_symbols=args.n_preamble_symbols,
+                              drive_scale=args.drive_scale,
                               equalizer=args.equalizer,
                               pilot_comb_stride=args.pilot_comb_stride,
+                              comb_tracking=args.comb_tracking,
                               edge_guard_bins=args.edge_guard_bins,
                               edge_taper=args.edge_taper,
-                              fec_rate=args.fec_rate)
+                              fec_rate=args.fec_rate,
+                              interleave=args.interleave)
 
     stamp = datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%SZ")
     output_dir = args.output_dir or Path("logs") / "mode_sweeps" / f"hf10_ofdm49_v6-{stamp}"
@@ -285,7 +301,8 @@ def main(argv=None, *, pair_factory=bench.radio_pair):
     active_hz = [round(b * bin_hz, 1) for b in mode.active_bins]
     print(f"fft_size={args.fft_size} (bin spacing {bin_hz:.1f} Hz) cp_len={args.cp_len} "
           f"n_active={mode.n_active} n_comb={mode.n_comb()} range=[{active_hz[0]},{active_hz[-1]}]Hz "
-          f"bps={args.bps} fec_rate={args.fec_rate} pilot_interval={args.pilot_interval} equalizer={args.equalizer}")
+          f"bps={args.bps} fec_rate={args.fec_rate} pilot_interval={args.pilot_interval} "
+          f"drive_scale={args.drive_scale} equalizer={args.equalizer}")
     print(f"frame: {mode.max_payload_bytes} B payload, {mode.frame_seconds():.3f}s, "
           f"crest factor {mode.crest_factor_db():.1f} dB, "
           f"net_bps_if_all_decode={(mode.max_payload_bytes*8)/mode.frame_seconds():.1f}")
@@ -304,7 +321,8 @@ def main(argv=None, *, pair_factory=bench.radio_pair):
         records.extend(run_direction(
             tx, rx, direction, mode, args.trials, args.seed,
             capture_tail=args.capture_tail, inter_trial=args.inter_trial,
-            capture_dir=capture_dir))
+            capture_dir=capture_dir, decoder_options={"gain_smoothing": args.gain_smoothing,
+                "noise_estimator": args.noise_estimator}))
 
     decoded = sum(1 for r in records if r["outcome"] == "decoded")
     total = len(records)
@@ -345,14 +363,18 @@ def main(argv=None, *, pair_factory=bench.radio_pair):
         "config": {"fft_size": args.fft_size, "cp_len": args.cp_len,
                    "active_bins": list(mode.active_bins), "bits_per_symbol": args.bps,
                    "fec_rate": args.fec_rate,
+                   "drive_scale": args.drive_scale,
                    "packet_bytes": args.packet_bytes, "pilot_interval": args.pilot_interval,
                    "pilot_comb_stride": args.pilot_comb_stride, "equalizer": args.equalizer,
+                   "comb_tracking": args.comb_tracking,
                    "edge_guard_bins": args.edge_guard_bins, "edge_taper": args.edge_taper,
                    "n_preamble_symbols": args.n_preamble_symbols,
                    "crest_factor_db": mode.crest_factor_db(),
                    "frame_seconds": mode.frame_seconds(),
                    "max_payload_bytes": mode.max_payload_bytes},
         "seed": args.seed, "trials": records,
+        "decoder_options": {"gain_smoothing": args.gain_smoothing,
+                            "noise_estimator": args.noise_estimator},
         "summary": {"decoded": decoded, "total": total, "mean_ber": mean_ber,
                      "mean_raw_ber": mean_raw_ber, "net_bps": net_bps, **levels},
     }

@@ -345,3 +345,185 @@ simulation alone.
   session, so this record — like every other number in this project's
   history — is a statement about today's channel, not a permanent
   ceiling.
+
+---
+
+# 2026-09-07 — reaching 7 kbps: what was actually limiting the link
+
+**Bottom line: 7,213.6 bps net, 19/20 real-hardware frames delivered
+across two independent seeds (9/10 and 10/10), zero residual bit errors
+in every decoded trial, IC-7300 -> IC-705.** That is a 66% improvement
+over the 4,332 bps recorded above, and it clears the 7 kbps goal. None
+of it came from the lever this experiment originally pursued (higher
+modulation order alone). Four things were wrong, and only one of them
+was in the waveform design.
+
+## The measurement that changed the diagnosis
+
+Every earlier trial reported `channel_snr_db` of 14-16 dB and treated
+that as the channel's ceiling. It is not a calibrated SNR (the
+demodulator's own docstring says so), and it disagrees with the real
+error vector magnitude. `evm_probe.py` (new) measures the honest number:
+it transmits a known long frame, regenerates the exact transmitted
+symbols, and decomposes the error against them by subcarrier, by symbol
+index, into common phase error, and into a per-symbol timing slope.
+
+That decomposition immediately ruled out three suspects and found the
+real one:
+
+| Impairment | Measured | Verdict |
+|---|---|---|
+| Sample-clock offset between radios | -0.7 to +1.4 ppm | negligible; long frames are safe |
+| Common phase error (oscillator) | 0.5-0.9 deg RMS | negligible |
+| Receive-path clipping | kurtosis 3.0-3.3, 0.01% at rail | **not clipping** (see below) |
+| Transmit drive level | 11 dB EVM at drive 1.0, 19.7 dB at drive 0.005 | **this was the limit** |
+
+The captures show peaks around 4.3 on a float stream that nominally
+spans +/-1, and the harness' `CLIP()` counter fires on every trial. That
+counter is a false alarm: the audio device applies a gain above unity,
+and the samples are Gaussian (kurtosis ~3.0) with only 0.01% anywhere
+near the observed peak. Nothing is clipping on receive. The counter's
+`>= 0.999` threshold is meaningless on this device and should not be
+read as an overload.
+
+## 1. Transmit drive: every prior hf10 trial ran ~7 dB overdriven
+
+`hardware_test.py` defaults `--drive-scale` to 1.0, and every trial in
+the record above used it. Sweeping it against measured EVM
+(`rx_level_probe.py`, new):
+
+| drive_scale | 1.0 | 0.5 | 0.25 | 0.1 | 0.03 | 0.015 | 0.008 | 0.005 | 0.003 |
+|---|---|---|---|---|---|---|---|---|---|
+| EVM SNR (dB) | 10.8-12.9 | 15.6-16.1 | 16.0-16.3 | 15.7-17.0 | 17.2-18.4 | 17.4-18.6 | 18.0-19.3 | 18.9-19.7 | 17.2-18.0 |
+
+**About 7 dB of margin — two constellation steps — was being given away
+by the default.** The peak lies near 0.005-0.008; below that the path
+becomes genuinely noise-limited.
+
+This also explains the puzzle in the 2026-09-07 hf4 TX-volume sweep,
+where received SNR stayed flat within ~1 dB across a 46 dB range of
+drive. hf4 is single-carrier with a low crest factor and is insensitive
+to drive; this OFDM waveform has a 9-11 dB crest factor and is very
+sensitive to it. The two results are consistent, not contradictory, and
+the flat hf4 curve should not be read as "level does not matter here".
+
+## 2. Frame geometry: a longer FFT, not a shorter guard
+
+Reducing `cp_len` from 60 to 30 to recover overhead **costs 2 dB of EVM**
+(19.7 dB -> 17.4 dB measured at the same drive): the 5 ms guard is not
+padding, it is covering the two radios' own SSB filter impulse
+responses. That is the same shape of negative result Step 5 above found
+for the mid-frame pilot, and it holds here.
+
+The efficient move is the opposite one — keep the 5 ms guard and make
+the symbol longer, so the same absolute guard costs proportionally less:
+
+| fft_size | bin spacing | bins in 300-2700 Hz | CP overhead | best 32-QAM + LDPC 3/4 |
+|---|---|---|---|---|
+| 240 (previous) | 50.0 Hz | 49 | 20% | 6,931 bps |
+| **480** | **25.0 Hz** | **97** | **11%** | **7,521 bps** |
+| 720 | 16.7 Hz | 145 | 8% | 7,725 bps |
+| 960 | 12.5 Hz | 193 | 6% | 7,742 bps |
+
+fft_size 480 was verified on hardware to hold the same EVM as 240
+(19.5-19.7 dB at drive 0.008). This needed no code change at all: both
+`fft_size` and the active bin set are already mode parameters. Returns
+flatten past 720, and longer symbols eventually trade against frequency
+offset and drift, which is why 480 was chosen rather than the largest.
+
+## 3. Frame length is a reliability/throughput trade, not free rate
+
+A frame decodes only if *every* LDPC codeword in it converges, so net
+rate and frame delivery pull against each other:
+
+| Payload | Frame | Net bps | Codewords | Measured |
+|---|---|---|---|---|
+| 2,394 B | 2.655 s | **7,213.6** | 40 | **19/20 delivered** |
+| 5,923 B | 6.300 s | 7,521.3 | 98 | 5/6 delivered |
+
+The larger frame is 4% faster and clearly less reliable. **2,394 B is the
+recommended operating point**; the 5,923 B row is recorded as real but
+not recommended.
+
+## 4. The receiver's noise estimator was mis-scaling the LLRs
+
+With everything above in place the mode still delivered only 4/6. The
+remaining fault was in the soft-decision path, and it was found offline
+by re-demodulating saved captures — no additional airtime:
+
+| max LDPC iterations | gain_smoothing | noise estimator | decoded |
+|---|---|---|---|
+| 30 | 1 | legacy | 4/6 |
+| 30 | 1 | **repeat** | **6/6** |
+| 100 | 1 | legacy | 4/6 |
+| 30 | 3 | repeat | 5/6 |
+| 30 | 5 | repeat | 3/6 |
+
+`noise_estimator="repeat"` differences the two independent preamble
+repetitions instead of fitting the preamble against a gain estimate
+derived from that same preamble; the legacy estimator's residual is
+biased low, so the LLRs handed to the LDPC decoder were scaled wrong.
+Raw BER is identical either way (0.0088) — this is purely soft-decision
+quality. Raising the iteration cap from 30 to 100 changes nothing, and
+carrier-domain gain smoothing actively hurts at this bin spacing.
+
+## 5. Interleaving (kept, small effect)
+
+A new `interleave` flag spreads each 648-bit codeword's bits over the
+whole frame. At 97 bins and 5 bits/symbol a codeword otherwise occupies
+barely more than one OFDM symbol, so a transient lands entirely inside
+one or two codewords. On hardware it changed 1/3 to 1/5 at the large
+frame size — within noise, not the win expected — but it left mean raw
+BER unchanged while cutting post-FEC BER, costs no airtime, and is
+retained. It is **off by default**, so every result recorded earlier in
+this document remains reproducible.
+
+## 32-QAM (bits_per_symbol=5)
+
+hf5's shared mapper jumps from 16-QAM to 64-QAM, so 32-QAM was added in
+`ofdm49_v6.py` (hf5 is still unmodified) as a rectangular 4x8
+constellation: hf5's own 8-level Gray axis map on I, its 4-level Gray
+axis map on Q. Verified to be 32 distinct points at unit mean energy,
+exactly invertible, and Gray-optimal (mean Hamming distance 1.0 over all
+minimum-distance neighbour pairs). A 32-cross constellation would be
+0.55 dB better at the same rate; that is the known reserve if a future
+trial lands just short.
+
+64-QAM is **not** reachable on this path: it needs roughly 24-25 dB, and
+the measured ceiling after all of the above is about 19-20 dB.
+
+## Recommended configuration
+
+```
+python experiments/hf10_ofdm49_v6/hardware_test.py \
+    --bps 5 --fec-rate 3/4 --fft-size 480 --cp-len 60 \
+    --packet-bytes 2400 --pilot-interval 20 \
+    --drive-scale 0.008 --interleave --noise-estimator repeat
+```
+
+97 subcarriers, 25 Hz spacing, 5 ms guard, 32-QAM, rate-3/4 LDPC,
+interleaved, 2,394 B payload, 2.655 s frame, **7,213.6 bps net**.
+
+| Seed | Trials | Decoded | Mean raw BER | Residual BER |
+|---|---|---|---|---|
+| 31337 | 10 | 9 | 0.0082 | 0.0 in all 9 |
+| 424242 | 10 | 10 | 0.0056 | 0.0 in all 10 |
+
+For comparison, VARA HF v4.3.0's vendor-claimed 32-QAM rate on its
+2300 Hz standard mode is 7,050 bps (see GOALS.md).
+
+## Caveats
+
+- **Occupied bandwidth is ~2,425 Hz, above the 2,300 Hz ceiling
+  SPEED_LADDERS.md sets for every HF rung.** This is inherited from the
+  300-2700 Hz band definition used throughout the hf6-hf10 line, not
+  introduced here, but the throughput above is therefore not yet a valid
+  Level-4 claim. Trimming to 2,300 Hz costs about 5% of the bins and
+  should be measured before any rung is claimed.
+- One direction only (IC-7300 -> IC-705), one session, one day's
+  channel, as with every result in this document.
+- `--drive-scale 0.008` is calibrated to *this* bench path's audio gain
+  structure. The right generalization is to set drive from measured EVM
+  rather than to hard-code the number.
+- These are provisional experiment results, not a qualification run
+  under MODE_QUALIFICATION.md.

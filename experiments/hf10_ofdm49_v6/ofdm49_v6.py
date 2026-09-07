@@ -27,7 +27,7 @@ history flagged as unexploited:
        demapper, not just v5's hard `symbols_to_bits`) and runs
        `ldpc.decode_batch` before CRC-checking.
      - A generic `_soft_bit_llrs()` demapper works for any
-       `bits_per_symbol` (1-4) by brute-force max-log distance over the
+       `bits_per_symbol` (1-6) by brute-force max-log distance over the
        constellation returned by `_constellation_table()`, built directly
        from hf5's own `bits_to_symbols` so the mapping is guaranteed
        consistent with the hard-decision path.
@@ -37,9 +37,19 @@ history flagged as unexploited:
        (uncoded, hard-demapped) bits so the test harness can report BOTH
        raw and residual (post-FEC) BER, per the task's requirement.
 
+  3. Frame/geometry and receiver levers found on hardware on 2026-09-07,
+     which together took this mode from 4332 bps to 7213 bps net (see
+     RESULTS.md, "2026-09-07"): a 32-QAM mapping at `bits_per_symbol=5`
+     (absent from hf5's mapper, added above); an `interleave` flag that
+     spreads each LDPC codeword over the whole frame; and, as pure
+     parameters needing no code change, a larger `fft_size` (the same
+     absolute guard time amortized over a longer symbol) and a much
+     lower `drive_scale`.
+
 Everything else (preamble/pilot structure, sync, per-bin gain equalizer,
 phase_slope/comb-pilot options, edge guard/taper) is v5's code,
-unmodified in behaviour when fec_rate=None and bits_per_symbol<=3.
+unmodified in behaviour when fec_rate=None, interleave=False and
+bits_per_symbol<=3.
 
 None of hf5/hf6/hf7/hf8/hf9/path_probe are modified; this is a fresh
 copy in this experiment's own directory per the task's constraints.
@@ -73,12 +83,60 @@ BAND_HI_HZ = 2700.0
 LENGTH_BYTES = _sc.LENGTH_BYTES
 CRC_BYTES = _sc.CRC_BYTES
 WHITENER_SEED = 0xBEEF17
+INTERLEAVER_SEED = 0x5EED1A
 
 SYNC_SEARCH_HZ = 20.0
 SYNC_SEARCH_STEP_HZ = 1.0
 
-bits_to_symbols = _sc.bits_to_symbols
-symbols_to_bits = _sc.symbols_to_bits
+# 32-QAM (bits_per_symbol=5) is not in hf5's shared mapper, which jumps
+# straight from 16-QAM to 64-QAM, and hf5 is not modified by this
+# experiment. It is added here as a rectangular 4x8 constellation: 3 Gray
+# bits on I over 8 levels (hf5's own 64-QAM axis map) and 2 Gray bits on Q
+# over 4 levels (hf5's own 16-QAM axis map), so the labelling is Gray on
+# both axes by construction and reuses mappings already validated here.
+#
+# A 32-cross constellation would carry the same 5 bits at mean energy 20
+# instead of this rectangle's 26 -- 0.55 dB better -- but it has no
+# per-axis Gray labelling, and the rectangle is the version whose
+# correctness is obvious by inspection. If a hardware trial lands just
+# short of a target, that 0.55 dB is the known reserve to spend next.
+_QAM32_I_LEVELS = np.array([-7.0, -5.0, -3.0, -1.0, 1.0, 3.0, 5.0, 7.0])
+_QAM32_I_BINARY_TO_LEVEL = np.array([0, 1, 3, 2, 7, 6, 4, 5])
+_QAM32_I_LEVEL_TO_BINARY = np.array([0, 1, 3, 2, 6, 7, 5, 4])
+_QAM32_Q_LEVELS = np.array([-3.0, -1.0, 1.0, 3.0])
+_QAM32_Q_BINARY_TO_LEVEL = np.array([0, 1, 3, 2])
+_QAM32_Q_LEVEL_TO_BINARY = np.array([0, 1, 3, 2])
+_QAM32_SCALE = np.sqrt(26.0)   # mean(I^2)=21, mean(Q^2)=5 -> unit mean energy
+
+
+def bits_to_symbols(bits: np.ndarray, bps: int) -> np.ndarray:
+    """hf5's mapper, plus 32-QAM at bps=5 (see _QAM32_* above)."""
+    if bps != 5:
+        return _sc.bits_to_symbols(bits, bps)
+    groups = np.asarray(bits, dtype=np.uint8).reshape(-1, 5)
+    i_idx = (groups[:, 0] << 2) | (groups[:, 1] << 1) | groups[:, 2]
+    q_idx = (groups[:, 3] << 1) | groups[:, 4]
+    re = _QAM32_I_LEVELS[_QAM32_I_BINARY_TO_LEVEL[i_idx]]
+    im = _QAM32_Q_LEVELS[_QAM32_Q_BINARY_TO_LEVEL[q_idx]]
+    return (re + 1j * im) / _QAM32_SCALE
+
+
+def symbols_to_bits(symbols: np.ndarray, bps: int) -> np.ndarray:
+    """Inverse of `bits_to_symbols`, including bps=5."""
+    if bps != 5:
+        return _sc.symbols_to_bits(symbols, bps)
+    symbols = np.asarray(symbols)
+    re = symbols.real * _QAM32_SCALE
+    im = symbols.imag * _QAM32_SCALE
+    i_lvl = np.argmin(np.abs(re[:, None] - _QAM32_I_LEVELS[None, :]), axis=1)
+    q_lvl = np.argmin(np.abs(im[:, None] - _QAM32_Q_LEVELS[None, :]), axis=1)
+    i_val = _QAM32_I_LEVEL_TO_BINARY[i_lvl]
+    q_val = _QAM32_Q_LEVEL_TO_BINARY[q_lvl]
+    return np.stack(((i_val >> 2) & 1, (i_val >> 1) & 1, i_val & 1,
+                     (q_val >> 1) & 1, q_val & 1),
+                    axis=-1).astype(np.uint8).reshape(-1)
+
+
 _pack_packet = _sc._pack_packet
 _unpack_packet = _sc._unpack_packet
 _pn_chips = _sc._pn_chips
@@ -143,7 +201,7 @@ def _soft_bit_llrs(rx_syms: np.ndarray, bps: int, noise_var) -> np.ndarray:
     constellation points with bit=1) - (min dist^2 over points with bit=0),
     scaled by per-symbol noise variance, matching whale/qpsk29's LDPC
     convention that a positive LLR means bit zero. Works for any
-    `bits_per_symbol` supported by `bits_to_symbols` (1-4 here) via
+    `bits_per_symbol` supported by `bits_to_symbols` (1-6 here) via
     brute-force distance over the (<=16-point) constellation -- no
     per-constellation closed form needed."""
     rx_syms = np.asarray(rx_syms)
@@ -185,7 +243,14 @@ class OFDM49Mode:
                                        # applied to the whitened packet bit
                                        # stream before symbol mapping.
 
+    interleave: bool = False          # spread each LDPC codeword's bits over
+                                       # the whole frame (see _interleaver)
+
+    comb_tracking: str = "legacy"  # legacy | common | confidence | residual | off
+
     def __post_init__(self):
+        if self.comb_tracking not in ("legacy", "common", "confidence", "residual", "off"):
+            raise ValueError("unknown comb tracking method")
         bins = tuple(sorted(self.active_bins))
         if self.edge_guard_bins:
             g = self.edge_guard_bins
@@ -329,6 +394,37 @@ class OFDM49Mode:
 
     # -- TX -------------------------------------------------------------------
 
+    def _interleaver(self) -> np.ndarray:
+        """Permutation applied to the coded bit stream before mapping.
+
+        Without it each 648-bit codeword occupies a short, contiguous run
+        of the frame -- at 97 data bins and 5 bits/symbol, barely more
+        than one OFDM symbol -- so a transient that lasts a few symbols
+        lands entirely inside one or two codewords and swamps them while
+        every other codeword decodes in one or two iterations. That is
+        exactly the failure seen on hardware at fft 480 / 32-QAM: a mean
+        raw BER of 0.6%, well inside what rate 3/4 corrects, yet whole
+        frames lost to a handful of adjacent non-convergent codewords.
+
+        A fixed pseudo-random permutation over the whole coded stream
+        spreads every codeword's bits across all subcarriers and the
+        entire frame, so a burst is shared thinly among all codewords
+        instead of destroying a few. It costs no airtime: the same bits
+        are sent, in a different order. Both ends derive it from
+        `coded_bit_count`, which is fixed by the mode's parameters."""
+        n = self.coded_bit_count
+        cached = self.__dict__.get("_interleaver_cache")
+        if cached is not None and len(cached[0]) == n:
+            return cached[0]
+        perm = np.random.default_rng(INTERLEAVER_SEED).permutation(n)
+        inverse = np.argsort(perm)
+        object.__setattr__(self, "_interleaver_cache", (perm, inverse))
+        return perm
+
+    def _deinterleaver(self) -> np.ndarray:
+        self._interleaver()
+        return self.__dict__["_interleaver_cache"][1]
+
     def pack_and_encode_bits(self, payload: bytes) -> tuple[np.ndarray, np.ndarray]:
         """Returns (raw_packet_bits, coded_bits) exactly as `modulate()`
         generates them pre-whitening, so a test harness can independently
@@ -348,6 +444,7 @@ class OFDM49Mode:
 
     def modulate(self, payload: bytes) -> np.ndarray:
         _, coded_bits = self.pack_and_encode_bits(payload)
+        coded_bits = coded_bits[self._interleaver()] if self.interleave else coded_bits
         whitener = _bits.pn_bits(len(coded_bits), WHITENER_SEED)
         data_bits = coded_bits ^ whitener
 
@@ -385,6 +482,10 @@ class OFDM49Mode:
         stuffed[::up] = passband
         lpf = _sc._design_interp_lpf(up)
         tx = np.convolve(stuffed, lpf, mode="same") * up
+        # The interpolation filter can overshoot the pre-filter peak by a few
+        # percent.  Normalize the actual DAC waveform so drive_scale=1.0 is
+        # genuinely full-scale without asking the audio backend to clip.
+        tx = tx / (np.max(np.abs(tx)) + 1e-12) * self.drive_scale
         return tx.astype(np.float32)
 
     # -- RX -------------------------------------------------------------------
@@ -409,7 +510,20 @@ class OFDM49Mode:
         a, b = coef
         return gain, float(b)
 
-    def demodulate(self, captured_12k: np.ndarray) -> dict:
+    def demodulate(self, captured_12k: np.ndarray, *, diagnostics=False,
+                   gain_smoothing=1, noise_estimator="legacy",
+                   ldpc_max_iterations=30) -> dict:
+        """Decode; optional HF17 diagnostics and training-only receiver trials.
+
+        gain_smoothing is an odd carrier-window width (default 1 disables).
+        noise_estimator='repeat' uses repeated-preamble differences for LLR
+        weighting and per-bin diagnostics. channel_snr_db retains its legacy
+        meaning and must not be interpreted as calibrated RF SNR.
+        """
+        if gain_smoothing < 1 or gain_smoothing % 2 != 1:
+            raise ValueError("gain_smoothing must be a positive odd width")
+        if noise_estimator not in ("legacy", "repeat"):
+            raise ValueError("unknown noise estimator")
         x = np.asarray(captured_12k, dtype=np.float64)
         result = {"synced": False, "crc_ok": False, "payload": None,
                   "confidence": 0.0, "freq_offset_hz": None,
@@ -528,6 +642,18 @@ class OFDM49Mode:
 
         anchors_idx = np.array(anchors_idx)
         anchors_gain = np.array(anchors_gain)
+        if gain_smoothing > 1:
+            # Local complex-gain average after removing the dominant delay
+            # ramp. Uses training symbols only, never transmitted data.
+            positions = np.asarray(self.active_bins, dtype=float)
+            radius = int(gain_smoothing) // 2
+            for row in range(len(anchors_gain)):
+                g = anchors_gain[row]
+                slope = np.polyfit(positions, np.unwrap(np.angle(g)), 1)[0]
+                flat = g * np.exp(-1j * slope * positions)
+                smooth = np.array([np.mean(flat[max(0,b-radius):b+radius+1])
+                                   for b in range(self.n_active)])
+                anchors_gain[row] = smooth * np.exp(1j * slope * positions)
 
         for start_sym, start_eq, count in pending:
             idx = start_sym + np.arange(count)
@@ -539,7 +665,35 @@ class OFDM49Mode:
             for i in range(count):
                 bins = _symbol_bins(start_sym + i, corrected)
                 gt = gain_trace[i]
-                if self.n_comb() > 0:
+                if self.n_comb() > 0 and self.comb_tracking in ("common", "confidence", "residual"):
+                    ci = self._comb_idx
+                    # TX multiplies the whole grid by phase_schedule/taper,
+                    # including comb symbols which already contain that phase.
+                    reference = (self._comb_bin_symbols[ci]
+                                 * np.exp(1j*self._phase_schedule[ci])
+                                 * self._amp_taper[ci])
+                    predicted = gt[ci] * reference
+                    common = np.vdot(predicted, bins[ci]) / max(
+                        float(np.vdot(predicted, predicted).real), 1e-18)
+                    if self.comb_tracking == "confidence":
+                        # Pilot disagreement estimates uncertainty in the common
+                        # complex correction. Shrink insignificant corrections
+                        # toward unity (the block-training channel estimate).
+                        error = bins[ci] - common * predicted
+                        variance = float(np.vdot(error,error).real) / max(len(ci)-1,1)
+                        variance /= max(float(np.vdot(predicted,predicted).real),1e-18)
+                        change = abs(common-1)**2
+                        trust = max(0.0, 1.0-variance/max(change,1e-18))
+                        gt = gt * (1 + trust*(common-1))
+                    elif self.comb_tracking == "common":
+                        gt = gt * common
+                    else:
+                        residual = bins[ci] / predicted
+                        positions = np.asarray(self.active_bins)
+                        corr = (np.interp(positions, positions[ci], residual.real)
+                                + 1j*np.interp(positions, positions[ci], residual.imag))
+                        gt = gt * corr
+                elif self.n_comb() > 0 and self.comb_tracking == "legacy":
                     # comb-pilot refinement: re-estimate gain at comb bin
                     # positions from this symbol's own known comb symbols,
                     # and blend/interpolate across frequency onto the data
@@ -561,6 +715,13 @@ class OFDM49Mode:
         result["pilot_symbols"] = len(anchors_idx) - 1
 
         bin_noise_var = np.mean(bin_noise_list, axis=0)  # (n_active,)
+        if noise_estimator == "repeat" and len(pre_bins_seq) >= 2:
+            # Difference independent repetitions; do not fit a pilot to itself.
+            differences = np.diff(np.asarray(pre_bins_seq), axis=0)
+            raw_variance = np.mean(np.abs(differences)**2, axis=0) / 2
+            raw_variance = np.array([np.mean(raw_variance[max(0,b-1):b+2])
+                                     for b in range(self.n_active)])
+            bin_noise_var = raw_variance / np.maximum(np.abs(gain0)**2, 1e-18)
 
         # Per-carrier post-equalization SNR, reported additively as a
         # diagnostic (hf14's hardware phase). bin_noise_list holds, for
@@ -578,9 +739,15 @@ class OFDM49Mode:
         result["per_bin_snr_db_min"] = float(np.min(per_bin_snr_db))
         result["per_bin_snr_db_median"] = float(np.median(per_bin_snr_db))
         result["per_bin_snr_db_max"] = float(np.max(per_bin_snr_db))
+        result["noise_estimator"] = noise_estimator
 
         data_syms_full = (eq_data * np.exp(-1j * self._phase_schedule)[None, :])
         data_syms_flat = data_syms_full[:, self._data_idx].reshape(-1)
+        if diagnostics:
+            result["equalized_symbols"] = data_syms_full[:, self._data_idx].copy()
+            result["anchor_gain"] = anchors_gain.copy()
+            result["anchor_index"] = anchors_idx.copy()
+            result["start_sample"] = int(start)
 
         # Hard-decision, pre-FEC bits in the coded-bit domain (== payload
         # domain when fec_rate is None): this is v5's original path,
@@ -590,6 +757,10 @@ class OFDM49Mode:
         coded_hard = coded_hard[: self.coded_bit_count] if len(coded_hard) > self.coded_bit_count else coded_hard
         whitener_coded = _bits.pn_bits(len(coded_hard), WHITENER_SEED)
         pre_fec_bits = coded_hard ^ whitener_coded
+        if self.interleave and len(pre_fec_bits) == self.coded_bit_count:
+            # back to transmit (codeword) order, so raw BER stays
+            # comparable with pack_and_encode_bits()' ground truth
+            pre_fec_bits = pre_fec_bits[self._deinterleaver()]
         result["pre_fec_bits"] = pre_fec_bits.copy()
 
         if self.fec_rate:
@@ -601,14 +772,18 @@ class OFDM49Mode:
             # sign of its LLR (positive LLR == bit zero), so this is
             # equivalent to de-whitening the soft channel output.
             llrs = np.where(whitener_llr == 1, -llrs, llrs)
+            if self.interleave and len(llrs) == self.coded_bit_count:
+                llrs = llrs[self._deinterleaver()]
             k = _ldpc.INFORMATION_BITS[self.fec_rate]
             n_cw = self.n_codewords
             pad = n_cw * _ldpc.N - len(llrs)
             if pad > 0:
                 llrs = np.concatenate([llrs, np.zeros(pad)])
             blocks = llrs[:n_cw * _ldpc.N].reshape(n_cw, _ldpc.N)
-            info, iterations, oks = _ldpc.decode_batch(blocks, rate=self.fec_rate)
+            info, iterations, oks = _ldpc.decode_batch(
+                blocks, max_iterations=ldpc_max_iterations, rate=self.fec_rate)
             result["ldpc_ok"] = bool(np.all(oks))
+            result["ldpc_codeword_ok"] = np.atleast_1d(oks).astype(bool).tolist()
             result["ldpc_iterations"] = [int(i) for i in np.atleast_1d(iterations)]
             raw_bits = info.reshape(-1)[: self.data_bits]
         else:
