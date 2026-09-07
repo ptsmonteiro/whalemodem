@@ -1,0 +1,23 @@
+{
+  "mode": "hc0: 16-FSK 750.0-2156.2 Hz, 93.75 baud, 307 symbols, 64 B + CRC32 in 3.380 s, offset tolerance +-46.88 Hz",
+  "payload_bytes": 64,
+  "trials": 1,
+  "a": "ic7300",
+  "b": "ic705",
+  "ic7300->ic705": [],
+  "ic705->ic7300": [
+    {
+      "trial": 1,
+      "decoded": true,
+      "confidence": 0.4939880810449561,
+      "cfo_hz": 7.918542417644484,
+      "clock_offset_ppm": 0.0,
+      "present_carriers": 0,
+      "tone_snr_db": 32.14,
+      "raw_ber": 0.0,
+      "carrier_snr_db": null,
+      "head": 2,
+      "failure": null
+    }
+  ]
+}

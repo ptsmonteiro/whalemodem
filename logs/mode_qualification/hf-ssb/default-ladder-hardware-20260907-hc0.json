@@ -1,0 +1,49 @@
+{
+  "mode": "hc0: 16-FSK 750.0-2156.2 Hz, 93.75 baud, 307 symbols, 64 B + CRC32 in 3.380 s, offset tolerance +-46.88 Hz",
+  "payload_bytes": 64,
+  "trials": 3,
+  "a": "ic7300",
+  "b": "ic705",
+  "ic7300->ic705": [
+    {
+      "trial": 1,
+      "decoded": false,
+      "confidence": 0.24565142764801828,
+      "cfo_hz": -37.285285334643575,
+      "clock_offset_ppm": 0.0,
+      "present_carriers": 0,
+      "tone_snr_db": 8.62,
+      "raw_ber": 0.46996466431095407,
+      "carrier_snr_db": null,
+      "head": 0,
+      "failure": "invalid length"
+    },
+    {
+      "trial": 2,
+      "decoded": false,
+      "confidence": 0.2873081342118224,
+      "cfo_hz": -43.68902766446462,
+      "clock_offset_ppm": 0.0,
+      "present_carriers": 0,
+      "tone_snr_db": 10.69,
+      "raw_ber": 0.4902826855123675,
+      "carrier_snr_db": null,
+      "head": 0,
+      "failure": "invalid length"
+    },
+    {
+      "trial": 3,
+      "decoded": false,
+      "confidence": 0.08470237292347813,
+      "cfo_hz": 0.0,
+      "clock_offset_ppm": 0.0,
+      "present_carriers": 0,
+      "tone_snr_db": null,
+      "raw_ber": null,
+      "carrier_snr_db": null,
+      "head": null,
+      "failure": "preamble not found"
+    }
+  ],
+  "ic705->ic7300": []
+}

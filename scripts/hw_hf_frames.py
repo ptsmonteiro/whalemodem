@@ -160,7 +160,13 @@ def main():
 
     ok_ab = ok_ba = None
     rec_ab = rec_ba = []
-    with bench.radio_pair(args.a, args.b, warmup=3.0) as (ta, tb):
+    # Keep the non-transmitting side receive-only.  Besides enforcing the
+    # direction safety rule, this avoids requiring a CAT/PTT handle for a
+    # receiver whose serial port may be occupied by another station tool.
+    with bench.radio_pair(
+            args.a, args.b, warmup=3.0,
+            a_receive_only=args.direction == "ba",
+            b_receive_only=args.direction == "ab") as (ta, tb):
         if args.direction in ("both", "ab"):
             ok_ab, rec_ab = run_direction(mode, ta, tb, f"{args.a}->{args.b}",
                                           args.trials, args.payload, rng,

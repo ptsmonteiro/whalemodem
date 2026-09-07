@@ -1,0 +1,55 @@
+{
+  "direction": "ic7300->ic705",
+  "records": [
+    {
+      "mode": "hr0",
+      "mode_id": 10,
+      "trial": 1,
+      "decoded": true,
+      "keyed_seconds": 4.01094913482666,
+      "rx_samples": 66120,
+      "confidence": 0.3653613396367298,
+      "failure": null
+    },
+    {
+      "mode": "hc0",
+      "mode_id": 5,
+      "trial": 1,
+      "decoded": true,
+      "keyed_seconds": 3.578817367553711,
+      "rx_samples": 60960,
+      "confidence": 0.4960011523285436,
+      "failure": null
+    },
+    {
+      "mode": "hc1",
+      "mode_id": 4,
+      "trial": 1,
+      "decoded": true,
+      "keyed_seconds": 0.9298787117004395,
+      "rx_samples": 29160,
+      "confidence": 0.9852171790995498,
+      "failure": null
+    },
+    {
+      "mode": "hf3",
+      "mode_id": 9,
+      "trial": 1,
+      "decoded": false,
+      "keyed_seconds": 3.669853925704956,
+      "rx_samples": 62160,
+      "confidence": 0.9933728717808091,
+      "failure": null
+    },
+    {
+      "mode": "hf4",
+      "mode_id": 11,
+      "trial": 1,
+      "decoded": true,
+      "keyed_seconds": 6.0701072216033936,
+      "rx_samples": 91080,
+      "confidence": 0.6939607477640096,
+      "failure": null
+    }
+  ]
+}

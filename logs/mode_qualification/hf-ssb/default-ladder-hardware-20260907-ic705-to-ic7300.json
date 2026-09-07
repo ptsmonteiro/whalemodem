@@ -1,0 +1,55 @@
+{
+  "direction": "ic705->ic7300",
+  "records": [
+    {
+      "mode": "hr0",
+      "mode_id": 10,
+      "trial": 1,
+      "decoded": true,
+      "keyed_seconds": 4.00873875617981,
+      "rx_samples": 66240,
+      "confidence": 0.3832053931222697,
+      "failure": null
+    },
+    {
+      "mode": "hc0",
+      "mode_id": 5,
+      "trial": 1,
+      "decoded": true,
+      "keyed_seconds": 3.5771355628967285,
+      "rx_samples": 60960,
+      "confidence": 0.4936156923139412,
+      "failure": null
+    },
+    {
+      "mode": "hc1",
+      "mode_id": 4,
+      "trial": 1,
+      "decoded": true,
+      "keyed_seconds": 0.9268970489501953,
+      "rx_samples": 29160,
+      "confidence": 0.985014138149803,
+      "failure": null
+    },
+    {
+      "mode": "hf3",
+      "mode_id": 9,
+      "trial": 1,
+      "decoded": false,
+      "keyed_seconds": 3.667414665222168,
+      "rx_samples": 62160,
+      "confidence": 0.9843144925338189,
+      "failure": null
+    },
+    {
+      "mode": "hf4",
+      "mode_id": 11,
+      "trial": 1,
+      "decoded": false,
+      "keyed_seconds": 6.0671398639678955,
+      "rx_samples": 91080,
+      "confidence": 0.6816921408813811,
+      "failure": "CRC mismatch"
+    }
+  ]
+}
