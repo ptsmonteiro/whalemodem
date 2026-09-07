@@ -1,4 +1,4 @@
-"""HF4 as a negotiable, experimental `WaveformMode`.
+"""HF4 as a negotiable `WaveformMode`.
 
 HF4 is a from-scratch single-carrier audio-passband data mode (8PSK @ 1500
 baud, no FEC, sparse mid-frame BPSK pilots for phase-drift tracking) for the
@@ -15,10 +15,9 @@ record and `experiments/hf13_fast_sync_v1/RESULTS.md` for the fused-FFT
 sync search's real-hardware equivalence evidence (0/10 discrepancies vs.
 the original sync search).
 
-HF4 is registered as EXPERIMENTAL only (see `whale/mode_qualification.py`),
-the same disposition as HF3 -- it is not a default or optional mode on any
-ladder, and remains available at the experimental registry level for a
-station that opts in.
+HF4 is registered as DEFAULT by an explicit owner product decision (see
+`whale/mode_qualification.py`). Availability is separate from evidence-based
+qualification; its remaining gates are documented in `MODE_QUALIFICATION.md`.
 
 Unlike HF2/HF3's OFDM waveforms, HF4's single-carrier preamble is a fixed,
 self-contained acquisition sequence (a 63-chip BPSK PN preamble, joint

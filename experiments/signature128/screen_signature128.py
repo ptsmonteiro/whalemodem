@@ -20,7 +20,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
 from experiments.lead2 import lead2
 from whale import rx_audio
 from whale.channel import (AwgnChannel, ChannelChain, ClippingChannel,
-                           FrequencyOffsetChannel, SnrSpec,
+                           FrequencyOffsetChannel, SnrKind, SnrSpec,
                            WattersonChannel)
 from whale.modes import hc0
 
@@ -223,7 +223,7 @@ def _channel(sample_rate: int, snr_db: float, seed: int,
         stages.append(FrequencyOffsetChannel(sample_rate, offset_hz))
     if clip is not None:
         stages.append(ClippingChannel(sample_rate, clip * TX_AMPLITUDE))
-    stages.append(AwgnChannel(sample_rate, SnrSpec(db=snr_db),
+    stages.append(AwgnChannel(sample_rate, SnrSpec(db=snr_db, kind=SnrKind.WAVEFORM),
                               seed=seed ^ 0xA5A5))
     return ChannelChain(stages)
 

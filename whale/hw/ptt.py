@@ -27,6 +27,7 @@ import logging
 import re
 import threading
 import time
+from dataclasses import dataclass
 
 import serial
 from serial.tools import list_ports
@@ -409,6 +410,34 @@ def icom_civ_candidates(usb_id):
     vid, pid = usb_id
     ports = [p for p in list_ports.comports() if p.vid == vid and p.pid == pid]
     return [p.device for p in sorted(ports, key=lambda p: p.device)]
+
+
+@dataclass(frozen=True)
+class SerialPort:
+    """One serial port as reported by the OS, for a wizard picker."""
+
+    device: str
+    description: str
+    manufacturer: str | None
+    usb_id: str | None
+
+
+def list_serial_ports():
+    """Lists every serial port the OS currently sees, lowest port first.
+
+    Unlike icom_civ_candidates(), unfiltered -- for a wizard's "pick your PTT
+    serial port" screen rather than locating a specific known radio.
+    """
+    ports = sorted(list_ports.comports(), key=lambda p: p.device)
+    return [
+        SerialPort(
+            device=p.device,
+            description=p.description,
+            manufacturer=p.manufacturer,
+            usb_id=None if p.vid is None or p.pid is None else f"{p.vid:04X}:{p.pid:04X}",
+        )
+        for p in ports
+    ]
 
 
 def open_icom_ptt(usb_id, name, expected_addr=None):

@@ -12,13 +12,21 @@ dependencies = [
     "scipy",
     "sounddevice",
     "pyserial",
+    "windows-curses; sys_platform == 'win32'",
 ]
 
 [project.optional-dependencies]
 test = ["pytest"]
 
+[project.scripts]
+whalemodem-server = "whale.vara_server:main"
+whalemodem-configure = "whale.radio_config_tui:main"
+
 [tool.setuptools]
 packages = ["whale", "whale.hw", "whale.modes"]
+
+[tool.setuptools.package-data]
+"whale.hw" = ["_vendor/hamlib/**/*"]
 # acceptance_test.py lives at the repo root and is both run directly
 # (`python acceptance_test.py ...`) and imported by two scripts. Declaring it
 # here is what makes `from acceptance_test import StationClient` resolve from

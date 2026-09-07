@@ -21,7 +21,8 @@ figures select experiments; they do not promote a mode.
 ## Method
 
 The screen ran all four frame lengths through identical, paired Watterson
-channel realizations at 0, 5, 10, and 15 dB waveform SNR for the standard
+channel realizations at 0, 5, 10, and 15 dB legacy full-Nyquist waveform SNR
+(9.03, 14.03, 19.03, and 24.03 dB SNR/3 kHz) for the standard
 quiet, moderate, and disturbed presets. There were 20 trials per
 `(preset, SNR, length)` point, full-capacity deterministic random payloads,
 and the production HC1 acquisition, equalization, differential QPSK, K=7

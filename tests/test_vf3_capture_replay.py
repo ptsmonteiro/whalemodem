@@ -23,17 +23,19 @@ import pytest
 
 from whale import rx_audio
 from whale.modes import vf3
-from scripts.make_vf3_golden import (ARRAY_KEYS, CAPTURES, SCALAR_KEYS,
-                                     digest)
+from scripts.make_vf3_golden import (CAPTURES, EXACT_ARRAY_KEYS, SCALAR_KEYS,
+                                     TOLERANCE_ARRAY_KEYS, deserialize, digest)
 
 GOLDEN_PATH = pathlib.Path(__file__).parent / "data" / "vf3_capture_golden.json"
 GOLDEN = json.loads(GOLDEN_PATH.read_text())
 
-# Scalars are compared exactly where they are integers or flags, and to a
-# tight relative tolerance where they are floats -- numpy's reductions are
-# not required to be bit-identical across BLAS builds, and holding them to
-# that would make the suite fail on a different machine rather than on a
-# real regression.  The array digests below are the strict half of the pin.
+# Scalars, and most of the pinned arrays, are compared to a tight relative
+# tolerance rather than bit-exact -- numpy's reductions are not required to
+# be bit-identical across BLAS builds (e.g. Apple's Accelerate vs. OpenBLAS),
+# and holding them to that would make the suite fail on a different machine
+# rather than on a real regression.  Only EXACT_ARRAY_KEYS (the
+# hard-decision Viterbi input) is pinned bit-exact, since thresholding makes
+# it stable across backends.
 FLOAT_TOLERANCE = 1e-9
 
 
@@ -64,8 +66,19 @@ def test_capture_still_decodes_to_its_transmitted_payload(name, decoded):
 def test_capture_decode_stages_are_bit_for_bit_unchanged(name, decoded):
     result = decoded[name]
     expected = GOLDEN[name]["arrays"]
-    actual = {key: digest(np.asarray(result[key])) for key in ARRAY_KEYS}
-    assert actual == expected
+    actual = {key: digest(np.asarray(result[key])) for key in EXACT_ARRAY_KEYS}
+    assert actual == {key: expected[key] for key in EXACT_ARRAY_KEYS}
+
+
+@pytest.mark.parametrize("name", capture_ids())
+def test_capture_decode_stages_are_unchanged_within_tolerance(name, decoded):
+    result = decoded[name]
+    expected = GOLDEN[name]["arrays"]
+    for key in TOLERANCE_ARRAY_KEYS:
+        actual = np.asarray(result[key])
+        golden = deserialize(expected[key])
+        assert np.allclose(actual, golden, rtol=FLOAT_TOLERANCE,
+                           atol=FLOAT_TOLERANCE), key
 
 
 @pytest.mark.parametrize("name", capture_ids())

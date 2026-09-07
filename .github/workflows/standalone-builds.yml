@@ -1,0 +1,236 @@
+# Builds the standalone (no-Python-required) PyInstaller bundle for each of
+# the six platforms whale/hw/_vendor/ carries native libhamlib/PortAudio
+# binaries for. Every leg builds *natively* on/for its own target -- there is
+# no cross-compilation of the Python/PyInstaller build itself -- so each job
+# can bundle that platform's own vendored native libraries, exactly the way
+# packaging/pyinstaller/whalemodem.spec resolves them via platform_tag() at
+# build time. The linux-aarch64/linux-armv7 legs still run on amd64 GitHub
+# runners, but only the *container* is emulated (QEMU); inside that emulated
+# container the build is native to the target arch.
+#
+# Deliberately artifacts-only: this workflow uploads build outputs as
+# workflow artifacts and does NOT create or publish a GitHub Release.
+# Publishing a Release is a separate, more visible action to opt into later
+# -- once more than just linux-x86_64 has been hardware-validated (see
+# packaging/pyinstaller/README.md and the standalone-builds plan). Do not
+# add release-publishing steps here without re-reading that reasoning first.
+
+name: Standalone builds
+
+on:
+  workflow_dispatch: {}
+  push:
+    tags:
+      - "v*"
+
+# Least-privilege default. In particular, publishing a GitHub Release would
+# need `contents: write` -- this workflow intentionally only ever needs read
+# access to check out the repo and upload workflow artifacts.
+permissions:
+  contents: read
+
+jobs:
+  # Single source of truth for the version string used in every archive
+  # name, so a manual workflow_dispatch run and a `git push --tags` run both
+  # produce sensibly named artifacts.
+  compute-version:
+    runs-on: ubuntu-latest
+    outputs:
+      version: ${{ steps.compute.outputs.version }}
+    steps:
+      - id: compute
+        run: |
+          if [ "${{ github.ref_type }}" = "tag" ]; then
+            echo "version=${{ github.ref_name }}" >> "$GITHUB_OUTPUT"
+          else
+            echo "version=manual-$(date -u +%Y%m%d%H%M)-${GITHUB_SHA::8}" >> "$GITHUB_OUTPUT"
+          fi
+
+  # linux-x86_64: native amd64 runner, but the actual PyInstaller build runs
+  # inside a debian:trixie container -- matching the Debian trixie baseline
+  # that scripts/vendor_hamlib.py and scripts/vendor_portaudio.py pulled the
+  # vendored libhamlib/libusb/libportaudio binaries from, for glibc/ABI
+  # consistency with those exact .so files. Not `-slim`: the full image's
+  # extra packages are cheap here and avoid guessing which slim-image gaps
+  # matter, since apt-get is already being used for build tooling.
+  build-linux-x86_64:
+    needs: compute-version
+    runs-on: ubuntu-latest
+    container:
+      image: debian:trixie
+    env:
+      DEBIAN_FRONTEND: noninteractive
+    steps:
+      # git must exist before actions/checkout can do anything in a
+      # container job; libasound2t64/libjack-jackd2-0 are the runtime
+      # libraries the earlier local Docker validation found were needed on
+      # the *smoke-test* side even with PortAudio itself vendored (PortAudio
+      # still dlopen's ALSA/JACK at run time; see whale/hw/audio_io.py's
+      # frozen-mode preload comment).
+      - name: Install system packages
+        run: |
+          apt-get update
+          apt-get install -y --no-install-recommends \
+            git ca-certificates \
+            python3 python3-venv python3-pip \
+            libasound2t64 libjack-jackd2-0
+      - uses: actions/checkout@v4
+      - name: Install project + build deps
+        run: |
+          python3 -m venv .venv
+          . .venv/bin/activate
+          pip install --upgrade pip
+          pip install -e ".[test]"
+          pip install pyinstaller
+      - name: Build standalone bundle
+        run: |
+          . .venv/bin/activate
+          pyinstaller packaging/pyinstaller/whalemodem.spec
+      - name: Smoke test
+        run: |
+          dist/whalemodem-server/whalemodem-server --help
+          . .venv/bin/activate
+          python3 -c "import whale.hw.hamlib, whale.hw.audio_io"
+      - name: Archive bundle
+        run: |
+          cd dist
+          tar czf "whalemodem-server-${{ needs.compute-version.outputs.version }}-linux-x86_64.tar.gz" whalemodem-server
+      - uses: actions/upload-artifact@v4
+        with:
+          name: whalemodem-server-linux-x86_64
+          path: dist/whalemodem-server-*-linux-x86_64.tar.gz
+
+  # linux-aarch64 / linux-armv7: also amd64 GitHub runners, cross-arch via
+  # QEMU user-mode emulation registered by setup-qemu-action, the same
+  # technique (generalized) used to cross-build/validate the linux-x86_64
+  # bundle from arm64 during local development. `docker run --platform`
+  # against debian:trixie makes the *build itself* run natively for the
+  # target arch inside the emulated container -- there is no separate
+  # cross-compiler toolchain involved, just a slower (QEMU-interpreted) CPU.
+  # This can be genuinely slow, especially if numpy/scipy have no prebuilt
+  # wheel for a given arch and pip falls back to a source build under
+  # emulation; a generous timeout is set for that reason.
+  build-linux-cross:
+    needs: compute-version
+    runs-on: ubuntu-latest
+    timeout-minutes: 180
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - tag: linux-aarch64
+            docker_platform: linux/arm64
+          - tag: linux-armv7
+            docker_platform: linux/arm/v7
+    steps:
+      - uses: actions/checkout@v4
+      - uses: docker/setup-qemu-action@v3
+      - uses: docker/setup-buildx-action@v3
+      - name: Build + smoke test inside emulated debian:trixie
+        run: |
+          docker run --rm --platform "${{ matrix.docker_platform }}" \
+            -v "${{ github.workspace }}:/workspace" -w /workspace \
+            -e DEBIAN_FRONTEND=noninteractive \
+            debian:trixie bash -c '
+              set -eux
+              apt-get update
+              # build-essential/gfortran/libopenblas-dev are a safety net in
+              # case numpy/scipy have no prebuilt wheel for this arch and pip
+              # falls back to building from source under emulation -- slow,
+              # but this is CI, not a Raspberry Pi doing its own build.
+              apt-get install -y --no-install-recommends \
+                ca-certificates \
+                python3 python3-venv python3-pip \
+                build-essential gfortran libopenblas-dev \
+                libasound2t64 libjack-jackd2-0
+              python3 -m venv .venv
+              . .venv/bin/activate
+              pip install --upgrade pip
+              pip install -e ".[test]"
+              pip install pyinstaller
+              pyinstaller packaging/pyinstaller/whalemodem.spec
+              dist/whalemodem-server/whalemodem-server --help
+              python3 -c "import whale.hw.hamlib, whale.hw.audio_io"
+            '
+      - name: Archive bundle
+        run: |
+          cd dist
+          tar czf "whalemodem-server-${{ needs.compute-version.outputs.version }}-${{ matrix.tag }}.tar.gz" whalemodem-server
+      - uses: actions/upload-artifact@v4
+        with:
+          name: whalemodem-server-${{ matrix.tag }}
+          path: dist/whalemodem-server-*-${{ matrix.tag }}.tar.gz
+
+  # macos-arm64 / macos-x86_64: real, native Apple Silicon / Intel runners.
+  # No QEMU/Rosetta needed -- macos-13 is the last macOS runner generation
+  # GitHub publishes on Intel hardware, macos-14 is Apple Silicon. The mac
+  # dylib relocation (install_name_tool + ad-hoc codesign) already happened
+  # once, at vendor time, in scripts/vendor_hamlib.py; this build just
+  # bundles the already-relocated .dylib as data, it doesn't redo that step.
+  build-macos:
+    needs: compute-version
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: macos-14
+            tag: macos-arm64
+          - os: macos-13
+            tag: macos-x86_64
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - name: Install project + build deps
+        run: |
+          python3 -m pip install --upgrade pip
+          pip install -e ".[test]"
+          pip install pyinstaller
+      - name: Build standalone bundle
+        run: pyinstaller packaging/pyinstaller/whalemodem.spec
+      - name: Smoke test
+        run: |
+          dist/whalemodem-server/whalemodem-server --help
+          python3 -c "import whale.hw.hamlib, whale.hw.audio_io"
+      - name: Archive bundle
+        run: |
+          cd dist
+          zip -r "whalemodem-server-${{ needs.compute-version.outputs.version }}-${{ matrix.tag }}.zip" whalemodem-server
+      - uses: actions/upload-artifact@v4
+        with:
+          name: whalemodem-server-${{ matrix.tag }}
+          path: dist/whalemodem-server-*-${{ matrix.tag }}.zip
+
+  # windows-x86_64: native runner, sounddevice's wheel already bundles
+  # PortAudio on Windows so there's no vendored-PortAudio preload step to
+  # worry about here (see whale/hw/audio_io.py); only the vendored hamlib
+  # DLLs (from Hamlib's own official w64 release zip) get bundled, per the
+  # spec.
+  build-windows-x86_64:
+    needs: compute-version
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - name: Install project + build deps
+        run: |
+          python -m pip install --upgrade pip
+          pip install -e ".[test]"
+          pip install pyinstaller
+      - name: Build standalone bundle
+        run: pyinstaller packaging/pyinstaller/whalemodem.spec
+      - name: Smoke test
+        run: |
+          dist\whalemodem-server\whalemodem-server.exe --help
+          python -c "import whale.hw.hamlib, whale.hw.audio_io"
+      - name: Archive bundle
+        run: |
+          Compress-Archive -Path dist\whalemodem-server -DestinationPath "dist\whalemodem-server-${{ needs.compute-version.outputs.version }}-windows-x86_64.zip"
+      - uses: actions/upload-artifact@v4
+        with:
+          name: whalemodem-server-windows-x86_64
+          path: dist/whalemodem-server-*-windows-x86_64.zip

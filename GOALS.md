@@ -21,11 +21,14 @@ That is a property of the whole mode ladder, not of any single mode. The
 objective is deliberately different at each end of the ladder, and a mode
 should be designed and judged against the objective for its own rung:
 
-- **Level 0 (the HF and FM control and fallback modes) is optimized for
-  maximum robustness.** These rungs must keep a link alive in the worst
-  conditions the policy claims to serve, including disturbed HF paths and
-  low signal-to-noise ratios. Speed is secondary; paying throughput for
-  margin is the correct trade here.
+- **Level 0 keeps control and fallback traffic reliable within its declared
+  envelope.** HF control targets the same packet-delivery reliability at
+  3 dB less received SNR than Level 1 data (approximately half the signal
+  power at fixed noise), while minimizing short-control airtime. Additional
+  sensitivity is not an objective at the expense of ACK latency. FM retains
+  its maximum-coverage objective. Neither policy may sacrifice its required
+  channel envelope. Avoid full DATA-frame padding for ACKs, and measure their
+  latency and robustness separately from full-capacity throughput.
 - **Top rungs are optimized for maximum speed.** They are *expected* to
   require good channel conditions and to stop working outside them. A fast
   mode that fails on a poor channel is behaving as designed, provided a
@@ -108,7 +111,8 @@ application throughput per data frame and delivery reliability at the target cha
 conditions; a nominal or codec rate alone does not demonstrate parity.
 
 The two ends of each ladder are held to different targets. Level 0 is judged
-by its required worst-channel boundary; Level 4 is judged by its required
+by its required channel boundary and, for HF, short-control latency and
+its 3 dB advantage over Level 1; Level 4 is judged by its required
 peak net application throughput per data frame in its deliberately narrow
 envelope.
 
@@ -261,8 +265,9 @@ Design decisions should favor:
 - Resource efficiency and predictable real-time behavior on low-end hardware
 - Correctness and observability before optimization
 - Robustness per rung as declared, rather than as much robustness as
-  possible in every mode: maximum margin at Level 0, maximum speed at Level
-  4, and the fixed operating envelope for each
+  possible in every mode: the specified control margin and latency for HF
+  Level 0, maximum coverage for FM Level 0, maximum speed at Level 4, and
+  the fixed operating envelope for each
 
 ## Definition of the end state
 

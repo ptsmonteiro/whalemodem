@@ -50,9 +50,14 @@ MANIFEST = (
     QualificationEntry("vhf-fm", 6, QualificationLevel.EXPERIMENTAL),
     QualificationEntry("hf-ssb", 5, QualificationLevel.DEFAULT),
     QualificationEntry("hf-ssb", 4, QualificationLevel.DEFAULT),
+    # Owner approved the 32-FSK HR0 replacement on 2026-09-06 despite its
+    # unproven 3 dB measured margin; Default is availability, not qualification.
     QualificationEntry("hf-ssb", 10, QualificationLevel.DEFAULT),
-    QualificationEntry("hf-ssb", 7, QualificationLevel.DEFAULT),
-    QualificationEntry("hf-ssb", 9, QualificationLevel.EXPERIMENTAL),
+    # HF3 replaces the bandwidth-noncompliant HF2 as the default fast-data
+    # rung. Availability is an owner product decision, not a qualification
+    # claim; HF3's remaining moderate-Watterson gate is documented below.
+    QualificationEntry("hf-ssb", 9, QualificationLevel.DEFAULT),
+    QualificationEntry("hf-ssb", 7, QualificationLevel.EXPERIMENTAL),
     QualificationEntry("hf-ssb", 11, QualificationLevel.DEFAULT),
 )
 
@@ -82,17 +87,15 @@ def registry(policy: str, level: QualificationLevel | str =
         from .modes.hr0_mode import HR0
         from .modes.hc0_mode import HC0
         from .modes.hc1_mode import HC1
-        from .modes.hf2_mode import HF2
+        from .modes.hf3_mode import HF3
         from .modes.hf4_mode import HF4
-        candidates, control = (HR0, HC0, HC1, HF2, HF4), HR0
-        # HF3 remains an experiment-backed adapter and optional development
-        # dependency; a normal/default station must not import it merely to
-        # construct the production HF ladder. HF2 and HF4 are manifest
-        # DEFAULT modes (see MANIFEST above) and so are always
-        # importable/selectable.
+        candidates, control = (HR0, HC0, HC1, HF3, HF4), HR0
+        # HF2 remains available only at experimental level as a historical
+        # fallback. HF3 and HF4 are manifest DEFAULT modes and are therefore
+        # importable/selectable on a normal station.
         if requested >= QualificationLevel.EXPERIMENTAL:
-            from .modes.hf3_mode import HF3
-            candidates += (HF3,)
+            from .modes.hf2_mode import HF2
+            candidates += (HF2,)
     else:
         raise ValueError(f"unknown channel policy {policy!r}")
 

@@ -3,7 +3,7 @@ import pytest
 from scipy import signal
 
 from experiments.hc2_32qam import hc2_32qam as hc2
-from whale.channel import AwgnChannel, SnrSpec
+from whale.channel import AwgnChannel, SnrKind, SnrSpec
 from whale.dsp import ofdm
 
 
@@ -63,7 +63,7 @@ def _awgn_capture(payload, *, lead, snr_db, seed, tail=4_096):
     frame = hc2.modulate(payload)
     capture = np.concatenate((np.zeros(lead, np.float32), frame,
                               np.zeros(tail, np.float32)))
-    spec = SnrSpec(snr_db, reference_start=lead,
+    spec = SnrSpec(snr_db, SnrKind.WAVEFORM, reference_start=lead,
                    reference_stop=lead + len(frame))
     channel = AwgnChannel(hc2.SAMPLE_RATE, spec, seed)
     return np.asarray(channel.process(capture).audio, dtype=float)

@@ -390,18 +390,47 @@ def _to_symbol_grid(coded_bits: np.ndarray) -> np.ndarray:
     both grid axes; no extra transpose is needed or correct here -- see
     `INTERLEAVER`'s comment for why the old block-plus-transpose
     construction was a no-op bug)."""
-    return INTERLEAVER.spread(coded_bits).reshape(DATA_SYMBOLS, _INTERLEAVE_COLUMNS)
+    columns = _INTERLEAVE_COLUMNS if not FREQUENCY_DIVERSITY else DIVERSITY_COLUMNS
+    compact = INTERLEAVER.spread(coded_bits).reshape(DATA_SYMBOLS, columns)
+    if not FREQUENCY_DIVERSITY:
+        return compact
+    grid = np.zeros((DATA_SYMBOLS, _INTERLEAVE_COLUMNS), dtype=compact.dtype)
+    first = int(DIVERSITY_COLUMNS)
+    second = int(DIVERSITY_SECOND_OFFSET)
+    grid[:, :first] = compact
+    grid[:, second:second + first] = compact
+    return grid
 
 
 def _from_symbol_grid(grid: np.ndarray) -> np.ndarray:
     """Inverse of `_to_symbol_grid`, for hard bits or soft reliabilities
     alike (both are plain arrays to `Interleaver.gather`)."""
-    return INTERLEAVER.gather(np.asarray(grid).reshape(-1))
+    grid = np.asarray(grid).reshape(DATA_SYMBOLS, _INTERLEAVE_COLUMNS)
+    if FREQUENCY_DIVERSITY:
+        first = int(DIVERSITY_COLUMNS)
+        second = int(DIVERSITY_SECOND_OFFSET)
+        compact = (grid[:, :first] + grid[:, second:second + first]) / 2.0
+        return INTERLEAVER.gather(compact.reshape(-1))
+    return INTERLEAVER.gather(grid.reshape(-1))
 
 #: Acquisition confidence gate. `whale.dsp.acquire` reports a normalized
 #: self-correlation score of the repeated sync block; this is the same
 #: proposal-scale threshold the shared library defaults to.
 ACQUISITION_THRESHOLD = 0.60
+
+# HF3 enables this experimentally for its denser pilot schedule. HF4 keeps
+# the historical phase-only path until it has its own qualification rerun.
+TRACK_PILOT_AMPLITUDE = False
+PILOT_CHANNEL_SMOOTHING = False
+FREQUENCY_DIVERSITY = False
+DIVERSITY_COLUMNS = None
+DIVERSITY_SECOND_OFFSET = None
+
+# HF3 may choose a stricter erasure floor while testing frequency-selective
+# fading. HF4 retains its qualified-path defaults.
+CARRIER_WEIGHT_LOW = 0.02
+CARRIER_WEIGHT_HIGH = 4.0
+CARRIER_ERASURE_SNR_DB = None
 
 DEFAULT_HEAD_SECONDS = LEAD_SECONDS
 
@@ -594,8 +623,11 @@ def _data_values_to_packet_bits(data_values: np.ndarray,
     soft_grid = soft_16qam_bits(data_values)  # (DATA_SYMBOLS, CARRIER_COUNT, 4)
     if carrier_weights is not None:
         soft_grid = soft_grid * np.asarray(carrier_weights)[None, :, None]
-    interleaved_soft = soft_grid.reshape(DATA_SYMBOLS, RAW_BITS // DATA_SYMBOLS)
-    coded_soft = _from_symbol_grid(interleaved_soft)
+    if FREQUENCY_DIVERSITY:
+        coded_soft = _from_symbol_grid(soft_grid)
+    else:
+        interleaved_soft = soft_grid.reshape(DATA_SYMBOLS, RAW_BITS // DATA_SYMBOLS)
+        coded_soft = _from_symbol_grid(interleaved_soft)
     mother_soft = _depuncture_to_soft(coded_soft)
     decoded = FEC_CODE.decode_soft(mother_soft)
     message = decoded[:MESSAGE_CAPACITY_BITS]  # drop the FEC_TAIL_BITS termination
@@ -721,6 +753,60 @@ def demodulate(audio: np.ndarray, **_ignored) -> dict:
         np.tile(PILOT_VALUES, (PILOT_SYMBOLS, 1)),
         equalized_header[-1], HEADER_VALUES[-1])
 
+    if PILOT_CHANNEL_SMOOTHING:
+        # Pilot observations are noisy. Smooth the time sequence of complex
+        # channel anchors before interpolation, while unwrapping phase and
+        # smoothing log-amplitude independently to avoid phase-wrap and
+        # deep-fade bias.
+        pilot_ratio = (equalized_payload[PILOT_INDICES] /
+                       np.tile(PILOT_VALUES, (PILOT_SYMBOLS, 1)))
+        phase_anchors = np.unwrap(np.angle(pilot_ratio), axis=0)
+        phase_anchors = np.vstack((
+            np.angle(equalized_header[-1] / HEADER_VALUES[-1]),
+            phase_anchors))
+        amplitude_anchors = np.vstack((
+            np.ones((1, CARRIER_COUNT)), np.abs(pilot_ratio)))
+        if len(PILOT_INDICES) >= 3:
+            kernel = np.array([0.25, 0.5, 0.25])
+            for carrier in range(CARRIER_COUNT):
+                phase_anchors[:, carrier] = np.convolve(
+                    np.pad(phase_anchors[:, carrier], (1, 1), mode="edge"),
+                    kernel, mode="valid")
+                log_amp = np.log(np.maximum(amplitude_anchors[:, carrier], 1e-3))
+                amplitude_anchors[:, carrier] = np.exp(np.convolve(
+                    np.pad(log_amp, (1, 1), mode="edge"), kernel,
+                    mode="valid"))
+        anchor_positions = np.concatenate((np.array([-1]), PILOT_INDICES))
+        phase_trace = np.empty_like(equalized_payload.real)
+        amplitude_trace = np.empty_like(equalized_payload.real)
+        for carrier in range(CARRIER_COUNT):
+            positions = np.arange(PAYLOAD_SYMBOLS)
+            phase_trace[:, carrier] = np.interp(
+                positions, anchor_positions, phase_anchors[:, carrier])
+            amplitude_trace[:, carrier] = np.exp(np.interp(
+                positions, anchor_positions,
+                np.log(np.maximum(amplitude_anchors[:, carrier], 1e-3))))
+        corrected = (equalized_payload * np.exp(-1j * phase_trace)
+                     / amplitude_trace)
+
+    if TRACK_PILOT_AMPLITUDE and not PILOT_CHANNEL_SMOOTHING:
+        # Header-only amplitude estimates are insufficient when Watterson
+        # fading changes a carrier's gain during the frame. Interpolate the
+        # positive gain envelope in log space; phase unwrapping remains
+        # handled by pilot_phase above.
+        pilot_ratio = (equalized_payload[PILOT_INDICES] /
+                       np.tile(PILOT_VALUES, (PILOT_SYMBOLS, 1)))
+        amplitude_anchors = np.concatenate((
+            np.ones((1, CARRIER_COUNT), dtype=np.float64),
+            np.abs(pilot_ratio)), axis=0)
+        anchor_positions = np.concatenate((np.array([-1]), PILOT_INDICES))
+        amplitude_trace = np.empty_like(equalized_payload.real)
+        for carrier in range(CARRIER_COUNT):
+            amplitude_trace[:, carrier] = np.exp(np.interp(
+                np.arange(PAYLOAD_SYMBOLS), anchor_positions,
+                np.log(np.maximum(amplitude_anchors[:, carrier], 1e-3))))
+        corrected = corrected / amplitude_trace
+
     data_values = corrected[DATA_ROWS]
     # 2026-09-01 dense-carrier redesign: tightened from low=0.05. The
     # stronger rate-8/9 code (see FEC_K/FEC_N) is more sensitive to a
@@ -728,7 +814,11 @@ def demodulate(audio: np.ndarray, **_ignored) -> dict:
     # dead carrier weighted at 0.05 occasionally still misled the Viterbi
     # metric enough to fail (found by test_one_dead_carrier_still_decodes
     # during this redesign); 0.02 leaves comfortably more margin.
-    weights = _equalize.carrier_weights(channel.snr_db, low=0.02, high=4.0)
+    weights = _equalize.carrier_weights(
+        channel.snr_db, low=CARRIER_WEIGHT_LOW, high=CARRIER_WEIGHT_HIGH)
+    if CARRIER_ERASURE_SNR_DB is not None:
+        weights = weights.copy()
+        weights[channel.snr_db < CARRIER_ERASURE_SNR_DB] = 0.0
     packet_bits = _data_values_to_packet_bits(data_values, carrier_weights=weights)
     packet_bytes = np.packbits(packet_bits).tobytes()
 

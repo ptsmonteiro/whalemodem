@@ -59,7 +59,7 @@ import numpy as np
 from scipy import signal
 
 from whale.channel import (WATTERSON_PRESETS, AwgnChannel, ChannelChain,
-                           SnrSpec, WattersonChannel, WattersonPath)
+                           SnrKind, SnrSpec, WattersonChannel, WattersonPath)
 from whale.qualification import channel_point_label, trial_seed
 from whale.trials import TrialOutcome, TrialResult, TrialRun
 
@@ -133,7 +133,7 @@ class ChannelPoint:
             WattersonChannel(hc2.SAMPLE_RATE, self.paths(), seed,
                              preset_name=self.preset),
             AwgnChannel(hc2.SAMPLE_RATE,
-                        SnrSpec(self.snr_db, reference_start=start,
+                        SnrSpec(self.snr_db, SnrKind.WAVEFORM, reference_start=start,
                                 reference_stop=stop),
                         seed ^ 0x5A5A),
         ))

@@ -106,13 +106,14 @@ are negotiated and adapted independently as described in
 
 Which mode is the control mode is a property of the registry, and therefore of
 the channel. On the VHF FM ladder it is mode `0`, and modes `0..2` above are
-that ladder. On the HF SSB ladder it is mode `10` (HR0), followed by mode `5`
-(HC0) and mode `4` (HC1); the CPFSK profiles are not offered at all,
+that ladder. On the HF SSB ladder it is mode `10` (HR0), followed by modes `5`
+(HC0), `4` (HC1), `7` (HF2), and `11` (HF4); the CPFSK profiles are not offered at all,
 because they carry no carrier-frequency estimate and so on SSB they are not a
 robust fallback but a mode that stops working as soon as the two stations
-disagree about frequency. Mode `7` (HF2, below) is a further, experimental-
-only rung above HC1, not offered by default. See `whale/policy.py`, which
-pairs each `ChannelPolicy` with its ladder.
+disagree about frequency. HF2 and HF4 are Default by explicit owner product
+decisions despite open qualification gates; availability is not a claim that
+those gates passed. See `whale/policy.py`, which pairs each `ChannelPolicy`
+with its ladder.
 
 Mode IDs are global across channels: an ID names one waveform everywhere, even
 where no registry offers two of them together.
@@ -272,7 +273,7 @@ Three details follow from being non-coherent:
   reads its ceiling whatever the timing, flat to within 1e-9 across +-48
   samples.
 
-### Mode 7: HF2, an experimental faster HF data mode
+### Mode 7: HF2, a default HF data mode with an open gate failure
 
 Mode `7` is `whale.modes.hf2_mode.HF2`, a pilot-assisted coherent 16-QAM OFDM
 mode built and qualified in `experiments/hf2/` as a from-scratch design
@@ -280,39 +281,69 @@ independent of HC0/HC1/VF6/HR0 (see `experiments/hf2/DESIGN.md`), then wired
 into `whale/modes/` as a thin `WaveformMode` adapter over the unchanged
 experiment module, the same shape `hc1_mode.py` uses over `hc1.py`. It
 targets Level 2 of the HF SSB speed ladder (`SPEED_LADDERS.md`):
-general-purpose data, quiet Watterson fading at +5 dB and above, moderate at
-+10 dB and above. 19 carriers (656.25-2343.75 Hz, 93.75 Hz spacing) carry 8
+general-purpose data, quiet Watterson fading at +14 dB and above, moderate at
++19 dB and above under the current SNR/3 kHz convention. 19 carriers
+(656.25-2343.75 Hz, 93.75 Hz spacing) carry 8
 comb pilots and 11 16-QAM data carriers grouped into 5 logical carriers with
 physical frequency diversity (each logical value repeated on 2-3 carriers
 spread across the band, LLR-combined at the receiver) to survive persistent
 Watterson notches; framing is the same rate-1/2 K=7 convolutional code,
 CRC32 and length field used inside the payload grid as HC0/HC1/VF3. A frame
 carries 117 payload bytes (107 after the link's air header) in 109 symbols /
-0.775 s of frame body plus the common HF lead.
+1.453 s of frame body, plus the common HF lead and tail for 1.601 s total.
 
-`experiments/hf2/RESULTS.md` records the qualifying Monte Carlo evidence: a
->=300-trial confirmed boundary at both required Level 2 envelope points
-(`mid_latitude_quiet` +5 dB and `mid_latitude_moderate` +10 dB), clearing
+`experiments/hf2/RESULTS.md` records the historical Monte Carlo evidence: a
+>=300-trial confirmed boundary at both required Level 2 envelope points under
+the retired full-Nyquist convention (`mid_latitude_quiet` +5 dB and
+`mid_latitude_moderate` +10 dB, equivalent to +14.03/+19.03 dB SNR/3 kHz), clearing
 `MODE_QUALIFICATION.md`'s FER/acquisition gate with useful throughput of
 about 577-585 bit/s -- above the 500 bit/s floor, but by a thin margin (see
-that document's caveats). HF2 is registered as EXPERIMENTAL only
-(`whale/mode_qualification.py`); it is not offered by any default or
-optional registry and carries no hardware, session, or ARQ evidence yet.
+that document's caveats). A newer paired current-convention comparison is at
+`logs/mode_qualification/hf-ssb/hc1-hf2/2026-09-07/INDEX.md`.
 
-### Mode 10: HR0, the maximum-margin HF control mode
+### Mode 10: HR0, the short-control HF mode
 
-HR0 is constant-envelope non-coherent 128-FSK at 17.857 baud. Its 128
-orthogonal tones occupy 2,285.7 Hz, each symbol is 2,688 samples at 48 kHz,
-and each carries seven Gray-mapped coded bits. Sixteen known sync symbols
-precede 112 payload symbols. A soft-decision rate-1/2 K=9 convolutional code,
-bit interleaver, whitened length field, and CRC32 protect up to 42 waveform
-bytes, or a 32-byte DATA chunk after the link air header. The fixed frame is
-7.316 seconds including the minimum common lead and tail, yielding 35.0
-bit/s at the DATA-chunk boundary before ARQ overhead. This exceeds the HF
-Level-0 20 bit/s floor while targeting decode at -15 dB waveform SNR.
+On 2026-09-06 the owner selected the faster MARGIN32 geometry for production
+HR0, overriding the outstanding qualification gates. HR0 is constant-envelope
+non-coherent 32-FSK at 46.875 baud. Its 32 orthogonal tones run from bin 12
+through 43 (562.5–2015.625 Hz), with 1500 Hz nominal tone-bank bandwidth.
+Each symbol is 1024 samples at 48 kHz and carries five Gray-mapped coded bits.
+Sixteen known sync symbols precede either 62 short-body or 158 full-body
+symbols. Soft-decision rate-1/2 K=9 coding, a bit interleaver, whitened length
+field, and CRC32 protect both sizes:
 
-The -15 dB boundary is a design target pending the required retained-channel
-qualification campaign and radio tests; it is not yet a measured claim.
+| Waveform payload | Body symbols | Airtime with minimum lead and tail |
+| --- | ---: | ---: |
+| 0–12 bytes (including DATA_ACK and empty controls) | 62 | 1.812 s |
+| 13–42 bytes | 158 | 3.860 s |
+
+The 12-byte DATA_ACK comprises the ten-byte air header and two-byte remainder.
+Its short frame saves 1.696 seconds (48.3%) against the preceding 128-FSK
+HR0 short frame. The full frame carries a 32-byte DATA chunk, yielding
+66.3 bit/s before ARQ overhead. The durations include the minimum 128 ms
+common lead and 20 ms tail; adaptive lead and radio turnaround add latency.
+
+The short codec has 310 coded bits, multiplicative interleaver stride 119,
+and whitener seed `0x17A7A`; the full codec has 790 coded bits, stride 301,
+and seed `0x17A98`. Both use the same sixteen-symbol sync. The receiver tries
+the short body first and accepts only a checked length and CRC32, then tries
+the full body if needed. An unsuccessful short hypothesis with an incomplete
+full body remains pending, so streaming RX cannot consume a full frame
+prematurely. There are at most two body-decoder attempts per acquisition.
+Airtime estimates select the same size as encoding.
+
+This replacement retains mode ID 10 and the HR0 common-lead signature but
+changes the on-air waveform. It does not transmit or decode legacy 128-FSK
+HR0 frames and does not negotiate a legacy option. **Both endpoints must be
+updated together.** The old 3.508/7.316-second HR0 remains a historical
+experimental comparison baseline only.
+
+Production availability is an explicit owner product decision, not a claim
+that the 3 dB relative-margin, retained-channel, or radio qualification gates
+passed. The 1.812-second candidate's moderate/disturbed 300-trial boundary
+comparisons did not establish the required confidence-qualified margin over
+HC0. See `MODE_QUALIFICATION.md` and the retained
+[experiment results](experiments/hr0_fast_control/RESULTS.md).
 
 ### Common HF lead and frame signature
 

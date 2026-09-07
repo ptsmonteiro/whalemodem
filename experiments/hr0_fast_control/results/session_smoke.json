@@ -1,0 +1,26 @@
+[
+  {
+    "mode": "hr0",
+    "setup_airtime": 25.232,
+    "transfer_airtime": 109.73599999999999,
+    "disconnect_airtime": 8.807999999999993
+  },
+  {
+    "mode": "fast16_k9",
+    "setup_airtime": 10.106666666666666,
+    "transfer_airtime": 32.104,
+    "disconnect_airtime": 2.4293333333333322
+  },
+  {
+    "mode": "fast32_k9",
+    "setup_airtime": 11.344,
+    "transfer_airtime": 37.416000000000004,
+    "disconnect_airtime": 2.7920000000000016
+  },
+  {
+    "mode": "fast32_k9_1024",
+    "setup_airtime": 14.032,
+    "transfer_airtime": 49.0,
+    "disconnect_airtime": 3.6240000000000023
+  }
+]

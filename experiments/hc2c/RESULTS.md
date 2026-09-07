@@ -35,14 +35,16 @@ from 207 to 188 physical-layer bytes, reducing nominal payload rate from
 1,089 to 989 bit/s.
 
 Every `(preset, SNR, trial)` used the identical channel seed for both modes.
-The screen used 20 trials at 0, 5, 10, and 15 dB for quiet, moderate, and
+This historical screen used the retired full-Nyquist waveform convention at
+0, 5, 10, and 15 dB (equivalent to 9.03, 14.03, 19.03, and 24.03 dB SNR/3 kHz)
+for quiet, moderate, and
 disturbed Watterson presets. It is deliberately below qualification size.
 
 ## Results
 
 Each cell is `delivered/20; observed payload bit/s`.
 
-| Preset | SNR | No payload pilots | Eight pilots |
+| Preset | Legacy full-Nyquist SNR | No payload pilots | Eight pilots |
 | --- | ---: | ---: | ---: |
 | quiet | 0 dB | 13; 708 | 13; 643 |
 | quiet | 5 dB | 15; 816 | 20; 989 |

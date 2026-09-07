@@ -9,7 +9,7 @@ Examples:
         --points 5 10 15 20 25 30 --trials 100
     python scripts/benchmark_simulated_channels.py --model watterson \
         --policy hf-ssb --watterson-preset mid_latitude_moderate \
-        --points -5 0 5 10 15 --trials 100
+        --points 4 9 14 19 24 --trials 100
 """
 
 from __future__ import annotations
@@ -159,7 +159,7 @@ def main(argv=None):
     ap.add_argument("--mode-level", choices=("default", "optional", "experimental"),
                     default="default")
     ap.add_argument("--points", type=float, nargs="+", required=True,
-                    help="waveform SNR dB, or RF C/N dB for FM")
+                    help="SNR in a 3 kHz reference bandwidth, or RF C/N dB for FM")
     ap.add_argument("--trials", type=int, default=100)
     ap.add_argument(
         "--workers", type=int, default=None,

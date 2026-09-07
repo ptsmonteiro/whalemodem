@@ -32,7 +32,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
 from whale import rx_audio                                     # noqa: E402
 from whale.channel import (AwgnChannel, ChannelChain,          # noqa: E402
                            ClippingChannel, FrequencyOffsetChannel,
-                           SnrSpec, WattersonChannel)
+                           SnrKind, SnrSpec, WattersonChannel)
 from whale.dsp import mfsk as _mfsk                             # noqa: E402
 from whale.modes import hc0                                     # noqa: E402
 
@@ -82,7 +82,7 @@ def _capture(geometry: lead2.Geometry, label: int, burn_repeats: int,
     reference = ((eaten, frame_start_tx) if frame_start_tx > eaten
                  else (frame_start_tx, len(transmitted)))
     stages.append(AwgnChannel(lead2.TX_SAMPLE_RATE,
-                              SnrSpec(db=snr_db,
+                              SnrSpec(db=snr_db, kind=SnrKind.WAVEFORM,
                                       reference_start=reference[0],
                                       reference_stop=reference[1]),
                               seed=seed ^ 0xA5A5))

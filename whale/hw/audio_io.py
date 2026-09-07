@@ -1,8 +1,12 @@
 """Audio device lookup and a TX-play/RX-record harness for over-the-air tests.
 
-The radios' USB sound cards are used via WASAPI (lower latency / more
-predictable buffering than MME or DirectSound on Windows). Which card belongs
-to which radio lives in radios.py, not here.
+The radios' USB sound cards are used through whichever PortAudio host API
+sits closest to the hardware on the running OS -- WASAPI on Windows, Core
+Audio on macOS, ALSA on Linux -- rather than a higher-level shared-mixer API
+(MME/DirectSound on Windows; a PulseAudio/JACK server sitting in front of
+ALSA on Linux) for lower and more predictable buffering. See _host_api_index()
+for the per-platform default and how to override it. Which card belongs to
+which radio lives in radios.py, not here.
 
 Copied from radiomodem's shark/hw/audio_io.py, since diverged: both keyed
 paths below now key *inside* their try block and un-key through ptt.unkey(),
@@ -11,9 +15,50 @@ transmitter up. See the un-keying notes in ptt.py for the bench incident that
 forced it.
 """
 
+import ctypes
+import ctypes.util
 import logging
+import os
+import sys
 import threading
 import time
+from dataclasses import dataclass
+from pathlib import Path
+
+
+def _preload_bundled_portaudio() -> None:
+    # The sounddevice wheel only bundles PortAudio on Windows/macOS (see the
+    # module docstring's ALSA/WASAPI/CoreAudio rationale) -- on Linux it does
+    # its own dynamic lookup of libportaudio.so.2 at import time and relies on
+    # a system package (docs/HARDWARE.md: `apt install libportaudio2`). A
+    # frozen, standalone Linux build has no such system package to find, so it
+    # must preload its own vendored copy here, before sounddevice's own
+    # lookup runs, or the "no Python/system deps required" point of freezing
+    # would be silently defeated by this one missing library.
+    if not (getattr(sys, "frozen", False) and sys.platform.startswith("linux")):
+        return
+    bundled = Path(sys._MEIPASS) / "_vendor_portaudio" / "libportaudio.so.2"
+    if not bundled.exists():
+        return
+    ctypes.CDLL(str(bundled), mode=ctypes.RTLD_GLOBAL)
+    # sounddevice itself locates PortAudio via ctypes.util.find_library(),
+    # which on Linux depends on `ldconfig`'s cache (or a `gcc`/`ld` fallback)
+    # to discover a library outside the default search path -- none of which
+    # is guaranteed on a bare deployment target, and the preload above (which
+    # only makes the library available in the process, not discoverable by
+    # name) does nothing to help that lookup. Point find_library straight at
+    # our vendored copy instead of relying on that discovery chain.
+    _orig_find_library = ctypes.util.find_library
+
+    def _find_bundled_or_fallback(name, _orig=_orig_find_library):
+        if name == "portaudio":
+            return str(bundled)
+        return _orig(name)
+
+    ctypes.util.find_library = _find_bundled_or_fallback
+
+
+_preload_bundled_portaudio()
 
 import numpy as np
 import sounddevice as sd
@@ -24,30 +69,92 @@ SAMPLE_RATE = 48000
 
 _log = logging.getLogger(__name__)
 
+# Per-platform default host API, matched by substring against
+# sd.query_hostapis()'s "name" field. Overridable with WHALE_AUDIO_HOST_API
+# for setups that need something other than the default -- a Linux station
+# deliberately routed through PulseAudio or JACK instead of raw ALSA, or a
+# Windows fallback to MME/DirectSound on a card that WASAPI won't open.
+_DEFAULT_HOST_API = {"win32": "wasapi", "darwin": "core audio"}.get(sys.platform, "alsa")
 
-def _wasapi_index():
-    for i, api in enumerate(sd.query_hostapis()):
-        if "wasapi" in api["name"].lower():
+
+def _host_api_index():
+    wanted = os.environ.get("WHALE_AUDIO_HOST_API", _DEFAULT_HOST_API).lower()
+    hostapis = sd.query_hostapis()
+    for i, api in enumerate(hostapis):
+        if wanted in api["name"].lower():
             return i
-    raise LookupError("no WASAPI host API found")
+    available = ", ".join(api["name"] for api in hostapis)
+    raise LookupError(
+        f"no host API matching {wanted!r} found (platform {sys.platform!r}); "
+        f"available: {available}. Set WHALE_AUDIO_HOST_API to override the default.")
 
 
-def find_device(name_substr, kind):
-    """Finds a WASAPI device index by partial name and direction ('input'/'output')."""
-    hostapi = _wasapi_index()
+def find_devices(name_substr, kind):
+    """Lists device indices on the selected host API by partial name and
+    direction ('input'/'output'). Unlike find_device(), never raises: 0, 1,
+    or many matches all come back as a plain (possibly empty) list."""
+    hostapi = _host_api_index()
     channel_key = "max_input_channels" if kind == "input" else "max_output_channels"
-    matches = [
+    return [
         i
         for i, d in enumerate(sd.query_devices())
         if d["hostapi"] == hostapi
         and name_substr.lower() in d["name"].lower()
         and d[channel_key] >= 1
     ]
+
+
+def find_device(name_substr, kind):
+    """Finds a device index on the selected host API by partial name and
+    direction ('input'/'output'). See _host_api_index() for which host API
+    that is on this platform."""
+    matches = find_devices(name_substr, kind)
+    api_name = sd.query_hostapis()[_host_api_index()]["name"]
     if not matches:
-        raise LookupError(f"no WASAPI {kind} device matching {name_substr!r}")
+        raise LookupError(f"no {api_name} {kind} device matching {name_substr!r}")
     if len(matches) > 1:
-        raise LookupError(f"ambiguous WASAPI {kind} device matches for {name_substr!r}: {matches}")
+        raise LookupError(f"ambiguous {api_name} {kind} device matches for {name_substr!r}: {matches}")
     return matches[0]
+
+
+@dataclass(frozen=True)
+class AudioDevice:
+    """One PortAudio device on the selected host API, for a wizard picker."""
+
+    index: int
+    name: str
+    host_api: str
+    max_input_channels: int
+    max_output_channels: int
+    default_samplerate: float
+
+
+def list_devices(kind=None):
+    """Lists every device on the selected host API, sorted by index.
+
+    kind="input"/"output" filters to devices with at least one channel in
+    that direction; kind=None (the default) returns every device on the host
+    API regardless of channel counts, for a wizard's unified picker table.
+    """
+    hostapi = _host_api_index()
+    api_name = sd.query_hostapis()[hostapi]["name"]
+    devices = []
+    for i, d in enumerate(sd.query_devices()):
+        if d["hostapi"] != hostapi:
+            continue
+        if kind == "input" and d["max_input_channels"] < 1:
+            continue
+        if kind == "output" and d["max_output_channels"] < 1:
+            continue
+        devices.append(AudioDevice(
+            index=i,
+            name=d["name"],
+            host_api=api_name,
+            max_input_channels=d["max_input_channels"],
+            max_output_channels=d["max_output_channels"],
+            default_samplerate=d["default_samplerate"],
+        ))
+    return sorted(devices, key=lambda dev: dev.index)
 
 
 def transmit(tx_signal, tx_device, ptt, samplerate=SAMPLE_RATE, ptt_lead=0.3, ptt_tail=0.2):

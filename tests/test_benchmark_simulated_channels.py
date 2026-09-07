@@ -32,7 +32,7 @@ def test_one_point_benchmark_writes_versioned_replayable_result(tmp_path):
     assert document["trials"][0]["payload_bytes"] == 98
     assert document["metadata"]["channel_descriptions_by_point"][0][
         "snr"]["db"] == 40
-    assert document["trials"][0]["channel_measurements"]["waveform_snr_db"] == 40
+    assert document["trials"][0]["channel_measurements"]["snr_3khz_db"] == 40
     summary = document["metadata"]["summary_by_mode_point"][0]
     assert summary["acquisition_probability"]["rate"] == 1
     assert summary["frame_error_rate"]["rate"] == 0

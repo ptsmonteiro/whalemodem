@@ -8,6 +8,11 @@ helpers over `whale.channel`'s Watterson model, run through
 `experiments/hf2/benchmark_hf2.py` — no radios were available for this work
 (see PLAN.md's status section).
 
+These original artifacts use the retired full-Nyquist `waveform_snr_db`
+convention. Add 9.03 dB for the current SNR/3 kHz convention: the +5/+10 dB
+points below are +14.03/+19.03 dB today. Artifacts retain their original
+labels and are not rewritten.
+
 ## Confirmed-boundary gate (>=300 trials, seed 20260910)
 
 Per `MODE_QUALIFICATION.md` section 3, the two required boundary points need
@@ -176,5 +181,8 @@ otherwise unchanged and still applies in full.
   (534.6 bit/s) clears the 500 bit/s floor by only 6.9%, not by a wide
   margin. A reader relying on this result for anything beyond "clears
   Level 2 as specified" should treat that margin as the main caveat.
-- **No claim of parity or comparison** with HC0, HC1, VF6, HR0, or VARA
-  (per DESIGN.md's explicit scope note).
+- The original design campaign made **no claim of parity or comparison** with
+  HC0, HC1, VF6, HR0, or VARA. A later production-adapter comparison with HC1
+  is retained at
+  `logs/mode_qualification/hf-ssb/hc1-hf2/2026-09-07/INDEX.md`; it does not
+  supply the still-missing session/ARQ or occupied-bandwidth qualification.

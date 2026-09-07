@@ -44,7 +44,7 @@ from pathlib import Path
 import numpy as np
 from scipy import signal
 
-from whale.channel import AwgnChannel, SnrSpec
+from whale.channel import AwgnChannel, SnrKind, SnrSpec
 from whale.qualification import channel_point_label, trial_seed
 from whale.trials import TrialOutcome, TrialResult, TrialRun
 
@@ -170,7 +170,7 @@ def frame_trial(*, snr_db: float, seed: int, trial: int, label: str,
     frame = hc2.modulate(payload)
     capture = np.concatenate((np.zeros(lead_samples, np.float32), frame,
                               np.zeros(tail_samples, np.float32)))
-    spec = SnrSpec(snr_db, reference_start=lead_samples,
+    spec = SnrSpec(snr_db, SnrKind.WAVEFORM, reference_start=lead_samples,
                    reference_stop=lead_samples + len(frame))
     channel = AwgnChannel(hc2.SAMPLE_RATE, spec, seed)
     received = channel.process(capture)

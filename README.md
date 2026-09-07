@@ -48,7 +48,9 @@ python acceptance_test.py --a-cmd 8300 --a-data 8301 --b-cmd 8310 --b-data 8311 
 ```
 
 Read the [hardware and safety guide](docs/HARDWARE.md) before transmitting;
-the [testing guide](docs/TESTING.md) covers the other test workflows.
+the [testing guide](docs/TESTING.md) covers the other test workflows. For a
+station that shouldn't need a Python setup at all, see
+[Standalone builds](docs/HARDWARE.md#standalone-builds).
 
 ## Current status
 

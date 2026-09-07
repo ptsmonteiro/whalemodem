@@ -89,8 +89,8 @@ def test_paired_transports_apply_independent_directional_channels():
 
 def test_directional_audio_link_resets_and_replays_seeded_channels():
     pair = DirectionalAudioLink(
-        AwgnChannel(48_000, SnrSpec(20.0), seed=41),
-        AwgnChannel(48_000, SnrSpec(20.0), seed=42),
+        AwgnChannel(48_000, SnrSpec(29.0308998699), seed=41),
+        AwgnChannel(48_000, SnrSpec(29.0308998699), seed=42),
     )
     pair.a.send(np.ones(480, dtype=np.float32))
     pair.b.send(np.full(240, 0.5, dtype=np.float32))
@@ -139,7 +139,7 @@ def test_full_stack_session_over_composed_asymmetric_channels():
             FilterChannel(48_000, low_hz=500, high_hz=3_500, order=4),
             ClippingChannel(48_000, 0.55),
             SampleClockChannel(48_000, clock),
-            AwgnChannel(48_000, SnrSpec(25.0), seed),
+            AwgnChannel(48_000, SnrSpec(34.0308998699), seed),
         ))
 
     channel_ab = path(+4.0, +0.05, 0.008, +20.0, 101)
@@ -230,7 +230,7 @@ def test_the_hf_channel_carries_a_session_with_hr0_in_control():
     link_a, link_b, ta, tb = _run_session(payload_ab, payload_ba, policy=HF_SSB)
 
     # HR0 is the control mode, so the handshake, the calibration exchange,
-    # every ACK and the disconnect all rode the guarded 16-MFSK waveform.
+    # every ACK and the disconnect all rode the 32-FSK control waveform.
     assert link_a.modes.control is HR0 and link_b.modes.control is HR0
     assert link_a.modes.supported_ids == (HR0.mode_id, HC0.mode_id,
                                            HC1.mode_id, HF2.mode_id,
