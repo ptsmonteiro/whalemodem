@@ -527,3 +527,24 @@ For comparison, VARA HF v4.3.0's vendor-claimed 32-QAM rate on its
   rather than to hard-code the number.
 - These are provisional experiment results, not a qualification run
   under MODE_QUALIFICATION.md.
+
+## Follow-up: how far the guard can actually be cut
+
+`experiments/hf18_ofdm49_vara/` swept `cp_len` between the 60 and 30
+tested above, on the 49-bin fft_size=240 geometry, and found the curve is
+nearly flat down to 2 ms (cp_len=24, -1.0 dB EVM) before collapsing at
+zero guard (-6.7 dB, QPSK probe would not decode). The resulting
+49-carrier / 2 ms-guard configuration reaches 7,617 bps at 27/30 frames
+against a same-session control of this configuration at 20/20 and
+7,195 bps. A follow-up 100x-per-arm interleaved trial, with both frames
+resized to ~5 s air time, then found the delivery rates statistically
+tied (96/100 vs 94/100, Fisher p = 0.75) and the 49-carrier arm ahead on
+throughput, so **hf18's geometry supersedes this one on this path**. See
+that experiment's RESULTS.md.
+
+That follow-up also measured something that applies to the record above:
+this bench spends a fixed **~155 ms per keying** on PTT ramp and tail,
+which `frame_seconds()` excludes. The 7,213.6 bps recorded here is
+therefore a waveform figure; measured against keyed air time the same
+configuration delivers **6,796 bps**. Doubling the frame to ~4.9 s
+amortizes the overhead and lifts it to 7,193 bps on air.

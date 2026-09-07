@@ -1,0 +1,800 @@
+[round 1 arm hf10]
+
+  A:ic7300->B:ic705: 1 x 4550 B, fft=480 cp=60 n_active=97 n_comb_pilot=0 bps=5 fec=3/4 pilot_interval=20 equalizer=gain frame=4.905s crest=10.7dB
+    1/1: keyed=5.06s rx=73320 rms=0.7949 peak=3.781 CLIP(15057) conf=0.980 snr=25.7dB binsnr=13.3/16.8/22.5dB foff=-8.40Hz raw_ber=0.0180(876/48600) ber=0.0000(0/36400) ldpc_ok=True iters=[3, 4, 4, 2, 2, 2, 3, 2, 2, 4, 2, 2, 3, 2, 3, 2, 3, 1, 3, 3, 4, 4, 2, 1, 3, 2, 2, 5, 2, 4, 3, 2, 3, 2, 3, 3, 2, 1, 2, 2, 4, 4, 2, 2, 3, 4, 2, 2, 4, 2, 1, 2, 2, 3, 1, 2, 2, 3, 2, 3, 2, 2, 3, 5, 1, 3, 2, 3, 2, 6, 3, 2, 3, 4, 4] decoded
+[round 1 arm hf18]
+
+  A:ic7300->B:ic705: 1 x 4732 B, fft=240 cp=24 n_active=49 n_comb_pilot=0 bps=5 fec=3/4 pilot_interval=20 equalizer=gain frame=4.840s crest=8.9dB
+    1/1: keyed=4.99s rx=72600 rms=0.8884 peak=3.804 CLIP(18078) conf=0.915 snr=27.7dB binsnr=13.2/16.8/21.4dB foff=-8.30Hz raw_ber=0.0191(964/50544) ber=0.0000(0/37856) ldpc_ok=True iters=[2, 2, 4, 2, 3, 1, 2, 5, 2, 3, 2, 2, 3, 2, 3, 4, 2, 2, 3, 6, 2, 2, 2, 4, 3, 4, 3, 3, 2, 3, 2, 3, 2, 2, 7, 2, 2, 4, 1, 4, 2, 8, 2, 3, 2, 5, 3, 2, 5, 4, 3, 3, 3, 3, 3, 3, 2, 2, 3, 3, 2, 2, 2, 2, 4, 2, 3, 7, 3, 2, 3, 3, 3, 2, 3, 2, 3, 5] decoded
+[round 2 arm hf18]
+
+  A:ic7300->B:ic705: 1 x 4732 B, fft=240 cp=24 n_active=49 n_comb_pilot=0 bps=5 fec=3/4 pilot_interval=20 equalizer=gain frame=4.840s crest=8.9dB
+    1/1: keyed=4.99s rx=72360 rms=0.9112 peak=3.888 CLIP(18937) conf=0.896 snr=30.1dB binsnr=15.0/19.4/27.7dB foff=-8.33Hz raw_ber=0.0094(475/50544) ber=0.0000(0/37856) ldpc_ok=True iters=[1, 3, 1, 3, 3, 1, 1, 1, 2, 3, 1, 1, 1, 1, 2, 2, 3, 2, 2, 2, 1, 3, 1, 1, 3, 3, 2, 1, 2, 2, 1, 1, 2, 2, 3, 1, 2, 3, 2, 2, 2, 5, 1, 1, 1, 1, 2, 3, 2, 1, 2, 2, 1, 1, 1, 2, 1, 1, 2, 1, 1, 2, 2, 2, 2, 4, 1, 2, 2, 2, 3, 2, 3, 1, 2, 1, 1, 2] decoded
+[round 2 arm hf10]
+
+  A:ic7300->B:ic705: 1 x 4550 B, fft=480 cp=60 n_active=97 n_comb_pilot=0 bps=5 fec=3/4 pilot_interval=20 equalizer=gain frame=4.905s crest=10.7dB
+    1/1: keyed=5.06s rx=73200 rms=0.9178 peak=4.005 CLIP(19239) conf=0.953 snr=29.5dB binsnr=15.7/21.0/27.5dB foff=-8.35Hz raw_ber=0.0093(454/48600) ber=0.0000(0/36400) ldpc_ok=True iters=[2, 3, 1, 2, 1, 1, 1, 2, 1, 1, 2, 1, 1, 1, 1, 2, 2, 2, 2, 2, 2, 2, 3, 3, 2, 2, 1, 2, 3, 2, 1, 1, 2, 1, 1, 1, 1, 2, 1, 1, 2, 2, 1, 2, 3, 1, 2, 2, 2, 2, 2, 2, 3, 3, 2, 2, 2, 1, 2, 2, 2, 4, 2, 2, 2, 1, 2, 1, 2, 3, 2, 2, 2, 1, 2] decoded
+[round 3 arm hf10]
+
+  A:ic7300->B:ic705: 1 x 4550 B, fft=480 cp=60 n_active=97 n_comb_pilot=0 bps=5 fec=3/4 pilot_interval=20 equalizer=gain frame=4.905s crest=10.7dB
+    1/1: keyed=5.06s rx=73200 rms=0.9214 peak=3.991 CLIP(19395) conf=0.956 snr=28.3dB binsnr=16.0/19.8/26.6dB foff=-8.38Hz raw_ber=0.0043(209/48600) ber=0.0000(0/36400) ldpc_ok=True iters=[1, 4, 2, 1, 0, 1, 1, 2, 1, 2, 2, 1, 1, 1, 1, 1, 1, 2, 2, 1, 2, 1, 1, 1, 1, 1, 2, 1, 2, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 0, 1, 1, 1, 0, 1, 1, 1, 1, 2, 2, 1, 1, 1, 1, 1, 1, 1, 0, 1, 3, 1, 1, 1, 1, 1, 1, 2, 1, 2, 2] decoded
+[round 3 arm hf18]
+
+  A:ic7300->B:ic705: 1 x 4732 B, fft=240 cp=24 n_active=49 n_comb_pilot=0 bps=5 fec=3/4 pilot_interval=20 equalizer=gain frame=4.840s crest=8.9dB
+    1/1: keyed=4.99s rx=72360 rms=0.9054 peak=4.536 CLIP(18576) conf=0.926 snr=27.4dB binsnr=12.8/16.8/22.4dB foff=-8.46Hz raw_ber=0.0131(660/50544) ber=0.0000(0/37856) ldpc_ok=True iters=[3, 3, 2, 1, 2, 2, 2, 4, 2, 5, 3, 2, 1, 1, 2, 2, 1, 1, 2, 2, 1, 2, 3, 1, 2, 1, 2, 1, 2, 2, 1, 1, 2, 1, 3, 2, 3, 2, 2, 2, 2, 3, 1, 2, 2, 2, 2, 1, 2, 1, 2, 2, 2, 2, 2, 5, 2, 2, 1, 2, 2, 2, 3, 2, 2, 3, 1, 2, 2, 2, 3, 1, 2, 1, 2, 3, 2, 2] decoded
+[round 4 arm hf18]
+
+  A:ic7300->B:ic705: 1 x 4732 B, fft=240 cp=24 n_active=49 n_comb_pilot=0 bps=5 fec=3/4 pilot_interval=20 equalizer=gain frame=4.840s crest=8.9dB
+    1/1: keyed=4.99s rx=72480 rms=0.9234 peak=3.874 CLIP(19165) conf=0.855 snr=34.0dB binsnr=18.6/23.4/30.0dB foff=-8.48Hz raw_ber=0.0109(553/50544) ber=0.0000(0/37856) ldpc_ok=True iters=[3, 1, 2, 1, 1, 2, 1, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 1, 3, 2, 2, 3, 2, 2, 3, 1, 3, 1, 3, 1, 3, 3, 3, 2, 2, 1, 2, 2, 3, 2, 1, 1, 2, 1, 2, 2, 3, 1, 2, 1, 3, 3, 2, 1, 2, 2, 2, 2, 2, 1, 2, 2, 2, 1, 2, 1, 2, 1, 2, 2, 2, 2, 2, 1, 2, 1, 2, 1] decoded
+[round 4 arm hf10]
+
+  A:ic7300->B:ic705: 1 x 4550 B, fft=480 cp=60 n_active=97 n_comb_pilot=0 bps=5 fec=3/4 pilot_interval=20 equalizer=gain frame=4.905s crest=10.7dB
+    1/1: keyed=5.06s rx=73200 rms=0.9158 peak=3.922 CLIP(19273) conf=0.914 snr=29.0dB binsnr=16.1/21.0/29.8dB foff=-8.47Hz raw_ber=0.0037(178/48600) ber=0.0000(0/36400) ldpc_ok=True iters=[2, 0, 2, 1, 1, 1, 1, 1, 0, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 2, 1, 1, 1, 1, 1, 1, 0, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 0, 1, 1, 1, 1, 4, 0, 1, 0, 1, 1, 1, 2, 1, 1, 1, 1, 1, 1, 1, 0, 1, 0, 2, 1, 1, 1, 1, 2, 2, 2, 0, 1, 1, 0, 0, 0, 1] decoded
+[round 5 arm hf10]
+
+  A:ic7300->B:ic705: 1 x 4550 B, fft=480 cp=60 n_active=97 n_comb_pilot=0 bps=5 fec=3/4 pilot_interval=20 equalizer=gain frame=4.905s crest=10.7dB
+    1/1: keyed=5.06s rx=73200 rms=0.9270 peak=4.029 CLIP(19618) conf=0.917 snr=29.1dB binsnr=15.8/20.8/27.0dB foff=-8.49Hz raw_ber=0.0059(287/48600) ber=0.0000(0/36400) ldpc_ok=True iters=[2, 1, 1, 2, 1, 2, 2, 2, 2, 1, 2, 1, 1, 2, 1, 1, 2, 1, 1, 1, 1, 2, 1, 1, 1, 1, 1, 2, 1, 1, 1, 1, 2, 2, 2, 1, 1, 1, 2, 3, 1, 2, 2, 1, 2, 2, 1, 2, 2, 2, 2, 1, 1, 2, 1, 2, 1, 2, 1, 0, 2, 1, 1, 2, 1, 2, 1, 2, 1, 1, 1, 1, 2, 2, 1] decoded
+[round 5 arm hf18]
+
+  A:ic7300->B:ic705: 1 x 4732 B, fft=240 cp=24 n_active=49 n_comb_pilot=0 bps=5 fec=3/4 pilot_interval=20 equalizer=gain frame=4.840s crest=8.9dB
+    1/1: keyed=4.99s rx=72360 rms=0.9183 peak=4.011 CLIP(18874) conf=0.891 snr=29.8dB binsnr=16.2/19.3/25.4dB foff=-8.54Hz raw_ber=0.0118(594/50544) ber=0.0000(0/37856) ldpc_ok=True iters=[1, 3, 3, 2, 2, 2, 1, 2, 2, 2, 2, 3, 2, 2, 2, 2, 1, 2, 2, 2, 2, 2, 3, 2, 1, 3, 2, 2, 1, 2, 2, 1, 1, 1, 2, 4, 2, 2, 2, 2, 2, 3, 3, 1, 2, 2, 2, 1, 2, 1, 2, 1, 2, 4, 2, 2, 2, 3, 3, 2, 2, 2, 3, 3, 1, 2, 3, 4, 2, 1, 1, 2, 2, 2, 2, 3, 2, 2] decoded
+[round 6 arm hf18]
+
+  A:ic7300->B:ic705: 1 x 4732 B, fft=240 cp=24 n_active=49 n_comb_pilot=0 bps=5 fec=3/4 pilot_interval=20 equalizer=gain frame=4.840s crest=8.9dB
+    1/1: keyed=4.99s rx=72360 rms=0.9369 peak=4.357 CLIP(19688) conf=0.872 snr=30.3dB binsnr=11.1/20.3/26.5dB foff=-8.61Hz raw_ber=0.0083(419/50544) ber=0.0000(0/37856) ldpc_ok=True iters=[2, 1, 2, 2, 2, 1, 1, 2, 1, 1, 2, 1, 1, 2, 2, 1, 2, 2, 1, 1, 1, 2, 2, 1, 2, 2, 2, 2, 2, 2, 1, 2, 2, 1, 2, 1, 2, 2, 1, 2, 1, 1, 2, 1, 2, 1, 2, 1, 2, 2, 3, 1, 2, 1, 1, 1, 1, 1, 2, 1, 2, 2, 1, 3, 2, 3, 1, 1, 1, 2, 2, 2, 1, 1, 2, 1, 2, 2] decoded
+[round 6 arm hf10]
+
+  A:ic7300->B:ic705: 1 x 4550 B, fft=480 cp=60 n_active=97 n_comb_pilot=0 bps=5 fec=3/4 pilot_interval=20 equalizer=gain frame=4.905s crest=10.7dB
+    1/1: keyed=5.06s rx=73200 rms=0.9293 peak=4.002 CLIP(19618) conf=0.941 snr=30.7dB binsnr=17.4/22.2/30.2dB foff=-8.52Hz raw_ber=0.0041(199/48600) ber=0.0000(0/36400) ldpc_ok=True iters=[1, 1, 1, 1, 2, 1, 1, 1, 2, 2, 0, 1, 2, 1, 2, 1, 2, 1, 1, 1, 1, 1, 2, 1, 1, 1, 1, 2, 1, 1, 1, 0, 1, 1, 1, 1, 0, 0, 1, 1, 1, 1, 1, 2, 1, 1, 1, 1, 1, 1, 1, 1, 1, 2, 1, 2, 1, 1, 0, 1, 1, 2, 2, 1, 1, 1, 1, 1, 2, 1, 1, 1, 0, 3, 1] decoded
+[round 7 arm hf10]
+
+  A:ic7300->B:ic705: 1 x 4550 B, fft=480 cp=60 n_active=97 n_comb_pilot=0 bps=5 fec=3/4 pilot_interval=20 equalizer=gain frame=4.905s crest=10.7dB
+    1/1: keyed=5.06s rx=73200 rms=0.9047 peak=3.975 CLIP(18888) conf=0.928 snr=28.6dB binsnr=15.4/20.1/25.7dB foff=-8.53Hz raw_ber=0.0041(201/48600) ber=0.0000(0/36400) ldpc_ok=True iters=[1, 1, 2, 1, 1, 1, 2, 0, 1, 0, 1, 1, 1, 1, 2, 1, 1, 1, 2, 2, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 0, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 0, 1, 0, 2, 1, 1, 1, 1, 1, 1, 2, 1, 1, 2, 1, 1, 1, 1, 1, 1, 1, 1, 1] decoded
+[round 7 arm hf18]
+
+  A:ic7300->B:ic705: 1 x 4732 B, fft=240 cp=24 n_active=49 n_comb_pilot=0 bps=5 fec=3/4 pilot_interval=20 equalizer=gain frame=4.840s crest=8.9dB
+    1/1: keyed=4.99s rx=72360 rms=0.9203 peak=4.011 CLIP(19031) conf=0.919 snr=31.5dB binsnr=15.5/21.0/27.3dB foff=-8.57Hz raw_ber=0.0145(734/50544) ber=0.0000(0/37856) ldpc_ok=True iters=[3, 2, 1, 4, 1, 2, 2, 2, 2, 4, 2, 3, 1, 3, 2, 2, 4, 2, 2, 2, 2, 2, 2, 2, 2, 1, 2, 1, 3, 3, 1, 2, 3, 4, 2, 2, 2, 2, 3, 2, 4, 5, 1, 2, 3, 2, 2, 3, 2, 3, 2, 2, 1, 2, 3, 2, 2, 2, 3, 2, 4, 2, 1, 1, 2, 3, 2, 1, 4, 2, 5, 3, 1, 3, 1, 2, 1, 2] decoded
+[round 8 arm hf18]
+
+  A:ic7300->B:ic705: 1 x 4732 B, fft=240 cp=24 n_active=49 n_comb_pilot=0 bps=5 fec=3/4 pilot_interval=20 equalizer=gain frame=4.840s crest=8.9dB
+    1/1: keyed=4.99s rx=72360 rms=0.9279 peak=4.211 CLIP(19334) conf=0.862 snr=31.1dB binsnr=16.3/20.8/26.6dB foff=-8.59Hz raw_ber=0.0126(637/50544) ber=0.0000(0/37856) ldpc_ok=True iters=[2, 3, 2, 1, 3, 3, 3, 2, 2, 1, 4, 2, 2, 1, 3, 1, 1, 4, 2, 1, 2, 3, 2, 2, 1, 1, 1, 2, 3, 3, 2, 2, 2, 2, 2, 2, 2, 1, 2, 2, 2, 2, 2, 1, 2, 2, 2, 1, 2, 2, 1, 2, 3, 2, 1, 2, 1, 1, 3, 3, 2, 2, 2, 1, 2, 2, 1, 2, 2, 2, 2, 3, 2, 2, 3, 3, 1, 1] decoded
+[round 8 arm hf10]
+
+  A:ic7300->B:ic705: 1 x 4550 B, fft=480 cp=60 n_active=97 n_comb_pilot=0 bps=5 fec=3/4 pilot_interval=20 equalizer=gain frame=4.905s crest=10.7dB
+    1/1: keyed=5.06s rx=73200 rms=0.9269 peak=3.972 CLIP(19608) conf=0.933 snr=30.8dB binsnr=18.3/21.8/34.9dB foff=-8.60Hz raw_ber=0.0047(230/48600) ber=0.0000(0/36400) ldpc_ok=True iters=[1, 1, 2, 2, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 2, 1, 1, 2, 1, 1, 2, 1, 1, 1, 1, 0, 1, 1, 1, 1, 1, 1, 1, 2, 1, 1, 2, 0, 1, 2, 1, 2, 1, 2, 1, 4, 3, 1, 2, 1, 1, 2, 1, 1, 1, 1, 2, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 2, 1, 1, 1] decoded
+[round 9 arm hf10]
+
+  A:ic7300->B:ic705: 1 x 4550 B, fft=480 cp=60 n_active=97 n_comb_pilot=0 bps=5 fec=3/4 pilot_interval=20 equalizer=gain frame=4.905s crest=10.7dB
+    1/1: keyed=5.06s rx=73200 rms=0.9237 peak=3.839 CLIP(19672) conf=0.928 snr=28.6dB binsnr=15.2/20.2/28.1dB foff=-8.56Hz raw_ber=0.0062(302/48600) ber=0.0000(0/36400) ldpc_ok=True iters=[2, 1, 1, 1, 1, 1, 1, 1, 2, 4, 1, 1, 1, 2, 2, 1, 2, 1, 1, 2, 1, 2, 1, 2, 2, 1, 2, 1, 1, 2, 1, 1, 1, 1, 3, 2, 1, 2, 2, 2, 1, 2, 1, 3, 3, 1, 1, 1, 1, 1, 1, 1, 2, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 2, 1, 2, 2, 1, 2, 2, 2, 1, 2, 1, 1] decoded
+[round 9 arm hf18]
+
+  A:ic7300->B:ic705: 1 x 4732 B, fft=240 cp=24 n_active=49 n_comb_pilot=0 bps=5 fec=3/4 pilot_interval=20 equalizer=gain frame=4.840s crest=8.9dB
+    1/1: keyed=4.99s rx=72360 rms=0.9042 peak=4.397 CLIP(18534) conf=0.937 snr=30.0dB binsnr=12.6/19.6/24.5dB foff=-8.66Hz raw_ber=0.0230(1164/50544) ber=0.0000(0/37856) ldpc_ok=True iters=[2, 2, 4, 3, 4, 2, 7, 5, 3, 4, 2, 4, 3, 3, 3, 3, 2, 3, 5, 7, 6, 3, 4, 2, 4, 2, 4, 4, 3, 4, 5, 5, 3, 2, 4, 2, 2, 4, 2, 5, 4, 4, 2, 4, 4, 3, 7, 4, 4, 3, 3, 7, 7, 2, 5, 4, 2, 4, 12, 4, 4, 4, 4, 3, 3, 2, 3, 3, 2, 3, 4, 4, 2, 2, 3, 5, 4, 4] decoded
+[round 10 arm hf18]
+
+  A:ic7300->B:ic705: 1 x 4732 B, fft=240 cp=24 n_active=49 n_comb_pilot=0 bps=5 fec=3/4 pilot_interval=20 equalizer=gain frame=4.840s crest=8.9dB
+    1/1: keyed=4.99s rx=72360 rms=0.9217 peak=4.386 CLIP(19339) conf=0.873 snr=33.1dB binsnr=12.7/24.2/27.8dB foff=-8.68Hz raw_ber=0.0132(665/50544) ber=0.0000(0/37856) ldpc_ok=True iters=[3, 2, 3, 1, 3, 2, 2, 2, 2, 3, 2, 1, 2, 2, 3, 3, 2, 2, 3, 2, 2, 3, 1, 2, 2, 2, 2, 2, 4, 2, 4, 2, 1, 3, 1, 1, 1, 2, 4, 2, 2, 3, 2, 2, 2, 2, 2, 2, 2, 2, 2, 3, 2, 2, 3, 1, 3, 2, 2, 2, 3, 3, 2, 1, 3, 2, 2, 3, 3, 2, 2, 4, 2, 3, 3, 3, 5, 1] decoded
+[round 10 arm hf10]
+
+  A:ic7300->B:ic705: 1 x 4550 B, fft=480 cp=60 n_active=97 n_comb_pilot=0 bps=5 fec=3/4 pilot_interval=20 equalizer=gain frame=4.905s crest=10.7dB
+    1/1: keyed=5.06s rx=73320 rms=0.9292 peak=3.859 CLIP(19578) conf=0.908 snr=30.8dB binsnr=17.8/22.2/28.9dB foff=-8.62Hz raw_ber=0.0058(283/48600) ber=0.0000(0/36400) ldpc_ok=True iters=[1, 1, 1, 1, 2, 1, 1, 1, 1, 2, 1, 1, 2, 1, 1, 1, 3, 1, 1, 1, 1, 1, 2, 2, 1, 1, 2, 2, 1, 2, 1, 1, 1, 1, 1, 1, 1, 1, 2, 1, 1, 1, 1, 1, 1, 1, 1, 3, 2, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 2, 1, 2, 1, 1, 2, 1, 1, 1, 1] decoded
+[round 11 arm hf10]
+
+  A:ic7300->B:ic705: 1 x 4550 B, fft=480 cp=60 n_active=97 n_comb_pilot=0 bps=5 fec=3/4 pilot_interval=20 equalizer=gain frame=4.905s crest=10.7dB
+    1/1: keyed=5.06s rx=73200 rms=0.9361 peak=4.121 CLIP(19959) conf=0.929 snr=30.5dB binsnr=17.5/21.8/29.3dB foff=-8.65Hz raw_ber=0.0034(167/48600) ber=0.0000(0/36400) ldpc_ok=True iters=[1, 1, 1, 1, 1, 1, 1, 0, 1, 0, 1, 2, 1, 1, 1, 1, 1, 1, 1, 2, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 0, 1, 1, 1, 1, 1, 1, 1, 2, 1, 1, 2, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 2, 0, 0, 1, 1, 1, 1, 0, 1, 0, 3, 1, 1, 1, 1] decoded
+[round 11 arm hf18]
+
+  A:ic7300->B:ic705: 1 x 4732 B, fft=240 cp=24 n_active=49 n_comb_pilot=0 bps=5 fec=3/4 pilot_interval=20 equalizer=gain frame=4.840s crest=8.9dB
+    1/1: keyed=4.99s rx=72480 rms=0.9235 peak=4.523 CLIP(19216) conf=0.872 snr=30.8dB binsnr=12.8/20.5/26.4dB foff=-8.71Hz raw_ber=0.0147(744/50544) ber=0.0000(0/37856) ldpc_ok=True iters=[2, 3, 4, 2, 5, 4, 4, 2, 2, 1, 2, 1, 3, 2, 3, 2, 2, 2, 2, 2, 3, 3, 1, 3, 3, 2, 2, 2, 4, 2, 2, 2, 3, 2, 2, 2, 2, 3, 4, 1, 3, 3, 3, 2, 2, 2, 3, 3, 2, 2, 3, 3, 1, 3, 2, 3, 1, 1, 2, 2, 2, 3, 2, 1, 2, 2, 1, 2, 3, 2, 2, 3, 2, 3, 2, 4, 3, 3] decoded
+[round 12 arm hf18]
+
+  A:ic7300->B:ic705: 1 x 4732 B, fft=240 cp=24 n_active=49 n_comb_pilot=0 bps=5 fec=3/4 pilot_interval=20 equalizer=gain frame=4.840s crest=8.9dB
+    1/1: keyed=4.99s rx=72480 rms=0.9161 peak=3.909 CLIP(19039) conf=0.902 snr=30.4dB binsnr=14.7/19.6/29.8dB foff=-8.80Hz raw_ber=0.0124(628/50544) ber=0.0000(0/37856) ldpc_ok=True iters=[1, 5, 1, 3, 2, 2, 1, 1, 1, 5, 2, 1, 2, 1, 5, 3, 2, 4, 2, 2, 2, 2, 1, 2, 2, 2, 2, 4, 1, 8, 2, 2, 2, 1, 1, 1, 2, 2, 5, 2, 1, 2, 3, 2, 2, 4, 3, 2, 2, 2, 3, 3, 2, 1, 3, 1, 2, 2, 2, 3, 2, 1, 5, 3, 1, 4, 2, 2, 3, 2, 5, 2, 3, 2, 4, 3, 2, 2] decoded
+[round 12 arm hf10]
+
+  A:ic7300->B:ic705: 1 x 4550 B, fft=480 cp=60 n_active=97 n_comb_pilot=0 bps=5 fec=3/4 pilot_interval=20 equalizer=gain frame=4.905s crest=10.7dB
+    1/1: keyed=5.06s rx=73200 rms=0.9060 peak=3.868 CLIP(18842) conf=0.821 snr=34.8dB binsnr=20.1/26.4/35.3dB foff=-8.66Hz raw_ber=0.0054(263/48600) ber=0.0000(0/36400) ldpc_ok=True iters=[0, 3, 1, 1, 1, 2, 1, 1, 1, 2, 1, 2, 1, 2, 1, 1, 1, 2, 3, 0, 1, 1, 1, 1, 2, 1, 2, 1, 1, 1, 2, 1, 2, 1, 2, 1, 3, 1, 3, 1, 1, 1, 2, 2, 1, 2, 1, 1, 3, 1, 1, 1, 1, 1, 1, 1, 1, 2, 1, 3, 2, 1, 0, 1, 1, 1, 1, 2, 1, 1, 2, 1, 1, 1, 2] decoded
+[round 13 arm hf10]
+
+  A:ic7300->B:ic705: 1 x 4550 B, fft=480 cp=60 n_active=97 n_comb_pilot=0 bps=5 fec=3/4 pilot_interval=20 equalizer=gain frame=4.905s crest=10.7dB
+    1/1: keyed=5.06s rx=73200 rms=0.9270 peak=3.968 CLIP(19582) conf=0.906 snr=30.8dB binsnr=18.8/22.0/27.1dB foff=-8.69Hz raw_ber=0.0055(267/48600) ber=0.0000(0/36400) ldpc_ok=True iters=[1, 1, 2, 1, 1, 1, 2, 1, 2, 1, 1, 1, 1, 1, 1, 1, 1, 2, 1, 2, 1, 0, 1, 2, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 2, 0, 1, 1, 2, 1, 2, 1, 1, 1, 1, 2, 2, 2, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 2, 2, 1, 1, 1, 1, 1, 1, 1, 1] decoded
+[round 13 arm hf18]
+
+  A:ic7300->B:ic705: 1 x 4732 B, fft=240 cp=24 n_active=49 n_comb_pilot=0 bps=5 fec=3/4 pilot_interval=20 equalizer=gain frame=4.840s crest=8.9dB
+    1/1: keyed=4.99s rx=72480 rms=0.9104 peak=4.680 CLIP(18820) conf=0.914 snr=29.4dB binsnr=13.1/19.3/22.8dB foff=-8.75Hz raw_ber=0.0164(828/50544) ber=0.0000(0/37856) ldpc_ok=True iters=[3, 2, 3, 2, 5, 1, 2, 2, 2, 2, 2, 2, 2, 3, 3, 2, 2, 3, 2, 4, 2, 2, 2, 2, 3, 2, 3, 2, 2, 2, 1, 1, 2, 2, 3, 2, 2, 3, 3, 2, 2, 3, 3, 1, 2, 2, 2, 4, 1, 2, 2, 3, 2, 3, 3, 2, 2, 3, 2, 3, 3, 2, 3, 2, 2, 3, 2, 2, 2, 3, 3, 3, 3, 1, 1, 1, 2, 3] decoded
+[round 14 arm hf18]
+
+  A:ic7300->B:ic705: 1 x 4732 B, fft=240 cp=24 n_active=49 n_comb_pilot=0 bps=5 fec=3/4 pilot_interval=20 equalizer=gain frame=4.840s crest=8.9dB
+    1/1: keyed=4.99s rx=72360 rms=0.9250 peak=4.466 CLIP(19180) conf=0.915 snr=29.3dB binsnr=13.0/18.8/25.5dB foff=-8.71Hz raw_ber=0.0205(1038/50544) ber=0.0000(0/37856) ldpc_ok=True iters=[3, 2, 4, 3, 4, 4, 2, 2, 5, 3, 3, 2, 3, 5, 4, 7, 7, 3, 3, 3, 4, 3, 8, 3, 4, 3, 2, 2, 3, 5, 3, 4, 4, 4, 2, 4, 3, 4, 7, 2, 2, 2, 4, 7, 4, 4, 5, 3, 4, 3, 3, 2, 2, 4, 4, 3, 7, 4, 4, 3, 4, 4, 2, 3, 4, 4, 4, 3, 4, 6, 3, 6, 3, 3, 5, 3, 8, 4] decoded
+[round 14 arm hf10]
+
+  A:ic7300->B:ic705: 1 x 4550 B, fft=480 cp=60 n_active=97 n_comb_pilot=0 bps=5 fec=3/4 pilot_interval=20 equalizer=gain frame=4.905s crest=10.7dB
+    1/1: keyed=5.06s rx=73200 rms=0.9387 peak=3.829 CLIP(20000) conf=0.900 snr=30.5dB binsnr=16.4/22.1/30.2dB foff=-8.67Hz raw_ber=0.0041(200/48600) ber=0.0000(0/36400) ldpc_ok=True iters=[1, 1, 1, 2, 2, 1, 1, 0, 1, 0, 1, 2, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 2, 1, 1, 1, 1, 1, 2, 1, 1, 2, 1, 1, 1, 1, 4, 1, 1, 0, 1, 1, 1, 1, 1, 2, 2, 1, 2, 1, 1, 1, 1, 1, 1, 1, 2, 1, 1, 2, 1, 0, 2, 2, 1, 1, 2, 1, 0, 1, 1, 2, 1, 3] decoded
+[round 15 arm hf10]
+
+  A:ic7300->B:ic705: 1 x 4550 B, fft=480 cp=60 n_active=97 n_comb_pilot=0 bps=5 fec=3/4 pilot_interval=20 equalizer=gain frame=4.905s crest=10.7dB
+    1/1: keyed=5.06s rx=73200 rms=0.9076 peak=3.832 CLIP(18921) conf=0.902 snr=30.9dB binsnr=18.2/22.3/27.2dB foff=-8.67Hz raw_ber=0.0069(334/48600) ber=0.0000(0/36400) ldpc_ok=True iters=[1, 1, 2, 2, 2, 2, 1, 1, 2, 2, 2, 2, 1, 2, 1, 1, 1, 2, 1, 1, 1, 1, 1, 2, 1, 1, 1, 2, 2, 2, 2, 1, 1, 1, 2, 0, 1, 2, 1, 1, 2, 1, 2, 1, 1, 2, 2, 2, 2, 2, 1, 2, 1, 2, 1, 1, 1, 1, 1, 1, 1, 2, 2, 1, 2, 1, 2, 2, 1, 2, 2, 1, 2, 1, 1] decoded
+[round 15 arm hf18]
+
+  A:ic7300->B:ic705: 1 x 4732 B, fft=240 cp=24 n_active=49 n_comb_pilot=0 bps=5 fec=3/4 pilot_interval=20 equalizer=gain frame=4.840s crest=8.9dB
+    1/1: keyed=4.99s rx=72480 rms=0.9377 peak=3.964 CLIP(19883) conf=0.864 snr=29.3dB binsnr=12.7/19.0/24.7dB foff=-8.75Hz raw_ber=0.0149(753/50544) ber=0.0000(0/37856) ldpc_ok=True iters=[2, 4, 3, 2, 3, 1, 2, 2, 3, 1, 3, 1, 3, 2, 3, 2, 3, 3, 2, 3, 1, 3, 3, 1, 3, 1, 2, 2, 2, 2, 2, 3, 1, 2, 2, 4, 5, 3, 3, 2, 2, 3, 2, 1, 2, 4, 1, 1, 3, 2, 2, 4, 2, 2, 1, 2, 3, 1, 2, 1, 1, 2, 1, 2, 5, 2, 3, 2, 2, 4, 2, 3, 3, 2, 1, 2, 2, 3] decoded
+[round 16 arm hf18]
+
+  A:ic7300->B:ic705: 1 x 4732 B, fft=240 cp=24 n_active=49 n_comb_pilot=0 bps=5 fec=3/4 pilot_interval=20 equalizer=gain frame=4.840s crest=8.9dB
+    1/1: keyed=4.99s rx=72480 rms=0.9239 peak=4.072 CLIP(19287) conf=0.882 snr=30.5dB binsnr=15.2/19.8/25.8dB foff=-8.71Hz raw_ber=0.0144(728/50544) ber=0.0000(0/37856) ldpc_ok=True iters=[3, 3, 2, 2, 2, 6, 4, 2, 3, 3, 2, 2, 2, 3, 5, 2, 3, 6, 2, 3, 2, 2, 3, 2, 2, 1, 1, 1, 1, 2, 1, 3, 2, 3, 2, 2, 3, 2, 1, 2, 4, 1, 2, 2, 3, 2, 2, 4, 5, 2, 2, 2, 2, 2, 1, 3, 2, 3, 2, 1, 2, 3, 2, 3, 3, 5, 2, 2, 6, 2, 4, 3, 2, 2, 3, 2, 1, 2] decoded
+[round 16 arm hf10]
+
+  A:ic7300->B:ic705: 1 x 4550 B, fft=480 cp=60 n_active=97 n_comb_pilot=0 bps=5 fec=3/4 pilot_interval=20 equalizer=gain frame=4.905s crest=10.7dB
+    1/1: keyed=5.06s rx=73200 rms=0.9357 peak=4.003 CLIP(19887) conf=0.901 snr=32.2dB binsnr=18.7/23.3/30.6dB foff=-8.72Hz raw_ber=0.0029(142/48600) ber=0.0000(0/36400) ldpc_ok=True iters=[1, 1, 1, 1, 1, 1, 1, 2, 1, 1, 1, 1, 2, 1, 1, 1, 2, 1, 1, 1, 1, 2, 1, 1, 0, 0, 1, 1, 2, 1, 1, 1, 2, 1, 1, 0, 1, 0, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 2, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 2, 1, 1, 1, 0, 1, 1, 0, 1, 0, 1, 1, 1, 1] decoded
+[round 17 arm hf10]
+
+  A:ic7300->B:ic705: 1 x 4550 B, fft=480 cp=60 n_active=97 n_comb_pilot=0 bps=5 fec=3/4 pilot_interval=20 equalizer=gain frame=4.905s crest=10.7dB
+    1/1: keyed=5.06s rx=73200 rms=0.9245 peak=3.952 CLIP(19340) conf=0.922 snr=32.2dB binsnr=18.7/23.7/34.1dB foff=-8.71Hz raw_ber=0.0069(333/48600) ber=0.0000(0/36400) ldpc_ok=True iters=[1, 1, 2, 1, 1, 2, 1, 1, 2, 1, 3, 1, 5, 2, 1, 2, 2, 1, 1, 1, 4, 1, 2, 1, 2, 2, 4, 1, 1, 2, 1, 1, 2, 2, 1, 1, 1, 2, 3, 2, 1, 1, 1, 2, 2, 1, 1, 2, 1, 2, 2, 1, 1, 2, 1, 2, 2, 3, 2, 2, 1, 1, 2, 1, 1, 1, 1, 2, 1, 1, 3, 5, 2, 2, 4] decoded
+[round 17 arm hf18]
+
+  A:ic7300->B:ic705: 1 x 4732 B, fft=240 cp=24 n_active=49 n_comb_pilot=0 bps=5 fec=3/4 pilot_interval=20 equalizer=gain frame=4.840s crest=8.9dB
+    1/1: keyed=4.99s rx=72360 rms=0.9373 peak=4.392 CLIP(19680) conf=0.868 snr=31.2dB binsnr=15.1/21.1/24.4dB foff=-8.71Hz raw_ber=0.0111(560/50544) ber=0.0000(0/37856) ldpc_ok=True iters=[3, 2, 2, 4, 4, 2, 1, 1, 2, 2, 2, 2, 1, 2, 1, 1, 1, 1, 2, 1, 1, 2, 1, 1, 1, 1, 1, 2, 2, 3, 2, 2, 2, 2, 1, 2, 2, 1, 1, 3, 2, 2, 2, 2, 1, 1, 2, 1, 1, 3, 1, 2, 2, 2, 3, 2, 1, 1, 1, 2, 3, 2, 2, 2, 1, 1, 2, 1, 2, 2, 1, 2, 1, 1, 1, 2, 1, 2] decoded
+[round 18 arm hf18]
+
+  A:ic7300->B:ic705: 1 x 4732 B, fft=240 cp=24 n_active=49 n_comb_pilot=0 bps=5 fec=3/4 pilot_interval=20 equalizer=gain frame=4.840s crest=8.9dB
+    1/1: keyed=4.99s rx=72480 rms=0.9315 peak=4.475 CLIP(19527) conf=0.908 snr=29.0dB binsnr=12.3/18.8/25.9dB foff=-8.70Hz raw_ber=0.0162(817/50544) ber=0.0000(0/37856) ldpc_ok=True iters=[2, 3, 2, 3, 2, 3, 3, 2, 2, 3, 5, 2, 3, 3, 2, 2, 3, 2, 2, 2, 2, 2, 3, 3, 2, 3, 3, 4, 2, 3, 4, 3, 1, 2, 2, 2, 1, 3, 4, 2, 2, 2, 2, 3, 2, 2, 2, 3, 3, 3, 2, 3, 1, 4, 2, 2, 2, 3, 3, 3, 3, 2, 4, 3, 3, 2, 1, 1, 3, 4, 1, 3, 2, 2, 4, 2, 1, 3] decoded
+[round 18 arm hf10]
+
+  A:ic7300->B:ic705: 1 x 4550 B, fft=480 cp=60 n_active=97 n_comb_pilot=0 bps=5 fec=3/4 pilot_interval=20 equalizer=gain frame=4.905s crest=10.7dB
+    1/1: keyed=5.06s rx=73200 rms=0.9162 peak=3.917 CLIP(19215) conf=0.936 snr=29.6dB binsnr=15.6/20.8/27.8dB foff=-8.69Hz raw_ber=0.0109(530/48600) ber=0.0000(0/36400) ldpc_ok=True iters=[2, 2, 1, 1, 5, 2, 1, 2, 2, 2, 2, 4, 2, 2, 1, 2, 2, 1, 2, 1, 2, 2, 2, 2, 2, 3, 3, 2, 2, 2, 2, 2, 2, 2, 1, 2, 3, 2, 1, 1, 1, 2, 1, 2, 1, 1, 2, 1, 2, 2, 1, 1, 1, 2, 1, 2, 1, 2, 1, 2, 1, 2, 2, 1, 1, 1, 3, 2, 1, 2, 2, 2, 1, 1, 1] decoded
+[round 19 arm hf10]
+
+  A:ic7300->B:ic705: 1 x 4550 B, fft=480 cp=60 n_active=97 n_comb_pilot=0 bps=5 fec=3/4 pilot_interval=20 equalizer=gain frame=4.905s crest=10.7dB
+    1/1: keyed=5.06s rx=73080 rms=0.9189 peak=3.850 CLIP(19404) conf=0.929 snr=28.7dB binsnr=15.7/20.4/28.9dB foff=-8.69Hz raw_ber=0.0048(233/48600) ber=0.0000(0/36400) ldpc_ok=True iters=[2, 1, 1, 1, 2, 1, 1, 1, 1, 0, 2, 2, 1, 1, 1, 2, 1, 1, 1, 1, 1, 1, 0, 1, 1, 0, 1, 2, 1, 2, 1, 1, 1, 2, 1, 0, 1, 1, 1, 1, 1, 2, 1, 1, 1, 1, 1, 1, 3, 1, 1, 2, 1, 2, 1, 1, 1, 1, 1, 1, 2, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 2, 1, 1] decoded
+[round 19 arm hf18]
+
+  A:ic7300->B:ic705: 1 x 4732 B, fft=240 cp=24 n_active=49 n_comb_pilot=0 bps=5 fec=3/4 pilot_interval=20 equalizer=gain frame=4.840s crest=8.9dB
+    1/1: keyed=4.99s rx=72360 rms=0.9181 peak=4.073 CLIP(19188) conf=0.863 snr=33.8dB binsnr=17.6/23.9/31.1dB foff=-8.73Hz raw_ber=0.0114(575/50544) ber=0.0000(0/37856) ldpc_ok=True iters=[2, 2, 3, 2, 3, 2, 3, 2, 2, 2, 2, 1, 2, 2, 2, 1, 2, 2, 1, 3, 2, 2, 2, 2, 2, 1, 1, 1, 2, 1, 4, 2, 1, 1, 3, 3, 2, 1, 3, 3, 3, 2, 2, 4, 2, 2, 2, 2, 2, 2, 2, 2, 2, 1, 2, 1, 2, 3, 1, 1, 2, 2, 2, 3, 1, 2, 2, 2, 2, 2, 1, 1, 2, 2, 2, 2, 3, 2] decoded
+[round 20 arm hf18]
+
+  A:ic7300->B:ic705: 1 x 4732 B, fft=240 cp=24 n_active=49 n_comb_pilot=0 bps=5 fec=3/4 pilot_interval=20 equalizer=gain frame=4.840s crest=8.9dB
+    1/1: keyed=4.99s rx=72360 rms=0.9072 peak=4.443 CLIP(18634) conf=0.919 snr=30.1dB binsnr=12.6/20.6/24.5dB foff=-8.74Hz raw_ber=0.0137(693/50544) ber=0.0000(0/37856) ldpc_ok=True iters=[3, 3, 2, 2, 3, 1, 2, 1, 3, 3, 2, 2, 2, 2, 2, 1, 2, 2, 3, 2, 3, 2, 4, 3, 2, 3, 2, 1, 2, 2, 2, 2, 2, 2, 2, 2, 1, 3, 2, 2, 3, 2, 3, 2, 2, 2, 3, 2, 2, 2, 3, 2, 2, 2, 4, 1, 3, 2, 4, 2, 2, 2, 2, 2, 1, 1, 2, 1, 2, 3, 2, 3, 2, 2, 1, 2, 3, 2] decoded
+[round 20 arm hf10]
+
+  A:ic7300->B:ic705: 1 x 4550 B, fft=480 cp=60 n_active=97 n_comb_pilot=0 bps=5 fec=3/4 pilot_interval=20 equalizer=gain frame=4.905s crest=10.7dB
+    1/1: keyed=5.06s rx=73200 rms=0.8955 peak=4.339 CLIP(18469) conf=0.971 snr=30.3dB binsnr=18.0/21.6/27.1dB foff=-8.69Hz raw_ber=0.0080(391/48600) ber=0.0000(0/36400) ldpc_ok=True iters=[2, 2, 1, 2, 1, 1, 2, 1, 2, 2, 2, 1, 1, 1, 2, 1, 1, 2, 1, 1, 1, 2, 1, 2, 1, 2, 1, 2, 1, 1, 2, 2, 2, 3, 1, 2, 2, 2, 2, 2, 0, 1, 1, 2, 2, 1, 2, 1, 2, 1, 1, 2, 1, 1, 1, 2, 2, 1, 1, 1, 2, 1, 3, 2, 1, 2, 1, 1, 1, 1, 1, 2, 1, 1, 1] decoded
+[round 21 arm hf10]
+
+  A:ic7300->B:ic705: 1 x 4550 B, fft=480 cp=60 n_active=97 n_comb_pilot=0 bps=5 fec=3/4 pilot_interval=20 equalizer=gain frame=4.905s crest=10.7dB
+    1/1: keyed=5.06s rx=73200 rms=0.9105 peak=4.071 CLIP(19073) conf=0.917 snr=28.1dB binsnr=15.3/19.7/26.7dB foff=-8.68Hz raw_ber=0.0045(220/48600) ber=0.0000(0/36400) ldpc_ok=True iters=[1, 1, 2, 1, 2, 1, 2, 1, 1, 1, 2, 2, 2, 1, 2, 2, 1, 1, 1, 2, 2, 1, 0, 1, 1, 1, 1, 1, 1, 5, 1, 1, 1, 1, 1, 2, 1, 1, 1, 1, 1, 2, 3, 1, 1, 1, 1, 1, 2, 1, 0, 4, 1, 2, 1, 1, 1, 0, 2, 1, 1, 1, 1, 2, 1, 1, 1, 1, 1, 1, 1, 1, 1, 2, 1] decoded
+[round 21 arm hf18]
+
+  A:ic7300->B:ic705: 1 x 4732 B, fft=240 cp=24 n_active=49 n_comb_pilot=0 bps=5 fec=3/4 pilot_interval=20 equalizer=gain frame=4.840s crest=8.9dB
+    1/1: keyed=4.99s rx=72360 rms=0.9088 peak=4.080 CLIP(18829) conf=0.913 snr=29.5dB binsnr=13.6/18.3/23.3dB foff=-8.76Hz raw_ber=0.0168(849/50544) ber=0.0000(0/37856) ldpc_ok=True iters=[2, 1, 2, 3, 2, 3, 4, 1, 2, 3, 2, 2, 1, 3, 1, 2, 1, 2, 3, 2, 3, 2, 3, 4, 1, 2, 2, 2, 2, 2, 2, 4, 3, 2, 4, 2, 3, 1, 2, 3, 3, 1, 4, 2, 4, 3, 2, 3, 2, 3, 1, 3, 2, 2, 2, 2, 3, 3, 4, 3, 4, 2, 2, 2, 2, 4, 3, 1, 2, 2, 2, 1, 2, 3, 1, 2, 4, 2] decoded
+[round 22 arm hf18]
+
+  A:ic7300->B:ic705: 1 x 4732 B, fft=240 cp=24 n_active=49 n_comb_pilot=0 bps=5 fec=3/4 pilot_interval=20 equalizer=gain frame=4.840s crest=8.9dB
+    1/1: keyed=4.99s rx=72360 rms=0.9059 peak=3.919 CLIP(18735) conf=0.928 snr=30.8dB binsnr=14.7/20.2/26.4dB foff=-8.79Hz raw_ber=0.0091(458/50544) ber=0.0000(0/37856) ldpc_ok=True iters=[2, 3, 2, 2, 2, 2, 3, 1, 2, 2, 2, 1, 2, 2, 2, 1, 2, 1, 1, 1, 2, 2, 1, 1, 2, 2, 2, 1, 1, 1, 2, 2, 2, 2, 2, 2, 2, 1, 2, 2, 1, 2, 2, 3, 2, 1, 1, 2, 2, 1, 1, 1, 1, 2, 2, 1, 1, 1, 2, 1, 1, 1, 1, 1, 1, 2, 3, 1, 1, 2, 3, 1, 1, 3, 3, 1, 2, 1] decoded
+[round 22 arm hf10]
+
+  A:ic7300->B:ic705: 1 x 4550 B, fft=480 cp=60 n_active=97 n_comb_pilot=0 bps=5 fec=3/4 pilot_interval=20 equalizer=gain frame=4.905s crest=10.7dB
+    1/1: keyed=5.06s rx=73080 rms=0.9183 peak=3.984 CLIP(19175) conf=0.950 snr=29.5dB binsnr=16.4/20.9/27.0dB foff=-8.70Hz raw_ber=0.0130(632/48600) ber=0.0000(0/36400) ldpc_ok=True iters=[4, 3, 2, 1, 3, 1, 3, 2, 1, 3, 1, 2, 6, 3, 2, 1, 2, 2, 2, 2, 2, 4, 2, 2, 2, 1, 2, 3, 2, 4, 2, 2, 2, 2, 2, 4, 2, 6, 2, 1, 2, 1, 3, 2, 2, 5, 3, 2, 1, 1, 2, 2, 2, 2, 2, 2, 1, 4, 2, 3, 2, 2, 2, 2, 1, 2, 3, 3, 1, 1, 2, 2, 3, 2, 3] decoded
+[round 23 arm hf10]
+
+  A:ic7300->B:ic705: 1 x 4550 B, fft=480 cp=60 n_active=97 n_comb_pilot=0 bps=5 fec=3/4 pilot_interval=20 equalizer=gain frame=4.905s crest=10.7dB
+    1/1: keyed=5.06s rx=73200 rms=0.9072 peak=4.132 CLIP(18985) conf=0.947 snr=30.8dB binsnr=17.8/21.8/29.1dB foff=-8.71Hz raw_ber=0.0067(328/48600) ber=0.0000(0/36400) ldpc_ok=True iters=[2, 1, 2, 2, 2, 1, 1, 2, 1, 0, 1, 2, 1, 2, 1, 2, 1, 1, 1, 3, 1, 1, 2, 2, 1, 0, 2, 1, 1, 1, 1, 1, 1, 1, 1, 2, 2, 2, 1, 2, 1, 1, 2, 2, 3, 1, 1, 2, 1, 1, 2, 1, 2, 1, 1, 1, 1, 2, 1, 1, 2, 5, 0, 2, 2, 1, 1, 1, 1, 1, 1, 1, 1, 1, 2] decoded
+[round 23 arm hf18]
+
+  A:ic7300->B:ic705: 1 x 4732 B, fft=240 cp=24 n_active=49 n_comb_pilot=0 bps=5 fec=3/4 pilot_interval=20 equalizer=gain frame=4.840s crest=8.9dB
+    1/1: keyed=5.00s rx=72480 rms=0.9039 peak=4.172 CLIP(18610) conf=0.887 snr=30.9dB binsnr=13.4/20.9/24.8dB foff=-8.81Hz raw_ber=0.0142(720/50544) ber=0.0000(0/37856) ldpc_ok=True iters=[2, 3, 2, 2, 3, 2, 2, 2, 3, 2, 2, 2, 2, 2, 2, 2, 1, 3, 2, 2, 1, 2, 2, 2, 2, 2, 1, 4, 1, 2, 1, 2, 2, 1, 2, 1, 2, 1, 2, 2, 2, 2, 1, 1, 2, 2, 1, 2, 2, 3, 2, 1, 2, 1, 2, 3, 3, 2, 1, 2, 2, 2, 2, 2, 3, 2, 2, 1, 1, 3, 2, 2, 2, 2, 2, 3, 3, 2] decoded
+[round 24 arm hf18]
+
+  A:ic7300->B:ic705: 1 x 4732 B, fft=240 cp=24 n_active=49 n_comb_pilot=0 bps=5 fec=3/4 pilot_interval=20 equalizer=gain frame=4.840s crest=8.9dB
+    1/1: keyed=4.99s rx=72360 rms=0.9065 peak=4.522 CLIP(18671) conf=0.924 snr=30.2dB binsnr=13.3/19.6/24.7dB foff=-8.81Hz raw_ber=0.0107(542/50544) ber=0.0000(0/37856) ldpc_ok=True iters=[2, 2, 2, 3, 1, 2, 2, 1, 2, 1, 1, 2, 2, 2, 2, 2, 2, 1, 2, 2, 1, 1, 1, 2, 1, 1, 2, 2, 1, 1, 3, 2, 2, 1, 1, 1, 1, 2, 1, 2, 3, 3, 2, 1, 2, 2, 1, 1, 2, 3, 2, 1, 2, 2, 1, 2, 1, 1, 2, 1, 1, 2, 2, 1, 2, 3, 1, 2, 2, 2, 2, 1, 3, 1, 2, 2, 1, 2] decoded
+[round 24 arm hf10]
+
+  A:ic7300->B:ic705: 1 x 4550 B, fft=480 cp=60 n_active=97 n_comb_pilot=0 bps=5 fec=3/4 pilot_interval=20 equalizer=gain frame=4.905s crest=10.7dB
+    1/1: keyed=5.06s rx=73080 rms=0.9126 peak=3.992 CLIP(19081) conf=0.943 snr=28.4dB binsnr=15.2/19.6/27.4dB foff=-8.72Hz raw_ber=0.0059(285/48600) ber=0.0000(0/36400) ldpc_ok=True iters=[1, 1, 2, 1, 1, 1, 1, 4, 2, 1, 1, 1, 1, 3, 1, 1, 1, 1, 1, 1, 1, 1, 2, 1, 1, 1, 3, 1, 3, 4, 1, 2, 0, 1, 1, 3, 2, 1, 1, 0, 1, 1, 2, 1, 2, 1, 1, 2, 1, 2, 2, 3, 2, 2, 3, 1, 1, 2, 1, 1, 3, 1, 2, 1, 2, 2, 2, 3, 2, 1, 2, 1, 1, 1, 1] decoded
+[round 25 arm hf10]
+
+  A:ic7300->B:ic705: 1 x 4550 B, fft=480 cp=60 n_active=97 n_comb_pilot=0 bps=5 fec=3/4 pilot_interval=20 equalizer=gain frame=4.905s crest=10.7dB
+    1/1: keyed=5.06s rx=73080 rms=0.9044 peak=4.366 CLIP(18817) conf=0.932 snr=30.3dB binsnr=17.0/22.2/27.5dB foff=-8.69Hz raw_ber=0.0037(181/48600) ber=0.0000(0/36400) ldpc_ok=True iters=[1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 0, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 2, 1, 1, 2, 1, 1, 1, 0, 0, 1, 1, 1, 1, 1, 1, 1, 2, 1, 1, 1, 1, 1, 1, 0, 2, 1, 1, 1, 1, 1, 1, 1, 2, 1, 3, 1, 2, 1, 1, 0, 1, 2, 1, 1, 1, 0] decoded
+[round 25 arm hf18]
+
+  A:ic7300->B:ic705: 1 x 4732 B, fft=240 cp=24 n_active=49 n_comb_pilot=0 bps=5 fec=3/4 pilot_interval=20 equalizer=gain frame=4.840s crest=8.9dB
+    1/1: keyed=4.99s rx=72360 rms=0.9049 peak=4.438 CLIP(18503) conf=0.885 snr=30.5dB binsnr=12.6/20.4/24.5dB foff=-8.80Hz raw_ber=0.0187(946/50544) ber=0.0000(0/37856) ldpc_ok=True iters=[2, 3, 3, 3, 3, 3, 2, 1, 3, 1, 2, 3, 3, 3, 2, 2, 3, 2, 4, 2, 5, 4, 2, 2, 2, 3, 3, 3, 4, 4, 3, 5, 1, 4, 3, 2, 4, 4, 2, 3, 3, 2, 4, 3, 2, 3, 2, 2, 4, 2, 3, 2, 2, 3, 3, 2, 2, 4, 1, 3, 2, 2, 1, 4, 3, 2, 2, 1, 4, 4, 3, 2, 2, 2, 3, 3, 3, 2] decoded
+[round 26 arm hf18]
+
+  A:ic7300->B:ic705: 1 x 4732 B, fft=240 cp=24 n_active=49 n_comb_pilot=0 bps=5 fec=3/4 pilot_interval=20 equalizer=gain frame=4.840s crest=8.9dB
+    1/1: keyed=4.99s rx=72360 rms=0.9063 peak=4.297 CLIP(18728) conf=0.911 snr=28.4dB binsnr=12.5/17.7/23.8dB foff=-8.73Hz raw_ber=0.0076(382/50544) ber=0.0000(0/37856) ldpc_ok=True iters=[1, 1, 1, 3, 2, 2, 1, 1, 1, 2, 1, 1, 1, 1, 1, 1, 1, 2, 1, 2, 1, 1, 2, 2, 1, 1, 1, 2, 2, 1, 1, 1, 1, 1, 2, 1, 1, 1, 2, 1, 2, 1, 1, 2, 1, 1, 1, 1, 1, 1, 1, 2, 2, 1, 1, 2, 1, 1, 1, 2, 1, 2, 1, 1, 1, 1, 1, 2, 3, 1, 2, 1, 2, 1, 1, 1, 2, 2] decoded
+[round 26 arm hf10]
+
+  A:ic7300->B:ic705: 1 x 4550 B, fft=480 cp=60 n_active=97 n_comb_pilot=0 bps=5 fec=3/4 pilot_interval=20 equalizer=gain frame=4.905s crest=10.7dB
+    1/1: keyed=5.06s rx=73200 rms=0.9308 peak=3.875 CLIP(19835) conf=0.928 snr=30.0dB binsnr=17.2/21.0/26.7dB foff=-8.72Hz raw_ber=0.0019(92/48600) ber=0.0000(0/36400) ldpc_ok=True iters=[1, 1, 1, 1, 1, 1, 0, 1, 0, 1, 0, 1, 1, 1, 1, 1, 0, 1, 1, 0, 1, 1, 1, 0, 0, 0, 1, 1, 0, 1, 0, 0, 1, 1, 1, 0, 1, 0, 1, 1, 1, 1, 1, 1, 1, 1, 1, 0, 1, 0, 1, 1, 0, 0, 1, 1, 1, 0, 1, 1, 2, 0, 1, 0, 0, 0, 2, 0, 0, 1, 1, 1, 0, 1, 1] decoded
+[round 27 arm hf10]
+
+  A:ic7300->B:ic705: 1 x 4550 B, fft=480 cp=60 n_active=97 n_comb_pilot=0 bps=5 fec=3/4 pilot_interval=20 equalizer=gain frame=4.905s crest=10.7dB
+    1/1: keyed=5.06s rx=73200 rms=0.9298 peak=3.954 CLIP(19679) conf=0.930 snr=30.1dB binsnr=16.7/21.8/27.3dB foff=-8.72Hz raw_ber=0.0071(343/48600) ber=0.0000(0/36400) ldpc_ok=True iters=[2, 2, 2, 1, 1, 2, 1, 4, 2, 1, 1, 1, 1, 1, 2, 1, 2, 2, 2, 2, 2, 1, 1, 1, 2, 2, 1, 3, 1, 1, 2, 3, 1, 2, 2, 1, 1, 2, 1, 1, 2, 1, 1, 1, 1, 2, 2, 1, 0, 1, 2, 2, 2, 3, 1, 2, 1, 1, 1, 2, 1, 2, 1, 1, 1, 3, 1, 3, 1, 2, 1, 2, 1, 2, 1] decoded
+[round 27 arm hf18]
+
+  A:ic7300->B:ic705: 1 x 4732 B, fft=240 cp=24 n_active=49 n_comb_pilot=0 bps=5 fec=3/4 pilot_interval=20 equalizer=gain frame=4.840s crest=8.9dB
+    1/1: keyed=4.99s rx=72480 rms=0.9353 peak=4.455 CLIP(19524) conf=0.929 snr=29.1dB binsnr=12.8/18.7/24.1dB foff=-8.80Hz raw_ber=0.0116(586/50544) ber=0.0000(0/37856) ldpc_ok=True iters=[1, 1, 1, 2, 2, 1, 2, 1, 1, 1, 1, 3, 1, 3, 1, 2, 2, 2, 2, 2, 2, 3, 2, 2, 1, 1, 2, 2, 1, 2, 2, 2, 1, 2, 2, 2, 1, 2, 2, 3, 3, 2, 2, 2, 2, 2, 3, 2, 2, 3, 1, 2, 1, 2, 2, 2, 1, 1, 2, 1, 3, 2, 1, 2, 2, 1, 1, 1, 1, 1, 1, 2, 2, 1, 1, 1, 1, 3] decoded
+[round 28 arm hf18]
+
+  A:ic7300->B:ic705: 1 x 4732 B, fft=240 cp=24 n_active=49 n_comb_pilot=0 bps=5 fec=3/4 pilot_interval=20 equalizer=gain frame=4.840s crest=8.9dB
+    1/1: keyed=4.99s rx=72480 rms=0.9178 peak=4.485 CLIP(19232) conf=0.910 snr=28.3dB binsnr=12.6/18.3/22.5dB foff=-8.74Hz raw_ber=0.0105(533/50544) ber=0.0000(0/37856) ldpc_ok=True iters=[3, 2, 1, 1, 1, 2, 2, 2, 2, 1, 2, 1, 2, 2, 2, 2, 1, 1, 2, 2, 2, 2, 1, 2, 2, 3, 2, 1, 2, 2, 1, 1, 1, 2, 2, 2, 2, 4, 2, 2, 3, 2, 2, 2, 1, 2, 1, 2, 2, 1, 2, 2, 2, 2, 2, 3, 2, 2, 2, 2, 2, 1, 2, 1, 1, 1, 4, 2, 2, 1, 1, 2, 1, 1, 1, 1, 1, 2] decoded
+[round 28 arm hf10]
+
+  A:ic7300->B:ic705: 1 x 4550 B, fft=480 cp=60 n_active=97 n_comb_pilot=0 bps=5 fec=3/4 pilot_interval=20 equalizer=gain frame=4.905s crest=10.7dB
+    1/1: keyed=5.06s rx=73200 rms=0.9313 peak=4.108 CLIP(19788) conf=0.954 snr=32.0dB binsnr=19.0/23.1/29.2dB foff=-8.70Hz raw_ber=0.0038(184/48600) ber=0.0000(0/36400) ldpc_ok=True iters=[2, 1, 1, 1, 1, 2, 0, 1, 2, 1, 2, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 0, 1, 1, 1, 2, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 0, 1, 0, 1, 1, 1, 0, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 2, 0, 1, 1, 1, 1, 1, 2, 1, 1, 0, 1, 1, 1, 2, 1, 1] decoded
+[round 29 arm hf10]
+
+  A:ic7300->B:ic705: 1 x 4550 B, fft=480 cp=60 n_active=97 n_comb_pilot=0 bps=5 fec=3/4 pilot_interval=20 equalizer=gain frame=4.905s crest=10.7dB
+    1/1: keyed=5.06s rx=73200 rms=0.9034 peak=3.988 CLIP(18608) conf=0.956 snr=29.1dB binsnr=17.6/20.0/25.4dB foff=-8.72Hz raw_ber=0.0092(447/48600) ber=0.0000(0/36400) ldpc_ok=True iters=[2, 1, 1, 1, 1, 1, 1, 2, 2, 2, 1, 1, 2, 1, 2, 1, 2, 2, 2, 2, 2, 3, 2, 2, 1, 1, 2, 1, 2, 1, 1, 2, 1, 1, 2, 1, 2, 3, 3, 1, 1, 1, 2, 2, 1, 3, 1, 2, 3, 1, 1, 2, 1, 1, 2, 2, 2, 1, 1, 2, 3, 2, 1, 1, 1, 3, 1, 2, 1, 1, 1, 1, 2, 1, 1] decoded
+[round 29 arm hf18]
+
+  A:ic7300->B:ic705: 1 x 4732 B, fft=240 cp=24 n_active=49 n_comb_pilot=0 bps=5 fec=3/4 pilot_interval=20 equalizer=gain frame=4.840s crest=8.9dB
+    1/1: keyed=4.99s rx=72360 rms=0.9017 peak=3.983 CLIP(18562) conf=0.935 snr=29.2dB binsnr=13.9/18.7/23.6dB foff=-8.73Hz raw_ber=0.0110(554/50544) ber=0.0000(0/37856) ldpc_ok=True iters=[3, 2, 1, 1, 4, 1, 2, 2, 1, 1, 2, 2, 2, 1, 2, 3, 2, 1, 2, 2, 1, 1, 3, 1, 2, 2, 1, 2, 1, 2, 1, 1, 2, 2, 2, 2, 2, 3, 3, 2, 1, 3, 1, 3, 2, 1, 1, 2, 1, 2, 2, 1, 1, 1, 1, 1, 2, 1, 1, 1, 1, 1, 1, 4, 2, 1, 2, 3, 2, 1, 3, 1, 1, 3, 2, 1, 1, 2] decoded
+[round 30 arm hf18]
+
+  A:ic7300->B:ic705: 1 x 4732 B, fft=240 cp=24 n_active=49 n_comb_pilot=0 bps=5 fec=3/4 pilot_interval=20 equalizer=gain frame=4.840s crest=8.9dB
+    1/1: keyed=4.99s rx=72480 rms=0.9106 peak=4.136 CLIP(18898) conf=0.949 snr=30.4dB binsnr=15.0/19.9/29.4dB foff=-8.82Hz raw_ber=0.0197(994/50544) ber=0.0016(60/37856) ldpc_ok=False iters=[5, 2, 30, 1, 5, 3, 3, 2, 3, 2, 9, 7, 5, 2, 7, 8, 2, 4, 3, 2, 2, 2, 2, 2, 3, 2, 6, 30, 6, 4, 4, 30, 5, 2, 30, 2, 4, 8, 3, 2, 5, 3, 4, 3, 3, 18, 4, 2, 3, 3, 30, 11, 4, 6, 3, 2, 2, 5, 2, 3, 2, 3, 3, 6, 2, 3, 30, 2, 3, 30, 4, 30, 5, 2, 3, 3, 5, 2] crc_fail
+[round 30 arm hf10]
+
+  A:ic7300->B:ic705: 1 x 4550 B, fft=480 cp=60 n_active=97 n_comb_pilot=0 bps=5 fec=3/4 pilot_interval=20 equalizer=gain frame=4.905s crest=10.7dB
+    1/1: keyed=5.06s rx=73200 rms=0.9317 peak=4.424 CLIP(19714) conf=0.962 snr=30.8dB binsnr=18.9/21.8/29.6dB foff=-8.71Hz raw_ber=0.0032(155/48600) ber=0.0000(0/36400) ldpc_ok=True iters=[1, 0, 1, 0, 0, 1, 1, 1, 1, 1, 1, 2, 1, 1, 0, 1, 1, 1, 1, 1, 0, 2, 1, 1, 1, 1, 1, 1, 1, 0, 1, 0, 1, 1, 1, 0, 1, 1, 1, 1, 1, 0, 1, 1, 1, 1, 1, 1, 1, 1, 0, 0, 2, 1, 2, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 2, 1, 1] decoded
+[round 31 arm hf10]
+
+  A:ic7300->B:ic705: 1 x 4550 B, fft=480 cp=60 n_active=97 n_comb_pilot=0 bps=5 fec=3/4 pilot_interval=20 equalizer=gain frame=4.905s crest=10.7dB
+    1/1: keyed=5.06s rx=73200 rms=0.9103 peak=4.401 CLIP(18899) conf=0.945 snr=33.4dB binsnr=19.4/25.6/32.7dB foff=-8.72Hz raw_ber=0.0057(275/48600) ber=0.0000(0/36400) ldpc_ok=True iters=[1, 1, 1, 1, 1, 1, 1, 2, 1, 2, 2, 1, 2, 2, 1, 1, 2, 2, 1, 3, 4, 3, 2, 1, 2, 1, 1, 2, 1, 1, 1, 3, 2, 2, 2, 3, 1, 2, 1, 1, 2, 1, 2, 1, 1, 1, 1, 4, 0, 4, 2, 1, 2, 1, 1, 2, 2, 2, 1, 1, 2, 2, 2, 1, 1, 2, 1, 2, 1, 1, 1, 1, 1, 2, 1] decoded
+[round 31 arm hf18]
+
+  A:ic7300->B:ic705: 1 x 4732 B, fft=240 cp=24 n_active=49 n_comb_pilot=0 bps=5 fec=3/4 pilot_interval=20 equalizer=gain frame=4.840s crest=8.9dB
+    1/1: keyed=4.99s rx=72360 rms=0.9108 peak=4.051 CLIP(18783) conf=0.940 snr=31.4dB binsnr=15.7/20.8/31.8dB foff=-8.75Hz raw_ber=0.0102(515/50544) ber=0.0000(0/37856) ldpc_ok=True iters=[4, 2, 3, 2, 3, 2, 1, 1, 2, 1, 1, 4, 2, 2, 2, 1, 2, 2, 1, 2, 1, 1, 1, 3, 3, 1, 1, 3, 2, 1, 1, 3, 2, 2, 1, 1, 1, 1, 1, 4, 1, 1, 2, 3, 1, 2, 1, 1, 1, 2, 1, 2, 2, 2, 3, 2, 1, 4, 2, 1, 2, 2, 2, 5, 2, 3, 1, 1, 1, 5, 1, 2, 2, 2, 2, 1, 3, 2] decoded
+[round 32 arm hf18]
+
+  A:ic7300->B:ic705: 1 x 4732 B, fft=240 cp=24 n_active=49 n_comb_pilot=0 bps=5 fec=3/4 pilot_interval=20 equalizer=gain frame=4.840s crest=8.9dB
+    1/1: keyed=4.99s rx=72360 rms=0.9185 peak=4.204 CLIP(18911) conf=0.916 snr=30.3dB binsnr=14.3/20.3/33.6dB foff=-8.79Hz raw_ber=0.0130(659/50544) ber=0.0007(28/37856) ldpc_ok=False iters=[4, 3, 1, 4, 3, 2, 2, 3, 2, 2, 3, 3, 1, 2, 3, 3, 2, 2, 2, 17, 2, 3, 2, 30, 2, 2, 1, 2, 1, 2, 2, 1, 3, 3, 2, 2, 4, 2, 30, 2, 2, 4, 1, 1, 2, 2, 2, 3, 1, 2, 1, 3, 2, 3, 1, 2, 2, 2, 2, 1, 2, 2, 2, 30, 3, 3, 2, 2, 1, 30, 2, 2, 3, 2, 2, 2, 2, 2] crc_fail
+[round 32 arm hf10]
+
+  A:ic7300->B:ic705: 1 x 4550 B, fft=480 cp=60 n_active=97 n_comb_pilot=0 bps=5 fec=3/4 pilot_interval=20 equalizer=gain frame=4.905s crest=10.7dB
+    1/1: keyed=5.06s rx=73200 rms=0.8988 peak=4.079 CLIP(18569) conf=0.967 snr=30.1dB binsnr=17.6/21.0/29.8dB foff=-8.72Hz raw_ber=0.0084(407/48600) ber=0.0007(25/36400) ldpc_ok=False iters=[2, 3, 3, 1, 1, 3, 3, 1, 1, 3, 2, 2, 1, 3, 1, 1, 1, 30, 4, 2, 2, 3, 1, 2, 1, 1, 2, 2, 1, 1, 2, 1, 2, 6, 1, 1, 1, 1, 3, 1, 3, 1, 30, 2, 2, 3, 1, 3, 1, 5, 2, 2, 2, 3, 4, 1, 1, 1, 1, 6, 2, 1, 1, 1, 2, 1, 1, 2, 2, 4, 5, 30, 2, 2, 2] crc_fail
+[round 33 arm hf10]
+
+  A:ic7300->B:ic705: 1 x 4550 B, fft=480 cp=60 n_active=97 n_comb_pilot=0 bps=5 fec=3/4 pilot_interval=20 equalizer=gain frame=4.905s crest=10.7dB
+    1/1: keyed=5.06s rx=73200 rms=0.9154 peak=4.139 CLIP(19308) conf=0.924 snr=29.1dB binsnr=16.1/20.9/30.2dB foff=-8.71Hz raw_ber=0.0073(353/48600) ber=0.0001(2/36400) ldpc_ok=False iters=[1, 1, 2, 2, 2, 1, 2, 2, 1, 1, 1, 2, 2, 2, 2, 1, 1, 1, 2, 3, 1, 3, 3, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 30, 1, 1, 1, 1, 2, 1, 3, 2, 1, 2, 2, 1, 1, 1, 2, 1, 2, 2, 2, 2, 2, 2, 1, 1, 2, 1, 1, 2, 1, 2, 1, 2, 1, 2, 3, 2, 1, 1, 1, 2, 1] crc_fail
+[round 33 arm hf18]
+
+  A:ic7300->B:ic705: 1 x 4732 B, fft=240 cp=24 n_active=49 n_comb_pilot=0 bps=5 fec=3/4 pilot_interval=20 equalizer=gain frame=4.840s crest=8.9dB
+    1/1: keyed=4.99s rx=72360 rms=0.9085 peak=4.827 CLIP(18689) conf=0.921 snr=29.2dB binsnr=11.9/18.9/22.9dB foff=-8.70Hz raw_ber=0.0211(1065/50544) ber=0.0000(0/37856) ldpc_ok=True iters=[2, 3, 3, 3, 3, 2, 3, 2, 3, 2, 2, 4, 2, 3, 5, 3, 3, 3, 3, 6, 3, 1, 3, 2, 3, 3, 4, 2, 2, 2, 2, 2, 5, 3, 2, 2, 4, 3, 2, 2, 3, 2, 3, 6, 4, 4, 3, 3, 1, 3, 4, 3, 2, 2, 2, 5, 3, 2, 4, 2, 3, 2, 1, 4, 2, 2, 2, 3, 2, 3, 3, 5, 4, 2, 2, 2, 5, 3] decoded
+[round 34 arm hf18]
+
+  A:ic7300->B:ic705: 1 x 4732 B, fft=240 cp=24 n_active=49 n_comb_pilot=0 bps=5 fec=3/4 pilot_interval=20 equalizer=gain frame=4.840s crest=8.9dB
+    1/1: keyed=4.99s rx=72360 rms=0.9057 peak=4.559 CLIP(18707) conf=0.957 snr=28.8dB binsnr=11.8/18.5/27.1dB foff=-8.79Hz raw_ber=0.0161(812/50544) ber=0.0000(0/37856) ldpc_ok=True iters=[2, 3, 3, 5, 2, 3, 3, 2, 2, 4, 3, 4, 2, 2, 3, 2, 3, 2, 3, 1, 1, 3, 2, 3, 2, 2, 2, 3, 2, 2, 5, 2, 1, 3, 2, 3, 2, 3, 3, 2, 5, 3, 3, 2, 3, 1, 2, 2, 3, 2, 5, 1, 2, 2, 2, 4, 5, 2, 3, 2, 2, 2, 2, 2, 3, 2, 2, 3, 3, 3, 2, 2, 3, 1, 4, 3, 4, 2] decoded
+[round 34 arm hf10]
+
+  A:ic7300->B:ic705: 1 x 4550 B, fft=480 cp=60 n_active=97 n_comb_pilot=0 bps=5 fec=3/4 pilot_interval=20 equalizer=gain frame=4.905s crest=10.7dB
+    1/1: keyed=5.06s rx=73200 rms=0.9070 peak=3.946 CLIP(18998) conf=0.959 snr=29.2dB binsnr=17.0/20.1/29.7dB foff=-8.67Hz raw_ber=0.0057(278/48600) ber=0.0000(0/36400) ldpc_ok=True iters=[1, 1, 1, 1, 2, 1, 2, 1, 1, 2, 1, 1, 1, 1, 1, 1, 1, 1, 1, 2, 1, 1, 1, 2, 2, 1, 1, 1, 1, 1, 2, 2, 1, 2, 1, 2, 1, 1, 1, 0, 1, 3, 1, 1, 2, 1, 1, 1, 1, 1, 1, 2, 1, 1, 1, 1, 2, 1, 1, 2, 1, 1, 1, 2, 1, 2, 2, 1, 2, 1, 1, 1, 1, 3, 1] decoded
+[round 35 arm hf10]
+
+  A:ic7300->B:ic705: 1 x 4550 B, fft=480 cp=60 n_active=97 n_comb_pilot=0 bps=5 fec=3/4 pilot_interval=20 equalizer=gain frame=4.905s crest=10.7dB
+    1/1: keyed=5.06s rx=73200 rms=0.9006 peak=3.880 CLIP(18796) conf=0.942 snr=30.5dB binsnr=17.7/21.8/30.7dB foff=-8.71Hz raw_ber=0.0053(256/48600) ber=0.0000(0/36400) ldpc_ok=True iters=[2, 1, 1, 1, 2, 2, 2, 1, 1, 1, 2, 1, 2, 1, 1, 1, 2, 1, 0, 1, 0, 2, 1, 0, 1, 4, 1, 2, 1, 1, 2, 1, 2, 1, 1, 2, 1, 1, 1, 1, 1, 1, 1, 2, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 2, 2, 1, 1, 0, 1, 1, 0, 2, 1, 1, 1, 1, 1, 1, 1, 2, 1, 1, 2, 2] decoded
+[round 35 arm hf18]
+
+  A:ic7300->B:ic705: 1 x 4732 B, fft=240 cp=24 n_active=49 n_comb_pilot=0 bps=5 fec=3/4 pilot_interval=20 equalizer=gain frame=4.840s crest=8.9dB
+    1/1: keyed=4.99s rx=72480 rms=0.9236 peak=4.672 CLIP(19413) conf=0.929 snr=29.0dB binsnr=12.7/18.9/24.5dB foff=-8.71Hz raw_ber=0.0166(840/50544) ber=0.0000(0/37856) ldpc_ok=True iters=[4, 1, 4, 3, 3, 3, 2, 2, 2, 1, 3, 3, 3, 1, 2, 1, 3, 2, 2, 2, 3, 3, 2, 2, 1, 2, 2, 2, 3, 7, 1, 4, 3, 3, 4, 2, 3, 1, 2, 3, 3, 2, 2, 3, 4, 3, 3, 2, 4, 3, 3, 3, 3, 4, 2, 2, 2, 2, 3, 2, 4, 2, 2, 3, 4, 4, 1, 2, 3, 4, 3, 3, 1, 2, 4, 2, 3, 2] decoded
+[round 36 arm hf18]
+
+  A:ic7300->B:ic705: 1 x 4732 B, fft=240 cp=24 n_active=49 n_comb_pilot=0 bps=5 fec=3/4 pilot_interval=20 equalizer=gain frame=4.840s crest=8.9dB
+    1/1: keyed=4.99s rx=72360 rms=0.9282 peak=3.989 CLIP(19454) conf=0.882 snr=31.3dB binsnr=15.2/20.9/27.2dB foff=-8.74Hz raw_ber=0.0134(679/50544) ber=0.0000(0/37856) ldpc_ok=True iters=[3, 2, 2, 2, 2, 2, 4, 2, 2, 2, 2, 2, 3, 3, 2, 1, 1, 2, 2, 2, 2, 4, 2, 1, 3, 1, 2, 2, 1, 5, 2, 2, 2, 4, 2, 2, 2, 2, 2, 2, 3, 2, 1, 2, 3, 2, 1, 2, 1, 2, 2, 2, 3, 2, 2, 1, 2, 1, 2, 2, 4, 2, 2, 2, 3, 2, 2, 2, 2, 2, 3, 2, 1, 2, 4, 1, 3, 3] decoded
+[round 36 arm hf10]
+
+  A:ic7300->B:ic705: 1 x 4550 B, fft=480 cp=60 n_active=97 n_comb_pilot=0 bps=5 fec=3/4 pilot_interval=20 equalizer=gain frame=4.905s crest=10.7dB
+    1/1: keyed=5.06s rx=73200 rms=0.9083 peak=4.214 CLIP(19068) conf=0.992 snr=32.5dB binsnr=19.0/24.1/32.1dB foff=-8.70Hz raw_ber=0.0033(162/48600) ber=0.0000(0/36400) ldpc_ok=True iters=[2, 1, 2, 0, 0, 1, 1, 1, 4, 1, 2, 1, 1, 1, 0, 1, 1, 2, 1, 1, 2, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 0, 1, 0, 0, 1, 1, 1, 2, 1, 1, 1, 2, 1, 1, 1, 1, 1, 1, 1, 0, 1, 0, 1, 0, 1, 1, 1, 1, 1, 0, 1, 1, 0, 2, 1, 2, 1, 2, 1, 2, 0, 0, 1] decoded
+[round 37 arm hf10]
+
+  A:ic7300->B:ic705: 1 x 4550 B, fft=480 cp=60 n_active=97 n_comb_pilot=0 bps=5 fec=3/4 pilot_interval=20 equalizer=gain frame=4.905s crest=10.7dB
+    1/1: keyed=5.06s rx=73080 rms=0.9117 peak=3.957 CLIP(18921) conf=0.962 snr=30.7dB binsnr=17.8/22.1/34.1dB foff=-8.70Hz raw_ber=0.0048(231/48600) ber=0.0001(2/36400) ldpc_ok=False iters=[1, 1, 1, 1, 1, 0, 1, 1, 1, 1, 1, 2, 1, 2, 2, 2, 1, 1, 1, 1, 1, 1, 1, 2, 0, 1, 2, 1, 1, 3, 2, 1, 1, 1, 1, 1, 1, 1, 1, 1, 2, 1, 1, 1, 1, 2, 1, 1, 1, 3, 1, 1, 1, 0, 1, 1, 1, 2, 3, 1, 1, 1, 1, 1, 1, 1, 1, 30, 1, 1, 1, 1, 1, 2, 1] crc_fail
+[round 37 arm hf18]
+
+  A:ic7300->B:ic705: 1 x 4732 B, fft=240 cp=24 n_active=49 n_comb_pilot=0 bps=5 fec=3/4 pilot_interval=20 equalizer=gain frame=4.840s crest=8.9dB
+    1/1: keyed=4.99s rx=72360 rms=0.8956 peak=4.000 CLIP(18272) conf=0.936 snr=30.5dB binsnr=14.9/19.8/27.2dB foff=-8.73Hz raw_ber=0.0154(780/50544) ber=0.0000(0/37856) ldpc_ok=True iters=[2, 4, 2, 1, 5, 2, 1, 3, 2, 2, 3, 3, 2, 2, 1, 5, 2, 3, 2, 3, 2, 4, 2, 4, 4, 2, 2, 2, 3, 3, 3, 3, 2, 2, 2, 1, 2, 3, 2, 1, 2, 2, 2, 5, 2, 2, 1, 2, 3, 2, 3, 4, 2, 4, 3, 2, 3, 2, 3, 3, 1, 3, 2, 3, 4, 4, 2, 1, 2, 3, 4, 5, 5, 2, 3, 2, 3, 4] decoded
+[round 38 arm hf18]
+
+  A:ic7300->B:ic705: 1 x 4732 B, fft=240 cp=24 n_active=49 n_comb_pilot=0 bps=5 fec=3/4 pilot_interval=20 equalizer=gain frame=4.840s crest=8.9dB
+    1/1: keyed=4.99s rx=72360 rms=0.9249 peak=3.864 CLIP(19289) conf=0.897 snr=29.6dB binsnr=14.3/18.6/22.9dB foff=-8.73Hz raw_ber=0.0074(373/50544) ber=0.0000(0/37856) ldpc_ok=True iters=[1, 1, 1, 1, 1, 1, 3, 1, 1, 1, 1, 1, 1, 1, 2, 1, 1, 2, 1, 1, 1, 1, 1, 2, 1, 1, 2, 1, 2, 2, 1, 1, 1, 1, 1, 1, 1, 1, 2, 1, 2, 2, 2, 2, 1, 2, 1, 0, 1, 1, 2, 1, 1, 2, 1, 1, 1, 1, 2, 1, 2, 2, 3, 1, 1, 1, 1, 1, 1, 1, 1, 2, 1, 1, 1, 1, 1, 1] decoded
+[round 38 arm hf10]
+
+  A:ic7300->B:ic705: 1 x 4550 B, fft=480 cp=60 n_active=97 n_comb_pilot=0 bps=5 fec=3/4 pilot_interval=20 equalizer=gain frame=4.905s crest=10.7dB
+    1/1: keyed=5.06s rx=73200 rms=0.9234 peak=4.051 CLIP(19357) conf=0.955 snr=30.7dB binsnr=18.4/22.2/28.5dB foff=-8.71Hz raw_ber=0.0087(422/48600) ber=0.0000(0/36400) ldpc_ok=True iters=[2, 2, 2, 2, 2, 1, 1, 2, 1, 1, 1, 1, 1, 2, 1, 1, 2, 1, 1, 2, 2, 3, 3, 1, 1, 1, 1, 2, 2, 1, 1, 2, 2, 1, 2, 2, 1, 3, 2, 1, 1, 2, 2, 2, 1, 1, 1, 2, 1, 1, 1, 1, 1, 1, 1, 1, 2, 1, 2, 1, 1, 1, 1, 2, 2, 1, 1, 2, 1, 1, 2, 1, 1, 1, 1] decoded
+[round 39 arm hf10]
+
+  A:ic7300->B:ic705: 1 x 4550 B, fft=480 cp=60 n_active=97 n_comb_pilot=0 bps=5 fec=3/4 pilot_interval=20 equalizer=gain frame=4.905s crest=10.7dB
+    1/1: keyed=5.06s rx=73200 rms=0.9229 peak=3.923 CLIP(19435) conf=0.934 snr=29.4dB binsnr=16.1/20.9/27.6dB foff=-8.72Hz raw_ber=0.0053(258/48600) ber=0.0000(0/36400) ldpc_ok=True iters=[1, 1, 2, 2, 1, 1, 3, 0, 2, 1, 0, 1, 1, 1, 1, 1, 1, 1, 2, 2, 1, 1, 1, 1, 1, 2, 2, 2, 2, 1, 1, 1, 2, 2, 1, 2, 2, 1, 1, 1, 1, 1, 1, 1, 2, 1, 1, 1, 2, 1, 1, 1, 1, 2, 1, 1, 1, 2, 2, 1, 1, 1, 1, 1, 1, 1, 1, 2, 1, 1, 1, 1, 1, 1, 1] decoded
+[round 39 arm hf18]
+
+  A:ic7300->B:ic705: 1 x 4732 B, fft=240 cp=24 n_active=49 n_comb_pilot=0 bps=5 fec=3/4 pilot_interval=20 equalizer=gain frame=4.840s crest=8.9dB
+    1/1: keyed=4.99s rx=72480 rms=0.9213 peak=4.558 CLIP(19190) conf=0.926 snr=30.4dB binsnr=12.5/20.2/25.8dB foff=-8.81Hz raw_ber=0.0158(797/50544) ber=0.0000(0/37856) ldpc_ok=True iters=[1, 3, 1, 2, 3, 4, 4, 1, 2, 2, 2, 3, 2, 2, 2, 4, 3, 2, 2, 3, 3, 2, 2, 3, 2, 2, 2, 2, 2, 2, 2, 2, 2, 1, 4, 2, 2, 2, 2, 2, 2, 2, 4, 4, 2, 2, 2, 2, 2, 2, 1, 3, 2, 4, 3, 2, 1, 4, 3, 2, 2, 3, 3, 2, 2, 3, 2, 1, 2, 3, 1, 2, 4, 5, 1, 2, 2, 2] decoded
+[round 40 arm hf18]
+
+  A:ic7300->B:ic705: 1 x 4732 B, fft=240 cp=24 n_active=49 n_comb_pilot=0 bps=5 fec=3/4 pilot_interval=20 equalizer=gain frame=4.840s crest=8.9dB
+    1/1: keyed=4.99s rx=72360 rms=0.9114 peak=4.274 CLIP(18742) conf=0.923 snr=30.8dB binsnr=16.2/20.2/25.0dB foff=-8.76Hz raw_ber=0.0100(507/50544) ber=0.0000(0/37856) ldpc_ok=True iters=[2, 2, 3, 2, 2, 1, 2, 2, 2, 2, 2, 2, 2, 1, 2, 2, 1, 2, 3, 3, 1, 1, 2, 1, 2, 2, 1, 1, 1, 1, 1, 1, 2, 2, 2, 2, 2, 2, 1, 2, 2, 2, 1, 1, 2, 1, 1, 2, 1, 1, 2, 1, 1, 2, 1, 2, 2, 2, 2, 2, 2, 1, 3, 2, 1, 1, 4, 2, 1, 2, 1, 1, 1, 2, 1, 2, 1, 3] decoded
+[round 40 arm hf10]
+
+  A:ic7300->B:ic705: 1 x 4550 B, fft=480 cp=60 n_active=97 n_comb_pilot=0 bps=5 fec=3/4 pilot_interval=20 equalizer=gain frame=4.905s crest=10.7dB
+    1/1: keyed=5.06s rx=73200 rms=0.9086 peak=4.349 CLIP(19018) conf=0.995 snr=30.0dB binsnr=17.0/21.4/26.2dB foff=-8.71Hz raw_ber=0.0017(83/48600) ber=0.0000(0/36400) ldpc_ok=True iters=[1, 1, 1, 1, 0, 0, 1, 0, 0, 0, 1, 1, 1, 0, 1, 1, 1, 0, 0, 0, 1, 1, 1, 0, 0, 0, 1, 1, 1, 1, 1, 1, 0, 0, 1, 1, 2, 1, 1, 0, 1, 1, 0, 0, 0, 1, 0, 0, 1, 0, 2, 1, 1, 1, 1, 0, 1, 1, 0, 1, 1, 1, 1, 0, 1, 2, 1, 1, 1, 0, 1, 1, 1, 0, 1] decoded
+[round 41 arm hf10]
+
+  A:ic7300->B:ic705: 1 x 4550 B, fft=480 cp=60 n_active=97 n_comb_pilot=0 bps=5 fec=3/4 pilot_interval=20 equalizer=gain frame=4.905s crest=10.7dB
+    1/1: keyed=5.06s rx=73200 rms=0.9124 peak=3.887 CLIP(19065) conf=0.900 snr=31.8dB binsnr=18.5/23.7/31.6dB foff=-8.65Hz raw_ber=0.0048(234/48600) ber=0.0001(3/36400) ldpc_ok=False iters=[1, 1, 1, 1, 1, 1, 2, 1, 2, 1, 2, 1, 2, 1, 2, 30, 1, 1, 2, 0, 1, 1, 2, 1, 1, 2, 1, 2, 1, 2, 1, 1, 2, 1, 2, 2, 2, 2, 2, 2, 1, 1, 1, 1, 3, 0, 0, 1, 1, 1, 3, 1, 1, 1, 2, 1, 2, 1, 1, 1, 1, 0, 2, 2, 1, 1, 1, 1, 0, 2, 1, 2, 2, 1, 2] crc_fail
+[round 41 arm hf18]
+
+  A:ic7300->B:ic705: 1 x 4732 B, fft=240 cp=24 n_active=49 n_comb_pilot=0 bps=5 fec=3/4 pilot_interval=20 equalizer=gain frame=4.840s crest=8.9dB
+    1/1: keyed=4.99s rx=72360 rms=0.9216 peak=4.078 CLIP(19230) conf=0.895 snr=31.1dB binsnr=16.2/20.2/26.6dB foff=-8.74Hz raw_ber=0.0077(390/50544) ber=0.0000(0/37856) ldpc_ok=True iters=[1, 2, 2, 2, 2, 2, 2, 1, 2, 2, 1, 1, 1, 1, 1, 1, 2, 1, 1, 3, 2, 1, 1, 2, 1, 1, 1, 2, 2, 1, 1, 1, 1, 1, 1, 1, 1, 1, 2, 3, 2, 1, 1, 2, 1, 2, 2, 2, 1, 1, 2, 1, 1, 2, 1, 2, 1, 1, 1, 2, 2, 4, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 2] decoded
+[round 42 arm hf18]
+
+  A:ic7300->B:ic705: 1 x 4732 B, fft=240 cp=24 n_active=49 n_comb_pilot=0 bps=5 fec=3/4 pilot_interval=20 equalizer=gain frame=4.840s crest=8.9dB
+    1/1: keyed=4.99s rx=72480 rms=0.9142 peak=4.181 CLIP(18892) conf=0.935 snr=30.8dB binsnr=14.5/19.9/25.0dB foff=-8.76Hz raw_ber=0.0095(481/50544) ber=0.0000(0/37856) ldpc_ok=True iters=[3, 3, 1, 1, 3, 2, 1, 1, 1, 1, 2, 1, 1, 2, 2, 3, 1, 1, 1, 3, 1, 1, 1, 2, 1, 1, 1, 1, 1, 2, 2, 1, 1, 2, 1, 1, 3, 3, 3, 2, 2, 1, 1, 2, 2, 1, 1, 2, 1, 3, 2, 3, 1, 2, 1, 1, 2, 1, 2, 2, 2, 1, 1, 1, 1, 2, 3, 1, 2, 2, 1, 3, 1, 2, 1, 1, 1, 2] decoded
+[round 42 arm hf10]
+
+  A:ic7300->B:ic705: 1 x 4550 B, fft=480 cp=60 n_active=97 n_comb_pilot=0 bps=5 fec=3/4 pilot_interval=20 equalizer=gain frame=4.905s crest=10.7dB
+    1/1: keyed=5.06s rx=73200 rms=0.9080 peak=4.003 CLIP(19007) conf=0.964 snr=31.2dB binsnr=18.5/22.3/30.6dB foff=-8.71Hz raw_ber=0.0035(172/48600) ber=0.0000(0/36400) ldpc_ok=True iters=[1, 1, 1, 1, 1, 0, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 2, 1, 1, 1, 1, 1, 1, 1, 1, 0, 1, 1, 1, 1, 1, 1, 1, 1, 1, 0, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 0, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 2, 1, 1, 1, 1, 0, 1, 1, 1, 1] decoded
+[round 43 arm hf10]
+
+  A:ic7300->B:ic705: 1 x 4550 B, fft=480 cp=60 n_active=97 n_comb_pilot=0 bps=5 fec=3/4 pilot_interval=20 equalizer=gain frame=4.905s crest=10.7dB
+    1/1: keyed=5.06s rx=73200 rms=0.9058 peak=4.549 CLIP(18915) conf=0.978 snr=30.7dB binsnr=17.3/21.9/28.9dB foff=-8.71Hz raw_ber=0.0036(177/48600) ber=0.0000(0/36400) ldpc_ok=True iters=[1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 2, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 0, 1, 1, 1, 1, 1, 2, 1, 1, 1, 0, 1, 1, 1, 1, 1, 1, 2, 1, 1, 2, 1, 1, 1, 1, 1, 2, 1, 1, 1, 1, 1, 2, 1, 0, 1, 1, 1, 1, 1] decoded
+[round 43 arm hf18]
+
+  A:ic7300->B:ic705: 1 x 4732 B, fft=240 cp=24 n_active=49 n_comb_pilot=0 bps=5 fec=3/4 pilot_interval=20 equalizer=gain frame=4.840s crest=8.9dB
+    1/1: keyed=4.99s rx=72360 rms=0.9212 peak=4.061 CLIP(19344) conf=0.916 snr=31.4dB binsnr=15.6/20.8/27.5dB foff=-8.74Hz raw_ber=0.0123(624/50544) ber=0.0000(0/37856) ldpc_ok=True iters=[2, 1, 1, 2, 4, 2, 1, 2, 2, 3, 2, 1, 2, 3, 2, 2, 2, 2, 1, 2, 2, 3, 2, 1, 2, 2, 2, 3, 4, 2, 2, 1, 3, 3, 2, 2, 3, 1, 2, 2, 3, 2, 1, 2, 1, 2, 1, 3, 2, 3, 2, 2, 1, 2, 2, 2, 2, 2, 3, 2, 1, 1, 2, 1, 2, 1, 2, 2, 3, 2, 2, 2, 2, 1, 4, 1, 2, 3] decoded
+[round 44 arm hf18]
+
+  A:ic7300->B:ic705: 1 x 4732 B, fft=240 cp=24 n_active=49 n_comb_pilot=0 bps=5 fec=3/4 pilot_interval=20 equalizer=gain frame=4.840s crest=8.9dB
+    1/1: keyed=4.99s rx=72360 rms=0.9388 peak=4.689 CLIP(19711) conf=0.898 snr=28.8dB binsnr=12.3/18.5/22.5dB foff=-8.83Hz raw_ber=0.0150(760/50544) ber=0.0000(0/37856) ldpc_ok=True iters=[2, 1, 2, 2, 3, 2, 3, 2, 2, 2, 1, 2, 2, 2, 2, 2, 1, 2, 2, 2, 2, 4, 1, 2, 2, 2, 2, 2, 1, 2, 2, 2, 3, 1, 2, 2, 3, 2, 2, 2, 4, 2, 1, 3, 2, 2, 1, 2, 1, 3, 2, 2, 2, 2, 3, 2, 2, 2, 3, 2, 3, 2, 3, 2, 2, 2, 2, 1, 1, 2, 2, 2, 2, 2, 1, 2, 2, 3] decoded
+[round 44 arm hf10]
+
+  A:ic7300->B:ic705: 1 x 4550 B, fft=480 cp=60 n_active=97 n_comb_pilot=0 bps=5 fec=3/4 pilot_interval=20 equalizer=gain frame=4.905s crest=10.7dB
+    1/1: keyed=5.06s rx=73200 rms=0.9113 peak=3.937 CLIP(19014) conf=0.945 snr=31.8dB binsnr=19.0/23.0/34.3dB foff=-8.70Hz raw_ber=0.0052(254/48600) ber=0.0000(0/36400) ldpc_ok=True iters=[2, 1, 1, 1, 1, 2, 1, 1, 2, 0, 1, 2, 2, 2, 1, 1, 3, 1, 1, 1, 2, 1, 1, 1, 1, 2, 1, 1, 2, 2, 2, 1, 1, 2, 1, 1, 1, 1, 2, 1, 2, 1, 1, 1, 3, 0, 1, 1, 1, 1, 1, 1, 2, 2, 2, 2, 2, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 2, 1, 3, 1, 1] decoded
+[round 45 arm hf10]
+
+  A:ic7300->B:ic705: 1 x 4550 B, fft=480 cp=60 n_active=97 n_comb_pilot=0 bps=5 fec=3/4 pilot_interval=20 equalizer=gain frame=4.905s crest=10.7dB
+    1/1: keyed=5.06s rx=73080 rms=0.9167 peak=4.080 CLIP(19207) conf=0.970 snr=29.5dB binsnr=17.0/20.6/26.5dB foff=-8.69Hz raw_ber=0.0038(185/48600) ber=0.0000(0/36400) ldpc_ok=True iters=[0, 1, 1, 1, 1, 1, 1, 3, 1, 2, 1, 1, 2, 1, 2, 1, 1, 1, 1, 1, 1, 1, 0, 1, 1, 1, 1, 0, 1, 1, 1, 1, 1, 0, 1, 1, 0, 1, 0, 2, 1, 1, 1, 1, 2, 1, 1, 1, 1, 1, 2, 1, 1, 1, 1, 2, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 0, 1, 1, 0, 1, 1, 1, 1, 1] decoded
+[round 45 arm hf18]
+
+  A:ic7300->B:ic705: 1 x 4732 B, fft=240 cp=24 n_active=49 n_comb_pilot=0 bps=5 fec=3/4 pilot_interval=20 equalizer=gain frame=4.840s crest=8.9dB
+    1/1: keyed=4.99s rx=72360 rms=0.9192 peak=4.593 CLIP(18971) conf=0.942 snr=28.8dB binsnr=13.4/17.8/23.9dB foff=-8.73Hz raw_ber=0.0117(590/50544) ber=0.0000(0/37856) ldpc_ok=True iters=[2, 2, 2, 1, 2, 1, 1, 2, 1, 1, 3, 3, 2, 1, 1, 1, 3, 2, 3, 1, 1, 1, 2, 2, 4, 2, 2, 2, 1, 1, 1, 2, 1, 1, 2, 1, 1, 2, 3, 2, 2, 2, 2, 3, 3, 2, 2, 1, 1, 1, 2, 2, 3, 2, 2, 1, 2, 1, 2, 2, 2, 2, 2, 2, 2, 2, 1, 1, 1, 1, 2, 2, 3, 2, 2, 2, 2, 3] decoded
+[round 46 arm hf18]
+
+  A:ic7300->B:ic705: 1 x 4732 B, fft=240 cp=24 n_active=49 n_comb_pilot=0 bps=5 fec=3/4 pilot_interval=20 equalizer=gain frame=4.840s crest=8.9dB
+    1/1: keyed=4.99s rx=72480 rms=0.9241 peak=3.997 CLIP(19345) conf=0.923 snr=30.1dB binsnr=15.1/19.4/27.6dB foff=-8.76Hz raw_ber=0.0101(508/50544) ber=0.0000(0/37856) ldpc_ok=True iters=[1, 3, 2, 2, 3, 2, 2, 2, 3, 2, 2, 2, 1, 1, 1, 2, 2, 1, 2, 1, 1, 3, 2, 1, 2, 1, 2, 2, 3, 3, 1, 2, 2, 1, 2, 2, 2, 2, 2, 1, 2, 2, 1, 2, 1, 2, 2, 3, 3, 3, 1, 3, 2, 2, 2, 1, 1, 2, 2, 1, 2, 2, 1, 3, 2, 1, 1, 1, 1, 2, 1, 1, 3, 2, 1, 2, 2, 4] decoded
+[round 46 arm hf10]
+
+  A:ic7300->B:ic705: 1 x 4550 B, fft=480 cp=60 n_active=97 n_comb_pilot=0 bps=5 fec=3/4 pilot_interval=20 equalizer=gain frame=4.905s crest=10.7dB
+    1/1: keyed=5.06s rx=73200 rms=0.9141 peak=3.905 CLIP(19127) conf=0.939 snr=27.3dB binsnr=15.3/18.5/24.3dB foff=-8.68Hz raw_ber=0.0044(213/48600) ber=0.0000(0/36400) ldpc_ok=True iters=[1, 1, 1, 2, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 2, 1, 1, 0, 1, 2, 1, 1, 1, 0, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 2, 1, 2, 1, 2, 1, 1, 0, 1, 2, 1, 1, 1, 1, 1, 1, 1, 1, 2, 2, 1, 1, 1, 1, 1, 1, 1, 0, 1, 1, 3, 1, 1, 1, 1, 1, 1, 1, 0, 1] decoded
+[round 47 arm hf10]
+
+  A:ic7300->B:ic705: 1 x 4550 B, fft=480 cp=60 n_active=97 n_comb_pilot=0 bps=5 fec=3/4 pilot_interval=20 equalizer=gain frame=4.905s crest=10.7dB
+    1/1: keyed=5.06s rx=73200 rms=0.9279 peak=4.518 CLIP(19428) conf=0.984 snr=30.4dB binsnr=17.0/22.2/29.9dB foff=-8.68Hz raw_ber=0.0053(256/48600) ber=0.0000(0/36400) ldpc_ok=True iters=[1, 2, 1, 1, 0, 1, 1, 1, 1, 1, 1, 2, 3, 4, 3, 1, 1, 1, 1, 1, 1, 1, 0, 1, 1, 1, 2, 1, 1, 1, 1, 2, 3, 1, 1, 1, 1, 1, 2, 1, 2, 2, 1, 2, 2, 1, 1, 2, 2, 1, 1, 1, 1, 3, 1, 1, 0, 1, 2, 1, 1, 2, 1, 2, 1, 1, 1, 1, 1, 1, 1, 1, 0, 1, 1] decoded
+[round 47 arm hf18]
+
+  A:ic7300->B:ic705: 1 x 4732 B, fft=240 cp=24 n_active=49 n_comb_pilot=0 bps=5 fec=3/4 pilot_interval=20 equalizer=gain frame=4.840s crest=8.9dB
+    1/1: keyed=4.99s rx=72240 rms=0.9066 peak=4.451 CLIP(18859) conf=0.875 snr=32.0dB binsnr=15.8/21.7/27.8dB foff=-8.70Hz raw_ber=0.0075(377/50544) ber=0.0000(0/37856) ldpc_ok=True iters=[2, 1, 1, 1, 2, 1, 2, 2, 0, 1, 2, 1, 1, 2, 1, 2, 1, 1, 3, 1, 1, 2, 2, 1, 1, 1, 1, 2, 1, 1, 3, 2, 2, 1, 2, 1, 1, 1, 4, 1, 2, 2, 1, 2, 2, 1, 1, 2, 2, 1, 1, 1, 2, 1, 2, 2, 1, 1, 1, 1, 2, 2, 2, 1, 1, 2, 2, 2, 1, 1, 2, 1, 2, 2, 1, 1, 2, 1] decoded
+[round 48 arm hf18]
+
+  A:ic7300->B:ic705: 1 x 4732 B, fft=240 cp=24 n_active=49 n_comb_pilot=0 bps=5 fec=3/4 pilot_interval=20 equalizer=gain frame=4.840s crest=8.9dB
+    1/1: keyed=4.99s rx=72360 rms=0.9171 peak=4.765 CLIP(18915) conf=0.932 snr=29.0dB binsnr=12.6/18.5/24.2dB foff=-8.78Hz raw_ber=0.0154(779/50544) ber=0.0000(0/37856) ldpc_ok=True iters=[1, 2, 4, 2, 3, 4, 1, 2, 1, 2, 2, 1, 3, 2, 4, 4, 2, 2, 3, 2, 2, 5, 2, 2, 3, 3, 2, 2, 2, 2, 3, 3, 3, 2, 4, 4, 5, 3, 2, 2, 3, 3, 2, 3, 2, 2, 2, 2, 4, 2, 6, 2, 3, 3, 3, 1, 1, 5, 3, 3, 3, 4, 2, 2, 3, 3, 3, 2, 2, 3, 4, 2, 2, 2, 4, 3, 2, 2] decoded
+[round 48 arm hf10]
+
+  A:ic7300->B:ic705: 1 x 4550 B, fft=480 cp=60 n_active=97 n_comb_pilot=0 bps=5 fec=3/4 pilot_interval=20 equalizer=gain frame=4.905s crest=10.7dB
+    1/1: keyed=5.06s rx=73200 rms=0.9091 peak=4.106 CLIP(18879) conf=0.943 snr=29.0dB binsnr=16.1/20.3/26.9dB foff=-8.66Hz raw_ber=0.0063(304/48600) ber=0.0000(0/36400) ldpc_ok=True iters=[2, 3, 1, 1, 1, 1, 1, 2, 2, 1, 2, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 2, 1, 2, 2, 1, 1, 2, 1, 1, 1, 1, 1, 1, 2, 2, 1, 2, 2, 1, 2, 3, 2, 1, 1, 2, 2, 1, 1, 1, 1, 2, 1, 2, 1, 1, 2, 1, 1, 2, 2, 1, 2, 2, 2, 1, 1, 2, 1, 1, 3, 3] decoded
+[round 49 arm hf10]
+
+  A:ic7300->B:ic705: 1 x 4550 B, fft=480 cp=60 n_active=97 n_comb_pilot=0 bps=5 fec=3/4 pilot_interval=20 equalizer=gain frame=4.905s crest=10.7dB
+    1/1: keyed=5.06s rx=73200 rms=0.9214 peak=4.047 CLIP(19542) conf=0.918 snr=30.8dB binsnr=18.5/21.6/27.5dB foff=-8.70Hz raw_ber=0.0043(208/48600) ber=0.0000(0/36400) ldpc_ok=True iters=[1, 2, 1, 1, 1, 1, 1, 1, 1, 0, 1, 1, 1, 1, 2, 1, 1, 1, 1, 1, 2, 1, 1, 1, 2, 1, 1, 0, 0, 0, 1, 1, 1, 1, 1, 2, 0, 1, 1, 1, 1, 2, 1, 1, 2, 1, 1, 1, 1, 1, 0, 1, 2, 1, 1, 1, 1, 1, 2, 1, 0, 1, 1, 1, 1, 1, 1, 1, 1, 2, 1, 1, 1, 1, 1] decoded
+[round 49 arm hf18]
+
+  A:ic7300->B:ic705: 1 x 4732 B, fft=240 cp=24 n_active=49 n_comb_pilot=0 bps=5 fec=3/4 pilot_interval=20 equalizer=gain frame=4.840s crest=8.9dB
+    1/1: keyed=4.99s rx=72480 rms=0.9194 peak=4.661 CLIP(19152) conf=0.907 snr=29.3dB binsnr=13.1/18.6/23.0dB foff=-8.73Hz raw_ber=0.0231(1167/50544) ber=0.0000(0/37856) ldpc_ok=True iters=[3, 3, 3, 3, 3, 3, 3, 3, 3, 4, 4, 2, 5, 4, 4, 2, 5, 3, 2, 5, 2, 2, 2, 3, 3, 5, 2, 4, 4, 5, 3, 4, 4, 6, 3, 5, 8, 2, 6, 4, 2, 5, 2, 4, 8, 4, 3, 2, 2, 2, 2, 3, 3, 5, 4, 3, 2, 2, 4, 5, 3, 4, 3, 3, 3, 3, 3, 3, 8, 4, 3, 4, 4, 4, 3, 3, 3, 4] decoded
+[round 50 arm hf18]
+
+  A:ic7300->B:ic705: 1 x 4732 B, fft=240 cp=24 n_active=49 n_comb_pilot=0 bps=5 fec=3/4 pilot_interval=20 equalizer=gain frame=4.840s crest=8.9dB
+    1/1: keyed=4.99s rx=72480 rms=0.9215 peak=4.326 CLIP(19292) conf=0.898 snr=29.2dB binsnr=12.1/18.7/22.3dB foff=-8.72Hz raw_ber=0.0125(630/50544) ber=0.0000(0/37856) ldpc_ok=True iters=[2, 1, 3, 1, 2, 2, 1, 2, 3, 2, 1, 3, 2, 2, 2, 1, 2, 2, 2, 2, 1, 2, 1, 2, 2, 1, 2, 2, 2, 2, 2, 3, 2, 1, 2, 2, 3, 4, 2, 2, 1, 2, 2, 2, 2, 2, 1, 1, 1, 2, 2, 1, 2, 1, 2, 2, 2, 1, 3, 3, 2, 1, 1, 2, 3, 2, 2, 2, 2, 2, 1, 3, 1, 2, 2, 3, 2, 3] decoded
+[round 50 arm hf10]
+
+  A:ic7300->B:ic705: 1 x 4550 B, fft=480 cp=60 n_active=97 n_comb_pilot=0 bps=5 fec=3/4 pilot_interval=20 equalizer=gain frame=4.905s crest=10.7dB
+    1/1: keyed=5.06s rx=73080 rms=0.9133 peak=4.063 CLIP(19112) conf=0.984 snr=32.4dB binsnr=19.2/23.9/30.0dB foff=-8.70Hz raw_ber=0.0033(159/48600) ber=0.0000(0/36400) ldpc_ok=True iters=[1, 2, 1, 1, 1, 0, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 0, 1, 1, 1, 1, 0, 0, 1, 1, 1, 1, 2, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 2, 1, 1, 1, 1, 1, 2, 1, 1, 1, 1, 0, 0, 1, 1, 1, 1, 1, 0, 1, 0, 1, 1, 1, 1, 1, 1, 1] decoded
+[round 51 arm hf10]
+
+  A:ic7300->B:ic705: 1 x 4550 B, fft=480 cp=60 n_active=97 n_comb_pilot=0 bps=5 fec=3/4 pilot_interval=20 equalizer=gain frame=4.905s crest=10.7dB
+    1/1: keyed=5.07s rx=73320 rms=0.9235 peak=3.775 CLIP(19610) conf=0.899 snr=31.0dB binsnr=18.0/22.3/27.3dB foff=-8.68Hz raw_ber=0.0042(202/48600) ber=0.0000(0/36400) ldpc_ok=True iters=[2, 1, 1, 2, 1, 1, 1, 1, 1, 1, 3, 2, 1, 1, 1, 1, 1, 1, 1, 1, 0, 2, 1, 2, 0, 1, 3, 1, 1, 1, 1, 1, 2, 2, 1, 1, 1, 1, 0, 0, 1, 1, 1, 1, 2, 1, 1, 1, 1, 1, 2, 1, 1, 1, 1, 0, 1, 1, 1, 0, 1, 1, 2, 1, 1, 1, 1, 1, 1, 2, 1, 1, 1, 1, 2] decoded
+[round 51 arm hf18]
+
+  A:ic7300->B:ic705: 1 x 4732 B, fft=240 cp=24 n_active=49 n_comb_pilot=0 bps=5 fec=3/4 pilot_interval=20 equalizer=gain frame=4.840s crest=8.9dB
+    1/1: keyed=4.99s rx=72360 rms=0.9145 peak=4.113 CLIP(18904) conf=0.915 snr=31.9dB binsnr=13.5/22.2/30.7dB foff=-8.74Hz raw_ber=0.0096(487/50544) ber=0.0000(0/37856) ldpc_ok=True iters=[3, 2, 2, 2, 3, 2, 2, 1, 1, 2, 2, 3, 2, 1, 2, 2, 2, 1, 1, 2, 1, 1, 2, 2, 2, 2, 1, 2, 1, 2, 2, 1, 1, 2, 3, 1, 2, 2, 1, 2, 1, 1, 1, 3, 2, 2, 1, 1, 3, 2, 4, 2, 3, 1, 2, 2, 2, 1, 2, 2, 2, 2, 2, 2, 3, 1, 2, 2, 2, 1, 1, 2, 1, 2, 1, 2, 2, 3] decoded
+[round 52 arm hf18]
+
+  A:ic7300->B:ic705: 1 x 4732 B, fft=240 cp=24 n_active=49 n_comb_pilot=0 bps=5 fec=3/4 pilot_interval=20 equalizer=gain frame=4.840s crest=8.9dB
+    1/1: keyed=4.99s rx=72360 rms=0.9060 peak=4.026 CLIP(18703) conf=0.902 snr=30.4dB binsnr=13.2/20.2/25.6dB foff=-8.76Hz raw_ber=0.0144(728/50544) ber=0.0000(0/37856) ldpc_ok=True iters=[3, 3, 2, 2, 2, 2, 2, 2, 3, 3, 2, 3, 3, 3, 2, 2, 2, 2, 3, 1, 3, 2, 2, 6, 2, 2, 2, 3, 2, 2, 3, 3, 3, 2, 1, 1, 2, 1, 3, 2, 1, 2, 1, 2, 3, 1, 2, 2, 2, 2, 1, 1, 2, 2, 1, 2, 2, 2, 2, 3, 2, 1, 1, 1, 2, 2, 2, 1, 1, 2, 2, 2, 2, 2, 2, 2, 2, 3] decoded
+[round 52 arm hf10]
+
+  A:ic7300->B:ic705: 1 x 4550 B, fft=480 cp=60 n_active=97 n_comb_pilot=0 bps=5 fec=3/4 pilot_interval=20 equalizer=gain frame=4.905s crest=10.7dB
+    1/1: keyed=5.06s rx=73320 rms=0.9042 peak=4.225 CLIP(18864) conf=0.947 snr=32.5dB binsnr=19.5/23.9/29.5dB foff=-8.70Hz raw_ber=0.0031(151/48600) ber=0.0000(0/36400) ldpc_ok=True iters=[0, 1, 1, 1, 1, 0, 1, 1, 1, 1, 0, 1, 1, 1, 1, 1, 1, 1, 2, 1, 2, 1, 1, 0, 1, 1, 1, 1, 1, 1, 1, 1, 2, 1, 0, 1, 1, 0, 0, 1, 0, 1, 1, 1, 1, 1, 0, 1, 1, 1, 2, 1, 1, 1, 0, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 0, 0, 1, 1] decoded
+[round 53 arm hf10]
+
+  A:ic7300->B:ic705: 1 x 4550 B, fft=480 cp=60 n_active=97 n_comb_pilot=0 bps=5 fec=3/4 pilot_interval=20 equalizer=gain frame=4.905s crest=10.7dB
+    1/1: keyed=5.06s rx=73200 rms=0.9197 peak=4.034 CLIP(19453) conf=0.927 snr=28.2dB binsnr=16.3/19.4/26.6dB foff=-8.69Hz raw_ber=0.0029(139/48600) ber=0.0000(0/36400) ldpc_ok=True iters=[1, 1, 1, 0, 1, 0, 1, 0, 1, 1, 1, 0, 1, 1, 1, 1, 1, 1, 1, 1, 0, 1, 1, 1, 1, 1, 1, 1, 1, 0, 1, 1, 0, 1, 1, 1, 1, 1, 1, 1, 1, 0, 1, 1, 1, 1, 1, 1, 1, 0, 1, 1, 1, 1, 1, 1, 0, 1, 1, 1, 0, 1, 1, 1, 1, 1, 1, 1, 1, 0, 1, 1, 1, 1, 1] decoded
+[round 53 arm hf18]
+
+  A:ic7300->B:ic705: 1 x 4732 B, fft=240 cp=24 n_active=49 n_comb_pilot=0 bps=5 fec=3/4 pilot_interval=20 equalizer=gain frame=4.840s crest=8.9dB
+    1/1: keyed=4.99s rx=72360 rms=0.9143 peak=4.814 CLIP(18937) conf=0.923 snr=28.7dB binsnr=12.1/18.3/22.1dB foff=-8.76Hz raw_ber=0.0144(726/50544) ber=0.0000(0/37856) ldpc_ok=True iters=[1, 2, 1, 2, 2, 2, 3, 2, 1, 1, 2, 2, 2, 2, 2, 1, 2, 2, 1, 2, 2, 3, 1, 2, 1, 2, 1, 2, 2, 2, 4, 3, 1, 1, 2, 1, 3, 2, 2, 1, 2, 3, 2, 2, 2, 2, 2, 3, 2, 2, 2, 2, 1, 1, 3, 2, 3, 2, 2, 2, 2, 2, 2, 3, 2, 3, 3, 2, 2, 3, 2, 2, 2, 2, 2, 2, 1, 1] decoded
+[round 54 arm hf18]
+
+  A:ic7300->B:ic705: 1 x 4732 B, fft=240 cp=24 n_active=49 n_comb_pilot=0 bps=5 fec=3/4 pilot_interval=20 equalizer=gain frame=4.840s crest=8.9dB
+    1/1: keyed=4.99s rx=72360 rms=0.9215 peak=4.005 CLIP(19249) conf=0.903 snr=29.9dB binsnr=13.5/19.5/25.9dB foff=-8.73Hz raw_ber=0.0113(573/50544) ber=0.0000(0/37856) ldpc_ok=True iters=[3, 1, 1, 1, 1, 1, 2, 1, 2, 1, 1, 2, 1, 2, 2, 2, 2, 3, 2, 2, 3, 1, 1, 2, 2, 1, 2, 3, 1, 4, 3, 2, 2, 2, 1, 2, 1, 1, 2, 2, 2, 2, 3, 2, 2, 2, 2, 1, 1, 1, 2, 1, 2, 2, 1, 2, 2, 2, 5, 1, 1, 2, 1, 2, 2, 2, 1, 1, 2, 2, 2, 1, 1, 2, 2, 3, 1, 3] decoded
+[round 54 arm hf10]
+
+  A:ic7300->B:ic705: 1 x 4550 B, fft=480 cp=60 n_active=97 n_comb_pilot=0 bps=5 fec=3/4 pilot_interval=20 equalizer=gain frame=4.905s crest=10.7dB
+    1/1: keyed=5.06s rx=73200 rms=0.9062 peak=4.046 CLIP(18935) conf=0.937 snr=33.6dB binsnr=19.8/25.0/32.8dB foff=-8.71Hz raw_ber=0.0092(445/48600) ber=0.0000(0/36400) ldpc_ok=True iters=[1, 2, 2, 2, 1, 3, 2, 1, 2, 1, 2, 2, 1, 2, 2, 2, 1, 1, 3, 3, 1, 1, 1, 3, 3, 1, 2, 3, 2, 1, 3, 2, 2, 4, 1, 2, 1, 2, 1, 4, 2, 1, 1, 2, 2, 2, 3, 1, 1, 1, 2, 2, 2, 3, 2, 2, 2, 1, 2, 2, 2, 2, 1, 2, 2, 1, 2, 1, 2, 3, 2, 3, 3, 1, 2] decoded
+[round 55 arm hf10]
+
+  A:ic7300->B:ic705: 1 x 4550 B, fft=480 cp=60 n_active=97 n_comb_pilot=0 bps=5 fec=3/4 pilot_interval=20 equalizer=gain frame=4.905s crest=10.7dB
+    1/1: keyed=5.06s rx=73200 rms=0.9364 peak=4.071 CLIP(19916) conf=0.916 snr=33.0dB binsnr=18.9/24.4/30.8dB foff=-8.69Hz raw_ber=0.0042(203/48600) ber=0.0000(0/36400) ldpc_ok=True iters=[0, 2, 3, 1, 1, 1, 0, 2, 1, 1, 1, 2, 1, 1, 3, 1, 1, 1, 1, 2, 1, 2, 1, 1, 1, 1, 1, 1, 1, 1, 3, 1, 1, 0, 1, 1, 1, 1, 1, 1, 1, 2, 1, 1, 1, 1, 1, 1, 2, 1, 2, 1, 1, 2, 1, 2, 1, 2, 1, 1, 1, 1, 1, 2, 0, 2, 1, 0, 1, 1, 1, 1, 2, 1, 2] decoded
+[round 55 arm hf18]
+
+  A:ic7300->B:ic705: 1 x 4732 B, fft=240 cp=24 n_active=49 n_comb_pilot=0 bps=5 fec=3/4 pilot_interval=20 equalizer=gain frame=4.840s crest=8.9dB
+    1/1: keyed=4.99s rx=72360 rms=0.9162 peak=4.553 CLIP(18973) conf=0.931 snr=30.6dB binsnr=13.6/19.8/27.9dB foff=-8.78Hz raw_ber=0.0144(728/50544) ber=0.0000(0/37856) ldpc_ok=True iters=[2, 2, 1, 3, 1, 2, 2, 1, 3, 3, 4, 2, 3, 2, 2, 2, 1, 2, 4, 2, 3, 2, 2, 3, 2, 2, 2, 3, 2, 2, 1, 2, 2, 2, 3, 3, 2, 3, 3, 3, 3, 2, 4, 4, 3, 2, 2, 1, 2, 2, 3, 3, 1, 1, 1, 2, 2, 1, 2, 4, 2, 4, 4, 2, 2, 2, 1, 3, 1, 2, 2, 2, 1, 2, 1, 2, 3, 2] decoded
+[round 56 arm hf18]
+
+  A:ic7300->B:ic705: 1 x 4732 B, fft=240 cp=24 n_active=49 n_comb_pilot=0 bps=5 fec=3/4 pilot_interval=20 equalizer=gain frame=4.840s crest=8.9dB
+    1/1: keyed=4.99s rx=72360 rms=0.9219 peak=4.745 CLIP(19143) conf=0.930 snr=29.4dB binsnr=12.5/19.1/23.3dB foff=-8.80Hz raw_ber=0.0113(570/50544) ber=0.0000(0/37856) ldpc_ok=True iters=[1, 1, 2, 4, 1, 2, 1, 2, 1, 1, 2, 2, 1, 1, 2, 2, 3, 1, 2, 3, 2, 3, 2, 2, 1, 3, 2, 2, 3, 5, 2, 2, 2, 3, 3, 2, 2, 2, 2, 2, 1, 1, 1, 1, 2, 1, 2, 1, 1, 1, 1, 1, 2, 2, 4, 1, 2, 2, 1, 2, 2, 3, 1, 1, 1, 2, 2, 1, 2, 2, 2, 3, 3, 2, 2, 1, 2, 2] decoded
+[round 56 arm hf10]
+
+  A:ic7300->B:ic705: 1 x 4550 B, fft=480 cp=60 n_active=97 n_comb_pilot=0 bps=5 fec=3/4 pilot_interval=20 equalizer=gain frame=4.905s crest=10.7dB
+    1/1: keyed=5.06s rx=73200 rms=0.9249 peak=4.229 CLIP(19714) conf=0.939 snr=27.7dB binsnr=14.6/19.2/25.4dB foff=-8.66Hz raw_ber=0.0030(146/48600) ber=0.0000(0/36400) ldpc_ok=True iters=[1, 0, 1, 1, 1, 0, 1, 2, 2, 1, 1, 1, 1, 1, 1, 2, 1, 2, 1, 1, 1, 1, 1, 1, 0, 1, 1, 0, 1, 1, 1, 1, 1, 1, 1, 1, 1, 0, 1, 1, 1, 2, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 2, 0, 1, 1, 0, 1, 1, 1, 1, 0, 1, 1, 1, 0, 2, 1, 2] decoded
+[round 57 arm hf10]
+
+  A:ic7300->B:ic705: 1 x 4550 B, fft=480 cp=60 n_active=97 n_comb_pilot=0 bps=5 fec=3/4 pilot_interval=20 equalizer=gain frame=4.905s crest=10.7dB
+    1/1: keyed=5.06s rx=73080 rms=0.9176 peak=3.985 CLIP(19275) conf=0.938 snr=30.7dB binsnr=17.3/21.9/29.7dB foff=-8.69Hz raw_ber=0.0035(171/48600) ber=0.0000(0/36400) ldpc_ok=True iters=[1, 1, 1, 1, 1, 0, 1, 1, 1, 1, 1, 1, 0, 1, 1, 1, 1, 2, 1, 1, 1, 1, 2, 0, 1, 1, 0, 1, 1, 1, 1, 1, 1, 1, 1, 1, 2, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 0, 1, 1, 1, 1, 2, 2, 1, 1, 1, 1, 0, 2, 1, 1, 2, 1, 0, 1, 1, 1, 1] decoded
+[round 57 arm hf18]
+
+  A:ic7300->B:ic705: 1 x 4732 B, fft=240 cp=24 n_active=49 n_comb_pilot=0 bps=5 fec=3/4 pilot_interval=20 equalizer=gain frame=4.840s crest=8.9dB
+    1/1: keyed=4.99s rx=72360 rms=0.9121 peak=4.211 CLIP(18783) conf=0.918 snr=29.7dB binsnr=13.9/19.1/27.7dB foff=-8.75Hz raw_ber=0.0147(742/50544) ber=0.0000(0/37856) ldpc_ok=True iters=[1, 3, 2, 3, 3, 6, 2, 2, 2, 2, 2, 5, 2, 5, 3, 1, 4, 3, 1, 2, 4, 3, 2, 3, 2, 3, 1, 2, 2, 2, 2, 3, 3, 3, 2, 2, 2, 1, 2, 4, 4, 4, 2, 4, 14, 4, 4, 1, 3, 2, 2, 6, 1, 2, 2, 2, 2, 2, 2, 2, 2, 5, 1, 3, 2, 3, 4, 2, 2, 4, 1, 2, 2, 2, 3, 2, 1, 3] decoded
+[round 58 arm hf18]
+
+  A:ic7300->B:ic705: 1 x 4732 B, fft=240 cp=24 n_active=49 n_comb_pilot=0 bps=5 fec=3/4 pilot_interval=20 equalizer=gain frame=4.840s crest=8.9dB
+    1/1: keyed=4.99s rx=72360 rms=0.9197 peak=4.143 CLIP(19294) conf=0.902 snr=29.9dB binsnr=13.6/19.4/28.5dB foff=-8.77Hz raw_ber=0.0155(785/50544) ber=0.0000(1/37856) ldpc_ok=False iters=[2, 2, 4, 2, 4, 2, 7, 1, 2, 5, 5, 1, 2, 2, 2, 2, 2, 2, 2, 7, 2, 2, 1, 2, 3, 1, 2, 2, 2, 3, 4, 2, 1, 2, 3, 4, 30, 2, 1, 2, 2, 2, 3, 3, 2, 2, 2, 2, 3, 2, 2, 2, 1, 3, 1, 2, 2, 2, 2, 3, 3, 2, 3, 4, 5, 2, 3, 3, 3, 2, 2, 3, 2, 4, 3, 2, 2, 4] crc_fail
+[round 58 arm hf10]
+
+  A:ic7300->B:ic705: 1 x 4550 B, fft=480 cp=60 n_active=97 n_comb_pilot=0 bps=5 fec=3/4 pilot_interval=20 equalizer=gain frame=4.905s crest=10.7dB
+    1/1: keyed=5.06s rx=73200 rms=0.9027 peak=3.949 CLIP(18727) conf=0.989 snr=32.0dB binsnr=18.1/23.1/31.0dB foff=-8.71Hz raw_ber=0.0097(471/48600) ber=0.0000(0/36400) ldpc_ok=True iters=[2, 2, 1, 1, 3, 3, 1, 1, 2, 1, 3, 1, 3, 1, 1, 1, 3, 1, 1, 2, 1, 1, 1, 1, 2, 2, 2, 1, 2, 1, 2, 1, 2, 1, 4, 2, 3, 2, 2, 2, 3, 1, 1, 2, 1, 2, 1, 4, 1, 1, 1, 1, 2, 2, 2, 2, 2, 2, 2, 2, 1, 1, 1, 1, 2, 1, 1, 2, 1, 2, 1, 2, 2, 2, 3] decoded
+[round 59 arm hf10]
+
+  A:ic7300->B:ic705: 1 x 4550 B, fft=480 cp=60 n_active=97 n_comb_pilot=0 bps=5 fec=3/4 pilot_interval=20 equalizer=gain frame=4.905s crest=10.7dB
+    1/1: keyed=5.06s rx=73200 rms=0.9136 peak=3.989 CLIP(19261) conf=0.945 snr=28.7dB binsnr=17.0/20.0/26.0dB foff=-8.70Hz raw_ber=0.0059(286/48600) ber=0.0000(0/36400) ldpc_ok=True iters=[2, 2, 2, 1, 2, 2, 1, 2, 1, 1, 1, 1, 2, 2, 1, 2, 1, 1, 1, 1, 1, 1, 2, 1, 2, 1, 1, 1, 1, 1, 2, 1, 1, 1, 2, 2, 1, 1, 2, 2, 1, 2, 1, 1, 2, 2, 1, 4, 1, 1, 1, 1, 1, 1, 1, 2, 1, 1, 2, 1, 2, 1, 1, 1, 2, 2, 2, 1, 1, 2, 1, 1, 0, 1, 2] decoded
+[round 59 arm hf18]
+
+  A:ic7300->B:ic705: 1 x 4732 B, fft=240 cp=24 n_active=49 n_comb_pilot=0 bps=5 fec=3/4 pilot_interval=20 equalizer=gain frame=4.840s crest=8.9dB
+    1/1: keyed=4.99s rx=72360 rms=0.9117 peak=4.113 CLIP(18841) conf=0.940 snr=28.1dB binsnr=12.9/17.5/21.2dB foff=-8.78Hz raw_ber=0.0111(560/50544) ber=0.0000(0/37856) ldpc_ok=True iters=[2, 1, 2, 1, 2, 1, 2, 2, 1, 1, 1, 2, 1, 2, 1, 1, 1, 2, 1, 1, 2, 1, 1, 1, 1, 2, 2, 2, 1, 2, 1, 2, 2, 2, 2, 2, 1, 1, 2, 2, 2, 2, 2, 3, 2, 2, 2, 2, 2, 2, 2, 1, 2, 2, 2, 1, 2, 1, 2, 2, 3, 2, 2, 3, 3, 2, 2, 3, 2, 1, 1, 2, 1, 2, 1, 2, 2, 2] decoded
+[round 60 arm hf18]
+
+  A:ic7300->B:ic705: 1 x 4732 B, fft=240 cp=24 n_active=49 n_comb_pilot=0 bps=5 fec=3/4 pilot_interval=20 equalizer=gain frame=4.840s crest=8.9dB
+    1/1: keyed=4.99s rx=72360 rms=0.9165 peak=3.908 CLIP(19116) conf=0.907 snr=29.5dB binsnr=14.8/18.4/24.5dB foff=-8.78Hz raw_ber=0.0092(466/50544) ber=0.0000(0/37856) ldpc_ok=True iters=[1, 1, 2, 2, 1, 1, 2, 2, 2, 1, 1, 2, 1, 1, 1, 1, 1, 2, 2, 2, 1, 3, 2, 2, 1, 2, 1, 1, 1, 2, 1, 1, 2, 1, 2, 1, 2, 1, 1, 2, 1, 3, 3, 1, 1, 1, 1, 1, 2, 2, 1, 2, 1, 1, 1, 1, 1, 1, 1, 1, 1, 2, 1, 1, 1, 1, 2, 2, 3, 1, 1, 2, 2, 1, 2, 1, 1, 2] decoded
+[round 60 arm hf10]
+
+  A:ic7300->B:ic705: 1 x 4550 B, fft=480 cp=60 n_active=97 n_comb_pilot=0 bps=5 fec=3/4 pilot_interval=20 equalizer=gain frame=4.905s crest=10.7dB
+    1/1: keyed=5.06s rx=73200 rms=0.9296 peak=4.011 CLIP(19676) conf=0.967 snr=29.5dB binsnr=17.0/20.4/26.4dB foff=-8.69Hz raw_ber=0.0042(203/48600) ber=0.0000(0/36400) ldpc_ok=True iters=[1, 1, 1, 1, 1, 1, 1, 1, 1, 2, 1, 1, 1, 0, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 2, 2, 1, 0, 0, 1, 1, 1, 1, 1, 1, 2, 0, 1, 1, 1, 0, 1, 1, 1, 2, 1, 2, 2, 1, 3, 1, 1, 1, 2, 1, 1, 1, 2, 1, 1, 0, 2, 1, 0, 1, 1, 1, 1, 1, 0, 1, 1] decoded
+[round 61 arm hf10]
+
+  A:ic7300->B:ic705: 1 x 4550 B, fft=480 cp=60 n_active=97 n_comb_pilot=0 bps=5 fec=3/4 pilot_interval=20 equalizer=gain frame=4.905s crest=10.7dB
+    1/1: keyed=5.06s rx=73200 rms=0.9068 peak=4.113 CLIP(19062) conf=0.950 snr=29.0dB binsnr=16.5/20.4/26.4dB foff=-8.70Hz raw_ber=0.0046(222/48600) ber=0.0000(0/36400) ldpc_ok=True iters=[0, 1, 1, 1, 1, 1, 1, 1, 1, 2, 1, 1, 2, 1, 1, 2, 1, 1, 1, 1, 1, 1, 1, 1, 1, 3, 3, 1, 1, 2, 2, 1, 1, 1, 1, 1, 1, 1, 2, 0, 1, 1, 1, 2, 1, 1, 2, 1, 1, 1, 1, 1, 2, 1, 1, 1, 2, 2, 1, 1, 1, 1, 1, 1, 1, 2, 0, 1, 1, 2, 1, 1, 1, 1, 0] decoded
+[round 61 arm hf18]
+
+  A:ic7300->B:ic705: 1 x 4732 B, fft=240 cp=24 n_active=49 n_comb_pilot=0 bps=5 fec=3/4 pilot_interval=20 equalizer=gain frame=4.840s crest=8.9dB
+    1/1: keyed=4.99s rx=72360 rms=0.9012 peak=4.067 CLIP(18477) conf=0.937 snr=31.0dB binsnr=15.5/20.2/29.5dB foff=-8.74Hz raw_ber=0.0087(440/50544) ber=0.0000(0/37856) ldpc_ok=True iters=[1, 1, 3, 1, 1, 2, 1, 1, 1, 2, 2, 1, 1, 2, 2, 3, 2, 1, 2, 1, 1, 2, 1, 1, 1, 1, 2, 1, 1, 2, 3, 1, 1, 3, 2, 1, 1, 2, 2, 2, 2, 1, 1, 1, 3, 3, 5, 0, 3, 1, 1, 3, 2, 1, 3, 4, 2, 2, 1, 3, 2, 2, 1, 3, 2, 2, 2, 2, 2, 2, 2, 1, 2, 4, 1, 1, 1, 1] decoded
+[round 62 arm hf18]
+
+  A:ic7300->B:ic705: 1 x 4732 B, fft=240 cp=24 n_active=49 n_comb_pilot=0 bps=5 fec=3/4 pilot_interval=20 equalizer=gain frame=4.840s crest=8.9dB
+    1/1: keyed=4.99s rx=72480 rms=0.9073 peak=4.066 CLIP(18780) conf=0.906 snr=30.2dB binsnr=15.2/19.3/25.0dB foff=-8.69Hz raw_ber=0.0146(739/50544) ber=0.0000(0/37856) ldpc_ok=True iters=[2, 3, 3, 2, 8, 4, 3, 2, 4, 2, 2, 2, 2, 1, 3, 2, 2, 3, 1, 3, 2, 3, 3, 1, 3, 1, 2, 3, 1, 4, 2, 3, 2, 2, 3, 3, 2, 2, 3, 2, 2, 3, 2, 2, 2, 6, 2, 2, 2, 2, 2, 3, 3, 2, 2, 3, 2, 1, 4, 1, 3, 2, 2, 2, 2, 1, 2, 3, 2, 4, 3, 2, 2, 2, 3, 2, 1, 2] decoded
+[round 62 arm hf10]
+
+  A:ic7300->B:ic705: 1 x 4550 B, fft=480 cp=60 n_active=97 n_comb_pilot=0 bps=5 fec=3/4 pilot_interval=20 equalizer=gain frame=4.905s crest=10.7dB
+    1/1: keyed=5.06s rx=73200 rms=0.9224 peak=3.843 CLIP(19368) conf=0.974 snr=29.9dB binsnr=16.4/21.4/27.2dB foff=-8.69Hz raw_ber=0.0059(288/48600) ber=0.0000(0/36400) ldpc_ok=True iters=[1, 2, 3, 1, 1, 1, 1, 2, 2, 2, 1, 2, 2, 0, 1, 1, 1, 1, 2, 1, 2, 1, 1, 2, 2, 2, 2, 1, 1, 4, 1, 2, 1, 1, 1, 3, 1, 1, 1, 2, 2, 1, 1, 1, 2, 2, 2, 1, 3, 1, 2, 1, 1, 3, 1, 1, 2, 1, 2, 2, 2, 2, 1, 3, 1, 1, 2, 1, 2, 1, 2, 1, 0, 1, 2] decoded
+[round 63 arm hf10]
+
+  A:ic7300->B:ic705: 1 x 4550 B, fft=480 cp=60 n_active=97 n_comb_pilot=0 bps=5 fec=3/4 pilot_interval=20 equalizer=gain frame=4.905s crest=10.7dB
+    1/1: keyed=5.06s rx=73320 rms=0.9103 peak=3.878 CLIP(19002) conf=0.950 snr=30.0dB binsnr=17.4/21.6/32.1dB foff=-8.67Hz raw_ber=0.0054(264/48600) ber=0.0000(0/36400) ldpc_ok=True iters=[1, 2, 1, 1, 2, 0, 1, 2, 1, 1, 1, 1, 2, 1, 2, 1, 1, 1, 1, 2, 1, 1, 1, 1, 1, 2, 1, 1, 2, 1, 1, 1, 1, 1, 1, 1, 1, 1, 2, 1, 1, 1, 2, 1, 2, 1, 1, 1, 2, 2, 1, 1, 2, 2, 1, 1, 1, 1, 1, 1, 1, 2, 1, 1, 2, 1, 0, 2, 1, 1, 1, 2, 1, 1, 1] decoded
+[round 63 arm hf18]
+
+  A:ic7300->B:ic705: 1 x 4732 B, fft=240 cp=24 n_active=49 n_comb_pilot=0 bps=5 fec=3/4 pilot_interval=20 equalizer=gain frame=4.840s crest=8.9dB
+    1/1: keyed=4.99s rx=72360 rms=0.9045 peak=4.376 CLIP(18423) conf=0.942 snr=30.4dB binsnr=13.4/20.0/26.0dB foff=-8.74Hz raw_ber=0.0146(738/50544) ber=0.0000(0/37856) ldpc_ok=True iters=[1, 3, 3, 3, 3, 3, 2, 3, 2, 3, 2, 4, 2, 4, 2, 2, 3, 2, 3, 2, 3, 1, 2, 5, 2, 1, 2, 2, 2, 3, 2, 2, 5, 2, 2, 4, 4, 2, 3, 3, 3, 6, 3, 2, 3, 3, 2, 4, 3, 2, 3, 4, 2, 2, 1, 3, 2, 3, 2, 3, 6, 5, 3, 2, 3, 4, 2, 2, 3, 1, 2, 2, 3, 2, 4, 2, 1, 3] decoded
+[round 64 arm hf18]
+
+  A:ic7300->B:ic705: 1 x 4732 B, fft=240 cp=24 n_active=49 n_comb_pilot=0 bps=5 fec=3/4 pilot_interval=20 equalizer=gain frame=4.840s crest=8.9dB
+    1/1: keyed=4.99s rx=72360 rms=0.9285 peak=4.600 CLIP(19355) conf=0.941 snr=29.0dB binsnr=14.0/18.4/23.3dB foff=-8.74Hz raw_ber=0.0168(850/50544) ber=0.0000(0/37856) ldpc_ok=True iters=[3, 5, 3, 3, 4, 2, 1, 2, 2, 2, 2, 2, 3, 3, 2, 3, 4, 4, 3, 4, 3, 2, 3, 3, 3, 3, 3, 6, 3, 3, 3, 2, 2, 2, 2, 2, 3, 3, 1, 3, 2, 4, 3, 1, 1, 3, 3, 2, 6, 2, 4, 3, 2, 3, 3, 2, 3, 2, 2, 2, 3, 6, 2, 1, 4, 3, 2, 2, 2, 4, 2, 4, 4, 3, 3, 2, 4, 3] decoded
+[round 64 arm hf10]
+
+  A:ic7300->B:ic705: 1 x 4550 B, fft=480 cp=60 n_active=97 n_comb_pilot=0 bps=5 fec=3/4 pilot_interval=20 equalizer=gain frame=4.905s crest=10.7dB
+    1/1: keyed=5.06s rx=73200 rms=0.9206 peak=3.838 CLIP(19393) conf=0.949 snr=29.6dB binsnr=16.3/20.8/27.1dB foff=-8.70Hz raw_ber=0.0042(204/48600) ber=0.0000(0/36400) ldpc_ok=True iters=[1, 1, 0, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 0, 1, 1, 1, 2, 2, 1, 1, 0, 1, 1, 1, 1, 1, 1, 1, 1, 1, 0, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 0, 1, 1, 1, 1, 1, 1, 1, 1, 1, 2, 1, 1, 1, 1, 1, 1, 1, 1, 1, 2, 1, 1, 1, 1, 1, 0, 1, 1, 1, 0, 1] decoded
+[round 65 arm hf10]
+
+  A:ic7300->B:ic705: 1 x 4550 B, fft=480 cp=60 n_active=97 n_comb_pilot=0 bps=5 fec=3/4 pilot_interval=20 equalizer=gain frame=4.905s crest=10.7dB
+    1/1: keyed=5.06s rx=73200 rms=0.9157 peak=4.248 CLIP(19106) conf=0.965 snr=31.2dB binsnr=18.5/22.6/28.1dB foff=-8.69Hz raw_ber=0.0094(458/48600) ber=0.0000(0/36400) ldpc_ok=True iters=[2, 3, 2, 2, 2, 2, 2, 1, 2, 2, 1, 1, 1, 1, 2, 2, 2, 2, 1, 3, 1, 2, 1, 2, 2, 1, 3, 1, 2, 2, 3, 2, 2, 1, 1, 1, 1, 2, 2, 1, 2, 2, 2, 2, 3, 1, 2, 3, 1, 1, 2, 2, 2, 1, 2, 1, 2, 2, 1, 2, 2, 1, 1, 2, 3, 2, 1, 1, 2, 1, 3, 1, 1, 2, 1] decoded
+[round 65 arm hf18]
+
+  A:ic7300->B:ic705: 1 x 4732 B, fft=240 cp=24 n_active=49 n_comb_pilot=0 bps=5 fec=3/4 pilot_interval=20 equalizer=gain frame=4.840s crest=8.9dB
+    1/1: keyed=4.99s rx=72240 rms=0.9246 peak=4.159 CLIP(19304) conf=0.899 snr=30.0dB binsnr=14.7/19.0/24.6dB foff=-8.78Hz raw_ber=0.0152(768/50544) ber=0.0000(0/37856) ldpc_ok=True iters=[1, 3, 2, 3, 3, 2, 3, 2, 3, 3, 2, 2, 2, 2, 3, 2, 3, 2, 3, 3, 2, 1, 2, 4, 3, 2, 3, 2, 3, 3, 3, 3, 2, 2, 2, 3, 2, 3, 2, 2, 2, 2, 2, 2, 3, 3, 2, 4, 2, 4, 3, 2, 2, 3, 8, 3, 2, 3, 2, 2, 1, 2, 2, 2, 3, 2, 2, 1, 1, 2, 2, 3, 4, 3, 1, 2, 3, 1] decoded
+[round 66 arm hf18]
+
+  A:ic7300->B:ic705: 1 x 4732 B, fft=240 cp=24 n_active=49 n_comb_pilot=0 bps=5 fec=3/4 pilot_interval=20 equalizer=gain frame=4.840s crest=8.9dB
+    1/1: keyed=4.99s rx=72360 rms=0.9217 peak=4.523 CLIP(19271) conf=0.935 snr=29.3dB binsnr=13.7/18.8/26.7dB foff=-8.76Hz raw_ber=0.0149(753/50544) ber=0.0000(0/37856) ldpc_ok=True iters=[1, 3, 3, 2, 2, 2, 2, 2, 2, 1, 3, 2, 1, 1, 2, 4, 1, 2, 2, 2, 2, 4, 3, 2, 3, 1, 3, 1, 1, 2, 2, 3, 2, 1, 4, 1, 2, 5, 3, 2, 2, 2, 2, 3, 4, 1, 1, 4, 2, 3, 4, 2, 2, 7, 2, 3, 3, 2, 7, 3, 5, 3, 2, 1, 1, 3, 2, 3, 2, 2, 1, 3, 3, 2, 1, 1, 2, 3] decoded
+[round 66 arm hf10]
+
+  A:ic7300->B:ic705: 1 x 4550 B, fft=480 cp=60 n_active=97 n_comb_pilot=0 bps=5 fec=3/4 pilot_interval=20 equalizer=gain frame=4.905s crest=10.7dB
+    1/1: keyed=5.06s rx=73200 rms=0.8963 peak=4.235 CLIP(18718) conf=0.959 snr=30.1dB binsnr=16.1/21.6/27.0dB foff=-8.71Hz raw_ber=0.0109(530/48600) ber=0.0000(0/36400) ldpc_ok=True iters=[1, 3, 3, 2, 1, 2, 3, 2, 3, 2, 2, 1, 1, 2, 2, 1, 2, 2, 1, 1, 1, 2, 2, 4, 3, 4, 2, 2, 3, 2, 3, 2, 1, 1, 1, 3, 2, 1, 3, 2, 3, 1, 3, 3, 2, 1, 1, 2, 2, 3, 2, 1, 2, 2, 2, 2, 2, 3, 3, 2, 2, 1, 2, 2, 2, 2, 3, 1, 2, 1, 2, 2, 3, 3, 2] decoded
+[round 67 arm hf10]
+
+  A:ic7300->B:ic705: 1 x 4550 B, fft=480 cp=60 n_active=97 n_comb_pilot=0 bps=5 fec=3/4 pilot_interval=20 equalizer=gain frame=4.905s crest=10.7dB
+    1/1: keyed=5.06s rx=73200 rms=0.9028 peak=4.153 CLIP(18814) conf=0.926 snr=28.2dB binsnr=15.8/19.3/25.4dB foff=-8.68Hz raw_ber=0.0036(174/48600) ber=0.0000(0/36400) ldpc_ok=True iters=[0, 1, 1, 1, 1, 1, 1, 3, 1, 1, 1, 1, 1, 0, 1, 1, 0, 1, 1, 1, 1, 1, 1, 1, 1, 1, 2, 1, 0, 1, 1, 1, 1, 2, 1, 1, 1, 1, 2, 1, 1, 1, 0, 0, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 2, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1] decoded
+[round 67 arm hf18]
+
+  A:ic7300->B:ic705: 1 x 4732 B, fft=240 cp=24 n_active=49 n_comb_pilot=0 bps=5 fec=3/4 pilot_interval=20 equalizer=gain frame=4.840s crest=8.9dB
+    1/1: keyed=4.99s rx=72360 rms=0.9032 peak=3.873 CLIP(18580) conf=0.905 snr=32.9dB binsnr=17.8/21.8/28.4dB foff=-8.75Hz raw_ber=0.0114(575/50544) ber=0.0000(0/37856) ldpc_ok=True iters=[2, 2, 1, 2, 4, 2, 2, 2, 1, 2, 2, 2, 3, 2, 2, 3, 1, 2, 2, 1, 7, 3, 1, 2, 2, 2, 1, 1, 1, 2, 2, 1, 3, 2, 2, 1, 2, 2, 1, 2, 1, 3, 2, 2, 1, 1, 2, 2, 2, 2, 1, 2, 2, 2, 1, 1, 2, 1, 4, 1, 1, 2, 1, 2, 2, 1, 3, 1, 1, 2, 2, 3, 1, 2, 1, 3, 3, 2] decoded
+[round 68 arm hf18]
+
+  A:ic7300->B:ic705: 1 x 4732 B, fft=240 cp=24 n_active=49 n_comb_pilot=0 bps=5 fec=3/4 pilot_interval=20 equalizer=gain frame=4.840s crest=8.9dB
+    1/1: keyed=4.99s rx=72480 rms=0.9133 peak=4.161 CLIP(19014) conf=0.930 snr=29.9dB binsnr=13.8/19.0/24.7dB foff=-8.79Hz raw_ber=0.0122(619/50544) ber=0.0000(0/37856) ldpc_ok=True iters=[1, 2, 2, 3, 2, 3, 2, 3, 2, 2, 1, 4, 1, 2, 2, 2, 2, 2, 2, 2, 2, 2, 1, 3, 2, 1, 2, 1, 1, 2, 2, 1, 3, 2, 2, 3, 2, 2, 2, 2, 1, 2, 1, 2, 2, 1, 1, 1, 2, 1, 2, 2, 2, 2, 1, 2, 1, 2, 3, 2, 2, 2, 2, 1, 2, 2, 1, 2, 1, 2, 2, 2, 1, 1, 2, 1, 3, 2] decoded
+[round 68 arm hf10]
+
+  A:ic7300->B:ic705: 1 x 4550 B, fft=480 cp=60 n_active=97 n_comb_pilot=0 bps=5 fec=3/4 pilot_interval=20 equalizer=gain frame=4.905s crest=10.7dB
+    1/1: keyed=5.07s rx=73320 rms=0.9201 peak=3.876 CLIP(19427) conf=0.914 snr=29.6dB binsnr=16.9/21.0/27.0dB foff=-8.68Hz raw_ber=0.0057(279/48600) ber=0.0000(0/36400) ldpc_ok=True iters=[1, 1, 2, 1, 1, 1, 1, 2, 2, 1, 2, 1, 1, 1, 1, 1, 1, 1, 1, 1, 2, 1, 2, 1, 1, 2, 1, 2, 1, 1, 1, 1, 2, 2, 1, 1, 1, 0, 1, 1, 1, 1, 2, 1, 1, 2, 1, 1, 1, 1, 1, 1, 1, 1, 1, 2, 3, 2, 1, 1, 2, 1, 1, 3, 1, 1, 1, 1, 2, 1, 1, 1, 1, 1, 1] decoded
+[round 69 arm hf10]
+
+  A:ic7300->B:ic705: 1 x 4550 B, fft=480 cp=60 n_active=97 n_comb_pilot=0 bps=5 fec=3/4 pilot_interval=20 equalizer=gain frame=4.905s crest=10.7dB
+    1/1: keyed=5.06s rx=73200 rms=0.9179 peak=4.031 CLIP(19286) conf=0.945 snr=27.5dB binsnr=15.6/18.6/23.4dB foff=-8.69Hz raw_ber=0.0066(321/48600) ber=0.0000(0/36400) ldpc_ok=True iters=[2, 3, 1, 1, 4, 3, 2, 1, 2, 2, 1, 2, 1, 1, 1, 2, 1, 1, 1, 2, 1, 1, 1, 2, 2, 1, 1, 2, 1, 1, 1, 0, 1, 1, 2, 1, 1, 1, 2, 1, 1, 1, 2, 1, 1, 1, 1, 1, 2, 1, 2, 1, 1, 1, 1, 2, 1, 0, 1, 1, 2, 1, 2, 2, 2, 1, 2, 1, 1, 2, 1, 1, 1, 1, 2] decoded
+[round 69 arm hf18]
+
+  A:ic7300->B:ic705: 1 x 4732 B, fft=240 cp=24 n_active=49 n_comb_pilot=0 bps=5 fec=3/4 pilot_interval=20 equalizer=gain frame=4.840s crest=8.9dB
+    1/1: keyed=4.99s rx=72480 rms=0.9096 peak=4.323 CLIP(18928) conf=0.904 snr=30.7dB binsnr=13.7/20.2/25.4dB foff=-8.75Hz raw_ber=0.0134(675/50544) ber=0.0000(0/37856) ldpc_ok=True iters=[2, 2, 2, 2, 3, 2, 1, 3, 1, 1, 4, 2, 1, 4, 2, 3, 3, 1, 2, 1, 1, 1, 2, 2, 1, 3, 2, 4, 1, 1, 2, 2, 2, 1, 2, 2, 3, 1, 1, 2, 3, 3, 4, 2, 2, 2, 2, 2, 2, 2, 2, 3, 1, 2, 1, 3, 2, 2, 2, 3, 1, 1, 2, 2, 2, 2, 2, 2, 2, 10, 3, 3, 2, 2, 2, 2, 4, 3] decoded
+[round 70 arm hf18]
+
+  A:ic7300->B:ic705: 1 x 4732 B, fft=240 cp=24 n_active=49 n_comb_pilot=0 bps=5 fec=3/4 pilot_interval=20 equalizer=gain frame=4.840s crest=8.9dB
+    1/1: keyed=4.99s rx=72360 rms=0.9175 peak=4.611 CLIP(18942) conf=0.909 snr=30.9dB binsnr=13.9/20.5/27.8dB foff=-8.75Hz raw_ber=0.0102(517/50544) ber=0.0000(0/37856) ldpc_ok=True iters=[2, 1, 2, 2, 1, 2, 3, 2, 1, 1, 1, 1, 2, 1, 2, 3, 3, 2, 2, 2, 2, 3, 2, 1, 2, 1, 2, 2, 1, 2, 2, 2, 1, 2, 2, 1, 1, 1, 1, 2, 1, 2, 2, 1, 2, 2, 2, 1, 2, 1, 1, 2, 2, 2, 2, 2, 1, 2, 1, 2, 1, 2, 2, 2, 2, 2, 3, 2, 2, 2, 1, 3, 2, 2, 2, 2, 2, 2] decoded
+[round 70 arm hf10]
+
+  A:ic7300->B:ic705: 1 x 4550 B, fft=480 cp=60 n_active=97 n_comb_pilot=0 bps=5 fec=3/4 pilot_interval=20 equalizer=gain frame=4.905s crest=10.7dB
+    1/1: keyed=5.06s rx=73200 rms=0.9189 peak=3.866 CLIP(19410) conf=0.938 snr=28.3dB binsnr=16.1/19.6/26.8dB foff=-8.66Hz raw_ber=0.0020(97/48600) ber=0.0000(0/36400) ldpc_ok=True iters=[1, 0, 1, 1, 1, 1, 2, 0, 1, 2, 0, 1, 1, 1, 0, 1, 0, 1, 0, 0, 1, 1, 1, 1, 1, 1, 1, 0, 1, 0, 1, 1, 0, 1, 1, 1, 1, 1, 1, 1, 1, 1, 0, 1, 2, 1, 1, 0, 1, 1, 0, 1, 0, 2, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 0, 1, 1, 1, 1, 1, 2, 0, 1, 1, 1] decoded
+[round 71 arm hf10]
+
+  A:ic7300->B:ic705: 1 x 4550 B, fft=480 cp=60 n_active=97 n_comb_pilot=0 bps=5 fec=3/4 pilot_interval=20 equalizer=gain frame=4.905s crest=10.7dB
+    1/1: keyed=5.06s rx=73320 rms=0.9289 peak=4.130 CLIP(19709) conf=0.950 snr=31.8dB binsnr=19.2/22.5/32.8dB foff=-8.69Hz raw_ber=0.0059(289/48600) ber=0.0000(0/36400) ldpc_ok=True iters=[1, 2, 2, 3, 1, 1, 2, 1, 1, 2, 1, 2, 2, 1, 2, 2, 1, 1, 2, 2, 1, 1, 1, 1, 2, 1, 1, 2, 1, 1, 1, 1, 1, 1, 1, 6, 2, 1, 1, 1, 1, 1, 1, 1, 2, 1, 1, 1, 1, 1, 1, 0, 2, 0, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 3, 2, 4, 1, 1, 1, 0, 2, 1] decoded
+[round 71 arm hf18]
+
+  A:ic7300->B:ic705: 1 x 4732 B, fft=240 cp=24 n_active=49 n_comb_pilot=0 bps=5 fec=3/4 pilot_interval=20 equalizer=gain frame=4.840s crest=8.9dB
+    1/1: keyed=4.99s rx=72360 rms=0.9227 peak=4.183 CLIP(19311) conf=0.926 snr=30.8dB binsnr=15.5/20.0/31.1dB foff=-8.71Hz raw_ber=0.0117(593/50544) ber=0.0004(16/37856) ldpc_ok=False iters=[1, 1, 2, 3, 3, 2, 2, 2, 1, 2, 30, 4, 2, 4, 8, 18, 3, 1, 2, 2, 2, 1, 1, 2, 2, 5, 2, 2, 1, 1, 1, 2, 2, 1, 2, 2, 2, 2, 3, 2, 1, 2, 1, 2, 3, 2, 5, 1, 1, 2, 2, 1, 2, 2, 2, 1, 1, 2, 2, 2, 2, 2, 3, 3, 2, 2, 2, 1, 3, 2, 3, 2, 2, 3, 1, 2, 2, 2] crc_fail
+[round 72 arm hf18]
+
+  A:ic7300->B:ic705: 1 x 4732 B, fft=240 cp=24 n_active=49 n_comb_pilot=0 bps=5 fec=3/4 pilot_interval=20 equalizer=gain frame=4.840s crest=8.9dB
+    1/1: keyed=4.99s rx=72360 rms=0.9400 peak=4.549 CLIP(19857) conf=0.904 snr=29.9dB binsnr=12.8/20.0/24.3dB foff=-8.75Hz raw_ber=0.0101(510/50544) ber=0.0000(0/37856) ldpc_ok=True iters=[2, 2, 1, 1, 1, 1, 2, 2, 1, 2, 2, 2, 3, 2, 2, 1, 2, 2, 2, 1, 2, 2, 2, 2, 2, 1, 2, 1, 2, 2, 1, 2, 3, 2, 1, 1, 1, 2, 2, 2, 1, 2, 1, 2, 1, 2, 1, 1, 1, 1, 2, 3, 2, 2, 2, 2, 1, 1, 2, 2, 1, 2, 1, 1, 1, 1, 2, 2, 1, 1, 2, 2, 2, 1, 1, 2, 1, 2] decoded
+[round 72 arm hf10]
+
+  A:ic7300->B:ic705: 1 x 4550 B, fft=480 cp=60 n_active=97 n_comb_pilot=0 bps=5 fec=3/4 pilot_interval=20 equalizer=gain frame=4.905s crest=10.7dB
+    1/1: keyed=5.06s rx=73080 rms=0.9065 peak=4.189 CLIP(18894) conf=0.982 snr=29.5dB binsnr=17.9/20.6/25.1dB foff=-8.70Hz raw_ber=0.0065(317/48600) ber=0.0000(0/36400) ldpc_ok=True iters=[1, 2, 1, 1, 1, 1, 3, 1, 1, 1, 1, 1, 2, 1, 1, 1, 1, 1, 1, 2, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 2, 1, 2, 2, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 0, 1, 1, 1, 1, 1, 1, 2, 1, 1, 1, 1, 1, 1, 2, 1, 2, 1, 0, 1, 1, 1, 1, 1, 2, 1] decoded
+[round 73 arm hf10]
+
+  A:ic7300->B:ic705: 1 x 4550 B, fft=480 cp=60 n_active=97 n_comb_pilot=0 bps=5 fec=3/4 pilot_interval=20 equalizer=gain frame=4.905s crest=10.7dB
+    1/1: keyed=5.06s rx=73080 rms=0.9093 peak=4.123 CLIP(19057) conf=0.951 snr=28.2dB binsnr=15.8/19.5/26.6dB foff=-8.67Hz raw_ber=0.0062(299/48600) ber=0.0000(0/36400) ldpc_ok=True iters=[1, 2, 2, 2, 2, 1, 1, 2, 1, 1, 1, 1, 1, 1, 1, 3, 2, 1, 1, 1, 2, 1, 1, 1, 2, 1, 3, 1, 2, 1, 0, 1, 1, 1, 1, 2, 1, 1, 1, 1, 2, 2, 1, 1, 1, 1, 1, 1, 2, 1, 1, 1, 1, 1, 1, 2, 1, 2, 1, 1, 1, 2, 1, 2, 1, 1, 2, 1, 2, 3, 2, 2, 1, 1, 1] decoded
+[round 73 arm hf18]
+
+  A:ic7300->B:ic705: 1 x 4732 B, fft=240 cp=24 n_active=49 n_comb_pilot=0 bps=5 fec=3/4 pilot_interval=20 equalizer=gain frame=4.840s crest=8.9dB
+    1/1: keyed=4.99s rx=72480 rms=0.9083 peak=4.048 CLIP(18779) conf=0.873 snr=31.1dB binsnr=13.2/21.1/28.0dB foff=-8.79Hz raw_ber=0.0104(524/50544) ber=0.0000(0/37856) ldpc_ok=True iters=[3, 1, 2, 2, 2, 1, 3, 1, 1, 2, 2, 3, 1, 1, 2, 2, 2, 2, 2, 2, 2, 2, 1, 2, 4, 1, 2, 1, 2, 1, 2, 3, 2, 1, 3, 2, 1, 2, 3, 1, 3, 3, 2, 2, 2, 3, 3, 2, 1, 1, 2, 2, 2, 2, 1, 1, 1, 1, 3, 2, 5, 1, 2, 2, 3, 1, 2, 4, 2, 2, 1, 2, 2, 1, 3, 1, 2, 2] decoded
+[round 74 arm hf18]
+
+  A:ic7300->B:ic705: 1 x 4732 B, fft=240 cp=24 n_active=49 n_comb_pilot=0 bps=5 fec=3/4 pilot_interval=20 equalizer=gain frame=4.840s crest=8.9dB
+    1/1: keyed=4.99s rx=72360 rms=0.8982 peak=4.401 CLIP(18449) conf=0.916 snr=31.3dB binsnr=15.1/20.0/30.8dB foff=-8.76Hz raw_ber=0.0154(779/50544) ber=0.0000(0/37856) ldpc_ok=True iters=[1, 2, 3, 3, 2, 4, 2, 3, 2, 2, 2, 3, 2, 1, 2, 2, 2, 2, 3, 3, 1, 2, 2, 2, 2, 1, 2, 2, 1, 2, 4, 2, 1, 3, 2, 5, 3, 3, 2, 2, 2, 2, 3, 2, 2, 2, 4, 3, 1, 2, 3, 3, 2, 3, 2, 2, 2, 3, 1, 2, 2, 2, 4, 3, 2, 2, 1, 3, 2, 1, 2, 1, 3, 3, 2, 2, 1, 3] decoded
+[round 74 arm hf10]
+
+  A:ic7300->B:ic705: 1 x 4550 B, fft=480 cp=60 n_active=97 n_comb_pilot=0 bps=5 fec=3/4 pilot_interval=20 equalizer=gain frame=4.905s crest=10.7dB
+    1/1: keyed=5.06s rx=73200 rms=0.8999 peak=3.841 CLIP(18722) conf=0.974 snr=29.6dB binsnr=17.2/20.9/29.6dB foff=-8.71Hz raw_ber=0.0068(329/48600) ber=0.0000(0/36400) ldpc_ok=True iters=[1, 1, 2, 1, 2, 3, 1, 1, 2, 1, 2, 3, 1, 2, 1, 5, 2, 2, 1, 1, 1, 2, 1, 1, 2, 2, 1, 2, 1, 1, 2, 1, 1, 1, 1, 1, 3, 1, 2, 2, 1, 1, 2, 4, 1, 2, 2, 2, 2, 1, 1, 1, 2, 1, 1, 2, 2, 1, 1, 1, 1, 1, 2, 1, 1, 1, 2, 1, 1, 2, 1, 1, 3, 2, 1] decoded
+[round 75 arm hf10]
+
+  A:ic7300->B:ic705: 1 x 4550 B, fft=480 cp=60 n_active=97 n_comb_pilot=0 bps=5 fec=3/4 pilot_interval=20 equalizer=gain frame=4.905s crest=10.7dB
+    1/1: keyed=5.06s rx=73320 rms=0.9127 peak=4.103 CLIP(19111) conf=0.908 snr=31.5dB binsnr=18.7/22.8/32.7dB foff=-8.70Hz raw_ber=0.0044(212/48600) ber=0.0000(0/36400) ldpc_ok=True iters=[1, 1, 1, 1, 1, 0, 1, 1, 1, 1, 1, 1, 1, 1, 0, 1, 1, 2, 1, 1, 1, 2, 1, 1, 3, 1, 1, 1, 2, 1, 1, 1, 2, 1, 1, 2, 2, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 2, 1, 2, 1, 1, 1, 1, 1, 1, 1, 1, 2, 2, 1, 1, 1, 1, 1, 1, 2, 1] decoded
+[round 75 arm hf18]
+
+  A:ic7300->B:ic705: 1 x 4732 B, fft=240 cp=24 n_active=49 n_comb_pilot=0 bps=5 fec=3/4 pilot_interval=20 equalizer=gain frame=4.840s crest=8.9dB
+    1/1: keyed=4.99s rx=72360 rms=0.9005 peak=3.900 CLIP(18577) conf=0.913 snr=29.0dB binsnr=13.4/18.4/23.3dB foff=-8.75Hz raw_ber=0.0124(626/50544) ber=0.0000(0/37856) ldpc_ok=True iters=[3, 2, 2, 1, 3, 2, 4, 3, 1, 3, 1, 1, 3, 3, 2, 3, 1, 2, 3, 3, 1, 3, 1, 2, 1, 2, 1, 1, 1, 2, 2, 2, 2, 5, 1, 2, 2, 2, 1, 2, 2, 1, 2, 2, 2, 3, 3, 1, 1, 1, 3, 1, 2, 2, 2, 1, 1, 2, 2, 3, 1, 2, 1, 2, 2, 2, 1, 2, 2, 1, 1, 1, 2, 2, 2, 5, 1, 2] decoded
+[round 76 arm hf18]
+
+  A:ic7300->B:ic705: 1 x 4732 B, fft=240 cp=24 n_active=49 n_comb_pilot=0 bps=5 fec=3/4 pilot_interval=20 equalizer=gain frame=4.840s crest=8.9dB
+    1/1: keyed=4.99s rx=72360 rms=0.9232 peak=4.333 CLIP(19328) conf=0.874 snr=30.2dB binsnr=14.8/19.7/23.5dB foff=-8.75Hz raw_ber=0.0131(661/50544) ber=0.0000(0/37856) ldpc_ok=True iters=[2, 2, 2, 2, 3, 1, 1, 2, 2, 2, 2, 1, 1, 2, 2, 1, 1, 2, 2, 2, 2, 2, 2, 1, 3, 1, 1, 4, 1, 2, 2, 2, 2, 1, 2, 2, 2, 1, 3, 1, 1, 2, 2, 2, 2, 2, 2, 2, 2, 1, 1, 3, 1, 2, 3, 1, 1, 1, 1, 1, 2, 1, 2, 1, 2, 2, 3, 2, 2, 1, 1, 2, 1, 1, 1, 2, 3, 2] decoded
+[round 76 arm hf10]
+
+  A:ic7300->B:ic705: 1 x 4550 B, fft=480 cp=60 n_active=97 n_comb_pilot=0 bps=5 fec=3/4 pilot_interval=20 equalizer=gain frame=4.905s crest=10.7dB
+    1/1: keyed=5.06s rx=73200 rms=0.9263 peak=3.950 CLIP(19679) conf=0.938 snr=29.5dB binsnr=17.0/20.9/27.8dB foff=-8.68Hz raw_ber=0.0016(76/48600) ber=0.0000(0/36400) ldpc_ok=True iters=[1, 1, 1, 0, 0, 0, 1, 0, 1, 1, 1, 1, 0, 2, 1, 1, 1, 1, 0, 0, 1, 0, 1, 0, 0, 0, 1, 0, 1, 1, 1, 1, 1, 1, 0, 1, 1, 1, 1, 1, 0, 1, 1, 1, 1, 0, 1, 1, 0, 1, 0, 1, 1, 0, 0, 1, 0, 0, 0, 1, 0, 0, 1, 1, 1, 0, 0, 0, 1, 1, 1, 1, 0, 0, 1] decoded
+[round 77 arm hf10]
+
+  A:ic7300->B:ic705: 1 x 4550 B, fft=480 cp=60 n_active=97 n_comb_pilot=0 bps=5 fec=3/4 pilot_interval=20 equalizer=gain frame=4.905s crest=10.7dB
+    1/1: keyed=5.06s rx=73200 rms=0.9029 peak=3.969 CLIP(18729) conf=0.964 snr=29.5dB binsnr=17.9/20.6/26.3dB foff=-8.72Hz raw_ber=0.0061(297/48600) ber=0.0000(0/36400) ldpc_ok=True iters=[1, 1, 1, 1, 2, 1, 2, 2, 2, 2, 2, 1, 2, 1, 1, 1, 1, 1, 1, 1, 2, 2, 1, 1, 1, 2, 2, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 2, 1, 1, 2, 2, 1, 1, 1, 2, 1, 1, 3, 1, 1, 1, 1, 1, 1, 1, 1, 2, 1, 1, 1, 1, 2, 1, 1, 2, 1, 2, 2, 1, 1, 1, 1, 2] decoded
+[round 77 arm hf18]
+
+  A:ic7300->B:ic705: 1 x 4732 B, fft=240 cp=24 n_active=49 n_comb_pilot=0 bps=5 fec=3/4 pilot_interval=20 equalizer=gain frame=4.840s crest=8.9dB
+    1/1: keyed=4.99s rx=72360 rms=0.9146 peak=4.721 CLIP(18900) conf=0.916 snr=29.5dB binsnr=12.0/19.1/23.8dB foff=-8.77Hz raw_ber=0.0175(885/50544) ber=0.0000(0/37856) ldpc_ok=True iters=[2, 4, 2, 3, 2, 5, 2, 2, 2, 3, 2, 2, 2, 2, 2, 3, 2, 3, 3, 3, 2, 2, 2, 3, 2, 3, 3, 2, 3, 2, 2, 2, 2, 3, 6, 2, 2, 3, 2, 1, 5, 3, 3, 3, 6, 2, 2, 2, 3, 2, 2, 3, 2, 2, 2, 3, 2, 2, 3, 2, 3, 4, 3, 3, 4, 1, 4, 1, 1, 3, 4, 3, 2, 3, 2, 1, 2, 2] decoded
+[round 78 arm hf18]
+
+  A:ic7300->B:ic705: 1 x 4732 B, fft=240 cp=24 n_active=49 n_comb_pilot=0 bps=5 fec=3/4 pilot_interval=20 equalizer=gain frame=4.840s crest=8.9dB
+    1/1: keyed=4.99s rx=72360 rms=0.9046 peak=4.115 CLIP(18613) conf=0.925 snr=30.7dB binsnr=16.3/19.8/28.7dB foff=-8.77Hz raw_ber=0.0158(799/50544) ber=0.0001(4/37856) ldpc_ok=False iters=[3, 2, 2, 1, 2, 2, 2, 2, 2, 2, 4, 2, 4, 4, 4, 5, 2, 3, 3, 3, 1, 2, 2, 3, 2, 3, 2, 2, 4, 1, 2, 2, 2, 2, 2, 3, 3, 1, 2, 3, 3, 3, 3, 3, 3, 3, 2, 2, 2, 2, 1, 2, 1, 2, 4, 2, 2, 7, 3, 2, 5, 2, 3, 2, 3, 3, 30, 2, 2, 3, 3, 2, 2, 1, 1, 3, 2, 2] crc_fail
+[round 78 arm hf10]
+
+  A:ic7300->B:ic705: 1 x 4550 B, fft=480 cp=60 n_active=97 n_comb_pilot=0 bps=5 fec=3/4 pilot_interval=20 equalizer=gain frame=4.905s crest=10.7dB
+    1/1: keyed=5.06s rx=73080 rms=0.9331 peak=4.173 CLIP(19903) conf=0.946 snr=32.9dB binsnr=20.4/23.6/30.7dB foff=-8.73Hz raw_ber=0.0038(185/48600) ber=0.0000(0/36400) ldpc_ok=True iters=[1, 1, 1, 1, 1, 1, 0, 0, 2, 1, 2, 2, 1, 1, 1, 1, 0, 1, 1, 1, 1, 1, 0, 2, 1, 1, 2, 1, 1, 1, 1, 1, 0, 2, 1, 1, 1, 2, 1, 3, 1, 1, 1, 1, 1, 1, 2, 2, 2, 1, 1, 1, 1, 1, 2, 3, 2, 1, 1, 1, 2, 2, 0, 1, 2, 1, 1, 2, 1, 1, 1, 1, 0, 1, 1] decoded
+[round 79 arm hf10]
+
+  A:ic7300->B:ic705: 1 x 4550 B, fft=480 cp=60 n_active=97 n_comb_pilot=0 bps=5 fec=3/4 pilot_interval=20 equalizer=gain frame=4.905s crest=10.7dB
+    1/1: keyed=5.06s rx=73200 rms=0.9013 peak=3.897 CLIP(18745) conf=0.935 snr=31.5dB binsnr=18.6/22.7/29.2dB foff=-8.69Hz raw_ber=0.0067(327/48600) ber=0.0000(0/36400) ldpc_ok=True iters=[1, 1, 2, 1, 1, 2, 1, 2, 1, 4, 0, 4, 1, 2, 1, 1, 2, 1, 1, 1, 1, 2, 3, 1, 2, 1, 3, 2, 1, 4, 1, 0, 2, 3, 2, 1, 2, 2, 1, 3, 2, 1, 2, 1, 2, 1, 2, 1, 2, 1, 2, 1, 2, 3, 1, 1, 1, 1, 2, 2, 2, 2, 2, 2, 2, 1, 2, 2, 1, 2, 2, 2, 1, 1, 1] decoded
+[round 79 arm hf18]
+
+  A:ic7300->B:ic705: 1 x 4732 B, fft=240 cp=24 n_active=49 n_comb_pilot=0 bps=5 fec=3/4 pilot_interval=20 equalizer=gain frame=4.840s crest=8.9dB
+    1/1: keyed=4.99s rx=72360 rms=0.9283 peak=4.138 CLIP(19506) conf=0.903 snr=29.0dB binsnr=13.9/18.1/24.3dB foff=-8.76Hz raw_ber=0.0106(534/50544) ber=0.0000(0/37856) ldpc_ok=True iters=[1, 1, 2, 2, 2, 2, 3, 2, 2, 1, 2, 2, 1, 2, 2, 1, 2, 1, 1, 2, 1, 1, 1, 2, 1, 2, 2, 1, 1, 2, 2, 2, 1, 1, 1, 1, 2, 3, 2, 1, 1, 2, 2, 1, 1, 2, 1, 1, 1, 1, 1, 2, 1, 2, 2, 1, 3, 2, 2, 3, 3, 2, 1, 3, 2, 2, 1, 1, 2, 1, 2, 1, 1, 1, 2, 2, 1, 2] decoded
+[round 80 arm hf18]
+
+  A:ic7300->B:ic705: 1 x 4732 B, fft=240 cp=24 n_active=49 n_comb_pilot=0 bps=5 fec=3/4 pilot_interval=20 equalizer=gain frame=4.840s crest=8.9dB
+    1/1: keyed=4.99s rx=72360 rms=0.9335 peak=3.989 CLIP(19645) conf=0.896 snr=29.3dB binsnr=14.6/18.6/21.7dB foff=-8.79Hz raw_ber=0.0092(465/50544) ber=0.0000(0/37856) ldpc_ok=True iters=[2, 2, 2, 3, 1, 2, 2, 2, 1, 2, 2, 1, 1, 1, 1, 1, 2, 1, 2, 2, 1, 2, 2, 2, 2, 1, 1, 2, 2, 2, 2, 1, 1, 2, 2, 1, 1, 1, 3, 3, 1, 1, 1, 1, 1, 1, 2, 2, 2, 2, 1, 1, 2, 1, 2, 1, 1, 2, 1, 3, 2, 1, 2, 1, 2, 2, 1, 1, 1, 1, 2, 1, 1, 2, 1, 2, 2, 2] decoded
+[round 80 arm hf10]
+
+  A:ic7300->B:ic705: 1 x 4550 B, fft=480 cp=60 n_active=97 n_comb_pilot=0 bps=5 fec=3/4 pilot_interval=20 equalizer=gain frame=4.905s crest=10.7dB
+    1/1: keyed=5.06s rx=73200 rms=0.9371 peak=4.345 CLIP(20035) conf=0.966 snr=31.5dB binsnr=19.1/22.9/28.1dB foff=-8.68Hz raw_ber=0.0049(237/48600) ber=0.0000(0/36400) ldpc_ok=True iters=[1, 2, 0, 1, 1, 1, 1, 2, 1, 1, 1, 1, 1, 1, 1, 2, 1, 1, 2, 1, 2, 1, 2, 1, 1, 2, 1, 1, 1, 1, 2, 0, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 2, 1, 0, 1, 1, 1, 1, 1, 1, 1, 0, 2, 1, 1, 1, 1, 2, 1, 1, 2, 1, 2, 1, 2, 1, 2, 1, 1, 1, 2, 1, 1] decoded
+[round 81 arm hf10]
+
+  A:ic7300->B:ic705: 1 x 4550 B, fft=480 cp=60 n_active=97 n_comb_pilot=0 bps=5 fec=3/4 pilot_interval=20 equalizer=gain frame=4.905s crest=10.7dB
+    1/1: keyed=5.06s rx=73200 rms=0.9424 peak=3.923 CLIP(20105) conf=0.901 snr=32.9dB binsnr=19.3/24.0/30.6dB foff=-8.68Hz raw_ber=0.0021(101/48600) ber=0.0000(0/36400) ldpc_ok=True iters=[1, 1, 1, 1, 2, 1, 1, 1, 1, 0, 2, 0, 2, 1, 1, 1, 1, 1, 1, 1, 1, 1, 2, 0, 1, 1, 2, 1, 1, 1, 1, 1, 0, 2, 1, 1, 0, 1, 1, 1, 1, 1, 1, 1, 1, 0, 1, 1, 1, 1, 0, 1, 1, 1, 0, 1, 1, 0, 1, 0, 1, 1, 1, 0, 0, 1, 0, 1, 0, 1, 0, 0, 1, 0, 1] decoded
+[round 81 arm hf18]
+
+  A:ic7300->B:ic705: 1 x 4732 B, fft=240 cp=24 n_active=49 n_comb_pilot=0 bps=5 fec=3/4 pilot_interval=20 equalizer=gain frame=4.840s crest=8.9dB
+    1/1: keyed=4.99s rx=72360 rms=0.9197 peak=4.221 CLIP(19130) conf=0.951 snr=30.2dB binsnr=14.1/19.3/31.0dB foff=-8.73Hz raw_ber=0.0147(744/50544) ber=0.0000(0/37856) ldpc_ok=True iters=[2, 3, 1, 2, 4, 2, 3, 2, 2, 2, 2, 3, 4, 2, 2, 2, 1, 5, 1, 3, 2, 3, 4, 2, 2, 2, 4, 2, 3, 2, 4, 3, 2, 2, 2, 4, 2, 2, 3, 4, 4, 2, 3, 2, 2, 2, 3, 3, 2, 2, 2, 4, 1, 3, 2, 2, 2, 2, 1, 2, 3, 2, 1, 1, 2, 3, 3, 2, 3, 2, 3, 2, 1, 3, 1, 2, 2, 4] decoded
+[round 82 arm hf18]
+
+  A:ic7300->B:ic705: 1 x 4732 B, fft=240 cp=24 n_active=49 n_comb_pilot=0 bps=5 fec=3/4 pilot_interval=20 equalizer=gain frame=4.840s crest=8.9dB
+    1/1: keyed=4.99s rx=72360 rms=0.9237 peak=4.553 CLIP(19197) conf=0.939 snr=31.9dB binsnr=14.7/21.6/27.7dB foff=-8.76Hz raw_ber=0.0122(616/50544) ber=0.0000(0/37856) ldpc_ok=True iters=[1, 3, 2, 2, 4, 2, 2, 2, 1, 2, 3, 1, 2, 2, 2, 2, 3, 2, 3, 2, 2, 3, 1, 3, 1, 2, 1, 2, 2, 2, 2, 1, 2, 2, 2, 3, 1, 2, 2, 3, 2, 2, 2, 1, 3, 2, 1, 1, 1, 2, 2, 3, 2, 1, 4, 2, 3, 1, 3, 2, 2, 3, 2, 3, 1, 2, 1, 2, 2, 2, 2, 1, 1, 2, 2, 1, 2, 2] decoded
+[round 82 arm hf10]
+
+  A:ic7300->B:ic705: 1 x 4550 B, fft=480 cp=60 n_active=97 n_comb_pilot=0 bps=5 fec=3/4 pilot_interval=20 equalizer=gain frame=4.905s crest=10.7dB
+    1/1: keyed=5.06s rx=73200 rms=0.9243 peak=3.946 CLIP(19449) conf=0.964 snr=30.3dB binsnr=17.5/21.6/28.8dB foff=-8.67Hz raw_ber=0.0084(410/48600) ber=0.0000(0/36400) ldpc_ok=True iters=[3, 2, 3, 1, 2, 1, 1, 1, 2, 2, 2, 1, 3, 3, 1, 3, 2, 1, 2, 2, 3, 5, 2, 2, 1, 1, 4, 1, 2, 2, 1, 2, 2, 2, 3, 2, 1, 1, 1, 2, 1, 3, 2, 3, 1, 1, 2, 2, 2, 1, 2, 1, 3, 3, 2, 2, 2, 2, 2, 1, 3, 1, 1, 1, 2, 3, 1, 1, 2, 1, 1, 1, 1, 1, 1] decoded
+[round 83 arm hf10]
+
+  A:ic7300->B:ic705: 1 x 4550 B, fft=480 cp=60 n_active=97 n_comb_pilot=0 bps=5 fec=3/4 pilot_interval=20 equalizer=gain frame=4.905s crest=10.7dB
+    1/1: keyed=5.06s rx=73200 rms=0.9139 peak=4.107 CLIP(18953) conf=0.955 snr=31.3dB binsnr=17.9/23.0/29.5dB foff=-8.68Hz raw_ber=0.0044(212/48600) ber=0.0000(0/36400) ldpc_ok=True iters=[1, 1, 2, 1, 1, 2, 0, 1, 1, 2, 1, 0, 2, 1, 1, 1, 4, 2, 1, 1, 2, 2, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 2, 1, 1, 1, 1, 1, 1, 1, 1, 2, 1, 1, 0, 1, 1, 3, 2, 2, 1, 1, 1, 1, 1, 1, 1, 1, 2, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 2, 1, 1, 1] decoded
+[round 83 arm hf18]
+
+  A:ic7300->B:ic705: 1 x 4732 B, fft=240 cp=24 n_active=49 n_comb_pilot=0 bps=5 fec=3/4 pilot_interval=20 equalizer=gain frame=4.840s crest=8.9dB
+    1/1: keyed=4.99s rx=72360 rms=0.9184 peak=4.530 CLIP(19087) conf=0.921 snr=31.3dB binsnr=13.1/21.5/28.3dB foff=-8.79Hz raw_ber=0.0147(744/50544) ber=0.0000(0/37856) ldpc_ok=True iters=[3, 4, 4, 3, 2, 4, 2, 4, 2, 2, 4, 2, 2, 3, 2, 2, 2, 3, 2, 2, 2, 2, 4, 2, 2, 1, 9, 2, 3, 1, 2, 2, 2, 2, 3, 3, 2, 2, 2, 2, 3, 2, 2, 3, 2, 4, 2, 3, 3, 3, 3, 2, 1, 2, 2, 1, 4, 2, 2, 2, 4, 2, 1, 3, 3, 2, 4, 2, 3, 2, 3, 2, 2, 4, 2, 2, 3, 4] decoded
+[round 84 arm hf18]
+
+  A:ic7300->B:ic705: 1 x 4732 B, fft=240 cp=24 n_active=49 n_comb_pilot=0 bps=5 fec=3/4 pilot_interval=20 equalizer=gain frame=4.840s crest=8.9dB
+    1/1: keyed=4.99s rx=72360 rms=0.9276 peak=4.572 CLIP(19314) conf=0.919 snr=29.5dB binsnr=12.2/18.8/24.7dB foff=-8.73Hz raw_ber=0.0158(800/50544) ber=0.0000(0/37856) ldpc_ok=True iters=[2, 2, 3, 2, 3, 2, 3, 3, 1, 2, 3, 1, 2, 4, 3, 1, 3, 2, 3, 9, 1, 3, 5, 2, 2, 3, 2, 3, 3, 3, 2, 1, 2, 3, 2, 4, 2, 3, 3, 3, 3, 3, 2, 2, 3, 4, 3, 1, 1, 3, 2, 3, 2, 1, 2, 3, 2, 3, 2, 2, 1, 2, 2, 2, 2, 3, 3, 3, 3, 4, 3, 3, 2, 3, 3, 4, 2, 3] decoded
+[round 84 arm hf10]
+
+  A:ic7300->B:ic705: 1 x 4550 B, fft=480 cp=60 n_active=97 n_comb_pilot=0 bps=5 fec=3/4 pilot_interval=20 equalizer=gain frame=4.905s crest=10.7dB
+    1/1: keyed=5.06s rx=73200 rms=0.9157 peak=3.972 CLIP(19143) conf=0.958 snr=30.7dB binsnr=18.1/21.8/29.8dB foff=-8.70Hz raw_ber=0.0120(584/48600) ber=0.0000(0/36400) ldpc_ok=True iters=[2, 2, 2, 2, 3, 2, 2, 1, 3, 3, 1, 2, 1, 2, 1, 2, 2, 1, 1, 2, 2, 2, 2, 1, 1, 1, 4, 3, 1, 2, 2, 3, 2, 2, 2, 2, 2, 2, 1, 4, 2, 2, 1, 1, 1, 3, 2, 1, 1, 2, 2, 2, 1, 3, 1, 1, 2, 1, 3, 1, 1, 2, 1, 2, 1, 3, 2, 1, 2, 2, 3, 2, 1, 2, 1] decoded
+[round 85 arm hf10]
+
+  A:ic7300->B:ic705: 1 x 4550 B, fft=480 cp=60 n_active=97 n_comb_pilot=0 bps=5 fec=3/4 pilot_interval=20 equalizer=gain frame=4.905s crest=10.7dB
+    1/1: keyed=5.06s rx=73200 rms=0.9242 peak=3.968 CLIP(19481) conf=0.917 snr=33.1dB binsnr=19.6/24.7/33.4dB foff=-8.70Hz raw_ber=0.0027(129/48600) ber=0.0000(0/36400) ldpc_ok=True iters=[1, 1, 1, 0, 1, 1, 1, 0, 2, 1, 1, 1, 2, 1, 0, 1, 1, 0, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 2, 1, 1, 2, 2, 1, 1, 0, 1, 0, 0, 0, 2, 1, 0, 0, 0, 1, 1, 1, 1, 1, 1, 0, 1, 2, 2, 1, 1, 1, 1, 0, 1, 1, 1, 1, 0, 1, 1, 1, 0, 3, 1, 1, 1] decoded
+[round 85 arm hf18]
+
+  A:ic7300->B:ic705: 1 x 4732 B, fft=240 cp=24 n_active=49 n_comb_pilot=0 bps=5 fec=3/4 pilot_interval=20 equalizer=gain frame=4.840s crest=8.9dB
+    1/1: keyed=4.99s rx=72360 rms=0.9056 peak=4.539 CLIP(18698) conf=0.916 snr=31.0dB binsnr=13.7/20.8/28.6dB foff=-8.73Hz raw_ber=0.0118(597/50544) ber=0.0000(0/37856) ldpc_ok=True iters=[1, 2, 1, 3, 3, 1, 2, 2, 1, 2, 1, 3, 1, 2, 2, 2, 2, 1, 2, 3, 1, 1, 3, 2, 2, 1, 2, 2, 1, 2, 2, 3, 1, 1, 1, 1, 1, 2, 2, 2, 2, 1, 2, 1, 2, 2, 2, 2, 1, 1, 1, 2, 2, 2, 1, 2, 4, 2, 2, 2, 2, 1, 1, 2, 1, 3, 1, 1, 3, 2, 1, 1, 3, 1, 2, 2, 1, 3] decoded
+[round 86 arm hf18]
+
+  A:ic7300->B:ic705: 1 x 4732 B, fft=240 cp=24 n_active=49 n_comb_pilot=0 bps=5 fec=3/4 pilot_interval=20 equalizer=gain frame=4.840s crest=8.9dB
+    1/1: keyed=4.99s rx=72360 rms=0.9112 peak=4.008 CLIP(18800) conf=0.946 snr=30.9dB binsnr=15.1/20.8/27.3dB foff=-8.75Hz raw_ber=0.0099(499/50544) ber=0.0000(0/37856) ldpc_ok=True iters=[2, 2, 2, 1, 1, 2, 1, 1, 2, 2, 2, 2, 2, 1, 1, 1, 2, 2, 1, 2, 2, 2, 1, 1, 2, 1, 1, 2, 1, 2, 3, 1, 1, 1, 3, 2, 1, 1, 2, 2, 2, 2, 1, 1, 1, 1, 1, 2, 2, 2, 1, 2, 2, 2, 2, 2, 1, 2, 2, 2, 2, 2, 1, 1, 1, 1, 1, 2, 1, 1, 1, 1, 2, 1, 2, 2, 2, 3] decoded
+[round 86 arm hf10]
+
+  A:ic7300->B:ic705: 1 x 4550 B, fft=480 cp=60 n_active=97 n_comb_pilot=0 bps=5 fec=3/4 pilot_interval=20 equalizer=gain frame=4.905s crest=10.7dB
+    1/1: keyed=5.06s rx=73200 rms=0.9228 peak=3.920 CLIP(19465) conf=0.953 snr=29.6dB binsnr=17.4/20.4/30.1dB foff=-8.69Hz raw_ber=0.0095(463/48600) ber=0.0000(0/36400) ldpc_ok=True iters=[1, 1, 1, 2, 1, 1, 1, 1, 2, 1, 3, 2, 2, 1, 2, 2, 2, 2, 1, 2, 2, 2, 3, 2, 2, 2, 2, 1, 2, 3, 2, 1, 1, 2, 3, 1, 1, 2, 7, 1, 1, 2, 3, 1, 1, 1, 2, 2, 1, 2, 2, 2, 2, 2, 1, 3, 2, 1, 2, 2, 2, 2, 1, 2, 1, 1, 1, 1, 1, 2, 2, 1, 1, 1, 1] decoded
+[round 87 arm hf10]
+
+  A:ic7300->B:ic705: 1 x 4550 B, fft=480 cp=60 n_active=97 n_comb_pilot=0 bps=5 fec=3/4 pilot_interval=20 equalizer=gain frame=4.905s crest=10.7dB
+    1/1: keyed=5.06s rx=73200 rms=0.9186 peak=3.820 CLIP(19346) conf=0.935 snr=30.2dB binsnr=18.1/21.3/26.8dB foff=-8.68Hz raw_ber=0.0059(286/48600) ber=0.0000(0/36400) ldpc_ok=True iters=[1, 2, 1, 2, 2, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 2, 2, 2, 2, 1, 1, 2, 1, 1, 1, 1, 1, 1, 2, 1, 1, 1, 1, 2, 1, 1, 1, 1, 2, 1, 1, 2, 1, 1, 1, 1, 1, 1, 1, 2, 1, 1, 1, 1, 1, 3, 1, 2, 1, 1, 2, 2, 1, 1, 1, 1, 1, 2, 2] decoded
+[round 87 arm hf18]
+
+  A:ic7300->B:ic705: 1 x 4732 B, fft=240 cp=24 n_active=49 n_comb_pilot=0 bps=5 fec=3/4 pilot_interval=20 equalizer=gain frame=4.840s crest=8.9dB
+    1/1: keyed=4.99s rx=72240 rms=0.9310 peak=4.383 CLIP(19442) conf=0.897 snr=32.6dB binsnr=17.0/22.3/29.2dB foff=-8.72Hz raw_ber=0.0076(385/50544) ber=0.0000(0/37856) ldpc_ok=True iters=[1, 2, 1, 1, 1, 1, 1, 2, 2, 1, 1, 1, 2, 1, 1, 1, 2, 1, 1, 2, 2, 0, 1, 1, 1, 2, 1, 1, 1, 1, 1, 3, 2, 1, 1, 1, 1, 2, 1, 1, 1, 2, 2, 2, 1, 1, 2, 2, 2, 1, 1, 2, 1, 1, 2, 1, 1, 1, 2, 1, 1, 2, 2, 1, 1, 1, 1, 1, 1, 1, 2, 1, 2, 1, 1, 1, 1, 1] decoded
+[round 88 arm hf18]
+
+  A:ic7300->B:ic705: 1 x 4732 B, fft=240 cp=24 n_active=49 n_comb_pilot=0 bps=5 fec=3/4 pilot_interval=20 equalizer=gain frame=4.840s crest=8.9dB
+    1/1: keyed=4.99s rx=72360 rms=0.9065 peak=3.976 CLIP(18735) conf=0.940 snr=30.7dB binsnr=13.2/20.6/24.7dB foff=-8.75Hz raw_ber=0.0089(452/50544) ber=0.0000(0/37856) ldpc_ok=True iters=[1, 1, 1, 1, 1, 1, 1, 1, 2, 3, 2, 1, 2, 2, 2, 1, 2, 2, 1, 1, 2, 1, 2, 1, 1, 1, 1, 2, 3, 1, 2, 2, 2, 2, 3, 1, 2, 1, 1, 1, 1, 1, 1, 2, 2, 2, 2, 2, 1, 2, 2, 2, 1, 2, 1, 1, 2, 2, 1, 1, 1, 2, 1, 2, 1, 3, 2, 1, 1, 2, 2, 1, 1, 3, 2, 1, 1, 2] decoded
+[round 88 arm hf10]
+
+  A:ic7300->B:ic705: 1 x 4550 B, fft=480 cp=60 n_active=97 n_comb_pilot=0 bps=5 fec=3/4 pilot_interval=20 equalizer=gain frame=4.905s crest=10.7dB
+    1/1: keyed=5.06s rx=73200 rms=0.9052 peak=4.137 CLIP(18772) conf=0.958 snr=31.2dB binsnr=18.4/22.1/30.0dB foff=-8.70Hz raw_ber=0.0082(397/48600) ber=0.0000(0/36400) ldpc_ok=True iters=[2, 4, 2, 1, 3, 2, 2, 1, 1, 3, 1, 1, 2, 1, 1, 1, 1, 1, 2, 1, 1, 1, 2, 1, 2, 1, 1, 3, 2, 3, 1, 1, 1, 2, 1, 2, 2, 3, 1, 2, 2, 2, 2, 1, 1, 1, 2, 3, 1, 1, 1, 2, 2, 2, 1, 2, 2, 2, 1, 1, 2, 4, 1, 2, 1, 2, 1, 2, 1, 2, 1, 2, 2, 1, 1] decoded
+[round 89 arm hf10]
+
+  A:ic7300->B:ic705: 1 x 4550 B, fft=480 cp=60 n_active=97 n_comb_pilot=0 bps=5 fec=3/4 pilot_interval=20 equalizer=gain frame=4.905s crest=10.7dB
+    1/1: keyed=5.06s rx=73200 rms=0.9194 peak=4.048 CLIP(19438) conf=0.953 snr=30.3dB binsnr=16.9/21.5/28.3dB foff=-8.69Hz raw_ber=0.0027(133/48600) ber=0.0000(0/36400) ldpc_ok=True iters=[1, 1, 1, 1, 1, 1, 1, 1, 1, 2, 1, 1, 1, 1, 1, 0, 0, 1, 0, 1, 1, 2, 0, 0, 1, 1, 1, 1, 1, 1, 0, 1, 1, 1, 1, 1, 1, 1, 1, 2, 1, 2, 1, 1, 0, 2, 1, 1, 1, 1, 0, 0, 1, 1, 0, 1, 1, 1, 2, 1, 1, 1, 2, 1, 1, 1, 1, 3, 0, 1, 1, 0, 1, 1, 1] decoded
+[round 89 arm hf18]
+
+  A:ic7300->B:ic705: 1 x 4732 B, fft=240 cp=24 n_active=49 n_comb_pilot=0 bps=5 fec=3/4 pilot_interval=20 equalizer=gain frame=4.840s crest=8.9dB
+    1/1: keyed=4.99s rx=72480 rms=0.9075 peak=3.999 CLIP(18651) conf=0.914 snr=30.9dB binsnr=15.8/19.7/27.1dB foff=-8.69Hz raw_ber=0.0145(733/50544) ber=0.0002(7/37856) ldpc_ok=False iters=[2, 2, 7, 2, 4, 4, 3, 4, 2, 2, 2, 5, 4, 10, 3, 3, 2, 3, 1, 3, 4, 5, 3, 2, 2, 2, 4, 3, 5, 3, 4, 2, 5, 2, 4, 1, 3, 2, 2, 3, 1, 2, 4, 30, 2, 2, 1, 3, 4, 3, 3, 5, 2, 2, 2, 3, 3, 5, 8, 2, 3, 2, 4, 3, 4, 1, 2, 3, 2, 2, 10, 2, 4, 4, 2, 2, 2, 6] crc_fail
+[round 90 arm hf18]
+
+  A:ic7300->B:ic705: 1 x 4732 B, fft=240 cp=24 n_active=49 n_comb_pilot=0 bps=5 fec=3/4 pilot_interval=20 equalizer=gain frame=4.840s crest=8.9dB
+    1/1: keyed=4.99s rx=72360 rms=0.9209 peak=4.016 CLIP(19133) conf=0.911 snr=29.6dB binsnr=14.1/18.6/25.2dB foff=-8.77Hz raw_ber=0.0144(729/50544) ber=0.0000(0/37856) ldpc_ok=True iters=[3, 1, 3, 2, 3, 3, 2, 2, 4, 2, 2, 1, 1, 2, 3, 1, 2, 1, 3, 3, 1, 3, 1, 1, 2, 2, 2, 2, 1, 3, 3, 2, 2, 3, 2, 2, 2, 3, 2, 3, 2, 2, 2, 1, 3, 2, 2, 2, 2, 3, 3, 2, 3, 2, 2, 2, 1, 3, 3, 2, 2, 2, 2, 2, 3, 2, 1, 1, 2, 5, 2, 2, 2, 3, 1, 2, 2, 1] decoded
+[round 90 arm hf10]
+
+  A:ic7300->B:ic705: 1 x 4550 B, fft=480 cp=60 n_active=97 n_comb_pilot=0 bps=5 fec=3/4 pilot_interval=20 equalizer=gain frame=4.905s crest=10.7dB
+    1/1: keyed=5.06s rx=73200 rms=0.9189 peak=4.081 CLIP(19380) conf=0.947 snr=28.6dB binsnr=16.6/19.5/25.0dB foff=-8.66Hz raw_ber=0.0071(347/48600) ber=0.0000(0/36400) ldpc_ok=True iters=[2, 1, 1, 1, 1, 1, 2, 1, 1, 1, 2, 1, 2, 1, 2, 1, 2, 1, 1, 1, 2, 2, 2, 1, 1, 1, 1, 1, 2, 1, 1, 2, 2, 2, 1, 2, 2, 1, 1, 1, 0, 2, 1, 3, 2, 1, 2, 2, 1, 1, 2, 1, 1, 2, 2, 1, 1, 1, 1, 1, 1, 3, 1, 1, 1, 2, 2, 1, 1, 1, 1, 1, 1, 2, 2] decoded
+[round 91 arm hf10]
+
+  A:ic7300->B:ic705: 1 x 4550 B, fft=480 cp=60 n_active=97 n_comb_pilot=0 bps=5 fec=3/4 pilot_interval=20 equalizer=gain frame=4.905s crest=10.7dB
+    1/1: keyed=5.06s rx=73200 rms=0.9169 peak=4.272 CLIP(19226) conf=0.966 snr=30.8dB binsnr=17.8/21.9/31.0dB foff=-8.65Hz raw_ber=0.0040(194/48600) ber=0.0000(0/36400) ldpc_ok=True iters=[1, 2, 1, 1, 1, 1, 0, 1, 1, 1, 1, 1, 2, 1, 2, 1, 1, 1, 1, 1, 1, 1, 2, 1, 1, 1, 2, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 2, 3, 1, 1, 1, 1, 1, 1, 1, 1, 1, 2, 0, 2, 1, 1, 1, 1, 1, 2, 1, 1, 1, 1, 1, 1, 2, 1, 1, 1, 2, 1, 1, 3, 1, 1, 1] decoded
+[round 91 arm hf18]
+
+  A:ic7300->B:ic705: 1 x 4732 B, fft=240 cp=24 n_active=49 n_comb_pilot=0 bps=5 fec=3/4 pilot_interval=20 equalizer=gain frame=4.840s crest=8.9dB
+    1/1: keyed=4.99s rx=72480 rms=0.9150 peak=4.129 CLIP(19038) conf=0.920 snr=31.5dB binsnr=13.6/21.2/28.1dB foff=-8.78Hz raw_ber=0.0160(808/50544) ber=0.0000(0/37856) ldpc_ok=True iters=[1, 3, 2, 4, 3, 1, 3, 2, 2, 2, 4, 2, 3, 3, 4, 3, 6, 3, 3, 1, 2, 2, 3, 3, 3, 2, 2, 3, 2, 2, 4, 1, 3, 1, 2, 2, 5, 1, 2, 2, 3, 2, 2, 3, 5, 3, 3, 3, 2, 2, 3, 2, 3, 3, 3, 2, 3, 4, 2, 3, 3, 2, 2, 3, 2, 4, 2, 1, 2, 2, 4, 1, 3, 2, 1, 2, 2, 2] decoded
+[round 92 arm hf18]
+
+  A:ic7300->B:ic705: 1 x 4732 B, fft=240 cp=24 n_active=49 n_comb_pilot=0 bps=5 fec=3/4 pilot_interval=20 equalizer=gain frame=4.840s crest=8.9dB
+    1/1: keyed=4.99s rx=72360 rms=0.8963 peak=4.292 CLIP(18367) conf=0.906 snr=31.7dB binsnr=14.3/21.4/30.5dB foff=-8.76Hz raw_ber=0.0124(628/50544) ber=0.0000(0/37856) ldpc_ok=True iters=[4, 2, 2, 3, 6, 4, 2, 2, 1, 4, 2, 1, 3, 2, 2, 2, 2, 1, 2, 2, 2, 2, 4, 1, 2, 2, 4, 3, 2, 2, 3, 2, 1, 3, 4, 1, 2, 2, 3, 2, 2, 2, 3, 2, 2, 2, 1, 2, 5, 2, 3, 2, 2, 4, 2, 2, 4, 4, 5, 5, 2, 3, 1, 1, 7, 2, 2, 5, 2, 4, 3, 1, 1, 2, 2, 6, 8, 2] decoded
+[round 92 arm hf10]
+
+  A:ic7300->B:ic705: 1 x 4550 B, fft=480 cp=60 n_active=97 n_comb_pilot=0 bps=5 fec=3/4 pilot_interval=20 equalizer=gain frame=4.905s crest=10.7dB
+    1/1: keyed=5.06s rx=73200 rms=0.9166 peak=4.309 CLIP(19247) conf=0.950 snr=31.4dB binsnr=19.6/22.3/28.9dB foff=-8.69Hz raw_ber=0.0013(62/48600) ber=0.0000(0/36400) ldpc_ok=True iters=[0, 0, 0, 0, 0, 1, 1, 0, 0, 0, 1, 1, 1, 1, 1, 0, 0, 1, 1, 1, 0, 1, 1, 1, 0, 1, 0, 0, 1, 0, 0, 0, 1, 1, 1, 0, 1, 0, 1, 1, 0, 1, 0, 0, 1, 1, 1, 1, 0, 1, 1, 1, 0, 1, 0, 0, 0, 1, 0, 0, 0, 1, 1, 0, 1, 0, 0, 0, 0, 0, 1, 1, 1, 1, 1] decoded
+[round 93 arm hf10]
+
+  A:ic7300->B:ic705: 1 x 4550 B, fft=480 cp=60 n_active=97 n_comb_pilot=0 bps=5 fec=3/4 pilot_interval=20 equalizer=gain frame=4.905s crest=10.7dB
+    1/1: keyed=5.06s rx=73200 rms=0.9031 peak=3.918 CLIP(18919) conf=0.937 snr=29.9dB binsnr=15.3/22.1/30.2dB foff=-8.66Hz raw_ber=0.0046(224/48600) ber=0.0000(0/36400) ldpc_ok=True iters=[1, 2, 1, 1, 2, 1, 1, 1, 2, 2, 1, 2, 1, 2, 1, 1, 0, 1, 0, 1, 1, 2, 1, 1, 1, 1, 1, 2, 1, 1, 2, 1, 1, 2, 1, 1, 1, 1, 1, 1, 2, 1, 2, 1, 1, 1, 1, 1, 1, 2, 2, 2, 2, 2, 1, 2, 1, 2, 1, 2, 1, 2, 2, 1, 2, 1, 1, 1, 2, 1, 1, 0, 2, 1, 1] decoded
+[round 93 arm hf18]
+
+  A:ic7300->B:ic705: 1 x 4732 B, fft=240 cp=24 n_active=49 n_comb_pilot=0 bps=5 fec=3/4 pilot_interval=20 equalizer=gain frame=4.840s crest=8.9dB
+    1/1: keyed=4.99s rx=72360 rms=0.9062 peak=4.377 CLIP(18623) conf=0.914 snr=31.6dB binsnr=13.4/21.7/28.0dB foff=-8.75Hz raw_ber=0.0168(851/50544) ber=0.0000(0/37856) ldpc_ok=True iters=[1, 2, 2, 4, 2, 3, 2, 4, 2, 1, 3, 5, 3, 2, 2, 2, 1, 5, 3, 4, 1, 2, 2, 4, 2, 2, 1, 2, 2, 2, 5, 3, 2, 3, 4, 3, 2, 2, 2, 2, 4, 3, 2, 2, 2, 3, 4, 1, 3, 3, 2, 2, 5, 2, 4, 2, 5, 3, 4, 1, 4, 5, 3, 5, 2, 2, 5, 2, 4, 3, 6, 3, 2, 3, 4, 2, 5, 1] decoded
+[round 94 arm hf18]
+
+  A:ic7300->B:ic705: 1 x 4732 B, fft=240 cp=24 n_active=49 n_comb_pilot=0 bps=5 fec=3/4 pilot_interval=20 equalizer=gain frame=4.840s crest=8.9dB
+    1/1: keyed=4.99s rx=72480 rms=0.9242 peak=4.512 CLIP(19196) conf=0.932 snr=29.1dB binsnr=11.8/18.9/22.6dB foff=-8.78Hz raw_ber=0.0135(684/50544) ber=0.0000(0/37856) ldpc_ok=True iters=[1, 2, 3, 1, 2, 3, 2, 2, 1, 2, 2, 2, 3, 2, 3, 2, 1, 1, 1, 2, 2, 2, 2, 3, 1, 2, 1, 2, 2, 2, 2, 2, 2, 1, 2, 1, 2, 3, 2, 2, 3, 1, 2, 4, 2, 2, 1, 2, 3, 2, 2, 2, 1, 2, 2, 1, 2, 1, 2, 2, 3, 1, 2, 3, 3, 1, 2, 2, 2, 2, 2, 3, 2, 3, 2, 3, 1, 2] decoded
+[round 94 arm hf10]
+
+  A:ic7300->B:ic705: 1 x 4550 B, fft=480 cp=60 n_active=97 n_comb_pilot=0 bps=5 fec=3/4 pilot_interval=20 equalizer=gain frame=4.905s crest=10.7dB
+    1/1: keyed=5.06s rx=73080 rms=0.9324 peak=3.956 CLIP(19735) conf=0.926 snr=32.5dB binsnr=19.5/23.6/33.6dB foff=-8.67Hz raw_ber=0.0026(125/48600) ber=0.0000(0/36400) ldpc_ok=True iters=[1, 0, 1, 0, 1, 1, 1, 1, 1, 1, 0, 1, 1, 1, 0, 0, 1, 1, 1, 0, 0, 1, 0, 1, 1, 1, 1, 2, 1, 1, 1, 1, 1, 2, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 2, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 0, 0, 0, 0, 1, 1, 1, 1, 2, 1, 2, 1, 0, 1, 0, 0, 1, 1] decoded
+[round 95 arm hf10]
+
+  A:ic7300->B:ic705: 1 x 4550 B, fft=480 cp=60 n_active=97 n_comb_pilot=0 bps=5 fec=3/4 pilot_interval=20 equalizer=gain frame=4.905s crest=10.7dB
+    1/1: keyed=5.06s rx=73080 rms=0.9104 peak=4.026 CLIP(18936) conf=0.970 snr=30.9dB binsnr=18.2/21.8/28.4dB foff=-8.70Hz raw_ber=0.0027(133/48600) ber=0.0000(0/36400) ldpc_ok=True iters=[1, 1, 1, 0, 1, 1, 1, 1, 1, 2, 2, 1, 1, 1, 1, 0, 1, 2, 1, 1, 1, 1, 0, 1, 1, 1, 0, 2, 0, 1, 0, 1, 0, 1, 0, 1, 0, 1, 1, 1, 2, 1, 1, 1, 1, 0, 0, 1, 1, 0, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 0, 0, 1, 1, 1, 0, 1, 1, 1, 1, 1, 1, 1, 1, 1] decoded
+[round 95 arm hf18]
+
+  A:ic7300->B:ic705: 1 x 4732 B, fft=240 cp=24 n_active=49 n_comb_pilot=0 bps=5 fec=3/4 pilot_interval=20 equalizer=gain frame=4.840s crest=8.9dB
+    1/1: keyed=4.99s rx=72360 rms=0.9249 peak=4.601 CLIP(19270) conf=0.885 snr=29.2dB binsnr=11.9/18.7/22.9dB foff=-8.83Hz raw_ber=0.0109(550/50544) ber=0.0000(0/37856) ldpc_ok=True iters=[1, 1, 2, 2, 2, 2, 2, 1, 2, 1, 3, 1, 2, 1, 1, 1, 1, 2, 1, 2, 1, 3, 1, 2, 2, 1, 2, 1, 2, 2, 1, 1, 2, 1, 1, 2, 3, 1, 1, 2, 1, 1, 1, 2, 2, 1, 1, 2, 3, 1, 2, 3, 2, 2, 1, 2, 1, 1, 2, 3, 1, 2, 2, 2, 1, 2, 2, 1, 1, 2, 2, 1, 1, 2, 2, 1, 1, 1] decoded
+[round 96 arm hf18]
+
+  A:ic7300->B:ic705: 1 x 4732 B, fft=240 cp=24 n_active=49 n_comb_pilot=0 bps=5 fec=3/4 pilot_interval=20 equalizer=gain frame=4.840s crest=8.9dB
+    1/1: keyed=4.99s rx=72480 rms=0.9184 peak=4.559 CLIP(19157) conf=0.911 snr=30.6dB binsnr=12.6/20.3/26.0dB foff=-8.74Hz raw_ber=0.0096(485/50544) ber=0.0000(0/37856) ldpc_ok=True iters=[2, 1, 2, 2, 2, 2, 1, 1, 2, 1, 2, 1, 2, 1, 2, 3, 4, 1, 3, 2, 1, 2, 2, 2, 1, 2, 1, 2, 2, 1, 2, 1, 1, 1, 1, 1, 2, 1, 2, 4, 3, 1, 2, 1, 3, 2, 1, 1, 2, 1, 2, 2, 1, 2, 3, 1, 2, 1, 1, 2, 2, 2, 1, 2, 2, 1, 2, 3, 3, 1, 2, 1, 2, 1, 2, 2, 1, 1] decoded
+[round 96 arm hf10]
+
+  A:ic7300->B:ic705: 1 x 4550 B, fft=480 cp=60 n_active=97 n_comb_pilot=0 bps=5 fec=3/4 pilot_interval=20 equalizer=gain frame=4.905s crest=10.7dB
+    1/1: keyed=5.06s rx=73200 rms=0.9096 peak=3.830 CLIP(19143) conf=0.953 snr=28.1dB binsnr=15.8/19.2/25.5dB foff=-8.66Hz raw_ber=0.0030(145/48600) ber=0.0000(0/36400) ldpc_ok=True iters=[1, 1, 1, 1, 1, 0, 0, 1, 1, 0, 1, 1, 1, 1, 1, 1, 1, 2, 1, 1, 1, 1, 1, 2, 1, 1, 1, 1, 2, 1, 1, 1, 1, 0, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 0, 1, 1, 1, 1, 2, 1, 1, 2, 1, 1, 1, 1, 1, 0, 1, 1, 1, 0, 1, 1, 1, 1, 1, 1, 1, 2, 1, 0] decoded
+[round 97 arm hf10]
+
+  A:ic7300->B:ic705: 1 x 4550 B, fft=480 cp=60 n_active=97 n_comb_pilot=0 bps=5 fec=3/4 pilot_interval=20 equalizer=gain frame=4.905s crest=10.7dB
+    1/1: keyed=5.06s rx=73200 rms=0.9057 peak=4.071 CLIP(18867) conf=0.968 snr=32.1dB binsnr=19.1/23.4/32.7dB foff=-8.66Hz raw_ber=0.0066(319/48600) ber=0.0000(0/36400) ldpc_ok=True iters=[1, 3, 2, 2, 1, 1, 1, 2, 3, 1, 1, 1, 2, 1, 1, 4, 2, 1, 1, 1, 2, 1, 1, 2, 1, 0, 1, 1, 1, 1, 1, 1, 2, 3, 1, 1, 1, 2, 2, 3, 1, 2, 2, 1, 1, 1, 1, 2, 1, 1, 2, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 2, 3, 1, 1, 1, 1, 1, 1, 1] decoded
+[round 97 arm hf18]
+
+  A:ic7300->B:ic705: 1 x 4732 B, fft=240 cp=24 n_active=49 n_comb_pilot=0 bps=5 fec=3/4 pilot_interval=20 equalizer=gain frame=4.840s crest=8.9dB
+    1/1: keyed=4.99s rx=72240 rms=0.9252 peak=4.169 CLIP(19127) conf=0.916 snr=31.2dB binsnr=15.1/20.1/25.8dB foff=-8.77Hz raw_ber=0.0093(472/50544) ber=0.0000(0/37856) ldpc_ok=True iters=[2, 1, 2, 3, 2, 1, 1, 1, 3, 1, 1, 2, 1, 1, 1, 2, 1, 2, 1, 2, 2, 2, 1, 2, 1, 2, 1, 1, 2, 2, 2, 1, 1, 1, 2, 1, 1, 2, 2, 2, 1, 2, 2, 2, 1, 2, 3, 2, 1, 1, 1, 2, 1, 1, 1, 2, 2, 2, 1, 2, 3, 2, 2, 2, 1, 2, 1, 1, 2, 1, 1, 2, 2, 1, 3, 1, 1, 1] decoded
+[round 98 arm hf18]
+
+  A:ic7300->B:ic705: 1 x 4732 B, fft=240 cp=24 n_active=49 n_comb_pilot=0 bps=5 fec=3/4 pilot_interval=20 equalizer=gain frame=4.840s crest=8.9dB
+    1/1: keyed=4.99s rx=72360 rms=0.9138 peak=4.621 CLIP(18886) conf=0.927 snr=29.2dB binsnr=12.3/19.0/26.4dB foff=-8.73Hz raw_ber=0.0130(657/50544) ber=0.0000(0/37856) ldpc_ok=True iters=[3, 2, 3, 3, 4, 2, 2, 2, 1, 2, 6, 4, 2, 1, 3, 3, 2, 5, 2, 3, 2, 3, 6, 3, 3, 2, 6, 5, 2, 3, 1, 2, 1, 1, 2, 4, 3, 2, 3, 2, 3, 3, 2, 4, 2, 2, 3, 3, 1, 2, 2, 2, 2, 2, 2, 3, 2, 3, 2, 2, 6, 3, 2, 3, 3, 1, 2, 3, 3, 2, 2, 5, 3, 4, 2, 3, 3, 4] decoded
+[round 98 arm hf10]
+
+  A:ic7300->B:ic705: 1 x 4550 B, fft=480 cp=60 n_active=97 n_comb_pilot=0 bps=5 fec=3/4 pilot_interval=20 equalizer=gain frame=4.905s crest=10.7dB
+    1/1: keyed=5.06s rx=73200 rms=0.9197 peak=3.944 CLIP(19476) conf=0.928 snr=29.1dB binsnr=15.4/21.3/27.1dB foff=-8.67Hz raw_ber=0.0069(334/48600) ber=0.0000(0/36400) ldpc_ok=True iters=[4, 1, 1, 2, 2, 1, 1, 1, 2, 2, 2, 1, 1, 1, 2, 1, 1, 2, 3, 1, 2, 1, 1, 2, 2, 3, 2, 1, 2, 2, 1, 2, 2, 1, 2, 2, 1, 2, 2, 2, 1, 1, 1, 1, 1, 2, 1, 2, 3, 1, 1, 1, 3, 1, 1, 1, 2, 2, 1, 1, 3, 2, 1, 2, 1, 2, 2, 1, 1, 1, 3, 1, 1, 2, 1] decoded
+[round 99 arm hf10]
+
+  A:ic7300->B:ic705: 1 x 4550 B, fft=480 cp=60 n_active=97 n_comb_pilot=0 bps=5 fec=3/4 pilot_interval=20 equalizer=gain frame=4.905s crest=10.7dB
+    1/1: keyed=5.06s rx=73200 rms=0.9059 peak=3.969 CLIP(18854) conf=0.948 snr=27.7dB binsnr=15.6/19.1/29.0dB foff=-8.66Hz raw_ber=0.0076(368/48600) ber=0.0000(0/36400) ldpc_ok=True iters=[2, 1, 1, 1, 1, 2, 1, 1, 1, 1, 1, 2, 2, 2, 3, 2, 1, 2, 1, 1, 2, 1, 2, 2, 3, 1, 2, 2, 2, 2, 1, 2, 1, 1, 2, 1, 1, 1, 1, 2, 1, 2, 1, 2, 1, 1, 1, 2, 2, 2, 2, 2, 2, 1, 1, 1, 1, 1, 3, 1, 2, 1, 1, 1, 1, 1, 2, 1, 1, 2, 0, 2, 1, 2, 3] decoded
+[round 99 arm hf18]
+
+  A:ic7300->B:ic705: 1 x 4732 B, fft=240 cp=24 n_active=49 n_comb_pilot=0 bps=5 fec=3/4 pilot_interval=20 equalizer=gain frame=4.840s crest=8.9dB
+    1/1: keyed=4.99s rx=72360 rms=0.9278 peak=4.566 CLIP(19224) conf=0.934 snr=29.4dB binsnr=13.7/19.1/23.7dB foff=-8.72Hz raw_ber=0.0124(627/50544) ber=0.0000(0/37856) ldpc_ok=True iters=[1, 2, 2, 3, 2, 2, 3, 1, 1, 2, 1, 1, 1, 2, 2, 2, 1, 2, 2, 2, 1, 2, 1, 3, 2, 2, 3, 2, 2, 2, 2, 1, 2, 1, 1, 1, 5, 1, 2, 2, 1, 2, 2, 1, 1, 2, 2, 2, 1, 1, 3, 1, 3, 2, 1, 2, 2, 2, 2, 1, 2, 2, 3, 2, 1, 1, 1, 1, 1, 2, 1, 1, 2, 2, 2, 2, 2, 2] decoded
+[round 100 arm hf18]
+
+  A:ic7300->B:ic705: 1 x 4732 B, fft=240 cp=24 n_active=49 n_comb_pilot=0 bps=5 fec=3/4 pilot_interval=20 equalizer=gain frame=4.840s crest=8.9dB
+    1/1: keyed=4.99s rx=72360 rms=0.9040 peak=4.146 CLIP(18528) conf=0.904 snr=29.6dB binsnr=14.8/18.8/30.6dB foff=-8.74Hz raw_ber=0.0057(288/50544) ber=0.0000(0/37856) ldpc_ok=True iters=[1, 1, 1, 2, 2, 3, 1, 2, 2, 2, 1, 2, 1, 2, 1, 1, 1, 1, 0, 1, 1, 2, 1, 1, 1, 1, 1, 4, 1, 1, 2, 1, 3, 2, 1, 2, 1, 2, 1, 1, 2, 1, 1, 1, 1, 2, 1, 2, 1, 2, 5, 1, 1, 1, 1, 0, 2, 2, 1, 1, 1, 1, 1, 0, 2, 1, 2, 1, 1, 1, 1, 1, 1, 1, 3, 2, 1, 1] decoded
+[round 100 arm hf10]
+
+  A:ic7300->B:ic705: 1 x 4550 B, fft=480 cp=60 n_active=97 n_comb_pilot=0 bps=5 fec=3/4 pilot_interval=20 equalizer=gain frame=4.905s crest=10.7dB
+    1/1: keyed=5.06s rx=73200 rms=0.9067 peak=4.034 CLIP(18947) conf=0.946 snr=31.1dB binsnr=19.3/22.4/29.3dB foff=-8.69Hz raw_ber=0.0041(198/48600) ber=0.0000(0/36400) ldpc_ok=True iters=[1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 2, 1, 2, 2, 2, 1, 1, 2, 1, 1, 1, 1, 1, 2, 1, 1, 3, 1, 0, 0, 1, 1, 1, 2, 1, 1, 1, 1, 1, 1, 1, 0, 1, 1, 1, 1, 1, 1, 0, 1, 1, 1, 1, 2, 1, 1, 1, 1, 1, 3, 1, 1, 1, 0, 1, 1, 1, 1, 1, 1, 1] decoded

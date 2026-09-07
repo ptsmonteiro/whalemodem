@@ -59,6 +59,16 @@ MANIFEST = (
     QualificationEntry("hf-ssb", 9, QualificationLevel.DEFAULT),
     QualificationEntry("hf-ssb", 7, QualificationLevel.EXPERIMENTAL),
     QualificationEntry("hf-ssb", 11, QualificationLevel.DEFAULT),
+    # HF7 is the maximum-speed HF data rung, installed as DEFAULT on
+    # 2026-09-07 by owner decision on the evidence in
+    # experiments/hf18_ofdm49_vara/RESULTS.md (50/50 hardware frames on the
+    # shipped 45-carrier configuration; 100 trials per arm, interleaved
+    # against the 97-carrier geometry, found delivery indistinguishable at
+    # Fisher p = 0.75). Unlike HF2, it is installed *inside* the 2,300 Hz
+    # occupied-bandwidth ceiling -- 2,253 Hz measured -- but its Level-4
+    # operating-envelope evidence has not been run. Default is
+    # availability, not qualification.
+    QualificationEntry("hf-ssb", 14, QualificationLevel.DEFAULT),
 )
 
 
@@ -89,7 +99,8 @@ def registry(policy: str, level: QualificationLevel | str =
         from .modes.hc1_mode import HC1
         from .modes.hf3_mode import HF3
         from .modes.hf4_mode import HF4
-        candidates, control = (HR0, HC0, HC1, HF3, HF4), HR0
+        from .modes.hf7_mode import HF7
+        candidates, control = (HR0, HC0, HC1, HF3, HF4, HF7), HR0
         # HF2 remains available only at experimental level as a historical
         # fallback. HF3 and HF4 are manifest DEFAULT modes and are therefore
         # importable/selectable on a normal station.

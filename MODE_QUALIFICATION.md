@@ -292,6 +292,74 @@ Evidence in the assessment table uses four words:
   the gate or lacks required metadata. A currently shipped mode may remain
   provisionally accepted while its evidence is brought up to this process.
 
+## HF7 maximum-speed rung, 2026-09-07
+
+HF7 (`whale/modes/hf7_mode.py`, mode_id 14) was installed as the DEFAULT
+maximum-speed HF data rung on 2026-09-07 by owner decision. **Default is
+availability, not qualification**; this section records exactly what the
+retained evidence does and does not establish.
+
+The waveform is `experiments/hf10_ofdm49_v6/ofdm49_v6.py` unmodified --
+the PHY HF6 already wraps -- at 50 Hz subcarrier spacing (`fft_size=240`),
+a 2 ms guard (`cp_len=24`), 32-QAM, rate-3/4 LDPC over an interleaved
+frame, 45 carriers spanning 500-2700 Hz, 4,368 B payload. Full derivation
+and every negative result behind those choices are in
+`experiments/hf18_ofdm49_vara/RESULTS.md`.
+
+What the retained evidence establishes:
+
+- **Occupied bandwidth passes.** 99%-power occupied bandwidth measures
+  2,253.1 Hz, 46.9 Hz inside the 2,300 Hz ceiling. This is a single
+  computed measurement over a maximum payload, **not** the 300-trial
+  statistical campaign with a distribution-free upper confidence bound
+  that HF3's passing bandwidth gate used; it is `provisional` by this
+  document's own vocabulary until that campaign is run.
+  `tests/test_hf7_mode.py` asserts the ceiling on every run.
+- **Per-frame net throughput: 7,187.2 bit/s** per full-capacity DATA
+  frame, by `SPEED_LADDERS.md`'s denominator (frame airtime, excluding the
+  air header from the numerator). The Level-4 target is 4,000 bit/s.
+- **Retained-direction hardware frames: 50/50 decoded**, zero residual bit
+  errors, mean raw BER 0.0072, IC-7300 to IC-705, 2026-09-07. 50 frames
+  meets the 40-frame minimum and the 95% Wilson upper bound on FER is
+  7.1%, inside the 10% ceiling, so **this gate passes for this direction**.
+  One direction, one session, one path. See
+  `logs/mode_qualification/hf-ssb/hf18/20260907T174338Z/result.json`.
+- **A 100-trial-per-arm interleaved comparison** against the 97-carrier
+  geometry HF6 wraps found their frame delivery statistically
+  indistinguishable (96/100 vs 94/100, Fisher p = 0.75) at matched air
+  time, with the 49-carrier arrangement ahead on throughput. See
+  `logs/mode_qualification/hf-ssb/hf18/20260907T164157Z-ab100/`.
+
+What it does **not** establish, and what must not be read into the
+manifest entry:
+
+- **The Level-4 operating envelope is unmeasured.** SPEED_LADDERS.md
+  requires benign/static at +22 dB SNR/3 kHz and above, measured under the
+  CHANNELS.md reference convention with a complete filter,
+  frequency-offset, drift, level, and nonlinearity description. No such
+  campaign has been run for HF7. The hardware trials above were run on an
+  uncalibrated bench path whose reported `channel_snr_db` the
+  demodulator's own docstring disclaims.
+- **No frame Monte Carlo** over the Watterson presets, so the mode's
+  behaviour under fading is entirely unknown. The bench path is a benign
+  audio-coupled link; hf10's own EVM decomposition measured its delay
+  spread as small enough that a 2 ms guard suffices, which will not hold
+  on a real ionospheric path. **A 2 ms guard is shorter than the 2.0 ms
+  differential delay spread of the disturbed Watterson class**, so HF7
+  should be expected to fail there and the ladder must be able to fall
+  back off it.
+- **`drive_scale=0.008` is calibrated to this bench's audio gain
+  structure** and does not generalize. The right fix is to set drive from
+  measured EVM rather than a hard-coded constant; until then HF7's
+  throughput on another station's audio path is not predicted by the
+  numbers above.
+- Resource evidence (CPU, RSS, dropouts), adjacent-rung overlap, and the
+  complete promotion artifact are all `unmeasured`.
+
+Present registry disposition: **provisional default HF maximum-speed
+rung**, on the same footing as the HR0 and HF2/HF3 product decisions
+recorded above.
+
 ## Reproducible test matrix
 
 The evidence is divided into three independent scopes:
