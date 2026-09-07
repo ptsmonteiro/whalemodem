@@ -148,4 +148,11 @@ class SingleCarrierMode(sc.SingleCarrierMode):
         # computation by hardware_test.py. No FEC exists in this mode, so
         # there is no separate pre-FEC/post-FEC distinction here.
         result["raw_bits"] = raw_bits
+        # A lightweight reliability stream for FEC users.  The sign is the
+        # hard bit hypothesis and the magnitude is the equalized symbol
+        # magnitude; this preserves fade confidence without changing HF4's
+        # public decode result or its hard-decision behavior.
+        if self.bits_per_symbol == 3:
+            result["raw_soft_bits"] = ((1.0 - 2.0 * raw_bits.astype(np.float64))
+                                        * np.repeat(np.abs(eq_data), 3))
         return result
