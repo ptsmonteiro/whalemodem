@@ -160,6 +160,18 @@ def bits_to_symbols(bits: np.ndarray, bps: int) -> np.ndarray:
         re = axis(groups[:, 0], groups[:, 1])
         im = axis(groups[:, 2], groups[:, 3])
         return (re + 1j * im) / np.sqrt(10.0)
+    if bps == 6:
+        # 64-QAM, Gray-coded independently on the I and Q axes.
+        # 000..100 map to -7,-5,-3,-1,+1,+3,+5,+7.
+        groups = bits.reshape(-1, 6)
+        levels = np.array([-7.0, -5.0, -3.0, -1.0,
+                           1.0, 3.0, 5.0, 7.0])
+        # Binary label -> physical level position.  This is the inverse of
+        # the Gray sequence: adjacent amplitudes differ by one bit.
+        binary_to_level = np.array([0, 1, 3, 2, 7, 6, 4, 5])
+        re = levels[binary_to_level[(groups[:, 0] << 2) | (groups[:, 1] << 1) | groups[:, 2]]]
+        im = levels[binary_to_level[(groups[:, 3] << 2) | (groups[:, 4] << 1) | groups[:, 5]]]
+        return (re + 1j * im) / np.sqrt(42.0)
     raise ValueError(f"unsupported bits_per_symbol={bps}")
 
 
@@ -188,6 +200,20 @@ def symbols_to_bits(symbols: np.ndarray, bps: int) -> np.ndarray:
         b0r, b1r = axis_bits(re)
         b0i, b1i = axis_bits(im)
         return np.stack((b0r, b1r, b0i, b1i), axis=-1).astype(np.uint8).reshape(-1)
+    if bps == 6:
+        # Nearest-neighbour decision followed by the inverse Gray map.
+        levels = np.array([-7.0, -5.0, -3.0, -1.0,
+                           1.0, 3.0, 5.0, 7.0])
+        level_to_binary = np.array([0, 1, 3, 2, 6, 7, 5, 4])
+        def axis_bits(v):
+            idx = np.argmin(np.abs(v[:, None] - levels[None, :]), axis=1)
+            val = level_to_binary[idx]
+            return ((val >> 2) & 1, (val >> 1) & 1, val & 1)
+        re = symbols.real * np.sqrt(42.0)
+        im = symbols.imag * np.sqrt(42.0)
+        br = axis_bits(re)
+        bi = axis_bits(im)
+        return np.stack((*br, *bi), axis=-1).astype(np.uint8).reshape(-1)
     raise ValueError(f"unsupported bits_per_symbol={bps}")
 
 
@@ -477,5 +503,3 @@ def _hilbert_envelope(x: np.ndarray) -> np.ndarray:
         h[1:(n + 1) // 2] = 2
     analytic = np.fft.ifft(xf * h)
     return analytic
-
-

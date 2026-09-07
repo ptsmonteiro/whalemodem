@@ -947,3 +947,31 @@ a fallback trigger caught only 45 to 71 percent of failures in the
 delay-dominated regime. A demotion policy should therefore use decode outcome,
 not EVM, as its primary signal. This observation imposes no promotion gate on
 the waveform.
+
+HF5 (hf-ssb mode ID `12`) is the experimental level-3 resilience candidate
+added on 2026-09-07. It retains HF4's 8PSK/1500-baud single-carrier PHY and
+fast synchronizer, adding terminated K=7 rate-1/2 coding with an eight-row
+block interleaver. Its provisional design target is quiet through slightly
+disturbed Watterson at 16 dB SNR/3 kHz and just over 2,000 bit/s net. That
+target remains unqualified: the initial screen acquired reliably but did not
+deliver enough full frames at 16 dB, so the mode stays experimental pending a
+stronger diversity/equalization revision.
+
+HF6 (hf-ssb mode ID `13`) is the experimental maximum-speed OFDM candidate.
+It uses 49 contiguous carriers across 300--2700 Hz and 64-QAM.  The tested
+350-byte packet gives a 344-byte payload and 0.325-second frame, or 8,468
+bit/s arithmetic net waveform throughput.  An initial IC-7300 -> IC-705
+smoke test delivered 0/3 frames at 12.6--14.4 dB SNR, with 6.7--9.3% raw
+BER, so HF6 is not a default replacement and is not yet a viable 7 kbit/s
+mode.  A follow-up 64-QAM + LDPC-3/4 test also delivered 0/3 at 14.0--16.0
+dB SNR; stronger coding or a better link margin is required before a
+qualification campaign.  Repeating the uncoded smoke after increasing the
+IC-7300 power still delivered 0/3, with 8.8--12.2% raw BER and 9.6--13.2 dB
+measured SNR; no clipping was observed, and the power change did not produce
+a usable 64-QAM margin. Earlier 64-QAM trials used non-Gray labeling;
+these remain evidence for that earlier mapping, not the corrected mapping.
+The corrected Gray-coded run delivered 0/3, with 7.0--9.8% raw BER.
+The reported SNR values above are legacy estimator outputs: fitting each
+pilot to itself biases the residual-power estimate and they must not be
+treated as calibrated RF SNR. Low receive amplitude alone does not establish
+insufficient RF power or exclude analog compression.
