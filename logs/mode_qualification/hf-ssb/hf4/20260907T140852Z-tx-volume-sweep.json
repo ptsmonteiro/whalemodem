@@ -1,0 +1,128 @@
+{
+  "mode_id": 11,
+  "mode_name": "hf4",
+  "direction": "ic7300->ic705",
+  "tx_audio_scale_is_applied_before_send": true,
+  "trials": [
+    {
+      "level": 0.003,
+      "trial": 1,
+      "decoded": false,
+      "outcome": "no_sync",
+      "keyed_seconds": 6.070815801620483,
+      "rx_samples_12k": 85080,
+      "confidence": 0.3426253467536991,
+      "channel_snr_db_3khz": null,
+      "freq_offset_hz": 20.0,
+      "crc_ok": false
+    },
+    {
+      "level": 0.003,
+      "trial": 2,
+      "decoded": false,
+      "outcome": "no_sync",
+      "keyed_seconds": 6.069324731826782,
+      "rx_samples_12k": 85080,
+      "confidence": 0.3305135656754552,
+      "channel_snr_db_3khz": null,
+      "freq_offset_hz": -20.0,
+      "crc_ok": false
+    },
+    {
+      "level": 0.002,
+      "trial": 1,
+      "decoded": false,
+      "outcome": "no_sync",
+      "keyed_seconds": 6.069567441940308,
+      "rx_samples_12k": 85080,
+      "confidence": 0.31587701506828225,
+      "channel_snr_db_3khz": null,
+      "freq_offset_hz": 20.0,
+      "crc_ok": false
+    },
+    {
+      "level": 0.002,
+      "trial": 2,
+      "decoded": false,
+      "outcome": "crc_fail",
+      "keyed_seconds": 6.068609237670898,
+      "rx_samples_12k": 85080,
+      "confidence": 0.3276093479259774,
+      "channel_snr_db_3khz": -15.811727579011162,
+      "freq_offset_hz": 15.451863665171071,
+      "crc_ok": false
+    },
+    {
+      "level": 0.001,
+      "trial": 1,
+      "decoded": false,
+      "outcome": "no_sync",
+      "keyed_seconds": 6.068798303604126,
+      "rx_samples_12k": 85080,
+      "confidence": 0.310441947770214,
+      "channel_snr_db_3khz": null,
+      "freq_offset_hz": -1.0,
+      "crc_ok": false
+    },
+    {
+      "level": 0.001,
+      "trial": 2,
+      "decoded": false,
+      "outcome": "no_sync",
+      "keyed_seconds": 6.069985389709473,
+      "rx_samples_12k": 85080,
+      "confidence": 0.30955740094676826,
+      "channel_snr_db_3khz": null,
+      "freq_offset_hz": -20.0,
+      "crc_ok": false
+    },
+    {
+      "level": 0.0005,
+      "trial": 1,
+      "decoded": false,
+      "outcome": "no_sync",
+      "keyed_seconds": 6.069604158401489,
+      "rx_samples_12k": 85080,
+      "confidence": 0.2681915971011657,
+      "channel_snr_db_3khz": null,
+      "freq_offset_hz": -15.0,
+      "crc_ok": false
+    },
+    {
+      "level": 0.0005,
+      "trial": 2,
+      "decoded": false,
+      "outcome": "no_sync",
+      "keyed_seconds": 6.070409059524536,
+      "rx_samples_12k": 85080,
+      "confidence": 0.2818547076747764,
+      "channel_snr_db_3khz": null,
+      "freq_offset_hz": -8.0,
+      "crc_ok": false
+    },
+    {
+      "level": 0.0002,
+      "trial": 1,
+      "decoded": false,
+      "outcome": "crc_fail",
+      "keyed_seconds": 6.059972524642944,
+      "rx_samples_12k": 84960,
+      "confidence": 0.39394988744434634,
+      "channel_snr_db_3khz": -17.489544000447033,
+      "freq_offset_hz": -43.374599119367524,
+      "crc_ok": false
+    },
+    {
+      "level": 0.0002,
+      "trial": 2,
+      "decoded": false,
+      "outcome": "no_sync",
+      "keyed_seconds": 6.069352865219116,
+      "rx_samples_12k": 85080,
+      "confidence": 0.3755746410432938,
+      "channel_snr_db_3khz": null,
+      "freq_offset_hz": -20.0,
+      "crc_ok": false
+    }
+  ]
+}

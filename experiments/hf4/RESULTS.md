@@ -6,6 +6,33 @@ record the status at the time of those campaigns. Default availability is an
 owner product disposition, not a reversal of the documented qualification
 failures; HF4 remains the maximum-speed rung.
 
+## Receiver-side SNR breakpoint: IC-7300 -> IC-705 (2026-09-07)
+
+At the owner's request, mode ID 11 was swept over the real IC-7300 -> IC-705
+path by scaling the encoded transmit audio immediately before
+`RadioTransport.send()`. The IC-705 was opened receive-only. The SNR value is
+HF4's `channel_snr_db`, measured from the IC-705 receive capture and reported
+in the standard 3 kHz reference bandwidth; it is not the IC-7300 audio level.
+
+The broad sweep decoded 2/2 frames at every transmit-audio scale from 1.00
+through 0.005. The tightened boundary was:
+
+| TX audio scale | Result | Receiver SNR/3 kHz |
+| ---: | :--- | ---: |
+| 0.0045 | 2/2 decoded | 17.94-18.04 dB |
+| 0.0040 | 1/2 decoded; one CRC failure | 17.42-17.70 dB |
+| 0.0035 | 0/2, no sync | not available |
+| 0.0030 | 0/2, no sync | not available |
+
+The measured break therefore begins around **17.5-18 dB SNR/3 kHz** on this
+path. The boundary is provisional because it uses two frames per point. A
+no-sync result has no valid decoder SNR estimate, so the lower failed points
+cannot be assigned a more precise receiver-side SNR from this method.
+
+Raw sweep artifacts are retained in
+`logs/mode_qualification/hf-ssb/hf4/20260907T141028Z-tx-volume-sweep.json`,
+with the sweep harness in `scripts/hf4_tx_volume_sweep.py`.
+
 ## Hardware-debug fix: the interleaver was an accidental no-op (2026-09-01)
 
 Offline debugging of the two saved synced-but-CRC-failed captures from the
