@@ -301,43 +301,49 @@ about 577-585 bit/s -- above the 500 bit/s floor, but by a thin margin (see
 that document's caveats). A newer paired current-convention comparison is at
 `logs/mode_qualification/hf-ssb/hc1-hf2/2026-09-07/INDEX.md`.
 
-### Mode 10: HR0, the maximum-margin HF control mode
+### Mode 10: HR0, the short-control HF mode
 
-HR0 is constant-envelope non-coherent 128-FSK at 17.857 baud. Its 128
-orthogonal tones occupy 2,285.7 Hz, each symbol is 2,688 samples at 48 kHz,
-and each carries seven Gray-mapped coded bits. Sixteen known sync symbols
-precede either 44 short-body or 112 full-body symbols. A soft-decision
-rate-1/2 K=9 convolutional code, bit interleaver, whitened length field, and
-CRC32 protect both sizes:
+On 2026-09-06 the owner selected the faster MARGIN32 geometry for production
+HR0, overriding the outstanding qualification gates. HR0 is constant-envelope
+non-coherent 32-FSK at 46.875 baud. Its 32 orthogonal tones run from bin 12
+through 43 (562.5–2015.625 Hz), with 1500 Hz nominal tone-bank bandwidth.
+Each symbol is 1024 samples at 48 kHz and carries five Gray-mapped coded bits.
+Sixteen known sync symbols precede either 62 short-body or 158 full-body
+symbols. Soft-decision rate-1/2 K=9 coding, a bit interleaver, whitened length
+field, and CRC32 protect both sizes:
 
 | Waveform payload | Body symbols | Airtime with minimum lead and tail |
 | --- | ---: | ---: |
-| 0–12 bytes (including DATA_ACK and empty controls) | 44 | 3.508 s |
-| 13–42 bytes | 112 | 7.316 s |
+| 0–12 bytes (including DATA_ACK and empty controls) | 62 | 1.812 s |
+| 13–42 bytes | 158 | 3.860 s |
 
 The 12-byte DATA_ACK comprises the ten-byte air header and two-byte remainder.
-Its short frame saves 3.808 seconds (52%) per ACK. The full frame still carries
-a 32-byte DATA chunk, yielding 35.0 bit/s before ARQ overhead. Adaptive lead
-padding and radio turnaround add to these minimum durations.
+Its short frame saves 1.696 seconds (48.3%) against the preceding 128-FSK
+HR0 short frame. The full frame carries a 32-byte DATA chunk, yielding
+66.3 bit/s before ARQ overhead. The durations include the minimum 128 ms
+common lead and 20 ms tail; adaptive lead and radio turnaround add latency.
 
-The short codec has 308 coded bits, multiplicative interleaver stride 131,
-and whitener seed `0x17A6E`; the existing full codec keeps 784 coded bits,
-stride 313, and seed `0x17A6D`. Both use the same sixteen-symbol sync. The
-receiver tries the short body first and accepts only a checked length and
-CRC32, then tries the full body if needed. An unsuccessful short hypothesis
-with an incomplete full body remains pending, so streaming RX cannot consume
-a full frame prematurely. There are at most two body-decoder attempts per
-acquisition. Airtime estimates select the same size as encoding.
+The short codec has 310 coded bits, multiplicative interleaver stride 119,
+and whitener seed `0x17A7A`; the full codec has 790 coded bits, stride 301,
+and seed `0x17A98`. Both use the same sixteen-symbol sync. The receiver tries
+the short body first and accepts only a checked length and CRC32, then tries
+the full body if needed. An unsuccessful short hypothesis with an incomplete
+full body remains pending, so streaming RX cannot consume a full frame
+prematurely. There are at most two body-decoder attempts per acquisition.
+Airtime estimates select the same size as encoding.
 
-Updated receivers still accept the previous full frames, including padded
-short payloads. Older receivers cannot decode the new short frames; both
-endpoints must be updated for short-control operation. This extension retains
-mode ID 10 and does not negotiate a legacy-transmit option.
+This replacement retains mode ID 10 and the HR0 common-lead signature but
+changes the on-air waveform. It does not transmit or decode legacy 128-FSK
+HR0 frames and does not negotiate a legacy option. **Both endpoints must be
+updated together.** The old 3.508/7.316-second HR0 remains a historical
+experimental comparison baseline only.
 
-Neither frame size has completed retained-channel qualification or radio
-acceptance. Keeping symbol energy, acquisition, and the K=9 code does not
-prove equal fading performance: the shorter interleaver must be qualified
-separately against the HF Level-0 envelope in `SPEED_LADDERS.md`.
+Production availability is an explicit owner product decision, not a claim
+that the 3 dB relative-margin, retained-channel, or radio qualification gates
+passed. The 1.812-second candidate's moderate/disturbed 300-trial boundary
+comparisons did not establish the required confidence-qualified margin over
+HC0. See `MODE_QUALIFICATION.md` and the retained
+[experiment results](experiments/hr0_fast_control/RESULTS.md).
 
 ### Common HF lead and frame signature
 

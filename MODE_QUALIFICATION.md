@@ -50,6 +50,37 @@ default ladders recorded in the assessment below. A `default` entry is a
 product-availability disposition, not proof that the evidence gates passed;
 promotion evidence retains the separate status words below.
 
+## HR0 product override, 2026-09-06
+
+The owner explicitly directed replacement of production HR0 with the faster
+MARGIN32 candidate after reviewing the unresolved qualification results.
+HR0 remains the default HF control mode, ID 10, but now uses 32-FSK with
+1024-sample symbols, 16 sync symbols, K=9 coding, and 12/42-byte short/full
+bodies. Complete minimum keyings are 1.812/3.860 seconds. The former 128-FSK
+HR0 is a historical experiment baseline, not an available negotiated fallback.
+The common lead and mode ID are retained; the waveform is incompatible with
+old HR0 peers, so both endpoints must update together.
+
+This is an explicit **product override of outstanding promotion gates**, not
+a qualification pass. The nominal Level-0 targets and 3 dB relative-margin
+requirement remain in force. The diagnostic experiment at control -5 dB and
+HC0 DATA -2 dB delivered 280/300 versus 286/300 on moderate Watterson and
+277/300 versus 283/300 on disturbed. Candidate 95% Wilson delivery lower
+bounds are 89.93%/88.76%, below the 90% floor; HC0's are 92.32%/91.11%.
+These results leave the confidence-qualified relative margin unproven;
+they do not by themselves establish statistical inferiority. They are
+outside the nominal +6/+11 dB target points and do not establish a failure
+at those nominal envelope boundaries.
+
+The evidence above is a product-decision diagnostic summary, not a qualifying
+artifact under this document's `logs/mode_qualification/` retention rule.
+Full packet-size envelope confirmation, the measured common-reliability
+boundary, radio/hardware acceptance, and complete promotion artifacts remain
+open. Clean software sessions establish integration only. See
+`experiments/hr0_fast_control/RESULTS.md` for the historical screens and the
+subsequent owner selection; none of their earlier hold decisions is silently
+relabelled as a gate pass.
+
 ## Rung levels and operating envelopes
 
 A mode seeking to fill a ladder target declares a **rung level** and an
@@ -58,7 +89,8 @@ mode may instead declare that it fills no target rung.
 
 The rung level is one of:
 
-- **Level 0** -- control and fallback, optimized for maximum coverage;
+- **Level 0** -- control and fallback: HF minimizes short-control airtime
+  with the specified 3 dB advantage over Level 1; FM maximizes coverage;
 - **Level 1** -- robust data;
 - **Level 2** -- general-purpose data;
 - **Level 3** -- fast data; or
@@ -171,14 +203,13 @@ not yet established" section for the remaining gap list (session/ARQ,
 resource evidence, hardware setup record); the bandwidth failure remains the
 qualification's primary open item on the evidence record.
 
-**Product decision: promoted to Default on 2026-09-01, overriding the open
-gate.** As explained near the top of this document, a `default` entry is a
-product-availability disposition, not proof that the evidence gates passed.
-The repo owner made an explicit, informed decision on 2026-09-01 to ship HF2
-as part of the normal hf-ssb mode ladder -- `whale/mode_qualification.py`'s
-`MANIFEST` now lists `QualificationEntry("hf-ssb", 7, QualificationLevel.DEFAULT)`
--- meaning HF2 is now negotiated and transmitted automatically by any
-default-configuration station, with no operator opt-in. This decision
+**Historical product decision: promoted to Default on 2026-09-01, then
+superseded by HF3.** HF2 remains available only at Experimental level. The
+current default fast-data rung is HF3 (mode ID 9), whose replacement decision
+is recorded below. As explained near the top of this document, a `default`
+entry is a product-availability disposition, not proof that the evidence
+gates passed. HF2 was negotiated and transmitted automatically by default
+stations until the HF3 replacement. This decision
 overrides, and does not resolve, the occupied-bandwidth gate failure above:
 the 99%-power occupied bandwidth still measures ~4,212-4,219 Hz against the
 2,300 Hz ceiling, nearly double the limit, driven by both an over-ceiling top
@@ -213,13 +244,20 @@ matrix, Wilson intervals, exact commands, failure buckets, and provisional
 adaptation guidance. HF2's occupied-bandwidth failure remains independently
 dispositive for evidence-based deployment.
 
-HF3 (hf-ssb mode ID `9`) declares Level 3 ("Fast data"): a from-scratch
-36-carrier coherent 16-QAM OFDM design (46.875 Hz spacing, 421.875-2,062.5
-Hz, rate-1/2 K=9 code, 9-pilot comb with per-symbol polar-interpolated
-tracking), designed independently of HC0/HC1/HF2/HR0's specific geometries
-per its own design record (`experiments/hf3/DESIGN.md`). Confirmed-tier
-(300-trial) Monte Carlo campaigns clear the frame Monte Carlo gate at
-**both** required boundary points. Benign/static +8 dB: 300/300 decoded
+HF3 (hf-ssb mode ID `9`) is now the HF4-derived rate-3/4 candidate. It reuses
+HF4's 149-carrier geometry, but uses a shorter 36-data-symbol frame with
+pilots every 6 symbols and an exact K=7 convolutional code punctured to `3/4`;
+its implementation is
+`experiments/hf3_fec34.py`. The former 36-carrier HF3 experiment and its
+qualification results below are historical and do not transfer to this new
+waveform. HF3 is now the owner-selected Default fast-data rung, replacing
+HF2 in the normal registry despite incomplete qualification evidence. The
+current candidate uses frequency diversity and passes the retained
+static/quiet smoke points, while moderate two-path fading remains unresolved.
+
+The historical HF3 experiment had declared Level 3 ("Fast data"): its
+confirmed-tier campaigns cleared the frame Monte Carlo gate at **both**
+required boundary points. Benign/static +8 dB: 300/300 decoded
 (95% Wilson-UB FER 0.013), 300/300 acquired (95% Wilson-LB 0.987), zero
 `error` outcomes; per-frame net throughput 2,000.0 bit/s, exactly meeting
 the 2,000 bit/s floor. Quiet-Watterson +10 dB: 291/300 decoded (95%
@@ -363,6 +401,17 @@ failure anywhere, envelope or not.
 envelope. A miss at any required point fails that claim; the envelope is not
 narrowed after seeing the results. Comparisons with neighbouring modes belong
 to ladder qualification, not this gate.
+
+For HF Level 0, also measure actual short ACKs separately from full-capacity
+DATA and management packets. The 2026-09-06 relative-margin requirement in
+`SPEED_LADDERS.md` needs a matched comparison with the selected Level-1 data
+mode: at a common delivery probability, control must need at least 3 dB less
+SNR. Bracket both measured boundaries and retain confidence intervals; passing
+the nominal +6/+11 dB target points alone does not prove that relative margin.
+Apply the existing trial-count and FER/acquisition requirements to each
+claimed packet-size envelope. A small candidate screen may guide development
+but cannot establish the boundary or trigger promotion. Keep short ACK airtime
+and retry-inclusive control latency separate from the DATA throughput gate.
 
 The script reports acquisition probability, FER, payload delivery, confidence
 intervals, channel/decoder measurements, seeds, expanded channel descriptions,

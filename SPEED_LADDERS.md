@@ -12,8 +12,9 @@ defined in [MODE_QUALIFICATION.md](MODE_QUALIFICATION.md).
 
 ## Shared interpretation
 
-- Level 0 is the control and last-resort fallback rung. Its priority is
-  maximum coverage.
+- Level 0 is the control and last-resort fallback rung. HF minimizes short
+  control airtime subject to a 3 dB reliability advantage over Level 1;
+  FM prioritizes maximum coverage.
 - Levels 1 through 3 exchange channel margin for increasing net application
   throughput per data frame.
 - Level 4 is the maximum-speed rung. Its deliberately narrow channel envelope
@@ -57,14 +58,50 @@ evidence is insufficient.
 
 | Level | Objective | Minimum net application throughput per DATA frame | Required operating envelope |
 | ---: | --- | ---: | --- |
-| 0 | Control and last-resort fallback | 20 bit/s | Quiet, moderate, and disturbed at +4 dB SNR/3 kHz and above |
+| 0 | Short control and last-resort fallback | 20 bit/s | Quiet and moderate at +6 dB SNR/3 kHz and above; disturbed at +11 dB and above |
 | 1 | Robust data | 100 bit/s | Quiet and moderate at +9 dB and above; disturbed at +14 dB and above |
 | 2 | General-purpose data | 500 bit/s | Quiet at +14 dB and above; moderate at +19 dB and above |
 | 3 | Fast data | 2,000 bit/s | Benign/static at +17 dB and above; quiet at +19 dB and above |
 | 4 | Maximum speed | 4,000 bit/s | Benign/static at +22 dB and above |
 
-These rounded thresholds preserve the former physical noise levels after
-conversion from the retired 0--24 kHz convention (exact offset: +9.03 dB).
+Levels 1–4 preserve the former physical noise levels after conversion from
+the retired 0–24 kHz convention (exact offset: +9.03 dB).
+
+**2026-09-06 HF Level-0 revision:** the owner replaced the former +4 dB
+all-class requirement with a relative control-margin objective: the same
+packet-delivery reliability at 3 dB less SNR than Level 1 data, approximately
+half the received signal power at fixed noise. This is not half the packet
+loss rate and does not imply half the airtime. The resulting target-rung
+boundaries are +6 dB for quiet/moderate and +11 dB for disturbed. The 20 bit/s
+full-DATA floor and 2,300 Hz bandwidth ceiling remain in force. FM is unchanged.
+
+Optimize actual short-control airtime subject to this requirement. A
+1–1.5-second complete ACK is the initial experimental design budget, not a
+measured capability or a substitute for the reliability gates. Report
+minimum waveform airtime separately from adaptive lead, radio turnaround,
+and retry-inclusive latency.
+
+For the relative-margin comparison, use actual short ACK packets against
+full-capacity Level-1 DATA packets through matching channel presets and
+impairments, with the same SNR reference convention. Locate each mode's
+boundary at a common delivery probability and report uncertainty. The target
+numbers above are derived from the Level-1 contract; they do not establish a
+3 dB advantage over the mode currently installed on that rung. A replacement
+must separately demonstrate the margin over that measured data-mode boundary;
+saturated 100% delivery at easy points cannot establish the margin. Retain
+the data-mode identity and revision with the comparison. Management and
+fallback DATA sizes also need their own envelope checks.
+
+**2026-09-06 owner product override:** after reviewing the candidate evidence,
+the owner explicitly directed replacement of HR0 with the MARGIN32 geometry:
+32-FSK, 1.812 s short ACK, and 3.860 s full frame. It remains production HR0,
+mode ID 10, with the same common-lead signature. Both endpoints must update;
+legacy 128-FSK transmission/reception is not negotiated or supported by this
+replacement. The prior 128-FSK HR0 is retained as a historical experiment
+baseline. This product selection overrides the outstanding promotion gates;
+it does not change the 3 dB requirement or mark it qualified. The measured
+relative margin, full packet-size envelope, hardware, and remaining evidence
+gates remain open (see `MODE_QUALIFICATION.md`).
 
 **2026-09-01 revision:** Level 4's floor was lowered from 7,050 bit/s to 4,000
 bit/s. The original figure was carried over from the VHF FM ladder's shape and

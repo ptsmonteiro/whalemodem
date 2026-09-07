@@ -105,19 +105,44 @@ band-limited white noise, the recorded comparison was:
 
 HC0 also has a lower crest factor, allowing greater average power through a
 peak-limited transmitter. HC1 remains the fast rung when the path supports it;
-HR0 is now the control mode below HC0. Its 128-FSK, soft K=9 waveform uses a
-3.508-second short frame for up to 12 waveform bytes (including DATA_ACK),
-and a 7.316-second full frame for up to 42 bytes. Short ACKs save 52% against
-the former always-full frame; full DATA retains 35.0 bit/s. These durations
-include the minimum common lead and tail. Both endpoints need the short-frame
-update. Neither size is yet qualified against the Level-0 channel envelope
-or radio-tested; short-frame fading robustness needs separate measurement.
-Focused short-frame regressions exercise two fixed seeds each on quiet,
-moderate, and disturbed mid-latitude Watterson channels at +4 dB SNR/3 kHz,
-plus noise with ±46 Hz offsets and a complete paired-audio HF session.
-These are bounded software checks, not statistical qualification. HC0 is
-the next fallback and HC1 remains the faster rung. Detailed geometry, synchronization, and
-SNR definitions are in [FRAMING.md](../FRAMING.md).
+HR0 is the control mode below HC0. On 2026-09-06 the owner explicitly selected
+the faster 32-FSK MARGIN32 geometry for production, overriding open
+qualification gates. Its soft K=9 waveform uses a 1.812-second short frame
+for up to 12 waveform bytes (including DATA_ACK), and a 3.860-second full
+frame for up to 42 bytes. The short ACK uses 48.3% less airtime than the preceding
+3.508-second 128-FSK HR0; full DATA carries 32 application bytes at 66.3 bit/s
+before ARQ overhead. These durations include the minimum common lead and
+tail, not radio turnaround or retries. Mode ID 10 and its common-lead
+signature remain; the changed waveform requires both endpoints to update.
+There is no negotiated legacy 128-FSK transmit/decode option.
+
+The 2026-09-06 control requirement prioritizes short ACK airtime with a 3 dB
+sensitivity advantage over Level-1 DATA at equal packet-delivery reliability.
+Its nominal quiet/moderate and disturbed targets are +6 and +11 dB SNR/3 kHz.
+See [SPEED_LADDERS.md](../SPEED_LADDERS.md) for the distinction between those
+target values and a measured advantage over HC0, the current next data mode.
+Production selection does not establish that margin or complete waveform
+qualification.
+
+The [fast-control experiment](../experiments/hr0_fast_control/RESULTS.md)
+retains the former 128-FSK HR0 baseline and the 1.215 s, 1.396 s, and selected
+1.812 s candidates. At -5 dB moderate/disturbed, the selected geometry
+returned 280/300 and 277/300 ACKs, with 95% Wilson lower bounds of 89.93%
+and 88.76%; HC0 DATA at -2 dB returned 286/300 and 283/300, clearing the 90%
+confidence floor. These measured-boundary comparisons did not establish a
+qualified 3 dB margin. They do not establish nominal +6/+11 dB envelope
+failure or statistical inferiority. The owner elected to ship the faster
+waveform with those evidence gaps open.
+
+Clean paired-audio sessions passed for all candidates. The selected geometry
+used 66.656 seconds of summed transmitted audio versus 143.776 seconds for
+the old HR0 in a connect/128-byte-each-direction/disconnect exercise. That
+gain includes full DATA geometry and adaptive lead as well as ACKs; it is
+not elapsed session latency or faded-channel retry performance. Historical
++4 dB short-frame smoke checks refer to the old 128-FSK implementation.
+See [FRAMING.md](../FRAMING.md) for current geometry and compatibility, and
+[MODE_QUALIFICATION.md](../MODE_QUALIFICATION.md) for the explicit product
+override and remaining gates.
 
 A 2026-08-30 qualification campaign
 (`logs/mode_qualification/hf-ssb/hc0-hc1/2026-08-30/INDEX.md`) found HC1's

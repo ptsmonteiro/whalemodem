@@ -37,6 +37,9 @@ history.
 - [Performance and engineering history](PERFORMANCE.md) retains benchmark
   results, unsuccessful approaches, design lessons, and open performance
   work.
+- [Simulation-to-radio differences and fixes](SIMULATION_RADIO_DIFFERENCES.md)
+  collects mode-specific mismatches between software channels and real-radio
+  tests, split into HF SSB and VHF FM, with the remedies that were demonstrated.
 - [`experiments/`](../experiments/) contains candidate waveforms and their
   local `README.md` and `RESULTS.md` evidence records.
 
