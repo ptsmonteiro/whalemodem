@@ -1,5 +1,11 @@
 # HF4 results
 
+Current product-status note: `whale.mode_qualification.MANIFEST` now lists
+HF4 (mode 11) as DEFAULT. Statements below that it had no manifest entry
+record the status at the time of those campaigns. Default availability is an
+owner product disposition, not a reversal of the documented qualification
+failures; HF4 remains the maximum-speed rung.
+
 ## Hardware-debug fix: the interleaver was an accidental no-op (2026-09-01)
 
 Offline debugging of the two saved synced-but-CRC-failed captures from the

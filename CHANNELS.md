@@ -179,6 +179,16 @@ are never duplicated in the tool. Every selected mode sends deterministic
 random packets at its full link capacity (air header plus DATA chunk) in both
 directions unless narrowed explicitly.
 
+`scripts/compare_hc1_hf2.py` performs the production-adapter, paired HF
+comparison. It normalizes complete encoded frames to a recorded common RMS,
+derives a mode-independent channel seed for each condition/SNR/trial, and
+applies the same filters, clipping limit, oscillator error/drift, two-path
+Watterson parameters, SNR/3 kHz AWGN convention, and sample-clock error to
+both modes. It reports the standard Wilson gates, exclusive failure buckets,
+data-frame goodput, and a separately labelled one-minimum-HR0-ACK stop-and-wait
+estimate. Retained evidence and interpretation are indexed at
+`logs/mode_qualification/hf-ssb/hc1-hf2/2026-09-07/INDEX.md`.
+
 The sweep bypasses negotiation and ARQ so each result describes one physical
 frame. It records acquisition, verified-payload, and exception outcomes;
 keyed duration; separate TX/RX rates and sample counts; receive levels; and

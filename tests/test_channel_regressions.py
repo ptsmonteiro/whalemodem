@@ -97,7 +97,7 @@ def test_hf_modes_on_moderate_watterson_with_awgn(mode_name):
 
 
 @pytest.mark.channel_regression
-def test_hf2_on_quiet_watterson_at_5db():
+def test_hf2_on_quiet_watterson_at_14db_snr_3khz():
     """HF2's Level 2 quiet-Watterson boundary point (SPEED_LADDERS.md), the
     required +5 dB waveform-SNR envelope edge confirmed at 300 trials in
     experiments/hf2/RESULTS.md -- equivalently 5.0 + 10*log10(24000/3000) =
@@ -120,7 +120,7 @@ def test_hf2_on_quiet_watterson_at_5db():
 
 
 @pytest.mark.channel_regression
-def test_hf2_on_moderate_watterson_at_10db():
+def test_hf2_on_moderate_watterson_at_19db_snr_3khz():
     """HF2's Level 2 moderate-Watterson boundary point (SPEED_LADDERS.md),
     the required +10 dB waveform-SNR envelope edge confirmed at 300 trials
     in experiments/hf2/RESULTS.md -- equivalently 10.0 + 10*log10(24000/3000)

@@ -1,23 +1,24 @@
-"""HF2 as a negotiable, experimental `WaveformMode`.
+"""HF2 as a negotiable `WaveformMode`.
 
 HF2 is a pilot-assisted coherent 16-QAM OFDM data mode targeting Level 2 of
 the HF SSB speed ladder in `SPEED_LADDERS.md` (general-purpose data, quiet
-Watterson fading at +5 dB and above, moderate at +10 dB and above). It
+Watterson fading at +14 dB and above, moderate at +19 dB and above under the
+current SNR/3 kHz convention). It
 carries frequency-diversity carrier grouping -- each 16-QAM value is sent on
 2-3 physical carriers spread across the band -- to survive the persistent
 local fades that a plain comb-pilot equalizer alone could not absorb. See
 `experiments/hf2/DESIGN.md` for the concrete geometry, constellation, pilot
 layout and coding choices and why each was picked, and
-`experiments/hf2/RESULTS.md` for the Monte Carlo qualification evidence
-(>=300-trial confirmed boundary at both required Level 2 envelope points).
+`experiments/hf2/RESULTS.md` for the original Monte Carlo evidence and the
+retained paired comparison for current-convention measurements.
 
-This module only wires the already-designed and already-qualified
+This module only wires the already-designed
 `experiments/hf2/hf2.py` waveform into the link's `WaveformMode` contract,
 mirroring `whale/modes/hc1_mode.py`'s pattern; it does not re-derive or
-re-run any of that design or evidence. HF2 is registered as EXPERIMENTAL
-only (see `whale/mode_qualification.py`) -- it is not a default or optional
-mode on any ladder, and remains a step beyond `hf-ssb`'s HC0/HC1 rungs for a
-station that opts into the experimental registry.
+re-run any of that design or evidence. The owner made HF2 a DEFAULT product
+mode despite its still-failing occupied-bandwidth gate; see
+`whale/mode_qualification.py` and `MODE_QUALIFICATION.md`. Default availability
+is not a qualification claim.
 """
 
 from __future__ import annotations

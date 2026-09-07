@@ -118,9 +118,10 @@ spacing, 656.25-2,343.75 Hz) with frequency-diversity carrier grouping,
 designed independently per its own design record
 (`experiments/hf2/DESIGN.md`). Confirmed-tier (300-trial) Monte Carlo
 campaigns clear the frame Monte Carlo gate at **both** required boundary
-points. Quiet Watterson +5 dB: 300/300 decoded (95% Wilson-UB FER 0.013),
+points under the retired full-Nyquist SNR convention. Quiet Watterson +5 dB
+(`waveform_snr_db`, equivalent to +14.03 dB SNR/3 kHz): 300/300 decoded (95% Wilson-UB FER 0.013),
 300/300 acquired (95% Wilson-LB 0.987), zero `error` outcomes. Moderate Watterson
-+10 dB: 296/300 decoded (95% Wilson-UB FER 0.034), 300/300 acquired (95%
++10 dB (`waveform_snr_db`, equivalent to +19.03 dB SNR/3 kHz): 296/300 decoded (95% Wilson-UB FER 0.034), 300/300 acquired (95%
 Wilson-LB 0.987), zero `error` outcomes. Per-frame net throughput is 534.6
 bit/s at both points. Earlier 576.7--584.5 bit/s figures counted the 10-byte
 air header and sometimes prorated frame loss; neither belongs in the mode's
@@ -128,7 +129,8 @@ net application-throughput criterion. The frame geometry clears the floor by
 6.9%, a thin margin the design record
 flags explicitly. See `experiments/hf2/RESULTS.md` for full point-by-point
 results and commands, and `tests/test_channel_regressions.py`'s
-`test_hf2_on_quiet_watterson_at_5db` / `test_hf2_on_moderate_watterson_at_10db`
+`test_hf2_on_quiet_watterson_at_14db_snr_3khz` /
+`test_hf2_on_moderate_watterson_at_19db_snr_3khz`
 for the bounded CI regression anchor at both required points.
 
 A 300-trial-per-payload statistical campaign measured 99%-power occupied
@@ -189,6 +191,27 @@ should treat HF2's bandwidth behavior as a known, unresolved defect, not as
 a false alarm cleared by this promotion. The waveform's spectral leakage and
 over-ceiling top carrier remain undiagnosed and unfixed, and the bandwidth
 campaign has not been re-run.
+
+### 2026-09-07 HC1/HF2 paired ladder comparison
+
+A current-convention, production-adapter campaign retained 300 paired trials
+per mode at 17 points spanning benign/static, quiet, moderate, and disturbed
+two-path conditions. Both first pass at 7.5 dB benign/static and 9 dB quiet.
+In moderate fading HF2 first passes at 15 dB; HC1 is unresolved at 15, 18,
+and 21 dB and first passes at 24 dB. Both remain confirmed failures through
+36 dB disturbed fading, with near-perfect acquisition and an SNR-independent
+payload/CRC floor.
+
+HC1's nominal DATA-frame rate is higher (660.9 versus 534.6 bit/s), but with
+one current minimum 1.812 s HR0 DATA_ACK after each successful frame, ideal
+stop-and-wait goodput reverses to 197.9 versus 250.8 bit/s. HF2 therefore
+adds fading robustness but does not make a clean adjacent rung: it is slower
+under the formal per-frame metric and faster under the link's current ACK
+cadence. No registry change follows from this direct-frame evidence. See
+`logs/mode_qualification/hf-ssb/hc1-hf2/2026-09-07/INDEX.md` for the complete
+matrix, Wilson intervals, exact commands, failure buckets, and provisional
+adaptation guidance. HF2's occupied-bandwidth failure remains independently
+dispositive for evidence-based deployment.
 
 HF3 (hf-ssb mode ID `9`) declares Level 3 ("Fast data"): a from-scratch
 36-carrier coherent 16-QAM OFDM design (46.875 Hz spacing, 421.875-2,062.5
