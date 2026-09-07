@@ -63,6 +63,7 @@ from whale.dsp import fec as _fec
 from whale.dsp import freq as _freq
 from whale.dsp import interleave as _interleave
 from whale.dsp import ofdm as _ofdm
+from whale.dsp import timing as _timing
 from whale.dsp.bits import pn_bits, qpsk_from_bits
 
 # --------------------------------------------------------------------------
@@ -418,6 +419,10 @@ def _from_symbol_grid(grid: np.ndarray) -> np.ndarray:
 #: proposal-scale threshold the shared library defaults to.
 ACQUISITION_THRESHOLD = 0.60
 
+# HF4 keeps a fixed symbol grid. HF3 enables this for its longer radio frame,
+# where a small TX/RX sample-clock mismatch can accumulate across the payload.
+SAMPLE_CLOCK_TRACKING = False
+
 # HF3 enables this experimentally for its denser pilot schedule. HF4 keeps
 # the historical phase-only path until it has its own qualification rerun.
 TRACK_PILOT_AMPLITUDE = False
@@ -713,28 +718,36 @@ def demodulate(audio: np.ndarray, **_ignored) -> dict:
                              > len(analytic)):
         return result
 
-    # No per-symbol sample-clock tracking: this design's target envelope
-    # (benign/static, SPEED_LADDERS.md) has negligible drift over one
-    # ~4-second frame, acquisition already locates the symbol boundary to
-    # the sample, and this waveform's 12-sample cyclic prefix is too short
-    # for `whale.dsp.timing`'s search window (tuned for the much longer
-    # guards other HF modes use) to fit a reliable per-symbol shift from --
-    # trying to anyway measurably *hurt* decode accuracy in testing rather
-    # than helping it. Carrier-frequency offset is still corrected: it is
-    # a per-frame constant this waveform's own header can estimate cleanly
-    # regardless of guard length.
+    # HF4 normally uses a fixed grid. HF3 enables the CP-based fit here: its
+    # radio frame is long enough for a small sample-clock mismatch to move
+    # the FFT window through the cyclic prefix and eventually corrupt data.
     coarse_hz = _freq.coarse_offset_hz(
         GEOMETRY, analytic, header_start, np.arange(HEADER_SYMBOLS))
     derotated = _freq.derotate(analytic, coarse_hz, GEOMETRY.sample_rate)
 
-    bank = _ofdm.carrier_bank(GEOMETRY, derotated, header_start, trailing_symbols)
+    timing_intercept = 0.0
+    timing_slope = 0.0
+    if SAMPLE_CLOCK_TRACKING:
+        timing_fit = _timing.estimate(
+            GEOMETRY, derotated, header_start,
+            np.arange(HEADER_SYMBOLS, trailing_symbols, dtype=np.int32))
+        timing_intercept = timing_fit.intercept
+        timing_slope = timing_fit.slope
+        result["clock_offset_ppm"] = timing_fit.clock_offset_ppm(GEOMETRY)
+        result["timing_confidence"] = timing_fit.confidence
+
+    bank = _ofdm.carrier_bank(
+        GEOMETRY, derotated, header_start, trailing_symbols,
+        timing_intercept, timing_slope)
     if bank is None:
         return result
     fine_hz = _freq.fine_offset_hz(GEOMETRY, bank[:HEADER_SYMBOLS], HEADER_VALUES)
     total_hz = coarse_hz + fine_hz
     derotated = _freq.derotate(analytic, total_hz, GEOMETRY.sample_rate)
 
-    bank = _ofdm.carrier_bank(GEOMETRY, derotated, header_start, trailing_symbols)
+    bank = _ofdm.carrier_bank(
+        GEOMETRY, derotated, header_start, trailing_symbols,
+        timing_intercept, timing_slope)
     if bank is None:
         return result
     header_bank = bank[:HEADER_SYMBOLS]

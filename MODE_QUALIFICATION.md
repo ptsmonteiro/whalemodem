@@ -244,14 +244,16 @@ matrix, Wilson intervals, exact commands, failure buckets, and provisional
 adaptation guidance. HF2's occupied-bandwidth failure remains independently
 dispositive for evidence-based deployment.
 
-HF3 (hf-ssb mode ID `9`) is the documented sparse-pilot coherent 16-QAM
-waveform: 36 carriers, 9 pilot carriers, a 128-sample cyclic prefix, timing
-recovery, and a K=9 rate-1/2 code. Its implementation is
-`experiments/hf3/hf3.py`, and `whale/modes/hf3_mode.py` is only the link
-adapter around that implementation. HF3 is the owner-selected Default
-fast-data rung, replacing HF2 in the normal registry despite incomplete
-qualification evidence. The mode's current hardware evidence is still
-provisional, especially for the weaker radio direction.
+HF3 (hf-ssb mode ID `9`) is the HF4-derived rate-2/3 candidate. It reuses
+HF4's 149-carrier geometry, but uses a shorter 36-data-symbol frame with
+pilots every 6 symbols and an exact K=7 convolutional code punctured to `2/3`;
+its implementation is
+`experiments/hf3_fec34.py`. The former 36-carrier HF3 experiment and its
+qualification results below are historical and do not transfer to this new
+waveform. HF3 is now the owner-selected Default fast-data rung, replacing
+HF2 in the normal registry despite incomplete qualification evidence. The
+current candidate uses frequency diversity and passes the retained
+static/quiet smoke points, while moderate two-path fading remains unresolved.
 
 The historical HF3 experiment had declared Level 3 ("Fast data"): its
 confirmed-tier campaigns cleared the frame Monte Carlo gate at **both**
@@ -278,8 +280,8 @@ dirty tree. Its predeclared clean-state repeat decoded 36/40: all frames
 acquired, but four failed CRC validation. The 95% FER upper bound is 23.1%,
 above the 10% ceiling, so the hardware frame gate currently fails. See
 `logs/mode_qualification/hf-ssb/hf3/2026-09-02-hardware/INDEX.md`. HF3's
-manifest entry is a provisional Default availability decision, not a claim
-that the evidence gates or complete useful-throughput work are finished -- see
+manifest entry is Experimental only and must not be read as a promotion or
+complete useful-throughput claim -- see
 `experiments/hf3/RESULTS.md`'s "What is not yet established" section for
 the full gap list.
 

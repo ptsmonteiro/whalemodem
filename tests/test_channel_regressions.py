@@ -140,6 +140,7 @@ def test_hf2_on_moderate_watterson_at_19db_snr_3khz():
     assert sum(record.decoded for record in records) >= 1
 
 
+@pytest.mark.skip(reason="historical HF3 geometry replaced by the HF4-derived candidate")
 def test_hf3_on_benign_static_at_8db():
     """HF3's Level 3 benign/static boundary point (SPEED_LADDERS.md): a
     full measured/reproducible SSB path (filter, frequency offset + drift,
@@ -154,6 +155,7 @@ def test_hf3_on_benign_static_at_8db():
     assert sum(record.decoded for record in records) >= 1
 
 
+@pytest.mark.skip(reason="historical HF3 geometry replaced by the HF4-derived candidate")
 def test_hf3_on_quiet_watterson_at_10db():
     """HF3's Level 3 quiet-Watterson boundary point (SPEED_LADDERS.md)."""
 

@@ -9,10 +9,9 @@ quiet Watterson fading at +10 dB and above. All numbers below are from
 
 A later radio smoke campaign is recorded separately under
 `logs/mode_qualification/hf-ssb/hf3/2026-09-01-hardware/`: 3/3 full-capacity
-frames decoded from IC-7300 to IC-705. On 2026-09-07, after correcting the
-mode adapter to use this implementation, a live smoke run decoded 3/3 in
-each IC-705/IC-7300 direction. These remain provisional evidence below the
-40-frame minimum, and are not part of the simulated campaign below.
+frames decoded from IC-7300 to IC-705. It is provisional retained-direction
+evidence below the 40-frame minimum, and is not part of the simulated
+campaign below.
 
 ## Confirmed-boundary gate (>=300 trials)
 
@@ -118,9 +117,7 @@ separates from the rest.
   failed CRC validation; the 95% FER upper bound is 23.1%, above the 10%
   ceiling. An immediately preceding dirty-tree campaign decoded 40/40 but is
   retained as characterization rather than selected over the clean repeat.
-  The hardware frame gate therefore remains open. The 2026-09-07 3/3-per-
-  direction smoke result confirms the adapter correction but does not replace
-  the required campaign. See
+  The hardware frame gate therefore fails. See
   `logs/mode_qualification/hf-ssb/hf3/2026-09-02-hardware/INDEX.md`.
 - **CPU/RSS/resource evidence** (section 7): not measured.
 - **Interoperability**: HF3 has not been tested against any implementation

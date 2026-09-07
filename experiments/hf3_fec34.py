@@ -1,4 +1,4 @@
-"""HF3: the HF4 waveform with an exact rate-3/4 inner FEC code."""
+"""HF3: the HF4 waveform with an exact rate-2/3 inner FEC code."""
 
 from __future__ import annotations
 
@@ -9,8 +9,8 @@ import numpy as np
 from experiments.hf4 import hf4
 from whale.dsp import interleave as _interleave
 
-FEC_K = 3
-FEC_N = 4
+FEC_K = 2
+FEC_N = 3
 FEC_RATE = FEC_K / FEC_N
 FEC_CODE = hf4.FEC_CODE
 FEC_TAIL_BITS = hf4.FEC_TAIL_BITS
@@ -91,6 +91,7 @@ _OVERRIDES = {
     "FREQUENCY_DIVERSITY": True,
     "DIVERSITY_COLUMNS": DIVERSITY_COLUMNS,
     "DIVERSITY_SECOND_OFFSET": DIVERSITY_SECOND_OFFSET,
+    "SAMPLE_CLOCK_TRACKING": True,
 }
 
 

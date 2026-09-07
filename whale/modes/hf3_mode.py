@@ -1,9 +1,4 @@
-"""HF3, the documented sparse-pilot coherent 16-QAM HF waveform.
-
-Mode ID 9 is the 36-carrier HF3 design in ``experiments.hf3.hf3``.  Keep
-this adapter deliberately thin so the mode used by the link is the same
-waveform covered by HF3's software and hardware evidence.
-"""
+"""HF3, the HF4 waveform with a rate-2/3 inner convolutional code."""
 
 from __future__ import annotations
 
@@ -11,7 +6,7 @@ from dataclasses import dataclass, field
 
 import numpy as np
 
-from experiments.hf3 import hf3
+from experiments import hf3_fec34 as hf3
 
 from .. import framing
 
@@ -26,18 +21,12 @@ class Hf3Codec:
 
     def encode(self, payload: bytes, mode: "Hf3Mode", *, include_head=True,
                head_seconds=None) -> np.ndarray:
-        del mode
+        del mode, include_head, head_seconds
         if len(payload) > hf3.MAX_PAYLOAD_BYTES:
             raise ValueError(
                 f"packet is {len(payload)} bytes; hf3 carries at most "
                 f"{hf3.MAX_PAYLOAD_BYTES}")
-        if not include_head:
-            # HF3's fixed lead is part of its acquisition contract.  The
-            # link may shorten the adaptive head, but it must not remove it.
-            head_seconds = hf3.DEFAULT_HEAD_SECONDS
-        return hf3.modulate(payload, head_seconds=head_seconds
-                            if head_seconds is not None
-                            else hf3.DEFAULT_HEAD_SECONDS)
+        return hf3.modulate(payload)
 
     def decode(self, audio, mode: "Hf3Mode", *, head_seconds=None, **kwargs) -> dict:
         del mode, head_seconds
@@ -45,7 +34,7 @@ class Hf3Codec:
 
     def airtime(self, payload_len: int, mode: "Hf3Mode") -> float:
         del payload_len, mode
-        return hf3.frame_seconds()
+        return hf3.FRAME_SECONDS
 
 
 HF3_CODEC = Hf3Codec()
@@ -57,7 +46,7 @@ class Hf3Mode:
     mode_id: int = HF3_MODE_ID
     chunk_size: int = CHUNK_SIZE
     confidence_threshold: float = CONFIDENCE_THRESHOLD
-    fec_rate: float = hf3.FEC_INPUT_BITS / hf3.PAYLOAD_BITS
+    fec_rate: float = hf3.FEC_RATE
     codec: Hf3Codec = field(default=HF3_CODEC, compare=False, repr=False)
 
     @property

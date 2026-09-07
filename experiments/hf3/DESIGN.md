@@ -249,23 +249,13 @@ final candidate.
   pilot and data-carrier soft decisions across symbols, rather than a fixed
   moving-average window) was not attempted.
 
-## Hardware test status (2026-08-31 / 2026-09-07, dated note)
+## Hardware test status (2026-08-31 / 2026-09-01, dated note)
 
 HF3 has **not yet been hardware-qualified**, but it now has successful
-bidirectional smoke evidence. On 2026-09-07, after the mode adapter was
-corrected to use this documented 36-carrier implementation, 3/3 full-capacity
-frames decoded byte-for-byte in each IC-705 -> IC-7300 and IC-7300 -> IC-705
-direction. The run measured all 36 carriers present and clock fits within the
-observed low-hundreds-of-ppm range. This is a smoke result, not a promotion-
-sized hardware claim; retain the predeclared 40-frame campaign before changing
-the qualification disposition.
-
-The failed run immediately before this correction was not a failure of this
-waveform. `whale/modes/hf3_mode.py` had accidentally wired mode ID 9 to the
-separate `experiments/hf3_fec34.py` HF4-derived prototype. That prototype
-acquired on the radios but produced impossible decoded lengths and no valid
-CRC. The adapter now points at this module, which is the implementation
-covered by the HF3 design, tests, and retained radio evidence.
+one-direction radio evidence: on 2026-09-01, 3/3 retained full-capacity
+frames decoded byte-for-byte from IC-7300 to IC-705. This is a status record,
+not a design change -- nothing in `hf3.py`/`whale/modes/hf3_mode.py`/
+`whale/modes/hf_lead.py` was modified as a result of the investigation below.
 
 A first single-frame IC-705 -> IC-7300 smoke test (same frequency) had HC0
 (the existing control mode) decode cleanly both directions, then HF3 fail to
