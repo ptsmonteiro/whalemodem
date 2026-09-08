@@ -15,7 +15,7 @@ exercised in these captures (incoming LISTEN-side connect, compression,
 WINLINK extensions) is marked as such
 and needs a follow-up capture before being treated as settled. This document
 exists to plan `whale/vara_server.py` work against; see that file and
-[LINK.md](LINK.md) for the current whale-side implementation and its
+[LINK.md](LINK.md) for the current Whale-side implementation and its
 documented deviations.
 
 ## Ports
@@ -50,7 +50,7 @@ Two TCP ports per station, both observed on loopback:
 | `CONNECT <mycall> <dstcall>` | `CONNECT F4JAW-2 F4JAW-1` | Initiates an outbound connection. |
 | `ABORT` | `ABORT` | Tears down the current connection. See "ABORT / disconnect timing" below; `DISCONNECT` itself was not exercised in this capture. |
 
-Not exercised in this capture (present in whale today, or known from VARA's
+Not exercised in this capture (present in Whale today, or known from VARA's
 general reputation, but unconfirmed against real traffic here): `LISTEN
 ON`/`LISTEN OFF`, `DISCONNECT` (as distinct from `ABORT`), compression
 commands, WINLINK-session commands.
@@ -64,13 +64,13 @@ commands, WINLINK-session commands.
 | `IAMALIVE` | `IAMALIVE` | Unsolicited keepalive, observed roughly every 60 seconds for the life of the session, unconditionally (connected or not). |
 | `REGISTERED` | `REGISTERED` | Sent once per captured command-port session, about 5s after setup, paired with `ENCRYPTION DISABLED` in the same packet. In `capture1.log` an `IAMALIVE` happened first; in the chat capture it did not. Likely a licensing/registration status push, not a reply to any command. |
 | `ENCRYPTION DISABLED` | `ENCRYPTION DISABLED` | See above; sent alongside `REGISTERED`. |
-| `PTT ON` / `PTT OFF` | `PTT ON` | Brackets every transmit burst, including the modem's own control/ACK frames during nominal receive. Matches whale's current format exactly. |
+| `PTT ON` / `PTT OFF` | `PTT ON` | Brackets every transmit burst, including the modem's own control/ACK frames during nominal receive. Matches Whale's current format exactly. |
 | `UNENCRYPTED LINK` | `UNENCRYPTED LINK` | Sent once, right after `CONNECT` succeeds, before the `CONNECTED` line. |
 | `BITRATE (n)  <val> bps <TX|RX>` | `BITRATE (3)  82 bps TX` | Reports the modem's current bitrate index/value/direction. **Note the double space** between `(n)` and the value — verbatim in both captures. Associated with data/setup activity in both directions; many short connected-idle PTT cycles have no `BITRATE` line. |
 | `CONNECTED <mycall> <dstcall> <bandwidth>` | `CONNECTED F4JAW-2 F4JAW-1 2300` | **Three arguments**: local call, peer call, and bandwidth in Hz. Whale's current adapter now emits this observed shape; it uses the preceding `BW<n>` value or `0` if none was supplied. |
 | `SN <x.y>` | `SN 11.4` | Signal-to-noise readout, one decimal place, varies per burst. Usually appears immediately before a `BITRATE (...) RX` line, sometimes in the same packet. |
 | `BUFFER <n>` | `BUFFER 0` | Observed after each of four outbound chat messages, as well as after the outbound binary write in `capture1.log`. Only value `0` was observed; it arrived after the data-bearing TX burst and before a following short PTT cycle. The unit and exact semantics (bytes queued? frames queued?) remain unconfirmed. |
-| `DISCONNECTED` | `DISCONNECTED` | Sent once established-session teardown completes, and also when an outbound connection attempt exhausts its retries without ever connecting. Matches whale's current API format. |
+| `DISCONNECTED` | `DISCONNECTED` | Sent once established-session teardown completes, and also when an outbound connection attempt exhausts its retries without ever connecting. Matches Whale's current API format. |
 
 No `CONNECT FAILED` line was observed. The targeted failed-call capture instead
 ended with `DISCONNECTED`; any conditions under which real VARA might use the
@@ -118,7 +118,7 @@ any status specific to an incoming/LISTEN-side connect, WINLINK, or compression.
 
 Important: `ABORT`'s `OK` is an immediate command acknowledgment, not a
 completion signal — `DISCONNECTED` only arrives after the real teardown
-finishes several seconds later. A client (or a whale reimplementation) must
+finishes several seconds later. A client (or a Whale reimplementation) must
 not treat `OK` after `ABORT` as "already disconnected."
 
 The chat capture also demonstrates **asynchronous teardown**. Its local API

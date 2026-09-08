@@ -2,7 +2,7 @@
 
 ## Purpose and scope
 
-whale measures leading loss independently in each radio direction and
+Whale measures leading loss independently in each radio direction and
 uses a channel-specific repeated lead to protect sync acquisition. The
 measurement includes transmitter startup, audio buffering, receiver recovery,
 squelch, and AGC settling because audio starts immediately after PTT assertion.

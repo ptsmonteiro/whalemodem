@@ -1,6 +1,6 @@
 # Testing and qualification
 
-whale uses progressively more realistic checks: deterministic unit
+Whale uses progressively more realistic checks: deterministic unit
 tests, full-stack paired audio, simulated channels, recorded radio captures,
 and finally retained-direction hardware frame trials plus bidirectional
 hardware sessions. A mode is not promoted solely

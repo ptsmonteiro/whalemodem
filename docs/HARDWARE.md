@@ -151,7 +151,7 @@ instead of CAT, etc).
 ## Standalone builds
 
 For an end user who doesn't want to set up Python, a venv, or `pip install`
-at all, whale can be frozen into a standalone, no-Python-required
+at all, Whale can be frozen into a standalone, no-Python-required
 onedir bundle with PyInstaller -- a folder containing the
 `whale-server` executable plus its own Python runtime, numpy/scipy,
 and (vendored the same way `hamlib` is vendored above) hamlib and, on

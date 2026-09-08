@@ -322,7 +322,7 @@ then emitted `DISCONNECTED` about 49.1s after the command without ever
 emitting `CONNECTED` or `CONNECT FAILED`. Whether some other rejection or
 failure class uses `CONNECT FAILED` remains unknown.
 
-For an incoming connection armed by `LISTEN ON`, whale emits
+For an incoming connection armed by `LISTEN ON`, Whale emits
 `CONNECTED <local_call> <caller_call> <bandwidth>` and then accepts the data
 connection exactly as it does for an outbound connection. This local/peer
 ordering is the symmetric extension of the captured outbound form, not a
@@ -372,7 +372,7 @@ is an implementation detail and must not be used for application framing.
   this code rather than hostile input.
 - `BW<n>` and `CHAT ON`/`CHAT OFF` are accepted and acknowledged with `OK`
   and their values recorded (`bandwidth_hz`, `chat_mode`), but neither
-  currently changes any other observable behavior. In particular, whale
+  currently changes any other observable behavior. In particular, Whale
   neither adds nor removes the length prefix observed in the pure-chat
   capture; callers can send that framing over the raw stream themselves.
   Tests cover byte-for-byte transport in both directions with `CHAT ON`, with
@@ -392,7 +392,7 @@ is an implementation detail and must not be used for application framing.
 - Whale emits only the observed `BUFFER 0`, after a successful link send has
   drained its application-data queue. All five capture observations were zero,
   so the unit, update cadence while nonempty, and legal nonzero range remain
-  unknown and whale does not fabricate them.
+  unknown and Whale does not fabricate them.
 - The `<bandwidth>` argument on `CONNECTED` falls back to `0` when the client
   never sent `BW<n>`. `whale.policy.ChannelPolicy` (the channel the station
   was started with) carries no bandwidth-like field, and `StationServer`

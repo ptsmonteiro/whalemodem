@@ -1,23 +1,33 @@
-# whale
+# Whale
 
-whale is an open amateur-radio data modem for VHF and HF.
-It has a VARA-shaped command/data interface, but its on-air protocol is native
-and the local interface is not yet fully VARA-compatible. Detailed references
-live in the [documentation index](docs/README.md).
+**An open HF and VHF data modem for amateur radio, up to 7.5 kbit/s — a
+fresh alternative to VARA HF and VARA FM, driven through the same VARA TCP
+interface your applications already speak.**
 
-## Project goals
+Whale is a small, readable Python implementation of a complete HF SSB and VHF
+FM data modem: waveforms, FEC, ARQ link layer, PTT/CAT control, and a
+VARA-shaped local TCP command/data interface.
 
-The goal is a practical open alternative to VARA FM and VARA HF: competitive
-useful throughput and reliability, compatibility with existing applications,
-and operation on inexpensive low-power hardware. Application adapters, link
-behavior, waveforms, audio transport, and radio control should remain modular
-and independently testable, with performance demonstrated by reproducible
-simulation and radio measurements. The full criteria are in
-[GOALS.md](GOALS.md).
+## Why another modem?
 
-## Setup and run
+VARA set the bar for amateur HF data, but it is closed source, paid, and
+Windows-centric. Whale aims at the same job with different properties:
 
-Python 3.11 or newer is required:
+- **Open and inspectable.** Every waveform, FEC choice, and timing decision
+  is in the repo, commented, and covered by tests.
+- **Drop-in for existing apps.** Whale listens on the same two TCP ports and
+  speaks the same line protocol, so a VARA-capable client can drive it.
+- **Cross-platform and cheap.** Pure Python plus numpy/scipy, a sound card,
+  and hamlib or a serial line for PTT. Runs on a Raspberry Pi.
+
+Whale negotiates a mode at connect time and adapts speed mid-session as the
+channel changes. Every shipped mode, with its rate and its pure-SNR,
+Watterson-fading, and on-air pass points, is listed in
+[docs/MODES.md](docs/MODES.md).
+
+## Quick start
+
+**Install.** Python 3.11 or newer:
 
 ```console
 python -m venv .venv
@@ -25,38 +35,38 @@ python -m venv .venv
 python -m pip install -e ".[test]"
 ```
 
-Run the full-stack software test or the complete automated suite without
-radios:
+**Set up your radio.** The terminal configuration tool writes `radios.toml`,
+browsing the audio devices, serial ports, and hamlib models it finds:
 
 ```console
-python -m pytest tests/test_audio_e2e.py -q
-python -m pytest -q
+whale-configure
 ```
 
-For radio operation, copy `radios.example.toml` to `radios.toml`, configure
-both stations, and start one server per radio:
+**Run.** Start one server per radio, then point your VARA-capable
+application at its command and data ports:
 
 ```console
-python -m whale.vara_server --radio-config radios.toml --radio station-a --mycall STA1 --cmd-port 8300 --data-port 8301
-python -m whale.vara_server --radio-config radios.toml --radio station-b --mycall STA2 --cmd-port 8310 --data-port 8311
+whale-server --radio-config radios.toml --radio station-a \
+    --mycall STA1 --cmd-port 8300 --data-port 8301
 ```
 
-Exercise both directions with:
-
-```console
-python acceptance_test.py --a-cmd 8300 --a-data 8301 --b-cmd 8310 --b-data 8311 --a-call STA1 --b-call STA2
-```
-
-Read the [hardware and safety guide](docs/HARDWARE.md) before transmitting;
-the [testing guide](docs/TESTING.md) covers the other test workflows. For a
-station that shouldn't need a Python setup at all, see
-[Standalone builds](docs/HARDWARE.md#standalone-builds).
+Read the [hardware and safety guide](docs/HARDWARE.md) before transmitting.
+A [standalone build](docs/HARDWARE.md#standalone-builds) needs no Python
+install on the station machine.
 
 ## Current status
 
-The end-to-end connect, bidirectional transfer, verification, and disconnect
-path is implemented. Current shipped modes and measured results are listed in
-[docs/MODES.md](docs/MODES.md).
+Whale is in early development, but the full path already works: two stations
+connect, transfer data in both directions with verification, and disconnect,
+on HF SSB and VHF FM. The on-air protocol is native, so Whale talks to Whale.
 
-HF is intended for controlled bench tests until clear-channel assessment and
-broader unattended-operation safeguards are implemented.
+## Contributing
+
+Good places to start: extending VARA API coverage against fresh captures,
+clear-channel assessment, new waveforms, and radio testing on paths and rigs
+we do not have. Waveform work is measurable — add a mode, run the simulated
+channel tests, and the numbers speak for themselves.
+
+See [GOALS.md](GOALS.md) for what the project is aiming at,
+[docs/TESTING.md](docs/TESTING.md) for the test workflows, and the
+[documentation index](docs/README.md) for everything else.

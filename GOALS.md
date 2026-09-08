@@ -1,6 +1,6 @@
 # Project goals
 
-whale is an open amateur-radio data modem for VHF FM and HF SSB.
+Whale is an open amateur-radio data modem for VHF FM and HF SSB.
 
 The practical goals are reliable bidirectional transfer, useful net
 throughput, a small inspectable implementation with a VARA-shaped local
