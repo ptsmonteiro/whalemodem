@@ -7,10 +7,10 @@ if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
 import bench
 from whale.modes.hc0_mode import HC0
-from whale.modes.hc1_mode import HC1
+from whale.modes.hc1w_mode import HC1W
 from whale.modes.hr0_mode import HR0
 
-MODES = (HR0, HC0, HC1)
+MODES = (HR0, HC0, HC1W)
 
 def main():
     ap = argparse.ArgumentParser()

@@ -9,14 +9,14 @@ raw waveform (geometry, mapping, FEC, framing, acquisition/timing/frequency
 recovery) -- not the `WaveformMode` promotion,
 which is a later stage.
 
-Like HC1 and VF3, this is geometry and wiring on top of the shared
+Like HC1W and VF3, this is geometry and wiring on top of the shared
 `whale/dsp/` kernels: OFDM symbol build/analyze (`whale.dsp.ofdm`), the
 rate-1/2 K=7 convolutional code and CRC32/length framing
 (`whale.dsp.fec`, `whale.dsp.framing`), acquisition
 (`whale.dsp.acquire`), frequency and timing recovery (`whale.dsp.freq`,
 `whale.dsp.timing`), and header equalization (`whale.dsp.equalize`).  Every
 geometry number, the pilot layout and the 16-QAM mapping are HF2's own,
-picked independently of HC0/HC1/VF6/HR0 per that DESIGN.md.
+picked independently of HC0/HC1W/VF6/HR0 per that DESIGN.md.
 
 Frame shape:
 
@@ -26,7 +26,7 @@ Frame shape:
 QPSK, all 19 carriers).  `TRAINING_SYMBOLS` are a second, varying, still
 fully-known QPSK block: `whale.dsp.equalize.fit_header` uses it for the
 initial per-carrier gain/offset/SNR and `whale.dsp.freq.fine_offset_hz` uses
-it for the fine carrier-frequency estimate, the same two jobs HC1's header
+it for the fine carrier-frequency estimate, the same two jobs HC1W's header
 does. Together they are `HEADER_SYMBOLS`.
 
 Each of the `PAYLOAD_SYMBOLS` OFDM symbols carries 19 carriers split into 8
@@ -48,7 +48,7 @@ for equalizing the payload), so per-symbol pilot tracking is HF2-local glue.
 Coding is `whale.dsp.framing.PacketCodec` unchanged: length field, CRC32,
 whitening, rate-1/2 K=7 soft-Viterbi and a multiplicative bit interleaver,
 all inside the payload grid (`whale.framing`'s PN-sync format is bypassed,
-the same choice VF3/HC0/HC1 each made independently).
+the same choice VF3/HC0/HC1W each made independently).
 
 Frame size: that DESIGN.md's starting point of 40 payload symbols does not
 divide into a whole number of packet bytes at any pilot/data-carrier split
@@ -60,7 +60,7 @@ dated note for the record of this and the pilot-count deviations.
 
 The shared HF lead-in (`whale.modes.hf_lead`, label `HF2_LABEL`) is
 prepended by `modulate` and measured by `demodulate`, the same calling
-convention `whale/modes/hc1_mode.py` uses around `whale/modes/hc1.py`.
+convention `whale/modes/hc1w_mode.py` uses around `whale/modes/hc1w.py`.
 """
 
 from __future__ import annotations
@@ -86,8 +86,7 @@ RX_CORE_SAMPLES = CORE_SAMPLES // rx_audio.DECIMATION
 RX_GUARD_SAMPLES = GUARD_SAMPLES // rx_audio.DECIMATION
 RX_SYMBOL_SAMPLES = RX_GUARD_SAMPLES + RX_CORE_SAMPLES
 
-#: 19 carriers at 93.75 Hz spacing, 656.25-2343.75 Hz.  See DESIGN.md for why
-#: this band, arrived at independently of HC1's identical-looking one.
+#: 19 carriers at 93.75 Hz spacing, 656.25-2343.75 Hz.
 CARRIER_BINS = np.arange(7, 26, dtype=np.int32)
 CARRIER_SPACING_HZ = SAMPLE_RATE / CORE_SAMPLES
 CARRIER_HZ = CARRIER_BINS.astype(np.float64) * CARRIER_SPACING_HZ
@@ -459,7 +458,7 @@ def demodulate(audio: np.ndarray, *,
 
     Returns at least `{"synced", "payload", "start_index"}` plus diagnostics
     (`confidence`, `carrier_snr_db`, `cfo_hz`, ...), matching the shape
-    `whale/modes/hc1_mode.py`'s codec reads off `hc1.demodulate`.
+    `whale/modes/hc1w_mode.py`'s codec reads off `hc1w.demodulate`.
     """
     del kwargs
     result = _base_result()

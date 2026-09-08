@@ -1,7 +1,7 @@
 """HF frames over the real radio pair: one modulate -> TX -> capture ->
 demodulate per trial, both directions, no ARQ and no sockets.
 
-`--mode hc0` is the robust 16-FSK rung, `--mode hc1` the OFDM one; they are
+`--mode hc0` is the robust 16-FSK rung, `--mode hc1w` the OFDM one; they are
 the same measurement so they live in the same script.
 
 Same method as everything else in this directory (see scripts/bench.py):
@@ -9,10 +9,10 @@ bypass whale.link entirely so a data point is a property of the channel and
 the DSP rather than of the retry logic on top of them.  What is different is
 what it prints, because on HF the interesting numbers are different ones:
 
-    offset       the carrier frequency error HC1 measured and corrected.
+    offset       the carrier frequency error HC1W measured and corrected.
                  This is the quantity the FM profiles have no estimate of at
                  all, and the first thing to look at if frames fail -- past
-                 +-46.9 Hz (hc1.COARSE_OFFSET_LIMIT_HZ) the coarse estimator
+                 +-46.9 Hz (hc1w.COARSE_OFFSET_LIMIT_HZ) the coarse estimator
                  wraps and nothing downstream can recover.
     raw BER      bit errors before the convolutional code, against the known
                  payload.  A frame that decodes at 8% raw BER is working as
@@ -28,7 +28,7 @@ what it prints, because on HF the interesting numbers are different ones:
 
 Run:
     python scripts/hw_hf_frames.py --mode hc0
-    python scripts/hw_hf_frames.py --mode hc1 --trials 5
+    python scripts/hw_hf_frames.py --mode hc1w --trials 5
     python scripts/hw_hf_frames.py --mode hc0 --direction ba --capture-dir logs/hc0
 """
 
@@ -41,9 +41,9 @@ from pathlib import Path
 import numpy as np
 
 import bench
-from whale.modes import hc0, hc1
+from whale.modes import hc0, hc1w
 
-MODES = {"hc0": hc0, "hc1": hc1}
+MODES = {"hc0": hc0, "hc1w": hc1w}
 
 CAPTURE_TAIL = 1.5
 INTER_TRIAL = 0.5

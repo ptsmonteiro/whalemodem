@@ -44,11 +44,11 @@ def experimental_registry(budget=None):
 
 
 def hf_registry(budget=None):
-    """The HF SSB ladder: HR0 control, then HC0, HC1, HF8, and HF7.
+    """The HF SSB ladder: HR0 control, then HC0, HC1W, HF8, and HF7.
 
-    HR0 is the short-control 32-FSK Level-0 control mode. HC0 and HC1
+    HR0 is the short-control 32-FSK Level-0 control mode. HC0 and HC1W
     are retained above it for progressively faster data on supporting paths.
-    HF8 (49-carrier OFDM, 8PSK, rate-2/3 LDPC, 3,299 bit/s) sits between HC1
+    HF8 (49-carrier OFDM, 8PSK, rate-2/3 LDPC, 3,299 bit/s) sits between HC1W
     and HF7: it is the robust rung, measured on radios to keep delivering on
     a path where HF7 delivers nothing. HF7 is the maximum-speed rung:
     49-carrier OFDM, 32-QAM, rate-3/4 LDPC. The ladder is ordered by rate and

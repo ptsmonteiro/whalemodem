@@ -26,7 +26,7 @@ Important focused groups include:
 ```console
 python -m pytest tests/test_audio_e2e.py -q
 python -m pytest tests/test_mode_qualification.py -q
-python -m pytest tests/test_hc0_mode.py tests/test_hc1_mode.py -q
+python -m pytest tests/test_hc0_mode.py tests/test_hc1w_mode.py -q
 python -m pytest tests/test_vf3_mode.py -q
 python -m pytest tests/test_ptt_backends.py tests/test_ptt_safety.py -q
 ```
@@ -58,7 +58,6 @@ Committed recordings preserve behavior that clean synthesis cannot exercise:
 
 ```console
 python -m pytest tests/test_hc0_capture_replay.py -q
-python -m pytest tests/test_hc1_capture_replay.py -q
 python -m pytest tests/test_vf3_capture_replay.py -q
 ```
 

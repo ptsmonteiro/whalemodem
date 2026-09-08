@@ -15,7 +15,7 @@ retained paired comparison for current-convention measurements.
 This module only wires the already-designed `whale/phy/hf2.py` waveform
 (developed in the retired `experiments/hf2/`) into the link's `WaveformMode`
 contract,
-mirroring `whale/modes/hc1_mode.py`'s pattern; it does not re-derive or
+mirroring `whale/modes/hc1w_mode.py`'s pattern; it does not re-derive or
 re-run any of that design or evidence. The owner made HF2 a DEFAULT product
 mode despite its still-failing occupied-bandwidth gate; see
 `whale/mode_qualification.py` and `MODE_QUALIFICATION.md`. Default availability
@@ -33,11 +33,7 @@ from whale.phy import hf2
 from .. import framing
 from . import hf_lead
 
-#: On-air identifier. 0, 1, 2 are the CPFSK profiles in whale/afsk.py, 3 is
-#: VF3, 4 is HC1, 5 is HC0, 6 is VF6; this must stay stable once anything
-#: has shipped with it. The number is global across channels even though no
-#: registry offers HF2 and a CPFSK profile at once -- a mode id means one
-#: waveform, everywhere.
+#: On-air identifier; mode IDs identify one immutable waveform globally.
 HF2_MODE_ID = 7
 
 #: Largest DATA body one HF2 frame can carry, once the link's air header is
@@ -96,7 +92,7 @@ HF2_CODEC = Hf2Codec()
 
 @dataclass(frozen=True)
 class Hf2Mode:
-    """One negotiable HF2 setting, shaped like `hc1_mode.Hc1Mode`."""
+    """One negotiable HF2 setting, shaped like `hc1w_mode.Hc1wMode`."""
 
     name: str = "hf2"
     mode_id: int = HF2_MODE_ID

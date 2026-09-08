@@ -49,7 +49,6 @@ MANIFEST = (
     QualificationEntry("vhf-fm", 8, QualificationLevel.EXPERIMENTAL),
     QualificationEntry("vhf-fm", 6, QualificationLevel.EXPERIMENTAL),
     QualificationEntry("hf-ssb", 5, QualificationLevel.DEFAULT),
-    QualificationEntry("hf-ssb", 4, QualificationLevel.DEFAULT),
     # Owner approved the 32-FSK HR0 replacement on 2026-09-06 despite its
     # unproven 3 dB measured margin; Default is availability, not qualification.
     QualificationEntry("hf-ssb", 10, QualificationLevel.DEFAULT),
@@ -79,6 +78,7 @@ MANIFEST = (
     # the margin claim on radios; the FADING envelope that motivates the mode
     # is still simulation only. Default is availability, not qualification.
     QualificationEntry("hf-ssb", 15, QualificationLevel.DEFAULT),
+    QualificationEntry("hf-ssb", 16, QualificationLevel.DEFAULT),
 )
 
 
@@ -106,13 +106,13 @@ def registry(policy: str, level: QualificationLevel | str =
     elif policy == "hf-ssb":
         from .modes.hr0_mode import HR0
         from .modes.hc0_mode import HC0
-        from .modes.hc1_mode import HC1
+        from .modes.hc1w_mode import HC1W
         from .modes.hf5_mode import HF5
         from .modes.hf6_mode import HF6
         from .modes.hf7_mode import HF7
         from .modes.hf8_mode import HF8
         # Rate order, which is the order _maybe_adapt climbs.
-        candidates, control = (HR0, HC0, HC1, HF8, HF5, HF6, HF7), HR0
+        candidates, control = (HR0, HC0, HC1W, HF8, HF5, HF6, HF7), HR0
         # HF2 remains available only at experimental level as a historical
         # fallback.
         if requested >= QualificationLevel.EXPERIMENTAL:

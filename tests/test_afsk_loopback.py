@@ -738,7 +738,7 @@ def test_timing_measurement_derives_guarded_session_head():
 def test_a_head_measured_slightly_long_is_clamped_not_rejected():
     """A mode that quantizes its head can measure a hair over what it asked
     for. That is quantization, not a corrupt measurement -- rejecting it
-    would fail the handshake every time (whale/modes/hc1.py rounds its head
+    would fail the handshake every time (whale/modes/hc1w.py rounds its head
     up to whole sync cores)."""
     assert link._encode_timing(0x5A, link.CALIBRATION_SECONDS * 1.01)[1] == 255
     for bad in (None, -0.1):

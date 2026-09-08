@@ -66,10 +66,10 @@ def test_channel_registries_drive_mode_selection():
     assert [mode.name for mode in sweep_modes.select_modes(vhf, ["0", "vf3"])] == [
         "300baud", "vf3"]
     assert [mode.name for mode in hf.modes] == [
-        "hr0", "hc0", "hc1", "hf8", "hf7"]
+        "hr0", "hc0", "hc1w", "hf8", "hf7"]
     assert "hf2" not in [mode.name for mode in hf.modes]
     assert [mode.name for mode in hf_experimental.modes] == [
-        "hr0", "hc0", "hc1", "hf8", "hf5", "hf6", "hf7", "hf2"]
+        "hr0", "hc0", "hc1w", "hf8", "hf5", "hf6", "hf7", "hf2"]
 
 
 def test_direct_trial_uses_full_link_packet_and_versioned_record(tmp_path):

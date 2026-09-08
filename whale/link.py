@@ -145,7 +145,7 @@ logger = logging.getLogger(__name__)
 def _decode_snr_summary(result):
     """Return the mode's receive-SNR diagnostic in a common log format.
 
-    HC0 measures the winning tone against the other tones. VF3 and HC1
+    HC0 measures the winning tone against the other tones. VF3 and HC1W
     estimate every carrier separately, for which the median is the stable
     frame-level summary. CPFSK fits its confirmed sync tones and reports
     their power against the unexplained residual.
@@ -446,13 +446,13 @@ def _encode_timing(session_id, head_seconds):
     `CALIBRATION_SECONDS * CONTROL_PROFILE.baud`, which is the same number
     by a longer route -- but taking the measurement in the control mode's
     own symbols meant only a mode with symbols could be the control mode.
-    An OFDM control mode (whale/modes/hc1.py) measures its head in cores,
+    An OFDM control mode (whale/modes/hc1w.py) measures its head in cores,
     an MFSK one would measure it in something else again, and seconds is
     the unit they all already report.  This is the connect-time half of the
     same move `_head_feedback_request` made for the DATA plane.
 
     An observation slightly *over* CALIBRATION_SECONDS is clamped rather
-    than rejected: a mode whose head is quantized (HC1's is, to whole sync
+    than rejected: a mode whose head is quantized (HC1W's is, to whole sync
     cores) can legitimately measure a hair more than was asked for, and
     that is quantization, not corruption.
     """

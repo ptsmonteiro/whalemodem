@@ -10,10 +10,7 @@ from scipy.signal import resample_poly
 from .. import framing, rx_audio
 from . import vf4
 
-#: On-air identifier. Mode IDs are global across both channel policies
-#: (`mode_qualification.validate_manifest` forbids reuse): 0-2 are the CPFSK
-#: profiles, 3/6 are VF3/VF6 (vhf-fm), 4/5/7 are HC1/HC0/HF2 (hf-ssb). 8 is
-#: the next free global ID.
+#: On-air identifier; mode IDs are global across both channel policies.
 VF4_MODE_ID = 8
 CHUNK_SIZE = vf4.MAX_PAYLOAD_BYTES - framing.AIR_HEADER_BYTES
 CONFIDENCE_THRESHOLD = vf4.ACQUISITION_THRESHOLD

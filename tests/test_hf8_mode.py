@@ -124,14 +124,14 @@ def test_hf8_rejects_oversize_payload():
         raise AssertionError("oversize HF8 payload was accepted")
 
 
-def test_hf8_sits_between_hc1_and_hf7_on_the_default_ladder():
+def test_hf8_sits_between_hc1w_and_hf7_on_the_default_ladder():
     """Installed DEFAULT by owner decision on 2026-09-07 (see
     MODE_QUALIFICATION.md). The ladder is ordered by rate because
     `_maybe_adapt` climbs it in order, so HF8's position is behaviour, not
-    presentation: at 3,299 bit/s it belongs between HC1 and HF7."""
+    presentation: at 3,299 bit/s it belongs between HC1W and HF7."""
     names = [m.name for m in registry("hf-ssb", "default").modes]
     assert "hf8" in names
-    assert names.index("hc1") < names.index("hf8") < names.index("hf7")
+    assert names.index("hc1w") < names.index("hf8") < names.index("hf7")
 
 
 def test_default_hf_ladder_is_ordered_by_rate():

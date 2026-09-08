@@ -207,7 +207,7 @@ VHF_FM = ChannelPolicy(
 
 #: A documented starting point for HF SSB.
 #:
-#: THESE POLICY NUMBERS ARE UNVALIDATED PLACEHOLDERS. The HC0/HC1 ladder has
+#: THESE POLICY NUMBERS ARE UNVALIDATED PLACEHOLDERS. The HC0/HC1W ladder has
 #: carried the end-to-end acceptance test over the IC-7300/IC-705 HF bench,
 #: validating the waveforms and protocol path, but that clean run did not
 #: measure the timeout, retry, turnaround, or adaptation choices below. None
@@ -230,7 +230,7 @@ VHF_FM = ChannelPolicy(
 #:   - Longer frames are worth more when turnaround is expensive, and HF
 #:     modems conventionally key for several seconds. The 8s useful-frame
 #:     budget records that policy choice, but the current fixed-geometry HC0
-#:     and HC1 modes accept and ignore it; it will matter only to a future HF
+#:     and HC1W modes accept and ignore it; it will matter only to a future HF
 #:     mode whose payload is sized from the channel budget.
 #:   - Conditions change over minutes, and a step up that fails costs a full
 #:     retry cycle. So: step up far more reluctantly, and let the reluctance

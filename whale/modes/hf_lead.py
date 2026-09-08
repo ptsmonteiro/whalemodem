@@ -38,8 +38,8 @@ BLOCKS = np.asarray(((9, 6, 12, 15, 0, 3),
                      (7, 13, 1, 10, 4, 15),
                      (1, 14, 5, 11, 8, 2)), dtype=np.int64)
 HC0_LABEL = 0
-HC1_LABEL = 1
 HF2_LABEL = 2
+HC1W_LABEL = 3
 HR0_LABEL = 4
 
 

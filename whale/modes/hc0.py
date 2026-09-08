@@ -1,51 +1,8 @@
-"""HC0: the rung that has to get through.
+"""HC0: robust noncoherent 16-FSK for HF control and fallback data.
 
-HC1 (`whale/modes/hc1.py`) is an OFDM frame, and it is a good one -- 10/10
-byte-for-byte on the bench's strong leg with no bit errors at all.  On the
-bench's *weak* leg it decoded nothing, and measuring why is what this mode
-came out of:
-
-    HC1 payload, acquisition handed the true start   works to  -4 dB
-    HC1 as actually decoded                          works to +3.5 dB
-    the weak leg delivers                            about   -8 dB
-
-Two separate problems, and the second one is the instructive one.  HC1's
-confidence is the normalized self-correlation of its repeated sync symbols,
-whose expected value is exactly `SNR/(SNR+1)` -- so the 0.70 threshold it
-inherited from VF3 *is* a 3.7 dB SNR floor, and no amount of preamble moves
-it, because lengthening the correlation shrinks its variance and not its
-mean.  Everything downstream then depends on a carrier-offset estimate that
-is itself unusable at low SNR: correcting by a bad estimate destroyed a
-coherent header match that would otherwise have worked 12 dB further down.
-
-The answer is not a better phase estimator.  It is to stop needing phase.
-
-HC0 is non-coherent 16-ary FSK.  Information is which of 16 tones is
-present, measured as energy, so no part of the receive path holds a phase
-reference: not the demodulator, not the synchronizer, and not the frequency
-estimator, which measures the offset but never gates on it.  Sync is a
-correlation against a known tone *pattern*, whose processing gain grows
-with its length in the ordinary way.  Behind the tone detector sits exactly
-the same interleaver, rate-1/2 K=7 convolutional code and length/CRC32
-packet the OFDM modes use, unchanged.
-
-Measured against HC1 at equal transmitted RMS, white noise across the full
-band, 74-byte frames:
-
-    HC1  (OFDM DQPSK, 0.70 s)     fails below  +3.5 dB
-    HC0  (16-FSK,     3.27 s)     decodes to    -16 dB
-
-19.5 dB, of which about 7 is spending time and the rest is not paying for
-coherence.  And that is at equal *RMS*: HC0's waveform is
-constant-envelope, crest factor 1.41 against HC1's 3.9, so through the same
-peak-limited transmitter it delivers roughly 8 dB more average power again.
-
-    [head][24 sync symbols][283 payload symbols][tail]
-
-What it costs is throughput -- 54 payload bytes per 3.3 s keying -- which is
-the correct trade for the mode every control frame rides and the one a
-struggling link falls back to.  HC1 stays in the ladder above it for when
-the channel can carry it.
+The receiver correlates a known tone pattern, estimates carrier offset, and
+decodes an interleaved terminated rate-1/2 K=7 packet with length and CRC32.
+Frames use the shared adaptive HF lead.
 """
 
 from __future__ import annotations
@@ -130,7 +87,7 @@ ACQUISITION_THRESHOLD = 0.12
 # counts backwards from the preamble.
 #
 # It does *not* have to avoid resembling the preamble the way VF3's and
-# HC1's heads have to avoid resembling their sync symbols. Those modes
+# HC1W's heads have to avoid resembling their sync symbols. Those modes
 # acquire by correlating the capture against itself, so any repeat anywhere
 # near the header widens the peak into a plateau; HC0 correlates against a
 # known pattern instead, and a head built from a different pattern simply

@@ -1,20 +1,4 @@
-"""HC0 as a WaveformMode, and the margin it exists to provide.
-
-HC0 is the HF ladder's control mode and bottom rung, so the first half of
-this file is the same contract `test_vf3_mode.py` and `test_hc1_mode.py`
-hold their modes to -- the surface whale/link.py drives and the three
-things its receive loop reads a decode result for.
-
-The second half is the reason the mode was written.  HC1 decodes nothing
-below +3.5 dB, which on the bench's weak leg meant 0 frames out of 10; the
-tests here pin HC0 working roughly 19 dB further down, tolerating a carrier
-offset without estimating one to detect, and not false-triggering on the
-things a receiver actually hears when no frame is present.  Those are
-assertions rather than prose because "more robust" is a claim that rots
-silently.
-
-The on-air half is `test_hc0_capture_replay.py`.  Software only here.
-"""
+"""HC0 mode contract, impairment coverage, and adaptive-head behavior."""
 
 import numpy as np
 import pytest
@@ -23,13 +7,12 @@ from scipy.signal import hilbert
 from whale import afsk, framing, rx_audio, waveform
 from whale.modes import hc0, hf_lead
 from whale.modes.hc0_mode import HC0, hf_registry
-from whale.modes.hc1_mode import HC1
+from whale.modes.hc1w_mode import HC1W
 
 RNG = np.random.default_rng(20260828)
 
-#: Noise for a given signal-to-noise ratio, against HC0's transmitted RMS,
-#: white across the whole 24 kHz band.  Every dB figure in this file is in
-#: these units, which is what makes them comparable with HC1's.
+#: Noise for a given signal-to-noise ratio against HC0's transmitted RMS,
+#: white across the whole 24 kHz band.
 TX_RMS = 0.13
 
 
@@ -70,10 +53,10 @@ def test_hc0_satisfies_the_waveform_mode_protocol():
 def test_hc0_is_the_control_mode_and_the_bottom_of_the_hf_ladder():
     registry = hf_registry()
     assert registry.control is HC0
-    assert registry.supported_ids == (HC0.mode_id, HC1.mode_id)
+    assert registry.supported_ids == (HC0.mode_id, HC1W.mode_id)
     assert registry.step(HC0, -1) is None       # nothing below it
-    assert registry.step(HC0, +1) is HC1        # and the fast rung above
-    assert registry.step(HC1, -1) is HC0
+    assert registry.step(HC0, +1) is HC1W        # and the fast rung above
+    assert registry.step(HC1W, -1) is HC0
 
 
 def test_hc0_carries_the_largest_control_packet_the_link_builds():
@@ -85,8 +68,8 @@ def test_hc0_carries_the_largest_control_packet_the_link_builds():
     """
     from whale import link
 
-    body = link._encode_connect_ack("A" * 15, "B" * 15, [HC0.mode_id, HC1.mode_id],
-                                    HC1.mode_id, HC1.mode_id, 0x5A)
+    body = link._encode_connect_ack("A" * 15, "B" * 15, [HC0.mode_id, HC1W.mode_id],
+                                    HC1W.mode_id, HC1W.mode_id, 0x5A)
     on_air = framing.AIR_HEADER_BYTES + len(body) - 2   # two bytes ride inline
     assert on_air <= hc0.MAX_PAYLOAD_BYTES, (
         f"a worst-case CONNECT_ACK needs {on_air} B and HC0 carries "
@@ -106,10 +89,8 @@ def test_an_oversize_packet_is_refused_rather_than_truncated():
 def test_the_transmitted_waveform_is_constant_envelope():
     """One tone at a time, so the crest factor is a sine's.
 
-    This is not cosmetic. A transmitter is peak-limited, so at the same
-    peak a crest factor of 1.41 puts about 8 dB more average power on the
-    air than HC1's 3.9 -- robustness this mode gets for free on top of
-    everything measured below, which is all at equal RMS.
+    This matters because a peak-limited transmitter can apply more average
+    power to a lower-crest-factor waveform.
     """
     audio = np.asarray(HC0.encode(_packet()), np.float64)
     body = audio[hf_lead.MIN_SAMPLES:-hc0.TAIL_SAMPLES]
@@ -173,30 +154,22 @@ def test_a_corrupted_frame_is_a_near_miss_the_link_can_skip_past():
 # -- the margin the mode exists for ---------------------------------------
 
 @pytest.mark.parametrize("snr_db", [-6.0, -12.0, -15.0])
-def test_it_decodes_far_below_where_the_ofdm_rung_gives_out(snr_db):
-    """The headline.
-
-    HC1 -- the rung above this one, and the only HF mode before it -- needs
-    +3.5 dB, because its confidence is a self-correlation whose expected
-    value is SNR/(SNR+1) and whose threshold is therefore an SNR floor.
-    Each of these points is below that by more than 9 dB.
-    """
+def test_it_decodes_at_its_low_snr_regression_points(snr_db):
     for _ in range(3):
         packet = _packet()
         audio = _noisy(HC0.encode(packet), snr_db)
         assert HC0.decode(_snapshot(audio))["payload"] == packet
 
 
-def test_the_ofdm_rung_cannot_do_what_this_one_does():
-    """The same channel, both modes, so the comparison is not folklore."""
+def test_hc0_remains_the_lower_snr_rung():
     snr_db = -12.0
     hc0_packet = _packet()
-    hc1_packet = bytes(RNG.integers(0, 256,
-                                    framing.AIR_HEADER_BYTES + HC1.chunk_size,
+    hc1w_packet = bytes(RNG.integers(0, 256,
+                                    framing.AIR_HEADER_BYTES + HC1W.chunk_size,
                                     dtype=np.uint8))
     assert HC0.decode(_snapshot(_noisy(HC0.encode(hc0_packet),
                                        snr_db)))["payload"] == hc0_packet
-    assert HC1.decode(_snapshot(_noisy(HC1.encode(hc1_packet),
+    assert HC1W.decode(_snapshot(_noisy(HC1W.encode(hc1w_packet),
                                        snr_db)))["payload"] is None
 
 
@@ -205,7 +178,7 @@ def test_a_carrier_offset_is_measured_and_removed(hz):
     """+-8 Hz is what the IC-7300/IC-705 pair measures on 10.145 MHz.
 
     Nothing in HC0's *detector* needs this -- energy detection does not
-    care about phase, which is why acquisition survives where HC1's does
+    care about phase, which is why acquisition survives where HC1W's does
     not -- but the payload tone bins do, and the estimate is what keeps
     them centred.
     """
@@ -254,8 +227,8 @@ def test_nothing_that_is_not_a_frame_clears_the_threshold():
         "white noise": RNG.normal(0.0, 0.1, seconds),
         "a bare carrier": 0.3 * np.sin(2 * np.pi * 1_500.0 * t),
         "silence": np.zeros(seconds),
-        "an HC1 frame": np.asarray(HC1.encode(
-            bytes(RNG.integers(0, 256, framing.AIR_HEADER_BYTES + HC1.chunk_size,
+        "an HC1W frame": np.asarray(HC1W.encode(
+            bytes(RNG.integers(0, 256, framing.AIR_HEADER_BYTES + HC1W.chunk_size,
                                dtype=np.uint8))), np.float64),
     }
     for name, audio in candidates.items():

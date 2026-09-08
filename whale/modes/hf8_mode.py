@@ -83,7 +83,7 @@ radio predictions -- including, on this very PHY family, a 16-QAM
 configuration that passed simulation and was 1/5 on the air.
 
 HF8 was installed as a **DEFAULT** rung on 2026-09-07 by owner decision, on
-the hardware evidence above, and sits between HC1 and HF7 in the rate-ordered
+the hardware evidence above, and sits between HC1W and HF7 in the rate-ordered
 ladder.  Default is availability, not qualification: the operating-envelope
 gates -- above all any hardware evidence under fading -- are open.  See
 `MODE_QUALIFICATION.md`.

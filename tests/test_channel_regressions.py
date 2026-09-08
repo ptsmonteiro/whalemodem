@@ -76,10 +76,9 @@ def test_vf6_full_capacity_on_very_good_flat_nbfm_channel():
 
 
 @pytest.mark.channel_regression
-@pytest.mark.parametrize("mode_name", ["hc0", "hc1"])
-def test_hf_modes_on_moderate_watterson_with_awgn(mode_name):
+def test_hc0_on_moderate_watterson_with_awgn():
     mode = next(mode for mode in modes.hf_registry().modes
-                if mode.name == mode_name)
+                if mode.name == "hc0")
 
     def channel(seed):
         return ChannelChain((

@@ -4,11 +4,11 @@ import pytest
 from whale import rx_audio
 from whale.modes import hf_lead
 from whale.modes.hc0_mode import HC0
-from whale.modes.hc1_mode import HC1
+from whale.modes.hc1w_mode import HC1W
 from whale.modes.hr0_mode import HR0
 
 
-HF_MODES = ((HC0, hf_lead.HC0_LABEL), (HC1, hf_lead.HC1_LABEL),
+HF_MODES = ((HC0, hf_lead.HC0_LABEL), (HC1W, hf_lead.HC1W_LABEL),
             (HR0, hf_lead.HR0_LABEL))
 
 
@@ -36,10 +36,10 @@ def test_common_lead_identifies_the_following_hf_mode(mode, label):
 
 def test_both_hf_modes_use_the_same_lead_geometry_and_rate():
     hc0_audio = HC0.encode(b"x")[:hf_lead.MIN_SAMPLES]
-    hc1_audio = HC1.encode(b"x")[:hf_lead.MIN_SAMPLES]
-    assert len(hc0_audio) == len(hc1_audio) == 6_144
+    hc1w_audio = HC1W.encode(b"x")[:hf_lead.MIN_SAMPLES]
+    assert len(hc0_audio) == len(hc1w_audio) == 6_144
     assert np.max(np.abs(hc0_audio)) == pytest.approx(
-        np.max(np.abs(hc1_audio)), rel=1e-6)
+        np.max(np.abs(hc1w_audio)), rel=1e-6)
 
 
 def test_lead_hint_is_not_required_for_checked_frame_recovery():
@@ -64,7 +64,7 @@ def test_erased_lead_does_not_prevent_either_checked_frame(mode, label):
 @pytest.mark.parametrize("mode,label", HF_MODES)
 def test_wrong_valid_label_is_only_a_hint(mode, label):
     payload = bytes(range(12))
-    wrong = hf_lead.HC1_LABEL if label == hf_lead.HC0_LABEL else hf_lead.HC0_LABEL
+    wrong = hf_lead.HC1W_LABEL if label == hf_lead.HC0_LABEL else hf_lead.HC0_LABEL
     audio = mode.encode(payload)
     audio[:hf_lead.MIN_SAMPLES] = hf_lead.modulate(wrong)
     capture = _capture(audio)
@@ -156,7 +156,7 @@ def test_candidate_work_is_bounded_even_with_many_false_signatures():
 
 def test_a_false_signature_before_a_real_frame_cannot_hide_its_boundary():
     payload = bytes(range(12))
-    prefix = np.concatenate((hf_lead.modulate(hf_lead.HC1_LABEL),
+    prefix = np.concatenate((hf_lead.modulate(hf_lead.HC1W_LABEL),
                              np.zeros(2_000, np.float32)))
     capture = _capture(np.concatenate((prefix, HC0.encode(payload))))
     expected = (len(prefix) + hf_lead.MIN_SAMPLES) // 4

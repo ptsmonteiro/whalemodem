@@ -10,7 +10,7 @@ This is what VF3 puts on the air, at the default M=4 (QPSK).  Every function
 below takes the constellation as an optional `points`/`labels` pair so a
 higher-order mode (HC2's differential 8-PSK) can reuse the same kernels
 instead of duplicating them; omitting them reproduces the original QPSK
-behaviour bit-for-bit, which is what VF3 and HC1 rely on.
+behaviour bit-for-bit, which is what VF3 and HC1W rely on.
 """
 
 from __future__ import annotations

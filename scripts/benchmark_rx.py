@@ -16,7 +16,7 @@ import numpy as np
 
 from whale import afsk, rx_audio
 from whale.modes.hc0_mode import HC0
-from whale.modes.hc1_mode import HC1
+from whale.modes.hc1w_mode import HC1W
 from whale.modes.vf3_mode import VF3
 
 
@@ -45,7 +45,7 @@ def main():
     print(f"buffer={args.seconds:g}s, repeats={args.repeats}")
     measure("48->12 kHz decimator", lambda: rx_audio.downsample(captured),
             args.repeats)
-    for mode in (*afsk.PROFILES, VF3, HC0, HC1):
+    for mode in (*afsk.PROFILES, VF3, HC0, HC1W):
         measure(f"{mode.name} decoder", lambda mode=mode: mode.decode(received),
                 args.repeats)
 

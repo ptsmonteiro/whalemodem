@@ -20,7 +20,7 @@ is right for a mode measuring the head on the audio as received, and wrong
 for one measuring it on audio it has *frequency corrected* first: the
 correction multiplies the whole capture by a slow phase ramp, and a ramp of
 even a few degrees per head moves the peak across a sample boundary
-somewhere in a long head.  Measured on HC1: a 0.038 Hz residual -- pure
+somewhere in a long head.  A 0.038 Hz residual in a regression -- pure
 estimator noise, on a signal with no offset at all -- cut a 94-core head to
 18.  So the tolerance is compared against the *previous* block rather than
 the first, which lets an arbitrarily slow drift accumulate while a real

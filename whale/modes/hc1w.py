@@ -1,63 +1,7 @@
-"""HC1: the robust HF frame -- what mode 0 is on FM, for an SSB channel.
+"""HC1W: 23-carrier differential-QPSK OFDM for HF SSB.
 
-`whale/afsk.py`'s `PROFILE_300` carries two jobs on the VHF FM bench: it is
-the control plane (every CONNECT, ACK, DISC and timing frame, whatever the
-data ladder is doing) and it is the bottom rung of the data ladder.  Both
-jobs rest on assumptions FM makes true and SSB does not:
-
-  - **Frequency is exact.** An FM receiver reproduces the transmitted audio
-    frequency; two SSB receivers reproduce it offset by the difference
-    between the two stations' reference oscillators plus whatever the two
-    dials disagree about.  Half a ppm each way at 14 MHz is already 14 Hz,
-    and `afsk.demodulate` integrates each tone in a fixed bin with no
-    frequency estimate anywhere in it.
-  - **A frame either arrives or does not.** FM capture makes the bench link
-    essentially binary; a fading HF path delivers most of a frame most of
-    the time.  CPFSK framing has a CRC and no correction, so on HF it
-    throws away frames that are one bit wrong.
-  - **The channel has no memory.** No FM path on this bench showed
-    measurable delay spread; an HF path routinely has a millisecond or two,
-    which smears a 300-baud symbol very little and a fast one a great deal.
-
-HC1 answers those three directly, and reuses `whale/dsp/` for all of it:
-
-    frequency  the cyclic prefix gives a coarse carrier offset and the
-               header a fine one (`whale.dsp.freq`, written for exactly
-               this and until now only a VF3 diagnostic).  Everything after
-               acquisition runs on the corrected signal.
-    fading     rate-1/2 K=7 convolutional coding with soft-decision Viterbi
-               over an interleaved 1,292-bit grid, CRC32 underneath
-               (`whale.dsp.fec`, `whale.dsp.framing`).  A frame survives
-               errors instead of being discarded by them.
-    delay      a 2.67 ms cyclic prefix, so echoes inside it cost margin
-               rather than the symbol.
-
-What it deliberately does *not* do is chase throughput.  This is the frame
-every control exchange rides and the one a struggling link falls back to,
-so it spends its bandwidth on margin: 19 carriers of differential QPSK,
-half of them redundancy, in 690 ms.
-
-    [2,304 lead-in][47 x (128 prefix + 512 core)][960 tail] = 33,344 samples
-
-Geometry choices worth the ink:
-
-  - **512-sample core, 93.75 Hz spacing.**  Twice VF3's spacing, which is
-    what makes an uncorrected residual offset a small fraction of a
-    carrier rather than a large one, and keeps each carrier far wider than
-    any Doppler spread this path will show.
-  - **19 carriers, 656.25-2343.75 Hz.**  Inside a 2.4 kHz SSB data filter
-    with room at both skirts for the offset the receiver has yet to
-    measure.  VF3's 468-3140 Hz band does not fit through one.
-  - **A 34-symbol payload.**  1,292 coded bits is the smallest grid that
-    leaves a whole number of packet bytes with no bits stranded (see
-    `_check_constants`), and the 74 payload bytes it yields leave 64 for a
-    DATA chunk once the link's 10-byte air header is taken out -- enough
-    for the largest control frame the link builds, with margin.
-
-Like VF3 this is geometry and wiring: every transform lives in
-`whale/dsp/`.  What is HC1's own is which bins carry data, how long the
-header is, and that the frequency estimate is applied rather than merely
-reported.
+The 468.75-2531.25 Hz carrier plan uses 93.75 Hz spacing, a 2.67 ms cyclic
+prefix, a 5.015 s frame, and terminated rate-1/2 K=9 coding.
 """
 
 from __future__ import annotations
@@ -83,10 +27,8 @@ RX_CORE_SAMPLES = CORE_SAMPLES // rx_audio.DECIMATION
 RX_GUARD_SAMPLES = GUARD_SAMPLES // rx_audio.DECIMATION
 RX_SYMBOL_SAMPLES = RX_GUARD_SAMPLES + RX_CORE_SAMPLES
 
-#: 19 carriers at 93.75 Hz, 656.25-2343.75 Hz.  Bin 7 is the lowest that
-#: clears an SSB filter's low skirt with room for a coarse offset still to
-#: be measured; bin 25 is the highest that does the same at the top.
-CARRIER_BINS = np.arange(7, 26, dtype=np.int32)
+#: 23 carriers at 93.75 Hz, spanning 468.75-2531.25 Hz.
+CARRIER_BINS = np.arange(5, 28, dtype=np.int32)
 CARRIER_SPACING_HZ = SAMPLE_RATE / CORE_SAMPLES
 CARRIER_HZ = CARRIER_BINS.astype(np.float64) * CARRIER_SPACING_HZ
 N_CARRIERS = len(CARRIER_BINS)
@@ -151,7 +93,7 @@ FFT_OFFSET = GUARD_SAMPLES
 RX_FFT_OFFSET = RX_GUARD_SAMPLES
 RX_TAIL_SAMPLES = TAIL_SAMPLES // rx_audio.DECIMATION
 ACQUISITION_THRESHOLD = 0.70
-MIN_PRESENT_CARRIERS = 15
+MIN_PRESENT_CARRIERS = 19
 CARRIER_FLOOR_DB = 35.0
 
 HEAD_MATCH_THRESHOLD = _head.MATCH_THRESHOLD
@@ -226,28 +168,14 @@ HEADER_VALUES = np.vstack((
                                            N_CARRIERS),
 ))
 
-#: Interleaver stride, chosen for this grid rather than inherited.
-#:
-#: A multiplicative interleaver `i -> i*a mod N` has two spreads and both
-#: are single numbers: on-air neighbours land `a` apart in the codeword,
-#: and codeword neighbours land `a^-1 mod N` apart on the air.  VF2..VF5
-#: all use 8101, which reduces to 349 on this 1,292-bit grid and leaves the
-#: first spread at 349.  Searching every stride coprime with 1,292 for the
-#: largest *worse* of the two puts 693 at the top: 591 either way, and its
-#: inverse is 17 bit-slots out of 38, so two adjacent codeword bits land 15
-#: symbols apart and on nearly opposite carriers.
-#:
-#: The carrier axis needs no help from the stride.  One carrier occupies
-#: on-air positions 38 apart, and `38a mod 1292` is `38 * (a mod 34)` for
-#: every `a`, so a carrier lost to a notch always maps to 34 codeword
-#: positions evenly spaced across the whole codeword.
-INTERLEAVER_STRIDE = 693
+#: Coprime with the 16,192-bit coded payload grid.
+INTERLEAVER_STRIDE = 811
 
 CODEC = dsp.PacketCodec(
     payload_bits=PAYLOAD_BITS,
-    interleaver=dsp.interleave.multiplicative(PAYLOAD_BITS, 811),
+    interleaver=dsp.interleave.multiplicative(PAYLOAD_BITS, INTERLEAVER_STRIDE),
     whitener_seed=0x1A5C7,
-    code=dsp.K7,
+    code=dsp.K9,
 )
 
 FEC_INPUT_BITS = CODEC.information_bits
@@ -412,19 +340,7 @@ def _base_result() -> dict:
 
 def demodulate(audio: np.ndarray, *,
                head_seconds: float = DEFAULT_HEAD_SECONDS) -> dict:
-    """Decode one HC1 frame out of `audio`.
-
-    `head_seconds` is accepted for symmetry with `modulate` and with the
-    `WaveformMode` contract; acquisition locks on the header, not the head,
-    so it does not need to be told how long the head was.
-
-    Alongside HC1's own diagnostics the result carries the three keys the
-    link's receive loop reads: `confidence`, `sync_end_index` and
-    `end_index`.  `end_index` is present only once the frame has been seen
-    through to its end -- its absence, with confidence above threshold, is
-    how the caller is told to wait for more audio rather than consume what
-    it has.  See whale/link.py's _decode_one.
-    """
+    """Decode one HC1W frame from receive-rate audio."""
     del head_seconds  # acquisition finds the header wherever the head ended
     result = _base_result()
     samples = np.asarray(audio, dtype=np.float64).reshape(-1)
@@ -539,7 +455,7 @@ INFO = FrameInfo()
 
 
 def describe() -> str:
-    return (f"hc1: {N_CARRIERS}x differential QPSK carriers "
+    return (f"hc1w: {N_CARRIERS}x differential QPSK carriers "
             f"{CARRIER_HZ[0]:.2f}-{CARRIER_HZ[-1]:.2f} Hz, {TOTAL_SYMBOLS} "
             f"symbols, {MAX_PAYLOAD_BYTES} B + CRC32 in {FRAME_SECONDS:.3f} s, "
             f"offset tolerance +-{COARSE_OFFSET_LIMIT_HZ:.1f} Hz")
@@ -549,16 +465,14 @@ def _check_constants() -> None:
     assert CORE_SAMPLES == 512 and GUARD_SAMPLES == 128
     assert SYMBOL_SAMPLES == 640
     assert CARRIER_SPACING_HZ == 93.75
-    assert N_CARRIERS == 19
-    assert CARRIER_HZ[0] == 656.25 and CARRIER_HZ[-1] == 2343.75
-    assert TOTAL_SYMBOLS == 365 and PAYLOAD_BITS == 13_376
-    assert FEC_INPUT_BITS == 6_688
+    assert N_CARRIERS == 23
+    assert CARRIER_HZ[0] == 468.75 and CARRIER_HZ[-1] == 2531.25
+    assert TOTAL_SYMBOLS == 365 and PAYLOAD_BITS == 16_192
+    assert FEC_INPUT_BITS == 8_096
     assert LEAD_IN_SAMPLES % CORE_SAMPLES == HEAD_PHASE_SAMPLES
     assert FRAME_SAMPLES == 236_864
-    # No stranded bits: the coded grid divides exactly into whole packet
-    # bytes plus the trellis tail.  This is what picked 34 payload symbols.
-    assert PACKET_BYTES == 835 and UNUSED_INFO_BITS == 2
-    assert MAX_PAYLOAD_BYTES == 829
+    assert PACKET_BYTES == 1_011 and UNUSED_INFO_BITS == 0
+    assert MAX_PAYLOAD_BYTES == 1_005
     assert COARSE_OFFSET_LIMIT_HZ == 46.875
     assert FINE_OFFSET_LIMIT_HZ == 37.5
     assert CODEC.interleaver.is_valid()

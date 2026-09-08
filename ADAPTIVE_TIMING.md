@@ -15,7 +15,7 @@ keying ends at the final CRC and PTT is released when those samples finish.
 ## Head sequence and measurement
 
 On VHF/FM, CPFSK retains its order-15 PN head in the implementation; VF3
-retains its sync-core lead. On HF, every HR0, HC0 and HC1 frame uses the common
+retains its sync-core lead. On HF, HR0, HC0, and HC1W use the common
 93.75-baud 16-FSK lead: a six-symbol mode-identifying block repeated at least
 twice. Calibration repeats it for one second and ordinary frames repeat it for
 the current adaptive duration, rounded upward to a complete block.
@@ -29,10 +29,10 @@ head_seconds_received
 Seconds, because the head measurement crosses layers that do not share a
 symbol. The CPFSK profiles count matched pad symbols and divide by their baud;
 mode 3 (VF3) counts 12 kHz receive-rate sync cores and divides by 12 kHz;
-both HF modes count common six-symbol MFSK blocks. These durations are
+these HF modes count common six-symbol MFSK blocks. These durations are
 identical to dividing the corresponding on-air counts by 48 kHz. Each also
 reports its native count as a diagnostic -- `head_symbols_received` for
-CPFSK, `head_cores_observed` for VF3, and `head_blocks_observed` for HC0/HC1 --
+CPFSK, `head_cores_observed` for VF3, and `head_blocks_observed` for HC0/HC1W --
 but nothing in the link reads those.
 
 Only a frame whose checked header, optional body, and CRC validate can produce
@@ -47,19 +47,15 @@ separate detector from both of them. A frame can therefore acquire and pass
 FEC/CRC while noise or distortion makes the adjacent head detector stop
 early.
 
-This matters especially on HF. Both modes measure the common MFSK lead by
+This matters especially on HF. These modes measure the common MFSK lead by
 walking its repeated identity block backward from a body that has already
 passed CRC. Counting stops at the first block that falls below the pattern or
 relative-energy gate. At low SNR that can yield a short or zero count even
-when the lead audio was physically present. HC1 can independently fail its
+when the lead audio was physically present. HC1W can independently fail its
 OFDM acquisition on the same weak direction.
 
-The 2026-08-28 HF end-to-end radio run showed this unresolved ambiguity on the
-STA2-to-STA1 direction: validated HC0 frames reported head observations from
-zero to 128 ms, feedback drove the transmitted head to the one-second maximum,
-and HC1 attempts did not decode. The logs alone cannot distinguish actual
-leading loss from a present but weak head. A capture must be inspected or
-replayed to make that distinction.
+Capture replay is needed to distinguish actual leading loss from a lead that
+was physically present but too weak for the measurement gate.
 
 Until measurement quality is represented separately from duration, the
 implementation deliberately treats zero as a lower bound and remains safe by

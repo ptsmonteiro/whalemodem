@@ -6,6 +6,7 @@ import pytest
 from whale import framing, modes, rx_audio
 from whale.modes import hf_lead, hr0
 from whale.modes.hc0_mode import HC0
+from whale.modes.hc1w_mode import HC1W
 from whale.modes.hr0_mode import HR0
 
 
@@ -48,7 +49,7 @@ def test_hr0_full_frame_at_revised_quiet_moderate_awgn_target():
 def test_hr0_is_new_hf_control_and_bottom_rung():
     registry = modes.hf_registry()
     assert registry.control is HR0
-    assert registry.supported_ids[:3] == (HR0.mode_id, HC0.mode_id, 4)
+    assert registry.supported_ids[:3] == (HR0.mode_id, HC0.mode_id, HC1W.mode_id)
     assert registry.step(HR0, -1) is None
     assert registry.step(HR0, +1) is HC0
 
