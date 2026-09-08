@@ -379,6 +379,155 @@ Present registry disposition: **provisional default HF maximum-speed
 rung**, on the same footing as the HR0 and HF2/HF3 product decisions
 recorded above.
 
+## HF8 robust 8PSK rung, 2026-09-07
+
+HF8 (`whale/modes/hf8_mode.py`, mode_id 15) is HF7's carrier plan and guard
+at 8PSK: rate-2/3 LDPC, a full pilot symbol every 10, and a 0.616 s frame.
+It was installed as a **DEFAULT** HF data rung on 2026-09-07 by owner
+decision, between HF3 and HF4 in the rate-ordered ladder. **Default is
+availability, not qualification**, exactly as for the HR0, HF3 and HF7
+product decisions recorded above; this section records what the retained
+evidence does and does not establish.
+
+Full derivation, negative results and data in
+`experiments/hf19_ofdm49_8psk/RESULTS.md`.
+
+What the retained evidence establishes, all of it in simulation, at 40 trials
+per point on 2 dB SNR steps under the `channel_factory("watterson", ...)`
+wiring:
+
+- **An 8 dB lower AWGN delivery floor than HF7**: 90% frame delivery from
+  12 dB, against HF7's 20 dB. HF7 is 0/40 at 16 dB where HF8 is 40/40.
+- **The first §3-qualified fading envelope on this PHY family: quiet
+  Watterson from 18 dB.** The bounded campaign was run on 2026-09-08 and is
+  retained at `logs/mode_qualification/hf-ssb/hf19/s3_watterson/`
+  (`quiet-grid-100.json`, `quiet-boundary-300.json`, `quiet-16db-300.json`),
+  `mid_latitude_quiet`, seed 19008:
+
+  | SNR/3 kHz | Trials | Delivered | Wilson lower | FER upper | Gate |
+  |---:|---:|---:|---:|---:|---|
+  | 12 | 100 | 57.0% | 47.2% | 52.8% | outside |
+  | 14 | 100 | 83.0% | 74.5% | 25.5% | outside |
+  | 16 | 300 | 90.0% | 86.1% | 13.9% | **fails** |
+  | 18 | 300 | 95.0% | 91.9% | 8.1% | **passes** |
+  | 20 | 300 | 96.3% | 93.6% | 6.4% | passes |
+  | 22 | 100 | 97.0% | 91.5% | 8.5% | passes |
+
+  Acquisition was 100% at every point -- every failure was `payload_failed`,
+  never a missed acquisition -- and there were no `error` outcomes, so those
+  two gate conditions pass across the grid. **This relocated the boundary 2 dB
+  up from the 16 dB the 40-trial screen in
+  `experiments/hf19_ofdm49_8psk/sweep.py` claimed**, and for exactly the
+  reason §3 requires the bounded form: at 16 dB the observed rate is 90.0%,
+  which a bare "90% delivered" rule passes and the Wilson bound fails.
+
+  HF7 never reaches 90% on that channel at any SNR tested, managing 7/40 at
+  24 dB. The HF7 section above records that HF7 has no fading evidence at
+  all, screen or gate; this is the mode that gives the HF ladder its first
+  measured one.
+- **Per-frame net throughput: 3,298 bit/s**, by `SPEED_LADDERS.md`'s
+  denominator. That is 1.6x the Level-3 "fast data" floor of 2,000 bit/s and
+  deliberately below Level 4's 4,000; HF8 spends the difference on margin.
+  On air, the ~155 ms per-keying overhead HF7's bench measured is ~20% of
+  this short frame, so the keyed figure is roughly 2,614 bit/s.
+- **Occupied bandwidth: 2,446.7 Hz** against the 2,500 Hz gate, with carriers
+  on both channel edges -- HF7's plan unchanged. As with HF7 this is a single
+  computed measurement, `provisional` by this document's vocabulary, not the
+  300-trial bounded campaign. `tests/test_hf8_mode.py` asserts it every run.
+
+What it does **not** establish:
+
+- **The hardware evidence is one drive sweep, not a campaign.** What was run
+  on 2026-09-07, IC-7300 -> IC-705 with the IC-705 receive-only, is an
+  interleaved HF8-vs-HF7 transmit-drive ladder, retained at
+  `logs/mode_qualification/hf-ssb/hf19/20260907T194237Z-drive-sweep/`:
+
+  | TX drive | HF8 | HF7 |
+  |---|---:|---:|
+  | x1 (0 dB) | 10/10 | 10/10 |
+  | x0.5 (-6 dB) | 10/10 | 5/10 |
+  | x0.25 (-12 dB) | 9/10 | 0/10 |
+  | x0.125 (-18 dB) and below | 0/10 | 0/10 |
+
+  **HF8's 90% breakpoint sits 12 dB of transmit audio below HF7's**, wider
+  than the simulated 8 dB, and at equal drive HF8's raw BER was 0.0000
+  against HF7's 0.011-0.018.
+
+  The reverse direction was then run the same way (IC-705 -> IC-7300, the
+  IC-7300 receive-only), retained at
+  `logs/mode_qualification/hf-ssb/hf19/20260907T195827Z-ba-drive-sweep/`.
+  That path is weaker and, importantly, does **not** clip -- capture peak
+  ~0.6 against ~4.5 forward -- so it is the cleaner of the two measurements:
+
+  | TX drive | HF8 | HF7 |
+  |---|---:|---:|
+  | x1 (0 dB) | 10/10 | 0/10 |
+  | x0.7 (-3.1 dB) | 10/10 | 0/10 |
+  | x0.5 (-6.0 dB) | 3/10 | 0/10 |
+  | x0.35 (-9.1 dB) and below | 0/10 | 0/10 |
+
+  **HF7 delivers nothing on this path at any drive level**, while HF8
+  delivers 10/10 with 3 dB of margin. HF7 reported 3.4 dB *more* SNR than
+  HF8 at every level and still failed: 32-QAM sat at 5.8% raw BER where 8PSK
+  sat at 0.8%. This is a real radio path on which the installed default top
+  rung does not work and HF8 does, which is the ladder-coverage case for the
+  mode.
+
+  Both runs corroborate the floor claim and nothing else. Neither is **an SNR
+  measurement** -- the drive multiplier is not the `CHANNELS.md` reference
+  convention and this demodulator disclaims its own reported
+  `channel_snr_db` -- so neither satisfies any envelope gate, and both are 10
+  trials per level, below the 40-frame minimum. The forward run's clipping
+  (peak ~4.0-4.7, as in the retained hf18 runs behind HF7's own record) would
+  favour constant-envelope 8PSK over amplitude-bearing 32-QAM by an unknown
+  amount; the non-clipping reverse run is not subject to that objection and
+  shows a larger gap, not a smaller one.
+- **Only the quiet class is qualified.** The §3 campaign covered
+  `mid_latitude_quiet` alone; moderate and disturbed remain screen-only and
+  outside the envelope (below). Section 3 defines the fading-envelope gate as
+  simulated -- `watterson` via `scripts/benchmark_simulated_channels.py`,
+  symmetric simulation being acceptable for waveform qualification -- so
+  hardware fading evidence is not a missing input here and none is required.
+  Both bench paths are, separately, benign and audio-coupled with no
+  ionosphere in them; that is expected, since §5's hardware gate is a
+  benign-path gate, not a fading one.
+- **The Level-3 operating envelope is not satisfied**, despite the quiet-class
+  result clearing its +19 dB point. Level 3 also requires benign/static at
+  +17 dB and above, measured with a complete filter, frequency-offset, drift,
+  level and nonlinearity description; `SPEED_LADDERS.md` says explicitly that
+  AWGN evidence cannot substitute for that class. It has not been run.
+- **Moderate and disturbed fading are outside the envelope**, and the
+  experiment establishes this is a property of the waveform rather than of
+  its tuning: guard length, code rate down to 1/2, block-pilot density and
+  comb pilots in every arrangement were each swept and none moved the
+  moderate boundary. HF8 reaches 50% delivery on moderate from 16 dB and 68%
+  at 24 dB -- better than HF7's 0/40, and not an envelope.
+- **`drive_scale=0.008` is inherited from HF7's bench calibration** and
+  carries HF7's caveat unchanged: it is a property of that audio gain
+  structure, not of the mode.
+- Resource evidence, adjacent-rung overlap, and the complete promotion
+  artifact are `unmeasured`.
+
+**2026-09-07 owner product decision.** The owner directed HF8's installation
+as a default rung on the evidence above. The decision rests on the
+two-direction drive sweeps, which establish on real radios that the mode
+works and that its margin over HF7 is real and large -- decisively so on the
+IC-705 -> IC-7300 path, where HF7 delivers nothing at all. It does not rest
+on, and does not assert, a measured operating envelope.
+
+This product selection overrides the outstanding promotion gates. It does not
+close them. The §3 quiet-Watterson gate was subsequently run on 2026-09-08
+and **passes at 18 dB and above**, which closes the fading-envelope gate for
+the quiet class and supersedes the 16 dB screen figure the decision was taken
+against; that gate is simulated by design (§3), so hardware fading evidence
+is not among the open items. The open items are: the §3 gate for the moderate
+and disturbed classes, the 40-frame hardware gate, a benign/static envelope
+measurement under the `CHANNELS.md` convention, and the resource and
+promotion-artifact gates.
+
+Present registry disposition: **provisional default HF robust rung**, on the
+same footing as the HR0, HF3 and HF7 product decisions recorded above.
+
 ## Reproducible test matrix
 
 The evidence is divided into three independent scopes:

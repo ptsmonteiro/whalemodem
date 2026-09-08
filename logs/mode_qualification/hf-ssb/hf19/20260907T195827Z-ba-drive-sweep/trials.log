@@ -1,0 +1,480 @@
+[level 1 round 1 arm hf8]
+
+  ic705->ic7300: 1 x 264 B, fft=240 cp=24 n_active=49 n_comb_pilot=0 bps=3 fec=2/3 pilot_interval=10 equalizer=gain frame=0.616s crest=9.7dB
+    1/1: keyed=0.77s rx=21360 rms=0.1194 peak=0.686 conf=1.277 snr=24.8dB binsnr=11.8/18.7/27.9dB foff=8.13Hz raw_ber=0.0028(9/3240) ber=0.0000(0/2112) ldpc_ok=True iters=[2, 1, 1, 0, 1] decoded
+[level 1 round 1 arm hf7]
+
+  ic705->ic7300: 1 x 4732 B, fft=240 cp=24 n_active=49 n_comb_pilot=0 bps=5 fec=3/4 pilot_interval=20 equalizer=gain frame=4.840s crest=8.9dB
+    1/1: keyed=4.99s rx=72480 rms=0.1680 peak=0.673 conf=0.982 snr=23.0dB binsnr=6.6/12.4/19.0dB foff=8.26Hz raw_ber=0.0528(2670/50544) ber=0.0424(1605/37856) ldpc_ok=False iters=[30, 30, 30, 30, 30, 30, 10, 30, 30, 30, 13, 30, 30, 15, 16, 30, 30, 30, 30, 30, 30, 30, 30, 9, 10, 30, 30, 30, 30, 30, 30, 30, 30, 10, 30, 30, 30, 6, 30, 7, 30, 6, 28, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 16, 30, 30, 30, 30, 30, 5, 30, 15, 30, 30, 14, 13, 30, 30, 30, 30, 30, 13, 30, 30] crc_fail
+[level 1 round 2 arm hf7]
+
+  ic705->ic7300: 1 x 4732 B, fft=240 cp=24 n_active=49 n_comb_pilot=0 bps=5 fec=3/4 pilot_interval=20 equalizer=gain frame=4.840s crest=8.9dB
+    1/1: keyed=4.99s rx=72360 rms=0.1723 peak=0.673 conf=0.936 snr=24.5dB binsnr=7.9/14.6/20.0dB foff=8.01Hz raw_ber=0.0559(2827/50544) ber=0.0591(2236/37856) ldpc_ok=False iters=[30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 9, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 19, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 8, 30, 12, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 6] crc_fail
+[level 1 round 2 arm hf8]
+
+  ic705->ic7300: 1 x 264 B, fft=240 cp=24 n_active=49 n_comb_pilot=0 bps=3 fec=2/3 pilot_interval=10 equalizer=gain frame=0.616s crest=9.7dB
+    1/1: keyed=0.77s rx=21240 rms=0.1200 peak=0.723 conf=1.366 snr=20.0dB binsnr=8.0/13.8/22.3dB foff=7.90Hz raw_ber=0.0071(23/3240) ber=0.0000(0/2112) ldpc_ok=True iters=[1, 2, 1, 1, 1] decoded
+[level 1 round 3 arm hf8]
+
+  ic705->ic7300: 1 x 264 B, fft=240 cp=24 n_active=49 n_comb_pilot=0 bps=3 fec=2/3 pilot_interval=10 equalizer=gain frame=0.616s crest=9.7dB
+    1/1: keyed=0.77s rx=21240 rms=0.1147 peak=0.690 conf=1.411 snr=21.1dB binsnr=10.2/14.7/19.4dB foff=8.23Hz raw_ber=0.0043(14/3240) ber=0.0000(0/2112) ldpc_ok=True iters=[1, 1, 1, 1, 1] decoded
+[level 1 round 3 arm hf7]
+
+  ic705->ic7300: 1 x 4732 B, fft=240 cp=24 n_active=49 n_comb_pilot=0 bps=5 fec=3/4 pilot_interval=20 equalizer=gain frame=4.840s crest=8.9dB
+    1/1: keyed=4.99s rx=72360 rms=0.1599 peak=0.664 conf=0.958 snr=23.2dB binsnr=8.6/12.3/17.8dB foff=8.15Hz raw_ber=0.0511(2585/50544) ber=0.0329(1246/37856) ldpc_ok=False iters=[30, 30, 16, 30, 30, 30, 14, 7, 30, 4, 6, 9, 30, 30, 30, 30, 17, 5, 30, 30, 30, 30, 30, 13, 30, 30, 30, 30, 30, 30, 7, 30, 9, 3, 30, 13, 30, 30, 30, 10, 30, 30, 10, 30, 30, 30, 6, 30, 7, 5, 30, 30, 30, 29, 7, 30, 30, 30, 30, 30, 30, 30, 11, 13, 30, 22, 30, 30, 30, 30, 30, 30, 30, 9, 30, 30, 30, 30] crc_fail
+[level 1 round 4 arm hf7]
+
+  ic705->ic7300: 1 x 4732 B, fft=240 cp=24 n_active=49 n_comb_pilot=0 bps=5 fec=3/4 pilot_interval=20 equalizer=gain frame=4.840s crest=8.9dB
+    1/1: keyed=4.99s rx=72360 rms=0.1629 peak=0.690 conf=0.939 snr=24.9dB binsnr=8.7/14.2/19.8dB foff=8.07Hz raw_ber=0.0504(2546/50544) ber=0.0457(1729/37856) ldpc_ok=False iters=[30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 26, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 6, 30, 30, 30, 30, 30, 10, 30, 30, 25, 30, 30, 30, 12, 30, 30, 30, 30, 30, 30, 10, 30, 30, 9, 30, 30, 30, 30, 30, 21, 30, 30, 16, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 6] crc_fail
+[level 1 round 4 arm hf8]
+
+  ic705->ic7300: 1 x 264 B, fft=240 cp=24 n_active=49 n_comb_pilot=0 bps=3 fec=2/3 pilot_interval=10 equalizer=gain frame=0.616s crest=9.7dB
+    1/1: keyed=0.77s rx=21240 rms=0.1192 peak=0.684 conf=1.318 snr=20.4dB binsnr=7.7/13.3/20.4dB foff=8.06Hz raw_ber=0.0093(30/3240) ber=0.0000(0/2112) ldpc_ok=True iters=[2, 2, 1, 1, 1] decoded
+[level 1 round 5 arm hf8]
+
+  ic705->ic7300: 1 x 264 B, fft=240 cp=24 n_active=49 n_comb_pilot=0 bps=3 fec=2/3 pilot_interval=10 equalizer=gain frame=0.616s crest=9.7dB
+    1/1: keyed=0.77s rx=21240 rms=0.1028 peak=0.720 conf=1.535 snr=20.3dB binsnr=7.4/13.7/19.9dB foff=8.21Hz raw_ber=0.0037(12/3240) ber=0.0000(0/2112) ldpc_ok=True iters=[1, 1, 1, 1, 1] decoded
+[level 1 round 5 arm hf7]
+
+  ic705->ic7300: 1 x 4732 B, fft=240 cp=24 n_active=49 n_comb_pilot=0 bps=5 fec=3/4 pilot_interval=20 equalizer=gain frame=4.840s crest=8.9dB
+    1/1: keyed=4.99s rx=72360 rms=0.1583 peak=0.710 conf=0.931 snr=23.8dB binsnr=7.5/13.2/22.6dB foff=8.10Hz raw_ber=0.0558(2822/50544) ber=0.0585(2213/37856) ldpc_ok=False iters=[30, 30, 30, 10, 30, 30, 30, 30, 30, 30, 30, 7, 30, 30, 30, 30, 30, 14, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 25, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30] crc_fail
+[level 1 round 6 arm hf7]
+
+  ic705->ic7300: 1 x 4732 B, fft=240 cp=24 n_active=49 n_comb_pilot=0 bps=5 fec=3/4 pilot_interval=20 equalizer=gain frame=4.840s crest=8.9dB
+    1/1: keyed=4.99s rx=72360 rms=0.1621 peak=0.719 conf=0.937 snr=23.9dB binsnr=8.7/13.5/21.5dB foff=8.13Hz raw_ber=0.0475(2401/50544) ber=0.0475(1799/37856) ldpc_ok=False iters=[30, 30, 30, 30, 30, 30, 30, 30, 5, 30, 30, 30, 30, 30, 30, 30, 30, 30, 9, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 8, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 10, 30] crc_fail
+[level 1 round 6 arm hf8]
+
+  ic705->ic7300: 1 x 264 B, fft=240 cp=24 n_active=49 n_comb_pilot=0 bps=3 fec=2/3 pilot_interval=10 equalizer=gain frame=0.616s crest=9.7dB
+    1/1: keyed=0.77s rx=21240 rms=0.1150 peak=0.758 conf=1.286 snr=20.0dB binsnr=7.9/13.9/23.6dB foff=8.10Hz raw_ber=0.0052(17/3240) ber=0.0000(0/2112) ldpc_ok=True iters=[1, 1, 1, 1, 1] decoded
+[level 1 round 7 arm hf8]
+
+  ic705->ic7300: 1 x 264 B, fft=240 cp=24 n_active=49 n_comb_pilot=0 bps=3 fec=2/3 pilot_interval=10 equalizer=gain frame=0.616s crest=9.7dB
+    1/1: keyed=0.77s rx=21240 rms=0.1117 peak=0.674 conf=1.372 snr=20.1dB binsnr=6.9/12.6/21.3dB foff=8.17Hz raw_ber=0.0077(25/3240) ber=0.0000(0/2112) ldpc_ok=True iters=[2, 4, 6, 4, 3] decoded
+[level 1 round 7 arm hf7]
+
+  ic705->ic7300: 1 x 4732 B, fft=240 cp=24 n_active=49 n_comb_pilot=0 bps=5 fec=3/4 pilot_interval=20 equalizer=gain frame=4.840s crest=8.9dB
+    1/1: keyed=4.99s rx=72360 rms=0.1612 peak=0.742 conf=0.920 snr=22.5dB binsnr=6.5/12.3/23.1dB foff=8.20Hz raw_ber=0.0534(2701/50544) ber=0.0446(1688/37856) ldpc_ok=False iters=[9, 30, 30, 30, 30, 18, 30, 30, 30, 18, 30, 30, 30, 30, 30, 30, 30, 7, 30, 30, 19, 30, 10, 30, 30, 29, 30, 30, 30, 17, 30, 30, 30, 11, 30, 30, 30, 30, 30, 8, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 7, 30, 30, 30, 30, 30, 30, 30, 30, 13, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 20, 30, 30, 30, 14] crc_fail
+[level 1 round 8 arm hf7]
+
+  ic705->ic7300: 1 x 4732 B, fft=240 cp=24 n_active=49 n_comb_pilot=0 bps=5 fec=3/4 pilot_interval=20 equalizer=gain frame=4.840s crest=8.9dB
+    1/1: keyed=4.99s rx=72360 rms=0.1627 peak=0.647 conf=0.917 snr=23.3dB binsnr=6.6/12.7/17.7dB foff=8.12Hz raw_ber=0.0487(2462/50544) ber=0.0460(1743/37856) ldpc_ok=False iters=[30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 7, 30, 30, 30, 30, 30, 30, 30, 30, 12, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 8, 30, 8, 30, 30, 15, 8, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 11, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30] crc_fail
+[level 1 round 8 arm hf8]
+
+  ic705->ic7300: 1 x 264 B, fft=240 cp=24 n_active=49 n_comb_pilot=0 bps=3 fec=2/3 pilot_interval=10 equalizer=gain frame=0.616s crest=9.7dB
+    1/1: keyed=0.77s rx=21240 rms=0.1124 peak=0.749 conf=1.306 snr=17.6dB binsnr=5.9/11.6/18.3dB foff=8.13Hz raw_ber=0.0136(44/3240) ber=0.0000(0/2112) ldpc_ok=True iters=[1, 3, 3, 2, 2] decoded
+[level 1 round 9 arm hf8]
+
+  ic705->ic7300: 1 x 264 B, fft=240 cp=24 n_active=49 n_comb_pilot=0 bps=3 fec=2/3 pilot_interval=10 equalizer=gain frame=0.616s crest=9.7dB
+    1/1: keyed=0.77s rx=21360 rms=0.1092 peak=0.656 conf=1.419 snr=18.7dB binsnr=5.6/12.6/20.1dB foff=8.27Hz raw_ber=0.0096(31/3240) ber=0.0000(0/2112) ldpc_ok=True iters=[1, 2, 2, 1, 1] decoded
+[level 1 round 9 arm hf7]
+
+  ic705->ic7300: 1 x 4732 B, fft=240 cp=24 n_active=49 n_comb_pilot=0 bps=5 fec=3/4 pilot_interval=20 equalizer=gain frame=4.840s crest=8.9dB
+    1/1: keyed=4.99s rx=72360 rms=0.1616 peak=0.764 conf=0.937 snr=23.1dB binsnr=8.2/12.4/18.1dB foff=7.94Hz raw_ber=0.0719(3636/50544) ber=0.0869(3289/37856) ldpc_ok=False iters=[30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30] crc_fail
+[level 1 round 10 arm hf7]
+
+  ic705->ic7300: 1 x 4732 B, fft=240 cp=24 n_active=49 n_comb_pilot=0 bps=5 fec=3/4 pilot_interval=20 equalizer=gain frame=4.840s crest=8.9dB
+    1/1: keyed=4.99s rx=72360 rms=0.1569 peak=0.725 conf=0.832 snr=21.6dB binsnr=4.3/11.3/19.1dB foff=8.45Hz raw_ber=0.0878(4439/50544) ber=0.1049(3970/37856) ldpc_ok=False iters=[30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30] crc_fail
+[level 1 round 10 arm hf8]
+
+  ic705->ic7300: 1 x 264 B, fft=240 cp=24 n_active=49 n_comb_pilot=0 bps=3 fec=2/3 pilot_interval=10 equalizer=gain frame=0.616s crest=9.7dB
+    1/1: keyed=0.77s rx=21240 rms=0.1103 peak=0.632 conf=1.267 snr=17.3dB binsnr=5.6/10.8/15.4dB foff=7.77Hz raw_ber=0.0130(42/3240) ber=0.0000(0/2112) ldpc_ok=True iters=[2, 2, 2, 2, 1] decoded
+[level 0.7 round 1 arm hf8]
+
+  ic705->ic7300: 1 x 264 B, fft=240 cp=24 n_active=49 n_comb_pilot=0 bps=3 fec=2/3 pilot_interval=10 equalizer=gain frame=0.616s crest=9.7dB
+    1/1: keyed=0.77s rx=21240 rms=0.1076 peak=0.660 conf=1.384 snr=18.6dB binsnr=6.9/11.7/18.7dB foff=7.98Hz raw_ber=0.0025(8/3240) ber=0.0000(0/2112) ldpc_ok=True iters=[1, 1, 1, 1, 1] decoded
+[level 0.7 round 1 arm hf7]
+
+  ic705->ic7300: 1 x 4732 B, fft=240 cp=24 n_active=49 n_comb_pilot=0 bps=5 fec=3/4 pilot_interval=20 equalizer=gain frame=4.840s crest=8.9dB
+    1/1: keyed=4.99s rx=72360 rms=0.1549 peak=0.704 conf=0.918 snr=20.8dB binsnr=4.3/10.7/19.0dB foff=7.74Hz raw_ber=0.0883(4463/50544) ber=0.1045(3956/37856) ldpc_ok=False iters=[30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30] crc_fail
+[level 0.7 round 2 arm hf7]
+
+  ic705->ic7300: 1 x 4732 B, fft=240 cp=24 n_active=49 n_comb_pilot=0 bps=5 fec=3/4 pilot_interval=20 equalizer=gain frame=4.840s crest=8.9dB
+    1/1: keyed=4.99s rx=72360 rms=0.1623 peak=0.731 conf=0.916 snr=22.0dB binsnr=3.2/11.5/20.7dB foff=8.17Hz raw_ber=0.0807(4079/50544) ber=0.0943(3570/37856) ldpc_ok=False iters=[30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30] crc_fail
+[level 0.7 round 2 arm hf8]
+
+  ic705->ic7300: 1 x 264 B, fft=240 cp=24 n_active=49 n_comb_pilot=0 bps=3 fec=2/3 pilot_interval=10 equalizer=gain frame=0.616s crest=9.7dB
+    1/1: keyed=0.77s rx=21360 rms=0.1114 peak=0.649 conf=1.193 snr=17.1dB binsnr=5.8/10.9/17.9dB foff=8.29Hz raw_ber=0.0130(42/3240) ber=0.0000(0/2112) ldpc_ok=True iters=[2, 4, 2, 2, 3] decoded
+[level 0.7 round 3 arm hf8]
+
+  ic705->ic7300: 1 x 264 B, fft=240 cp=24 n_active=49 n_comb_pilot=0 bps=3 fec=2/3 pilot_interval=10 equalizer=gain frame=0.616s crest=9.7dB
+    1/1: keyed=0.77s rx=21240 rms=0.1114 peak=0.681 conf=1.377 snr=18.5dB binsnr=5.8/13.1/18.8dB foff=8.17Hz raw_ber=0.0046(15/3240) ber=0.0000(0/2112) ldpc_ok=True iters=[1, 1, 1, 2, 1] decoded
+[level 0.7 round 3 arm hf7]
+
+  ic705->ic7300: 1 x 4732 B, fft=240 cp=24 n_active=49 n_comb_pilot=0 bps=5 fec=3/4 pilot_interval=20 equalizer=gain frame=4.840s crest=8.9dB
+    1/1: keyed=4.99s rx=72360 rms=0.1548 peak=0.689 conf=0.936 snr=21.7dB binsnr=4.2/11.7/18.2dB foff=8.36Hz raw_ber=0.0793(4008/50544) ber=0.0966(3655/37856) ldpc_ok=False iters=[30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30] crc_fail
+[level 0.7 round 4 arm hf7]
+
+  ic705->ic7300: 1 x 4732 B, fft=240 cp=24 n_active=49 n_comb_pilot=0 bps=5 fec=3/4 pilot_interval=20 equalizer=gain frame=4.840s crest=8.9dB
+    1/1: keyed=4.99s rx=72480 rms=0.1587 peak=0.693 conf=0.937 snr=22.1dB binsnr=6.2/12.5/19.1dB foff=7.78Hz raw_ber=0.1331(6729/50544) ber=0.1552(5876/37856) ldpc_ok=False iters=[30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30] crc_fail
+[level 0.7 round 4 arm hf8]
+
+  ic705->ic7300: 1 x 264 B, fft=240 cp=24 n_active=49 n_comb_pilot=0 bps=3 fec=2/3 pilot_interval=10 equalizer=gain frame=0.616s crest=9.7dB
+    1/1: keyed=0.77s rx=21240 rms=0.1155 peak=0.699 conf=1.216 snr=18.0dB binsnr=5.0/11.5/21.0dB foff=7.85Hz raw_ber=0.0080(26/3240) ber=0.0000(0/2112) ldpc_ok=True iters=[2, 1, 2, 2, 1] decoded
+[level 0.7 round 5 arm hf8]
+
+  ic705->ic7300: 1 x 264 B, fft=240 cp=24 n_active=49 n_comb_pilot=0 bps=3 fec=2/3 pilot_interval=10 equalizer=gain frame=0.616s crest=9.7dB
+    1/1: keyed=0.77s rx=21240 rms=0.1024 peak=0.674 conf=1.530 snr=18.3dB binsnr=5.9/12.2/21.9dB foff=8.09Hz raw_ber=0.0086(28/3240) ber=0.0000(0/2112) ldpc_ok=True iters=[1, 2, 1, 4, 1] decoded
+[level 0.7 round 5 arm hf7]
+
+  ic705->ic7300: 1 x 4732 B, fft=240 cp=24 n_active=49 n_comb_pilot=0 bps=5 fec=3/4 pilot_interval=20 equalizer=gain frame=4.840s crest=8.9dB
+    1/1: keyed=4.99s rx=72360 rms=0.1560 peak=0.682 conf=0.965 snr=24.0dB binsnr=7.0/14.5/21.5dB foff=7.95Hz raw_ber=0.0721(3644/50544) ber=0.0894(3385/37856) ldpc_ok=False iters=[30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30] crc_fail
+[level 0.7 round 6 arm hf7]
+
+  ic705->ic7300: 1 x 4732 B, fft=240 cp=24 n_active=49 n_comb_pilot=0 bps=5 fec=3/4 pilot_interval=20 equalizer=gain frame=4.840s crest=8.9dB
+    1/1: keyed=4.99s rx=72360 rms=0.1571 peak=0.729 conf=0.909 snr=20.6dB binsnr=2.4/10.4/15.8dB foff=8.00Hz raw_ber=0.0835(4221/50544) ber=0.0990(3747/37856) ldpc_ok=False iters=[30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30] crc_fail
+[level 0.7 round 6 arm hf8]
+
+  ic705->ic7300: 1 x 264 B, fft=240 cp=24 n_active=49 n_comb_pilot=0 bps=3 fec=2/3 pilot_interval=10 equalizer=gain frame=0.616s crest=9.7dB
+    1/1: keyed=0.77s rx=21240 rms=0.1145 peak=0.670 conf=1.215 snr=18.9dB binsnr=5.8/12.6/22.4dB foff=8.31Hz raw_ber=0.0108(35/3240) ber=0.0000(0/2112) ldpc_ok=True iters=[2, 1, 2, 2, 2] decoded
+[level 0.7 round 7 arm hf8]
+
+  ic705->ic7300: 1 x 264 B, fft=240 cp=24 n_active=49 n_comb_pilot=0 bps=3 fec=2/3 pilot_interval=10 equalizer=gain frame=0.616s crest=9.7dB
+    1/1: keyed=0.77s rx=21240 rms=0.1105 peak=0.750 conf=1.236 snr=17.4dB binsnr=4.9/10.9/16.0dB foff=8.10Hz raw_ber=0.0096(31/3240) ber=0.0000(0/2112) ldpc_ok=True iters=[1, 1, 2, 1, 1] decoded
+[level 0.7 round 7 arm hf7]
+
+  ic705->ic7300: 1 x 4732 B, fft=240 cp=24 n_active=49 n_comb_pilot=0 bps=5 fec=3/4 pilot_interval=20 equalizer=gain frame=4.840s crest=8.9dB
+    1/1: keyed=4.99s rx=72360 rms=0.1519 peak=0.692 conf=1.009 snr=21.7dB binsnr=4.6/10.9/18.9dB foff=7.89Hz raw_ber=0.0937(4735/50544) ber=0.1107(4189/37856) ldpc_ok=False iters=[30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30] crc_fail
+[level 0.7 round 8 arm hf7]
+
+  ic705->ic7300: 1 x 4732 B, fft=240 cp=24 n_active=49 n_comb_pilot=0 bps=5 fec=3/4 pilot_interval=20 equalizer=gain frame=4.840s crest=8.9dB
+    1/1: keyed=4.99s rx=72360 rms=0.1569 peak=0.655 conf=0.945 snr=21.5dB binsnr=6.3/10.5/16.8dB foff=8.24Hz raw_ber=0.0868(4387/50544) ber=0.0957(3623/37856) ldpc_ok=False iters=[30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30] crc_fail
+[level 0.7 round 8 arm hf8]
+
+  ic705->ic7300: 1 x 264 B, fft=240 cp=24 n_active=49 n_comb_pilot=0 bps=3 fec=2/3 pilot_interval=10 equalizer=gain frame=0.616s crest=9.7dB
+    1/1: keyed=0.77s rx=21360 rms=0.1063 peak=0.758 conf=1.283 snr=20.5dB binsnr=7.8/13.9/26.2dB foff=8.34Hz raw_ber=0.0123(40/3240) ber=0.0000(0/2112) ldpc_ok=True iters=[5, 4, 6, 5, 5] decoded
+[level 0.7 round 9 arm hf8]
+
+  ic705->ic7300: 1 x 264 B, fft=240 cp=24 n_active=49 n_comb_pilot=0 bps=3 fec=2/3 pilot_interval=10 equalizer=gain frame=0.616s crest=9.7dB
+    1/1: keyed=0.77s rx=21360 rms=0.1079 peak=0.676 conf=1.347 snr=17.7dB binsnr=5.8/11.1/20.2dB foff=8.23Hz raw_ber=0.0253(82/3240) ber=0.0000(0/2112) ldpc_ok=True iters=[6, 6, 3, 5, 4] decoded
+[level 0.7 round 9 arm hf7]
+
+  ic705->ic7300: 1 x 4732 B, fft=240 cp=24 n_active=49 n_comb_pilot=0 bps=5 fec=3/4 pilot_interval=20 equalizer=gain frame=4.840s crest=8.9dB
+    1/1: keyed=4.99s rx=72360 rms=0.1559 peak=0.735 conf=0.927 snr=21.6dB binsnr=5.8/10.7/17.7dB foff=8.03Hz raw_ber=0.0873(4410/50544) ber=0.0995(3765/37856) ldpc_ok=False iters=[30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30] crc_fail
+[level 0.7 round 10 arm hf7]
+
+  ic705->ic7300: 1 x 4732 B, fft=240 cp=24 n_active=49 n_comb_pilot=0 bps=5 fec=3/4 pilot_interval=20 equalizer=gain frame=4.840s crest=8.9dB
+    1/1: keyed=4.99s rx=72360 rms=0.1547 peak=0.740 conf=0.898 snr=21.7dB binsnr=6.0/10.9/20.2dB foff=7.99Hz raw_ber=0.0969(4897/50544) ber=0.1112(4211/37856) ldpc_ok=False iters=[30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30] crc_fail
+[level 0.7 round 10 arm hf8]
+
+  ic705->ic7300: 1 x 264 B, fft=240 cp=24 n_active=49 n_comb_pilot=0 bps=3 fec=2/3 pilot_interval=10 equalizer=gain frame=0.616s crest=9.7dB
+    1/1: keyed=0.77s rx=21360 rms=0.1139 peak=0.737 conf=1.234 snr=17.4dB binsnr=2.7/10.7/25.3dB foff=8.23Hz raw_ber=0.0114(37/3240) ber=0.0000(0/2112) ldpc_ok=True iters=[1, 2, 3, 3, 2] decoded
+[level 0.5 round 1 arm hf8]
+
+  ic705->ic7300: 1 x 264 B, fft=240 cp=24 n_active=49 n_comb_pilot=0 bps=3 fec=2/3 pilot_interval=10 equalizer=gain frame=0.616s crest=9.7dB
+    1/1: keyed=0.77s rx=21360 rms=0.1121 peak=0.747 conf=1.300 snr=18.3dB binsnr=6.7/11.6/20.6dB foff=7.76Hz raw_ber=0.0133(43/3240) ber=0.0000(0/2112) ldpc_ok=True iters=[2, 3, 3, 3, 3] decoded
+[level 0.5 round 1 arm hf7]
+
+  ic705->ic7300: 1 x 4732 B, fft=240 cp=24 n_active=49 n_comb_pilot=0 bps=5 fec=3/4 pilot_interval=20 equalizer=gain frame=4.840s crest=8.9dB
+    1/1: keyed=4.99s rx=72360 rms=0.1430 peak=0.678 conf=0.972 snr=19.8dB binsnr=1.3/10.2/22.9dB foff=8.11Hz raw_ber=0.1304(6593/50544) ber=0.1495(5660/37856) ldpc_ok=False iters=[30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30] crc_fail
+[level 0.5 round 2 arm hf7]
+
+  ic705->ic7300: 1 x 4732 B, fft=240 cp=24 n_active=49 n_comb_pilot=0 bps=5 fec=3/4 pilot_interval=20 equalizer=gain frame=4.840s crest=8.9dB
+    1/1: keyed=4.99s rx=72480 rms=0.1556 peak=0.657 conf=0.908 snr=20.9dB binsnr=5.2/9.5/17.8dB foff=7.56Hz raw_ber=0.1457(7366/50544) ber=0.1592(6027/37856) ldpc_ok=False iters=[30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30] crc_fail
+[level 0.5 round 2 arm hf8]
+
+  ic705->ic7300: 1 x 264 B, fft=240 cp=24 n_active=49 n_comb_pilot=0 bps=3 fec=2/3 pilot_interval=10 equalizer=gain frame=0.616s crest=9.7dB
+    1/1: keyed=0.77s rx=21240 rms=0.1140 peak=0.732 conf=1.167 snr=15.3dB binsnr=3.9/8.2/13.1dB foff=8.04Hz raw_ber=0.0438(142/3240) ber=0.0000(0/2112) ldpc_ok=True iters=[3, 6, 6, 3, 5] decoded
+[level 0.5 round 3 arm hf8]
+
+  ic705->ic7300: 1 x 264 B, fft=240 cp=24 n_active=49 n_comb_pilot=0 bps=3 fec=2/3 pilot_interval=10 equalizer=gain frame=0.616s crest=9.7dB
+    1/1: keyed=0.77s rx=21240 rms=0.1124 peak=0.663 conf=1.299 snr=17.2dB binsnr=5.0/11.1/15.9dB foff=8.36Hz raw_ber=0.0250(81/3240) ber=0.0000(0/2112) ldpc_ok=True iters=[2, 4, 3, 2, 4] decoded
+[level 0.5 round 3 arm hf7]
+
+  ic705->ic7300: 1 x 4732 B, fft=240 cp=24 n_active=49 n_comb_pilot=0 bps=5 fec=3/4 pilot_interval=20 equalizer=gain frame=4.840s crest=8.9dB
+    1/1: keyed=4.99s rx=72360 rms=0.1258 peak=0.698 conf=1.048 snr=20.5dB binsnr=4.6/9.8/17.0dB foff=8.39Hz raw_ber=0.1881(9506/50544) ber=0.2014(7625/37856) ldpc_ok=False iters=[30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30] crc_fail
+[level 0.5 round 4 arm hf7]
+
+  ic705->ic7300: 1 x 4732 B, fft=240 cp=24 n_active=49 n_comb_pilot=0 bps=5 fec=3/4 pilot_interval=20 equalizer=gain frame=4.840s crest=8.9dB
+    1/1: keyed=4.99s rx=72360 rms=0.1524 peak=0.684 conf=0.591 snr=20.0dB binsnr=-3.1/13.0/19.4dB foff=8.10Hz raw_ber=0.2363(11944/50544) ber=0.2479(9386/37856) ldpc_ok=False iters=[30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30] crc_fail
+[level 0.5 round 4 arm hf8]
+
+  ic705->ic7300: 1 x 264 B, fft=240 cp=24 n_active=49 n_comb_pilot=0 bps=3 fec=2/3 pilot_interval=10 equalizer=gain frame=0.616s crest=9.7dB
+    1/1: keyed=0.77s rx=21240 rms=0.1311 peak=0.623 conf=1.032 snr=12.7dB binsnr=-1.7/7.4/13.4dB foff=7.86Hz raw_ber=0.1235(400/3240) ber=0.1435(303/2112) ldpc_ok=False iters=[30, 30, 30, 30, 30] crc_fail
+[level 0.5 round 5 arm hf8]
+
+  ic705->ic7300: 1 x 264 B, fft=240 cp=24 n_active=49 n_comb_pilot=0 bps=3 fec=2/3 pilot_interval=10 equalizer=gain frame=0.616s crest=9.7dB
+    1/1: keyed=0.77s rx=21360 rms=0.1274 peak=0.645 conf=1.166 snr=12.6dB binsnr=0.6/6.8/13.5dB foff=7.66Hz raw_ber=0.1244(403/3240) ber=0.1425(301/2112) ldpc_ok=False iters=[30, 30, 30, 30, 30] crc_fail
+[level 0.5 round 5 arm hf7]
+
+  ic705->ic7300: 1 x 4732 B, fft=240 cp=24 n_active=49 n_comb_pilot=0 bps=5 fec=3/4 pilot_interval=20 equalizer=gain frame=4.840s crest=8.9dB
+    1/1: keyed=4.99s rx=72480 rms=0.1570 peak=0.644 conf=0.660 snr=16.2dB binsnr=0.4/5.6/11.0dB foff=8.56Hz raw_ber=0.2743(13864/50544) ber=0.2829(10710/37856) ldpc_ok=False iters=[30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30] crc_fail
+[level 0.5 round 6 arm hf7]
+
+  ic705->ic7300: 1 x 4732 B, fft=240 cp=24 n_active=49 n_comb_pilot=0 bps=5 fec=3/4 pilot_interval=20 equalizer=gain frame=4.840s crest=8.9dB
+    1/1: keyed=4.99s rx=72360 rms=0.1580 peak=0.680 conf=0.887 snr=13.6dB binsnr=-8.0/5.1/16.3dB foff=7.87Hz raw_ber=0.2563(12955/50544) ber=0.2680(10144/37856) ldpc_ok=False iters=[30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30] crc_fail
+[level 0.5 round 6 arm hf8]
+
+  ic705->ic7300: 1 x 264 B, fft=240 cp=24 n_active=49 n_comb_pilot=0 bps=3 fec=2/3 pilot_interval=10 equalizer=gain frame=0.616s crest=9.7dB
+    1/1: keyed=0.77s rx=21240 rms=0.1259 peak=0.635 conf=1.021 snr=13.7dB binsnr=2.1/7.8/16.1dB foff=8.82Hz raw_ber=0.1472(477/3240) ber=0.1671(353/2112) ldpc_ok=False iters=[30, 30, 30, 30, 30] crc_fail
+[level 0.5 round 7 arm hf8]
+
+  ic705->ic7300: 1 x 264 B, fft=240 cp=24 n_active=49 n_comb_pilot=0 bps=3 fec=2/3 pilot_interval=10 equalizer=gain frame=0.616s crest=9.7dB
+    1/1: keyed=0.77s rx=21360 rms=0.1354 peak=0.645 conf=1.104 snr=12.3dB binsnr=-1.3/6.7/15.2dB foff=8.27Hz raw_ber=0.1407(456/3240) ber=0.1605(339/2112) ldpc_ok=False iters=[30, 30, 30, 30, 30] crc_fail
+[level 0.5 round 7 arm hf7]
+
+  ic705->ic7300: 1 x 4732 B, fft=240 cp=24 n_active=49 n_comb_pilot=0 bps=5 fec=3/4 pilot_interval=20 equalizer=gain frame=4.840s crest=8.9dB
+    1/1: keyed=4.99s rx=72240 rms=0.1555 peak=0.682 conf=0.715 snr=14.4dB binsnr=-5.9/5.5/13.2dB foff=7.38Hz raw_ber=0.2997(15148/50544) ber=0.3063(11597/37856) ldpc_ok=False iters=[30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30] crc_fail
+[level 0.5 round 8 arm hf7]
+
+  ic705->ic7300: 1 x 4732 B, fft=240 cp=24 n_active=49 n_comb_pilot=0 bps=5 fec=3/4 pilot_interval=20 equalizer=gain frame=4.840s crest=8.9dB
+    1/1: keyed=4.99s rx=72360 rms=0.1548 peak=0.636 conf=0.871 snr=15.1dB binsnr=-3.8/5.4/14.3dB foff=8.08Hz raw_ber=0.2615(13215/50544) ber=0.2699(10217/37856) ldpc_ok=False iters=[30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30] crc_fail
+[level 0.5 round 8 arm hf8]
+
+  ic705->ic7300: 1 x 264 B, fft=240 cp=24 n_active=49 n_comb_pilot=0 bps=3 fec=2/3 pilot_interval=10 equalizer=gain frame=0.616s crest=9.7dB
+    1/1: keyed=0.77s rx=21360 rms=0.1315 peak=0.650 conf=1.001 snr=13.0dB binsnr=-1.1/6.6/12.9dB foff=7.24Hz raw_ber=0.1469(476/3240) ber=0.1610(340/2112) ldpc_ok=False iters=[30, 30, 30, 30, 30] crc_fail
+[level 0.5 round 9 arm hf8]
+
+  ic705->ic7300: 1 x 264 B, fft=240 cp=24 n_active=49 n_comb_pilot=0 bps=3 fec=2/3 pilot_interval=10 equalizer=gain frame=0.616s crest=9.7dB
+    1/1: keyed=0.77s rx=21240 rms=0.1361 peak=0.620 conf=0.949 snr=10.2dB binsnr=-6.1/5.0/14.9dB foff=7.78Hz raw_ber=0.1886(611/3240) ber=0.2116(447/2112) ldpc_ok=False iters=[30, 30, 30, 30, 30] crc_fail
+[level 0.5 round 9 arm hf7]
+
+  ic705->ic7300: 1 x 4732 B, fft=240 cp=24 n_active=49 n_comb_pilot=0 bps=5 fec=3/4 pilot_interval=20 equalizer=gain frame=4.840s crest=8.9dB
+    1/1: keyed=4.99s rx=72360 rms=0.1556 peak=0.661 conf=0.743 snr=16.6dB binsnr=-2.9/5.7/13.7dB foff=7.67Hz raw_ber=0.2729(13794/50544) ber=0.2791(10565/37856) ldpc_ok=False iters=[30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30] crc_fail
+[level 0.5 round 10 arm hf7]
+
+  ic705->ic7300: 1 x 4732 B, fft=240 cp=24 n_active=49 n_comb_pilot=0 bps=5 fec=3/4 pilot_interval=20 equalizer=gain frame=4.840s crest=8.9dB
+    1/1: keyed=4.99s rx=72360 rms=0.1518 peak=0.725 conf=0.647 snr=14.1dB binsnr=-7.6/4.8/12.0dB foff=7.29Hz raw_ber=0.3294(16649/50544) ber=0.3348(12674/37856) ldpc_ok=False iters=[30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30] crc_fail
+[level 0.5 round 10 arm hf8]
+
+  ic705->ic7300: 1 x 264 B, fft=240 cp=24 n_active=49 n_comb_pilot=0 bps=3 fec=2/3 pilot_interval=10 equalizer=gain frame=0.616s crest=9.7dB
+    1/1: keyed=0.77s rx=21240 rms=0.1378 peak=0.670 conf=0.797 snr=10.3dB binsnr=-3.6/4.8/18.0dB foff=8.10Hz raw_ber=0.1864(604/3240) ber=0.2116(447/2112) ldpc_ok=False iters=[30, 30, 30, 30, 30] crc_fail
+[level 0.35 round 1 arm hf8]
+
+  ic705->ic7300: 1 x 264 B, fft=240 cp=24 n_active=49 n_comb_pilot=0 bps=3 fec=2/3 pilot_interval=10 equalizer=gain frame=0.616s crest=9.7dB
+    1/1: keyed=0.77s rx=21240 rms=0.1371 peak=0.691 conf=0.934 snr=9.5dB binsnr=-4.7/3.7/13.1dB foff=9.54Hz raw_ber=0.2904(941/3240) ber=0.2950(623/2112) ldpc_ok=False iters=[30, 30, 30, 30, 30] crc_fail
+[level 0.35 round 1 arm hf7]
+
+  ic705->ic7300: 1 x 4732 B, fft=240 cp=24 n_active=49 n_comb_pilot=0 bps=5 fec=3/4 pilot_interval=20 equalizer=gain frame=4.840s crest=8.9dB
+    1/1: keyed=4.99s rx=72360 rms=0.1522 peak=0.688 conf=0.664 snr=12.2dB binsnr=-9.7/2.4/11.1dB foff=8.42Hz raw_ber=0.3357(16968/50544) ber=0.3415(12929/37856) ldpc_ok=False iters=[30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30] crc_fail
+[level 0.35 round 2 arm hf7]
+
+  ic705->ic7300: 1 x 4732 B, fft=240 cp=24 n_active=49 n_comb_pilot=0 bps=5 fec=3/4 pilot_interval=20 equalizer=gain frame=4.840s crest=8.9dB
+    1/1: keyed=4.99s rx=72480 rms=0.1544 peak=0.671 conf=0.724 snr=8.1dB binsnr=-16.9/3.0/11.1dB foff=8.00Hz raw_ber=0.3296(16657/50544) ber=0.3368(12751/37856) ldpc_ok=False iters=[30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30] crc_fail
+[level 0.35 round 2 arm hf8]
+
+  ic705->ic7300: 1 x 264 B, fft=240 cp=24 n_active=49 n_comb_pilot=0 bps=3 fec=2/3 pilot_interval=10 equalizer=gain frame=0.616s crest=9.7dB
+    1/1: keyed=0.77s rx=21240 rms=0.1413 peak=0.606 conf=0.813 snr=9.5dB binsnr=-9.8/5.2/14.4dB foff=7.59Hz raw_ber=0.2355(763/3240) ber=0.2528(534/2112) ldpc_ok=False iters=[30, 30, 30, 30, 30] crc_fail
+[level 0.35 round 3 arm hf8]
+
+  ic705->ic7300: 1 x 264 B, fft=240 cp=24 n_active=49 n_comb_pilot=0 bps=3 fec=2/3 pilot_interval=10 equalizer=gain frame=0.616s crest=9.7dB
+    1/1: keyed=0.77s rx=21360 rms=0.1382 peak=0.615 conf=0.844 snr=9.7dB binsnr=-4.1/4.2/12.1dB foff=8.64Hz raw_ber=0.2160(700/3240) ber=0.2386(504/2112) ldpc_ok=False iters=[30, 30, 30, 30, 30] crc_fail
+[level 0.35 round 3 arm hf7]
+
+  ic705->ic7300: 1 x 4732 B, fft=240 cp=24 n_active=49 n_comb_pilot=0 bps=5 fec=3/4 pilot_interval=20 equalizer=gain frame=4.840s crest=8.9dB
+    1/1: keyed=4.99s rx=72480 rms=0.1511 peak=0.632 conf=0.649 snr=12.0dB binsnr=-5.2/2.5/10.1dB foff=7.89Hz raw_ber=0.3398(17176/50544) ber=0.3492(13219/37856) ldpc_ok=False iters=[30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30] crc_fail
+[level 0.35 round 4 arm hf7]
+
+  ic705->ic7300: 1 x 4732 B, fft=240 cp=24 n_active=49 n_comb_pilot=0 bps=5 fec=3/4 pilot_interval=20 equalizer=gain frame=4.840s crest=8.9dB
+    1/1: keyed=4.99s rx=72480 rms=0.1547 peak=0.634 conf=0.686 snr=12.3dB binsnr=-7.3/3.3/11.5dB foff=8.67Hz raw_ber=0.3381(17091/50544) ber=0.3445(13043/37856) ldpc_ok=False iters=[30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30] crc_fail
+[level 0.35 round 4 arm hf8]
+
+  ic705->ic7300: 1 x 264 B, fft=240 cp=24 n_active=49 n_comb_pilot=0 bps=3 fec=2/3 pilot_interval=10 equalizer=gain frame=0.616s crest=9.7dB
+    1/1: keyed=0.77s rx=21240 rms=0.1389 peak=0.653 conf=0.765 snr=7.0dB binsnr=-12.7/4.4/11.1dB foff=8.07Hz raw_ber=0.2127(689/3240) ber=0.2457(519/2112) ldpc_ok=False iters=[30, 30, 30, 30, 30] crc_fail
+[level 0.35 round 5 arm hf8]
+
+  ic705->ic7300: 1 x 264 B, fft=240 cp=24 n_active=49 n_comb_pilot=0 bps=3 fec=2/3 pilot_interval=10 equalizer=gain frame=0.616s crest=9.7dB
+    1/1: keyed=0.77s rx=21240 rms=0.1058 peak=0.616 conf=1.174 snr=8.7dB binsnr=-4.2/3.2/9.4dB foff=7.73Hz raw_ber=0.2164(701/3240) ber=0.2339(494/2112) ldpc_ok=False iters=[30, 30, 30, 30, 30] crc_fail
+[level 0.35 round 5 arm hf7]
+
+  ic705->ic7300: 1 x 4732 B, fft=240 cp=24 n_active=49 n_comb_pilot=0 bps=5 fec=3/4 pilot_interval=20 equalizer=gain frame=4.840s crest=8.9dB
+    1/1: keyed=4.99s rx=72360 rms=0.1475 peak=0.621 conf=0.435 snr=10.6dB binsnr=-8.9/3.6/10.8dB foff=7.63Hz raw_ber=0.3413(17249/50544) ber=0.3478(13166/37856) ldpc_ok=False iters=[30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30] crc_fail
+[level 0.35 round 6 arm hf7]
+
+  ic705->ic7300: 1 x 4732 B, fft=240 cp=24 n_active=49 n_comb_pilot=0 bps=5 fec=3/4 pilot_interval=20 equalizer=gain frame=4.840s crest=8.9dB
+    1/1: keyed=4.99s rx=72360 rms=0.1494 peak=0.784 conf=0.678 snr=11.5dB binsnr=-6.5/3.2/17.5dB foff=8.45Hz raw_ber=0.3446(17415/50544) ber=0.3496(13236/37856) ldpc_ok=False iters=[30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30] crc_fail
+[level 0.35 round 6 arm hf8]
+
+  ic705->ic7300: 1 x 264 B, fft=240 cp=24 n_active=49 n_comb_pilot=0 bps=3 fec=2/3 pilot_interval=10 equalizer=gain frame=0.616s crest=9.7dB
+    1/1: keyed=0.77s rx=21240 rms=0.1432 peak=0.650 conf=0.806 snr=7.2dB binsnr=-8.5/3.9/13.8dB foff=7.00Hz raw_ber=0.2540(823/3240) ber=0.2652(560/2112) ldpc_ok=False iters=[30, 30, 30, 30, 30] crc_fail
+[level 0.35 round 7 arm hf8]
+
+  ic705->ic7300: 1 x 264 B, fft=240 cp=24 n_active=49 n_comb_pilot=0 bps=3 fec=2/3 pilot_interval=10 equalizer=gain frame=0.616s crest=9.7dB
+    1/1: keyed=0.77s rx=21240 rms=0.1422 peak=0.624 conf=0.950 snr=10.7dB binsnr=-3.2/4.5/13.6dB foff=7.35Hz raw_ber=0.2389(774/3240) ber=0.2552(539/2112) ldpc_ok=False iters=[30, 30, 30, 30, 30] crc_fail
+[level 0.35 round 7 arm hf7]
+
+  ic705->ic7300: 1 x 4732 B, fft=240 cp=24 n_active=49 n_comb_pilot=0 bps=5 fec=3/4 pilot_interval=20 equalizer=gain frame=4.840s crest=8.9dB
+    1/1: keyed=4.99s rx=72360 rms=0.1489 peak=0.644 conf=0.693 snr=12.6dB binsnr=-9.2/3.7/10.7dB foff=6.56Hz raw_ber=0.4658(23544/50544) ber=0.4644(17582/37856) ldpc_ok=False iters=[30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30] crc_fail
+[level 0.35 round 8 arm hf7]
+
+  ic705->ic7300: 1 x 4732 B, fft=240 cp=24 n_active=49 n_comb_pilot=0 bps=5 fec=3/4 pilot_interval=20 equalizer=gain frame=4.840s crest=8.9dB
+    1/1: keyed=4.99s rx=72360 rms=0.1533 peak=0.645 conf=0.641 snr=12.2dB binsnr=-6.9/3.8/11.1dB foff=8.51Hz raw_ber=0.3416(17268/50544) ber=0.3454(13076/37856) ldpc_ok=False iters=[30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30] crc_fail
+[level 0.35 round 8 arm hf8]
+
+  ic705->ic7300: 1 x 264 B, fft=240 cp=24 n_active=49 n_comb_pilot=0 bps=3 fec=2/3 pilot_interval=10 equalizer=gain frame=0.616s crest=9.7dB
+    1/1: keyed=0.77s rx=21240 rms=0.1400 peak=0.642 conf=0.842 snr=9.9dB binsnr=-3.7/3.7/14.7dB foff=7.79Hz raw_ber=0.2299(745/3240) ber=0.2524(533/2112) ldpc_ok=False iters=[30, 30, 30, 30, 30] crc_fail
+[level 0.35 round 9 arm hf8]
+
+  ic705->ic7300: 1 x 264 B, fft=240 cp=24 n_active=49 n_comb_pilot=0 bps=3 fec=2/3 pilot_interval=10 equalizer=gain frame=0.616s crest=9.7dB
+    1/1: keyed=0.77s rx=21240 rms=0.1426 peak=0.662 conf=0.778 snr=9.2dB binsnr=-6.1/4.8/14.0dB foff=8.10Hz raw_ber=0.2682(869/3240) ber=0.2860(604/2112) ldpc_ok=False iters=[30, 30, 30, 30, 30] crc_fail
+[level 0.35 round 9 arm hf7]
+
+  ic705->ic7300: 1 x 4732 B, fft=240 cp=24 n_active=49 n_comb_pilot=0 bps=5 fec=3/4 pilot_interval=20 equalizer=gain frame=4.840s crest=8.9dB
+    1/1: keyed=4.99s rx=72360 rms=0.1532 peak=0.666 conf=0.778 snr=11.6dB binsnr=-7.1/2.6/11.6dB foff=6.84Hz raw_ber=0.4384(22158/50544) ber=0.4421(16737/37856) ldpc_ok=False iters=[30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30] crc_fail
+[level 0.35 round 10 arm hf7]
+
+  ic705->ic7300: 1 x 4732 B, fft=240 cp=24 n_active=49 n_comb_pilot=0 bps=5 fec=3/4 pilot_interval=20 equalizer=gain frame=4.840s crest=8.9dB
+    1/1: keyed=4.99s rx=72360 rms=0.1499 peak=0.619 conf=0.614 snr=9.5dB binsnr=-7.9/1.3/9.5dB foff=9.01Hz raw_ber=0.4163(21040/50544) ber=0.4202(15908/37856) ldpc_ok=False iters=[30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30] crc_fail
+[level 0.35 round 10 arm hf8]
+
+  ic705->ic7300: 1 x 264 B, fft=240 cp=24 n_active=49 n_comb_pilot=0 bps=3 fec=2/3 pilot_interval=10 equalizer=gain frame=0.616s crest=9.7dB
+    1/1: keyed=0.77s rx=21240 rms=0.1373 peak=0.679 conf=0.778 snr=6.3dB binsnr=-11.9/3.1/11.6dB foff=10.42Hz raw_ber=0.4340(1406/3240) ber=0.4441(938/2112) ldpc_ok=False iters=[30, 30, 30, 30, 30] crc_fail
+[level 0.25 round 1 arm hf8]
+
+  ic705->ic7300: 1 x 264 B, fft=240 cp=24 n_active=49 n_comb_pilot=0 bps=3 fec=2/3 pilot_interval=10 equalizer=gain frame=0.616s crest=9.7dB
+    1/1: keyed=0.77s rx=21240 rms=0.1452 peak=0.627 conf=0.655 snr=7.2dB binsnr=-7.6/2.5/9.4dB foff=8.64Hz raw_ber=0.2981(966/3240) ber=0.3087(652/2112) ldpc_ok=False iters=[30, 30, 30, 30, 30] crc_fail
+[level 0.25 round 1 arm hf7]
+
+  ic705->ic7300: 1 x 4732 B, fft=240 cp=24 n_active=49 n_comb_pilot=0 bps=5 fec=3/4 pilot_interval=20 equalizer=gain frame=4.840s crest=8.9dB
+    1/1: keyed=4.99s rx=72480 rms=0.1473 peak=0.679 conf=0.507 snr=9.3dB binsnr=-12.9/0.5/11.8dB foff=7.72Hz raw_ber=0.3977(20103/50544) ber=0.4016(15204/37856) ldpc_ok=False iters=[30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30] crc_fail
+[level 0.25 round 2 arm hf7]
+
+  ic705->ic7300: 1 x 4732 B, fft=240 cp=24 n_active=49 n_comb_pilot=0 bps=5 fec=3/4 pilot_interval=20 equalizer=gain frame=4.840s crest=8.9dB
+    1/1: keyed=4.99s rx=72480 rms=0.1491 peak=0.646 conf=0.605 snr=11.0dB binsnr=-7.4/1.6/13.7dB foff=8.37Hz raw_ber=0.3883(19627/50544) ber=0.3910(14800/37856) ldpc_ok=False iters=[30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30] crc_fail
+[level 0.25 round 2 arm hf8]
+
+  ic705->ic7300: 1 x 264 B, fft=240 cp=24 n_active=49 n_comb_pilot=0 bps=3 fec=2/3 pilot_interval=10 equalizer=gain frame=0.616s crest=9.7dB
+    1/1: keyed=0.77s rx=21240 rms=0.1460 peak=0.592 conf=0.595 snr=2.7dB binsnr=-16.6/2.7/11.2dB foff=8.23Hz raw_ber=0.3216(1042/3240) ber=0.3404(719/2112) ldpc_ok=False iters=[30, 30, 30, 30, 30] crc_fail
+[level 0.25 round 3 arm hf8]
+
+  ic705->ic7300: 1 x 264 B, fft=240 cp=24 n_active=49 n_comb_pilot=0 bps=3 fec=2/3 pilot_interval=10 equalizer=gain frame=0.616s crest=9.7dB
+    1/1: keyed=0.77s rx=21360 rms=0.1499 peak=0.598 conf=0.572 snr=3.7dB binsnr=-14.9/1.8/11.3dB foff=7.97Hz raw_ber=0.2951(956/3240) ber=0.3111(657/2112) ldpc_ok=False iters=[30, 30, 30, 30, 30] crc_fail
+[level 0.25 round 3 arm hf7]
+
+  ic705->ic7300: 1 x 4732 B, fft=240 cp=24 n_active=49 n_comb_pilot=0 bps=5 fec=3/4 pilot_interval=20 equalizer=gain frame=4.840s crest=8.9dB
+    1/1: keyed=4.99s rx=72360 rms=0.1484 peak=0.651 conf=0.498 snr=2.7dB binsnr=-23.7/-0.0/10.3dB foff=5.37Hz raw_ber=0.4885(24693/50544) ber=0.4864(18412/37856) ldpc_ok=False iters=[30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30] crc_fail
+[level 0.25 round 4 arm hf7]
+
+  ic705->ic7300: 1 x 4732 B, fft=240 cp=24 n_active=49 n_comb_pilot=0 bps=5 fec=3/4 pilot_interval=20 equalizer=gain frame=4.840s crest=8.9dB
+    1/1: keyed=4.99s rx=72360 rms=0.1511 peak=0.651 conf=0.550 snr=9.8dB binsnr=-11.3/1.6/13.6dB foff=6.28Hz raw_ber=0.4844(24485/50544) ber=0.4861(18400/37856) ldpc_ok=False iters=[30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30] crc_fail
+[level 0.25 round 4 arm hf8]
+
+  ic705->ic7300: 1 x 264 B, fft=240 cp=24 n_active=49 n_comb_pilot=0 bps=3 fec=2/3 pilot_interval=10 equalizer=gain frame=0.616s crest=9.7dB
+    1/1: keyed=0.77s rx=21360 rms=0.1402 peak=0.635 conf=0.619 snr=4.4dB binsnr=-10.9/1.0/11.4dB foff=8.12Hz raw_ber=0.3481(1128/3240) ber=0.3565(753/2112) ldpc_ok=False iters=[30, 30, 30, 30, 30] crc_fail
+[level 0.25 round 5 arm hf8]
+
+  ic705->ic7300: 1 x 264 B, fft=240 cp=24 n_active=49 n_comb_pilot=0 bps=3 fec=2/3 pilot_interval=10 equalizer=gain frame=0.616s crest=9.7dB
+    1/1: keyed=0.77s rx=21240 rms=0.1362 peak=0.636 conf=0.629 snr=6.9dB binsnr=-10.7/3.0/13.2dB foff=6.86Hz raw_ber=0.3238(1049/3240) ber=0.3461(731/2112) ldpc_ok=False iters=[30, 30, 30, 30, 30] crc_fail
+[level 0.25 round 5 arm hf7]
+
+  ic705->ic7300: 1 x 4732 B, fft=240 cp=24 n_active=49 n_comb_pilot=0 bps=5 fec=3/4 pilot_interval=20 equalizer=gain frame=4.840s crest=8.9dB
+    1/1: keyed=4.99s rx=72360 rms=0.1494 peak=0.621 conf=0.552 snr=9.3dB binsnr=-11.5/0.6/10.2dB foff=8.95Hz raw_ber=0.4298(21725/50544) ber=0.4359(16502/37856) ldpc_ok=False iters=[30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30] crc_fail
+[level 0.25 round 6 arm hf7]
+
+  ic705->ic7300: 1 x 4732 B, fft=240 cp=24 n_active=49 n_comb_pilot=0 bps=5 fec=3/4 pilot_interval=20 equalizer=gain frame=4.840s crest=8.9dB
+    1/1: keyed=4.99s rx=72240 rms=0.1497 peak=0.608 conf=0.595 snr=10.7dB binsnr=-10.0/2.5/12.4dB foff=6.22Hz raw_ber=0.4843(24478/50544) ber=0.4844(18336/37856) ldpc_ok=False iters=[30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30] crc_fail
+[level 0.25 round 6 arm hf8]
+
+  ic705->ic7300: 1 x 264 B, fft=240 cp=24 n_active=49 n_comb_pilot=0 bps=3 fec=2/3 pilot_interval=10 equalizer=gain frame=0.616s crest=9.7dB
+    1/1: keyed=0.77s rx=21240 rms=0.1419 peak=0.587 conf=0.656 snr=3.0dB binsnr=-22.3/3.8/12.9dB foff=7.49Hz raw_ber=0.3062(992/3240) ber=0.3116(658/2112) ldpc_ok=False iters=[30, 30, 30, 30, 30] crc_fail
+[level 0.25 round 7 arm hf8]
+
+  ic705->ic7300: 1 x 264 B, fft=240 cp=24 n_active=49 n_comb_pilot=0 bps=3 fec=2/3 pilot_interval=10 equalizer=gain frame=0.616s crest=9.7dB
+    1/1: keyed=0.77s rx=21240 rms=0.1470 peak=0.639 conf=0.625 snr=4.2dB binsnr=-13.4/1.7/12.3dB foff=8.47Hz raw_ber=0.3031(982/3240) ber=0.3153(666/2112) ldpc_ok=False iters=[30, 30, 30, 30, 30] crc_fail
+[level 0.25 round 7 arm hf7]
+
+  ic705->ic7300: 1 x 4732 B, fft=240 cp=24 n_active=49 n_comb_pilot=0 bps=5 fec=3/4 pilot_interval=20 equalizer=gain frame=4.840s crest=8.9dB
+    1/1: keyed=4.99s rx=72360 rms=0.1495 peak=0.661 conf=0.538 snr=7.2dB binsnr=-12.2/1.6/13.9dB foff=7.27Hz raw_ber=0.4316(21815/50544) ber=0.4346(16451/37856) ldpc_ok=False iters=[30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30] crc_fail
+[level 0.25 round 8 arm hf7]
+
+  ic705->ic7300: 1 x 4732 B, fft=240 cp=24 n_active=49 n_comb_pilot=0 bps=5 fec=3/4 pilot_interval=20 equalizer=gain frame=4.840s crest=8.9dB
+    1/1: keyed=4.99s rx=72360 rms=0.1492 peak=0.642 conf=0.556 snr=7.7dB binsnr=-13.9/-0.5/11.4dB foff=7.72Hz raw_ber=0.4030(20371/50544) ber=0.4075(15426/37856) ldpc_ok=False iters=[30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30] crc_fail
+[level 0.25 round 8 arm hf8]
+
+  ic705->ic7300: 1 x 264 B, fft=240 cp=24 n_active=49 n_comb_pilot=0 bps=3 fec=2/3 pilot_interval=10 equalizer=gain frame=0.616s crest=9.7dB
+    1/1: keyed=0.77s rx=21360 rms=0.1414 peak=0.630 conf=0.673 snr=4.0dB binsnr=-12.1/1.3/12.9dB foff=8.96Hz raw_ber=0.3228(1046/3240) ber=0.3314(700/2112) ldpc_ok=False iters=[30, 30, 30, 30, 30] crc_fail
+[level 0.25 round 9 arm hf8]
+
+  ic705->ic7300: 1 x 264 B, fft=240 cp=24 n_active=49 n_comb_pilot=0 bps=3 fec=2/3 pilot_interval=10 equalizer=gain frame=0.616s crest=9.7dB
+    1/1: keyed=0.77s rx=21240 rms=0.1427 peak=0.595 conf=0.554 snr=-1.3dB binsnr=-20.7/0.2/9.2dB foff=10.81Hz raw_ber=0.4836(1567/3240) ber=0.4957(1047/2112) ldpc_ok=False iters=[30, 30, 30, 30, 30] crc_fail
+[level 0.25 round 9 arm hf7]
+
+  ic705->ic7300: 1 x 4732 B, fft=240 cp=24 n_active=49 n_comb_pilot=0 bps=5 fec=3/4 pilot_interval=20 equalizer=gain frame=4.840s crest=8.9dB
+    1/1: keyed=4.99s rx=72600 rms=0.1444 peak=0.688 conf=0.461 snr=4.4dB binsnr=-16.8/-0.4/10.1dB foff=9.48Hz raw_ber=0.4769(24105/50544) ber=0.4825(18264/37856) ldpc_ok=False iters=[30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30] crc_fail
+[level 0.25 round 10 arm hf7]
+
+  ic705->ic7300: 1 x 4732 B, fft=240 cp=24 n_active=49 n_comb_pilot=0 bps=5 fec=3/4 pilot_interval=20 equalizer=gain frame=4.840s crest=8.9dB
+    1/1: keyed=4.99s rx=72360 rms=0.1484 peak=0.608 conf=0.450 snr=6.1dB binsnr=-14.4/0.5/13.9dB foff=9.02Hz raw_ber=0.4494(22713/50544) ber=0.4507(17061/37856) ldpc_ok=False iters=[30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30] crc_fail
+[level 0.25 round 10 arm hf8]
+
+  ic705->ic7300: 1 x 264 B, fft=240 cp=24 n_active=49 n_comb_pilot=0 bps=3 fec=2/3 pilot_interval=10 equalizer=gain frame=0.616s crest=9.7dB
+    1/1: keyed=0.77s rx=21240 rms=0.1409 peak=0.618 conf=0.513 snr=2.2dB binsnr=-12.3/-0.3/11.5dB foff=6.98Hz raw_ber=0.3534(1145/3240) ber=0.3636(768/2112) ldpc_ok=False iters=[30, 30, 30, 30, 30] crc_fail
+[level 0.125 round 1 arm hf8]
+
+  ic705->ic7300: 1 x 264 B, fft=240 cp=24 n_active=49 n_comb_pilot=0 bps=3 fec=2/3 pilot_interval=10 equalizer=gain frame=0.616s crest=9.7dB
+    1/1: keyed=0.77s rx=21240 rms=0.1411 peak=0.633 conf=0.313 snr=-2.6dB binsnr=-25.4/-2.5/7.3dB foff=-35.05Hz raw_ber=0.5096(1651/3240) ber=0.5033(1063/2112) ldpc_ok=False iters=[30, 30, 30, 30, 30] crc_fail
+[level 0.125 round 1 arm hf7]
+
+  ic705->ic7300: 1 x 4732 B, fft=240 cp=24 n_active=49 n_comb_pilot=0 bps=5 fec=3/4 pilot_interval=20 equalizer=gain frame=4.840s crest=8.9dB
+    1/1: keyed=4.99s rx=72240 rms=0.1077 peak=0.645 conf=0.409 foff=9.00Hz raw_ber=n/a ber=n/a ldpc_ok=None iters=None no_sync
+[level 0.125 round 2 arm hf7]
+
+  ic705->ic7300: 1 x 4732 B, fft=240 cp=24 n_active=49 n_comb_pilot=0 bps=5 fec=3/4 pilot_interval=20 equalizer=gain frame=4.840s crest=8.9dB
+    1/1: keyed=4.99s rx=72360 rms=0.1396 peak=0.600 conf=0.340 foff=-1.00Hz raw_ber=n/a ber=n/a ldpc_ok=None iters=None no_sync
+[level 0.125 round 2 arm hf8]
+
+  ic705->ic7300: 1 x 264 B, fft=240 cp=24 n_active=49 n_comb_pilot=0 bps=3 fec=2/3 pilot_interval=10 equalizer=gain frame=0.616s crest=9.7dB
+    1/1: keyed=0.77s rx=21240 rms=0.1424 peak=0.602 conf=0.383 snr=2.0dB binsnr=-15.5/-0.9/9.0dB foff=6.36Hz raw_ber=0.4840(1568/3240) ber=0.4702(993/2112) ldpc_ok=False iters=[30, 30, 30, 30, 30] crc_fail
+[level 0.125 round 3 arm hf8]
+
+  ic705->ic7300: 1 x 264 B, fft=240 cp=24 n_active=49 n_comb_pilot=0 bps=3 fec=2/3 pilot_interval=10 equalizer=gain frame=0.616s crest=9.7dB
+    1/1: keyed=0.77s rx=21240 rms=0.1464 peak=0.636 conf=0.587 snr=0.2dB binsnr=-21.0/-1.3/8.1dB foff=5.34Hz raw_ber=0.4898(1587/3240) ber=0.4920(1039/2112) ldpc_ok=False iters=[30, 30, 30, 30, 30] crc_fail
+[level 0.125 round 3 arm hf7]
+
+  ic705->ic7300: 1 x 4732 B, fft=240 cp=24 n_active=49 n_comb_pilot=0 bps=5 fec=3/4 pilot_interval=20 equalizer=gain frame=4.840s crest=8.9dB
+    1/1: keyed=4.99s rx=72360 rms=0.1456 peak=0.620 conf=0.314 foff=-5.00Hz raw_ber=n/a ber=n/a ldpc_ok=None iters=None no_sync
+[level 0.125 round 4 arm hf7]
+
+  ic705->ic7300: 1 x 4732 B, fft=240 cp=24 n_active=49 n_comb_pilot=0 bps=5 fec=3/4 pilot_interval=20 equalizer=gain frame=4.840s crest=8.9dB
+    1/1: keyed=4.99s rx=72480 rms=0.1414 peak=0.658 conf=0.400 snr=6.1dB binsnr=-13.2/-0.7/6.4dB foff=9.91Hz raw_ber=0.4904(24785/50544) ber=0.4905(18569/37856) ldpc_ok=False iters=[30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30] crc_fail
+[level 0.125 round 4 arm hf8]
+
+  ic705->ic7300: 1 x 264 B, fft=240 cp=24 n_active=49 n_comb_pilot=0 bps=3 fec=2/3 pilot_interval=10 equalizer=gain frame=0.616s crest=9.7dB
+    1/1: keyed=0.77s rx=21240 rms=0.1405 peak=0.619 conf=0.354 snr=1.8dB binsnr=-12.6/-2.3/5.2dB foff=4.88Hz raw_ber=0.5201(1685/3240) ber=0.5118(1081/2112) ldpc_ok=False iters=[30, 30, 30, 30, 30] crc_fail
+[level 0.125 round 5 arm hf8]
+
+  ic705->ic7300: 1 x 264 B, fft=240 cp=24 n_active=49 n_comb_pilot=0 bps=3 fec=2/3 pilot_interval=10 equalizer=gain frame=0.616s crest=9.7dB
+    1/1: keyed=0.77s rx=21240 rms=0.1444 peak=0.619 conf=0.361 snr=-2.4dB binsnr=-20.3/-3.9/7.5dB foff=-13.27Hz raw_ber=0.4988(1616/3240) ber=0.4754(1004/2112) ldpc_ok=False iters=[30, 30, 30, 30, 30] crc_fail
+[level 0.125 round 5 arm hf7]
+
+  ic705->ic7300: 1 x 4732 B, fft=240 cp=24 n_active=49 n_comb_pilot=0 bps=5 fec=3/4 pilot_interval=20 equalizer=gain frame=4.840s crest=8.9dB
+    1/1: keyed=4.99s rx=72360 rms=0.1449 peak=0.661 conf=0.389 snr=1.8dB binsnr=-20.6/-2.2/8.6dB foff=6.89Hz raw_ber=0.4880(24667/50544) ber=0.4874(18452/37856) ldpc_ok=False iters=[30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30] crc_fail
+[level 0.125 round 6 arm hf7]
+
+  ic705->ic7300: 1 x 4732 B, fft=240 cp=24 n_active=49 n_comb_pilot=0 bps=5 fec=3/4 pilot_interval=20 equalizer=gain frame=4.840s crest=8.9dB
+    1/1: keyed=4.99s rx=72480 rms=0.1469 peak=0.623 conf=0.390 snr=1.0dB binsnr=-28.3/-1.5/11.7dB foff=14.21Hz raw_ber=0.4978(25160/50544) ber=0.4976(18838/37856) ldpc_ok=False iters=[30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30] crc_fail
+[level 0.125 round 6 arm hf8]
+
+  ic705->ic7300: 1 x 264 B, fft=240 cp=24 n_active=49 n_comb_pilot=0 bps=3 fec=2/3 pilot_interval=10 equalizer=gain frame=0.616s crest=9.7dB
+    1/1: keyed=0.77s rx=21360 rms=0.1422 peak=0.589 conf=0.299 snr=-0.6dB binsnr=-16.1/-3.4/7.9dB foff=-3.65Hz raw_ber=0.5046(1635/3240) ber=0.5095(1076/2112) ldpc_ok=False iters=[30, 30, 30, 30, 30] crc_fail
+[level 0.125 round 7 arm hf8]
+
+  ic705->ic7300: 1 x 264 B, fft=240 cp=24 n_active=49 n_comb_pilot=0 bps=3 fec=2/3 pilot_interval=10 equalizer=gain frame=0.616s crest=9.7dB
+    1/1: keyed=0.77s rx=21240 rms=0.1438 peak=0.638 conf=0.447 snr=2.2dB binsnr=-12.5/-0.6/13.3dB foff=5.74Hz raw_ber=0.4790(1552/3240) ber=0.4886(1032/2112) ldpc_ok=False iters=[30, 30, 30, 30, 30] crc_fail
+[level 0.125 round 7 arm hf7]
+
+  ic705->ic7300: 1 x 4732 B, fft=240 cp=24 n_active=49 n_comb_pilot=0 bps=5 fec=3/4 pilot_interval=20 equalizer=gain frame=4.840s crest=8.9dB
+    1/1: keyed=4.99s rx=72360 rms=0.1437 peak=0.651 conf=0.330 foff=9.00Hz raw_ber=n/a ber=n/a ldpc_ok=None iters=None no_sync
+[level 0.125 round 8 arm hf7]
+
+  ic705->ic7300: 1 x 4732 B, fft=240 cp=24 n_active=49 n_comb_pilot=0 bps=5 fec=3/4 pilot_interval=20 equalizer=gain frame=4.840s crest=8.9dB
+    1/1: keyed=4.99s rx=72480 rms=0.1388 peak=0.638 conf=0.310 foff=-8.00Hz raw_ber=n/a ber=n/a ldpc_ok=None iters=None no_sync
+[level 0.125 round 8 arm hf8]
+
+  ic705->ic7300: 1 x 264 B, fft=240 cp=24 n_active=49 n_comb_pilot=0 bps=3 fec=2/3 pilot_interval=10 equalizer=gain frame=0.616s crest=9.7dB
+    1/1: keyed=0.77s rx=21240 rms=0.1469 peak=0.598 conf=0.374 snr=1.6dB binsnr=-11.2/-2.4/6.9dB foff=-6.65Hz raw_ber=0.5025(1628/3240) ber=0.4924(1040/2112) ldpc_ok=False iters=[30, 30, 30, 30, 30] crc_fail
+[level 0.125 round 9 arm hf8]
+
+  ic705->ic7300: 1 x 264 B, fft=240 cp=24 n_active=49 n_comb_pilot=0 bps=3 fec=2/3 pilot_interval=10 equalizer=gain frame=0.616s crest=9.7dB
+    1/1: keyed=0.77s rx=21240 rms=0.1622 peak=0.610 conf=0.316 snr=-2.9dB binsnr=-25.9/-4.1/14.3dB foff=18.73Hz raw_ber=0.5003(1621/3240) ber=0.4972(1050/2112) ldpc_ok=False iters=[30, 30, 30, 30, 30] crc_fail
+[level 0.125 round 9 arm hf7]
+
+  ic705->ic7300: 1 x 4732 B, fft=240 cp=24 n_active=49 n_comb_pilot=0 bps=5 fec=3/4 pilot_interval=20 equalizer=gain frame=4.840s crest=8.9dB
+    1/1: keyed=4.99s rx=72360 rms=0.1443 peak=0.661 conf=0.352 foff=3.00Hz raw_ber=n/a ber=n/a ldpc_ok=None iters=None no_sync
+[level 0.125 round 10 arm hf7]
+
+  ic705->ic7300: 1 x 4732 B, fft=240 cp=24 n_active=49 n_comb_pilot=0 bps=5 fec=3/4 pilot_interval=20 equalizer=gain frame=4.840s crest=8.9dB
+    1/1: keyed=4.99s rx=72360 rms=0.1446 peak=0.644 conf=0.370 snr=1.5dB binsnr=-18.7/-2.9/10.1dB foff=7.37Hz raw_ber=0.4791(24216/50544) ber=0.4802(18180/37856) ldpc_ok=False iters=[30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30] crc_fail
+[level 0.125 round 10 arm hf8]
+
+  ic705->ic7300: 1 x 264 B, fft=240 cp=24 n_active=49 n_comb_pilot=0 bps=3 fec=2/3 pilot_interval=10 equalizer=gain frame=0.616s crest=9.7dB
+    1/1: keyed=0.77s rx=21360 rms=0.1447 peak=0.608 conf=0.353 snr=-3.5dB binsnr=-22.0/-1.9/9.3dB foff=16.14Hz raw_ber=0.5000(1620/3240) ber=0.5000(1056/2112) ldpc_ok=False iters=[30, 30, 30, 30, 30] crc_fail

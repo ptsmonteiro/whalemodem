@@ -24,13 +24,14 @@ from whale.modes.hf3_mode import HF3
 from whale.modes.hf5_mode import HF5
 from whale.modes.hf6_mode import HF6
 from whale.modes.hf7_mode import HF7
+from whale.modes.hf8_mode import HF8
 from whale.modes.hr0_mode import HR0
 from whale.modes.vf3_mode import VF3
 from whale.modes.vf4_mode import VF4
 from whale.modes.vf6_mode import VF6
 
 MODES = (afsk.PROFILE_300, afsk.PROFILE_600, afsk.PROFILE_1200,
-         VF3, VF4, VF6, HC1, HC0, HR0, HF2, HF3, HF5, HF6, HF7)
+         VF3, VF4, VF6, HC1, HC0, HR0, HF2, HF3, HF5, HF6, HF7, HF8)
 
 RNG = np.random.default_rng(20260830)
 CAPTURE_SECONDS = 3

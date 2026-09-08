@@ -70,6 +70,20 @@ MANIFEST = (
     # Level-4 operating-envelope evidence has not been run. Default is
     # availability, not qualification.
     QualificationEntry("hf-ssb", 14, QualificationLevel.DEFAULT),
+    # HF8 is HF7's carrier plan and guard at 8PSK with rate-2/3 LDPC, double
+    # the pilot density and a 0.616 s frame: 3,299 bit/s against HF7's 7,805,
+    # bought for an 8 dB lower simulated AWGN floor (12 dB vs 20) and the only
+    # measured fading envelope on this PHY family -- 90% delivery on quiet
+    # Watterson from 16 dB, where HF7 manages 7/40 at 24 dB.
+    #
+    # Installed as DEFAULT on 2026-09-07 by owner decision, on two-direction
+    # hardware drive sweeps (logs/mode_qualification/hf-ssb/hf19/): HF8's
+    # breakpoint is 12 dB below HF7's on IC-7300 -> IC-705, and on the weaker
+    # non-clipping IC-705 -> IC-7300 path HF7 delivers 0/10 at every drive
+    # level while HF8 delivers 10/10 with 3 dB to spare. Those runs establish
+    # the margin claim on radios; the FADING envelope that motivates the mode
+    # is still simulation only. Default is availability, not qualification.
+    QualificationEntry("hf-ssb", 15, QualificationLevel.DEFAULT),
 )
 
 
@@ -103,7 +117,10 @@ def registry(policy: str, level: QualificationLevel | str =
         from .modes.hf5_mode import HF5
         from .modes.hf6_mode import HF6
         from .modes.hf7_mode import HF7
-        candidates, control = (HR0, HC0, HC1, HF3, HF4, HF5, HF6, HF7), HR0
+        from .modes.hf8_mode import HF8
+        # Rate order, which is the order _maybe_adapt climbs: HF8's 3,299 bit/s
+        # sits between HF3 and HF4.
+        candidates, control = (HR0, HC0, HC1, HF3, HF8, HF4, HF5, HF6, HF7), HR0
         # HF2 remains available only at experimental level as a historical
         # fallback. HF3 and HF4 are manifest DEFAULT modes and are therefore
         # importable/selectable on a normal station.

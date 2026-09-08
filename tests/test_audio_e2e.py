@@ -30,6 +30,7 @@ from whale.modes.hc1_mode import HC1
 from whale.modes.hf3_mode import HF3
 from whale.modes.hf4_mode import HF4
 from whale.modes.hf7_mode import HF7
+from whale.modes.hf8_mode import HF8
 from whale.modes.hr0_mode import HR0
 from whale.modes.vf3_mode import VF3
 from whale.policy import HF_SSB, VHF_FM
@@ -235,7 +236,8 @@ def test_the_hf_channel_carries_a_session_with_hr0_in_control():
     assert link_a.modes.control is HR0 and link_b.modes.control is HR0
     assert link_a.modes.supported_ids == (HR0.mode_id, HC0.mode_id,
                                            HC1.mode_id, HF3.mode_id,
-                                           HF4.mode_id, HF7.mode_id)
+                                           HF8.mode_id, HF4.mode_id,
+                                           HF7.mode_id)
     # And the data plane climbed off the control mode in both directions,
     # which is the ladder working rather than everything staying on HR0.
     # Which faster rung each direction lands on is not pinned down here --
