@@ -86,7 +86,7 @@ def test_hc1_carries_the_largest_control_packet_the_link_builds():
 
 
 def test_an_hc1_keying_is_fixed_length_whatever_it_carries():
-    assert HC1.airtime(1) == HC1.airtime(HC1.chunk_size) == pytest.approx(0.7747,
+    assert HC1.airtime(1) == HC1.airtime(HC1.chunk_size) == pytest.approx(5.0147,
                                                                           abs=1e-4)
 
 

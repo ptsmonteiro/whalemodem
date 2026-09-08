@@ -83,7 +83,7 @@ radio predictions -- including, on this very PHY family, a 16-QAM
 configuration that passed simulation and was 1/5 on the air.
 
 HF8 was installed as a **DEFAULT** rung on 2026-09-07 by owner decision, on
-the hardware evidence above, and sits between HF3 and HF4 in the rate-ordered
+the hardware evidence above, and sits between HC1 and HF4 in the rate-ordered
 ladder.  Default is availability, not qualification: the operating-envelope
 gates -- above all any hardware evidence under fading -- are open.  See
 `MODE_QUALIFICATION.md`.
@@ -130,7 +130,7 @@ BAND_HI_HZ = 2700.0
 # the same ~155 ms is ~20% of this frame on air, so ~3,298 bit/s of waveform
 # throughput is ~2,614 bit/s of keyed-air throughput.  `airtime()` reports
 # waveform duration, per the `WaveformMode` contract and SPEED_LADDERS.md.
-PACKET_BYTES = 270
+PACKET_BYTES = 2460
 
 ACTIVE_BINS = tuple(hf8.bins_in_band(FFT_SIZE, BAND_LO_HZ, BAND_HI_HZ))
 HF8_PHY = hf8.OFDM49Mode(

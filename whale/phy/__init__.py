@@ -18,8 +18,6 @@ Three layers sit between the link and the sound card:
                   negotiates.
 
   `hf2`           pilot-assisted coherent 16-QAM OFDM with carrier grouping
-  `hf3`           `hf4`'s waveform under a rate-2/3 inner convolutional code
-  `hf4`           single-carrier 8PSK with mid-frame pilots
   `sc`            the parametric single-carrier PSK/QAM PHY
   `sc_fast`       `sc` with the fused-FFT acquisition search
   `sc_resilient`  `sc_fast` plus convolutional coding and interleaving

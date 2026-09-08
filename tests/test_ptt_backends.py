@@ -26,7 +26,7 @@ def test_hamlib_backend_keys_the_dummy_rig():
     try:
         controller = ptt_backends.open_backend("hamlib", {"model": 1})
     except OSError:
-        pytest.skip("libhamlib is not installed and this platform isn't one whalemodem bundles for")
+        pytest.skip("libhamlib is not installed and this platform isn't one whale bundles for")
     assert controller.key(True)
     assert not controller.key_state_unknown
     assert controller.key(False)
@@ -40,7 +40,7 @@ def test_hamlib_backend_prefers_the_bundled_library():
     """
     tag = platform_tag()
     if tag is None:
-        pytest.skip("this platform is not one whalemodem bundles hamlib for")
+        pytest.skip("this platform is not one whale bundles hamlib for")
     ptt_backends.open_backend("hamlib", {"model": 1}).close()
     assert hamlib.LOADED_FROM is not None
     assert f"_vendor/hamlib/{tag}/" in hamlib.LOADED_FROM.replace("\\", "/")
@@ -51,7 +51,7 @@ def test_hamlib_backend_rejects_unknown_model():
         with pytest.raises(ValueError):
             ptt_backends.open_backend("hamlib", {"model": 999_999})
     except OSError:
-        pytest.skip("libhamlib is not installed and this platform isn't one whalemodem bundles for")
+        pytest.skip("libhamlib is not installed and this platform isn't one whale bundles for")
 
 
 def test_list_rig_models_includes_a_known_stable_entry():
@@ -62,7 +62,7 @@ def test_list_rig_models_includes_a_known_stable_entry():
     try:
         models = hamlib.list_rig_models()
     except OSError:
-        pytest.skip("libhamlib is not installed and this platform isn't one whalemodem bundles for")
+        pytest.skip("libhamlib is not installed and this platform isn't one whale bundles for")
     assert len(models) > 100  # order of hundreds; hamlib 4.7.2 has 312
     dummy = [m for m in models if m.model == 1]
     assert len(dummy) == 1
@@ -79,7 +79,7 @@ def test_list_rig_models_is_stable_across_repeated_calls():
         first = hamlib.list_rig_models()
         second = hamlib.list_rig_models()
     except OSError:
-        pytest.skip("libhamlib is not installed and this platform isn't one whalemodem bundles for")
+        pytest.skip("libhamlib is not installed and this platform isn't one whale bundles for")
     assert len(second) == len(first)
 
 
@@ -87,7 +87,7 @@ def test_list_rig_models_is_sorted_by_manufacturer_then_model_name():
     try:
         models = hamlib.list_rig_models()
     except OSError:
-        pytest.skip("libhamlib is not installed and this platform isn't one whalemodem bundles for")
+        pytest.skip("libhamlib is not installed and this platform isn't one whale bundles for")
     keys = [(m.manufacturer.lower(), m.model_name.lower()) for m in models]
     assert keys == sorted(keys)
 

@@ -1,6 +1,6 @@
-# whalemodem
+# whale
 
-Whalemodem is an experimental, open amateur-radio data modem for VHF and HF.
+whale is an open amateur-radio data modem for VHF and HF.
 It has a VARA-shaped command/data interface, but its on-air protocol is native
 and the local interface is not yet fully VARA-compatible. Detailed references
 live in the [documentation index](docs/README.md).
@@ -54,25 +54,9 @@ station that shouldn't need a Python setup at all, see
 
 ## Current status
 
-- The end-to-end connect, bidirectional byte transfer, verification, and
-  disconnect path is implemented. Software full-stack tests cover VHF FM and
-  HF SSB; retained captures and bench runs cover parts of both radio paths.
-- Every shipped mode remains provisionally qualified. Waveform evidence gaps
-  include retained-direction frame campaigns, per-frame net-throughput,
-  and resource measurements. Ladder overlap/adaptation and complete-system
-  hardware recovery are tracked separately.
-- The local API is only the subset needed by the acceptance scenario, ARQ is
-  stop-and-wait, and HF clear-channel assessment is missing. HF operation is
-  therefore for controlled bench tests, not unattended use on a shared band.
+The end-to-end connect, bidirectional transfer, verification, and disconnect
+path is implemented. Current shipped modes and measured results are listed in
+[docs/MODES.md](docs/MODES.md).
 
-See [MODE_QUALIFICATION.md](MODE_QUALIFICATION.md) for the evidence audit.
-
-## Next steps
-
-- Close waveform-qualification gaps with retained-direction hardware frames
-  and per-frame net-throughput measurements; qualify ladder adaptation and
-  complete-system hardware sessions independently.
-- Add HF clear-channel assessment.
-- Measure CPU, memory, latency, and audio dropouts on a low-end target.
-- Expand and test VARA API compatibility, then improve throughput and radio
-  turnaround against the [speed-ladder targets](SPEED_LADDERS.md).
+HF is intended for controlled bench tests until clear-channel assessment and
+broader unattended-operation safeguards are implemented.

@@ -2,7 +2,7 @@
 
 ## Purpose and scope
 
-Whalemodem measures leading loss independently in each radio direction and
+whale measures leading loss independently in each radio direction and
 uses a channel-specific repeated lead to protect sync acquisition. The
 measurement includes transmitter startup, audio buffering, receiver recovery,
 squelch, and AGC settling because audio starts immediately after PTT assertion.
@@ -14,7 +14,7 @@ keying ends at the final CRC and PTT is released when those samples finish.
 
 ## Head sequence and measurement
 
-On VHF/FM, CPFSK retains the order-15 PN head defined in `FRAMING.md`; VF3
+On VHF/FM, CPFSK retains its order-15 PN head in the implementation; VF3
 retains its sync-core lead. On HF, every HR0, HC0 and HC1 frame uses the common
 93.75-baud 16-FSK lead: a six-symbol mode-identifying block repeated at least
 twice. Calibration repeats it for one second and ordinary frames repeat it for

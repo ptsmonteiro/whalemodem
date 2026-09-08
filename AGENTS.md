@@ -1,12 +1,13 @@
-# Agent Instructions
+# Agent instructions
 
-## End Goals
-
-- Always keep in mind the long term goals stated in GOALS.md
-
-## Documentation and Code Consistency
-
-- Always cross-check the relevant documentation against the code before implementing a feature, fixing a bug, or suggesting a change.
-- Treat neither the documentation nor the current implementation as automatically authoritative when they conflict.
-- If documentation and code conflict, resolve the discrepancy from the surrounding context when the intended behavior is obvious. Otherwise, ask the user for clarification before proceeding.
-- Whenever you implement new behavior or change existing behavior, update all affected documentation in the same change so that the documentation and code remain consistent.
+- Keep documentation short and current.
+- Document only behavior that is shipped in `whale/`.
+- Do not add mode contracts, qualification frameworks, experiment histories,
+  design diaries, or speculative future documentation.
+- When a shipped mode changes, update `docs/MODES.md` with only its name,
+  channel, net application bit/s per full-capacity DATA frame, simulated pure-
+  SNR pass points, simulated Watterson pass points when applicable, and
+  calibrated radio-test SNR pass points when available.
+- Use `not measured` when evidence is absent or is not an SNR measurement.
+- Cross-check code and `docs/MODES.md` before changing a documented value.
+  Update only the affected entry.

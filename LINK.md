@@ -2,7 +2,8 @@
 
 This document describes the link protocol and VARA-shaped local TCP interface
 implemented by the current `whale` package. Modulation, coding, framing, and
-on-air timing are specified separately in [`FRAMING.md`](FRAMING.md).
+on-air timing are specified by the waveform implementations and summarized in
+[`docs/MODES.md`](docs/MODES.md).
 Except where a section is explicitly marked as a proposed format, this is a
 description of the present implementation and not a compatibility promise.
 
@@ -41,12 +42,12 @@ radio evidence yet.
 local application bytes
   -> messages and stop-and-wait ARQ (`whale.link`)
   -> packet validation and serialization (`whale.link_protocol`)
-  -> modulation, coding, and framing (`FRAMING.md`)
+  -> modulation, coding, and framing (`whale/modes/`)
   -> keyed, half-duplex radio (`whale.transport`)
 ```
 
 The checked header and optional body consumed by the link layer are
-defined in [`FRAMING.md`](FRAMING.md#checked-packet-format).
+defined in `whale/framing.py`.
 
 ## Link packets
 
@@ -217,7 +218,7 @@ Each endpoint adapts only its own transmit direction from ARQ outcomes:
   The default VHF FM ladder is 0, 1, 2 with mode 3 (VF3) appended above them;
   the explicit experimental registry also appends mode 6 (VF6) as its fastest
   current experimental mode (see
-  [`FRAMING.md`](FRAMING.md#mode-3-vf3-a-non-cpfsk-data-mode)). The HF SSB
+  `whale/modes/`. The HF SSB
   ladder is mode 10 (HR0, the control mode), then mode 5 (HC0) and mode 4
   (HC1).
 

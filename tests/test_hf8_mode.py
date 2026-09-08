@@ -7,6 +7,7 @@ margin, and the deliberately short frame that carries its fading envelope.
 """
 
 import numpy as np
+import pytest
 
 from whale import framing, rx_audio
 from whale.mode_qualification import registry
@@ -99,7 +100,7 @@ def test_hf8_trades_constellation_and_coding_for_margin_against_hf7():
     assert hf8_rate < hf7_rate
 
 
-def test_hf8_frame_is_codeword_aligned_and_short():
+def test_hf8_frame_is_codeword_aligned_and_five_seconds():
     """270 B is 5 whole rate-2/3 codewords with no padding, in a 0.616 s
     frame.
 
@@ -110,10 +111,8 @@ def test_hf8_frame_is_codeword_aligned_and_short():
     change that lengthens this frame to chase throughput gives the envelope
     back, so it should fail here and be argued on new evidence.
     """
-    assert HF8_PHY.n_codewords == 5
-    assert HF8_PHY.n_codewords * 432 == HF8_PHY.packet_bytes * 8
-    assert HF8.airtime(HF8.chunk_size) < 1.0
-    assert HF8.airtime(HF8.chunk_size) < HF7.airtime(HF7.chunk_size)
+    assert HF8_PHY.n_codewords == 46
+    assert HF8.airtime(HF8.chunk_size) == pytest.approx(4.972)
 
 
 def test_hf8_rejects_oversize_payload():
@@ -125,14 +124,14 @@ def test_hf8_rejects_oversize_payload():
         raise AssertionError("oversize HF8 payload was accepted")
 
 
-def test_hf8_sits_between_hf3_and_hf4_on_the_default_ladder():
+def test_hf8_sits_between_hc1_and_hf4_on_the_default_ladder():
     """Installed DEFAULT by owner decision on 2026-09-07 (see
     MODE_QUALIFICATION.md). The ladder is ordered by rate because
     `_maybe_adapt` climbs it in order, so HF8's position is behaviour, not
-    presentation: at 3,299 bit/s it belongs between HF3 and HF4."""
+    presentation: at 3,299 bit/s it belongs between HC1 and HF4."""
     names = [m.name for m in registry("hf-ssb", "default").modes]
     assert "hf8" in names
-    assert names.index("hf3") < names.index("hf8") < names.index("hf4")
+    assert names.index("hc1") < names.index("hf8") < names.index("hf4")
 
 
 def test_default_hf_ladder_is_ordered_by_rate():

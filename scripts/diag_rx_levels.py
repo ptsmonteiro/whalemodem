@@ -14,7 +14,7 @@ import bench
 from whale import afsk
 from whale.transport import RX_SAMPLE_RATE
 
-PAYLOAD = (b"hello whalemodem " * 4)
+PAYLOAD = (b"hello whale " * 4)
 
 
 def stats(name, audio, sr):

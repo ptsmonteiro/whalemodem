@@ -1,4 +1,4 @@
-"""Pure wire-format helpers for the Whalemodem link protocol.
+"""Pure wire-format helpers for the whale link protocol.
 
 This module owns byte-level packet identities and connection/header
 serialization.  It deliberately has no transport, threading, or session

@@ -20,7 +20,6 @@ from whale import afsk, rx_audio
 from whale.modes.hc0_mode import HC0
 from whale.modes.hc1_mode import HC1
 from whale.modes.hf2_mode import HF2
-from whale.modes.hf3_mode import HF3
 from whale.modes.hf5_mode import HF5
 from whale.modes.hf6_mode import HF6
 from whale.modes.hf7_mode import HF7
@@ -31,7 +30,7 @@ from whale.modes.vf4_mode import VF4
 from whale.modes.vf6_mode import VF6
 
 MODES = (afsk.PROFILE_300, afsk.PROFILE_600, afsk.PROFILE_1200,
-         VF3, VF4, VF6, HC1, HC0, HR0, HF2, HF3, HF5, HF6, HF7, HF8)
+         VF3, VF4, VF6, HC1, HC0, HR0, HF2, HF5, HF6, HF7, HF8)
 
 RNG = np.random.default_rng(20260830)
 CAPTURE_SECONDS = 3

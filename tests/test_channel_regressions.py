@@ -8,14 +8,12 @@ belong to scripts/benchmark_simulated_channels.py.
 import numpy as np
 import pytest
 
-from experiments.hf3.benchmark_hf3 import benign_static_channel
 from whale import framing, modes
 from whale.channel import (AwgnChannel, ChannelChain, SnrSpec,
                            WattersonChannel)
 from whale.fm_channel import ComplexFmChannel
 from whale.modes import vf4, vf6
 from whale.modes.hf2_mode import HF2
-from whale.modes.hf3_mode import HF3
 from whale.modes.vf4_mode import VF4
 from whale.modes.vf6_mode import VF6
 from whale.qualification import run_frame_trial, run_frame_trials, trial_seed
@@ -137,38 +135,6 @@ def test_hf2_on_moderate_watterson_at_19db_snr_3khz():
         HF2, channel, 2, MASTER_SEED, point_index=5,
         direction="mid-latitude moderate, SNR/3 kHz 19.03 dB",
         payload_bytes=HF2.chunk_size + framing.AIR_HEADER_BYTES)
-    assert sum(record.decoded for record in records) >= 1
-
-
-@pytest.mark.skip(reason="historical HF3 geometry replaced by the HF4-derived candidate")
-def test_hf3_on_benign_static_at_8db():
-    """HF3's Level 3 benign/static boundary point (SPEED_LADDERS.md): a
-    full measured/reproducible SSB path (filter, frequency offset + drift,
-    sample-clock error, gain, light clipping, then waveform-referenced
-    AWGN), not an identity/AWGN-only channel -- see
-    experiments/hf3/benchmark_hf3.py's `benign_static_channel`."""
-    records = run_frame_trials(
-        HF3, lambda seed: benign_static_channel(8.0, seed),
-        2, MASTER_SEED, point_index=2,
-        direction="benign_static, waveform SNR 8 dB",
-        payload_bytes=HF3.chunk_size + framing.AIR_HEADER_BYTES)
-    assert sum(record.decoded for record in records) >= 1
-
-
-@pytest.mark.skip(reason="historical HF3 geometry replaced by the HF4-derived candidate")
-def test_hf3_on_quiet_watterson_at_10db():
-    """HF3's Level 3 quiet-Watterson boundary point (SPEED_LADDERS.md)."""
-
-    def channel(seed):
-        return ChannelChain((
-            WattersonChannel.from_preset(48_000, "mid_latitude_quiet", seed),
-            AwgnChannel(48_000, SnrSpec(10.0), seed ^ 0x5A5A),
-        ))
-
-    records = run_frame_trials(
-        HF3, channel, 2, MASTER_SEED, point_index=3,
-        direction="mid-latitude quiet, waveform SNR 10 dB",
-        payload_bytes=HF3.chunk_size + framing.AIR_HEADER_BYTES)
     assert sum(record.decoded for record in records) >= 1
 
 

@@ -54,7 +54,7 @@ SOURCES = {
 
 def _download(url: str, dest: Path) -> None:
     print(f"  fetching {url}")
-    headers = {"User-Agent": "whalemodem-vendor-script"}
+    headers = {"User-Agent": "whale-vendor-script"}
     request = urllib.request.Request(url, headers=headers)
     with urllib.request.urlopen(request, timeout=120) as response, dest.open("wb") as out:
         shutil.copyfileobj(response, out)

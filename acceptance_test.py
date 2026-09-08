@@ -171,9 +171,9 @@ def main():
     a.open_data()
     b.open_data()
 
-    payload_ab = hashlib.sha256(b"whalemodem-A-to-B").digest() * (args.size // 32 + 1)
+    payload_ab = hashlib.sha256(b"whale-A-to-B").digest() * (args.size // 32 + 1)
     payload_ab = payload_ab[:args.size]
-    payload_ba = hashlib.sha256(b"whalemodem-B-to-A").digest() * (args.size // 32 + 1)
+    payload_ba = hashlib.sha256(b"whale-B-to-A").digest() * (args.size // 32 + 1)
     payload_ba = payload_ba[:args.size]
 
     print(f"== A -> B: sending {len(payload_ab)} bytes ==")

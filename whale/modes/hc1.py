@@ -100,7 +100,7 @@ N_CARRIERS = len(CARRIER_BINS)
 #: residual the differential payload does not notice; see FINE_OFFSET_NOTE.
 SYNC_SYMBOLS = 5
 HEADER_SYMBOLS = 13
-PAYLOAD_SYMBOLS = 34
+PAYLOAD_SYMBOLS = 352
 TOTAL_SYMBOLS = HEADER_SYMBOLS + PAYLOAD_SYMBOLS
 BITS_PER_SYMBOL = 2 * N_CARRIERS
 PAYLOAD_BITS = PAYLOAD_SYMBOLS * BITS_PER_SYMBOL
@@ -245,7 +245,7 @@ INTERLEAVER_STRIDE = 693
 
 CODEC = dsp.PacketCodec(
     payload_bits=PAYLOAD_BITS,
-    interleaver=dsp.interleave.multiplicative(PAYLOAD_BITS, INTERLEAVER_STRIDE),
+    interleaver=dsp.interleave.multiplicative(PAYLOAD_BITS, 811),
     whitener_seed=0x1A5C7,
     code=dsp.K7,
 )
@@ -551,14 +551,14 @@ def _check_constants() -> None:
     assert CARRIER_SPACING_HZ == 93.75
     assert N_CARRIERS == 19
     assert CARRIER_HZ[0] == 656.25 and CARRIER_HZ[-1] == 2343.75
-    assert TOTAL_SYMBOLS == 47 and PAYLOAD_BITS == 1_292
-    assert FEC_INPUT_BITS == 646
+    assert TOTAL_SYMBOLS == 365 and PAYLOAD_BITS == 13_376
+    assert FEC_INPUT_BITS == 6_688
     assert LEAD_IN_SAMPLES % CORE_SAMPLES == HEAD_PHASE_SAMPLES
-    assert FRAME_SAMPLES == 33_344
+    assert FRAME_SAMPLES == 236_864
     # No stranded bits: the coded grid divides exactly into whole packet
     # bytes plus the trellis tail.  This is what picked 34 payload symbols.
-    assert PACKET_BYTES == 80 and UNUSED_INFO_BITS == 0
-    assert MAX_PAYLOAD_BYTES == 74
+    assert PACKET_BYTES == 835 and UNUSED_INFO_BITS == 2
+    assert MAX_PAYLOAD_BYTES == 829
     assert COARSE_OFFSET_LIMIT_HZ == 46.875
     assert FINE_OFFSET_LIMIT_HZ == 37.5
     assert CODEC.interleaver.is_valid()

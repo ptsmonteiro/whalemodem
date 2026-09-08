@@ -13,7 +13,7 @@ import bench
 from whale import afsk
 from whale.transport import RX_SAMPLE_RATE
 
-PAYLOAD = (b"hello whalemodem " * 4)
+PAYLOAD = (b"hello whale " * 4)
 AMPLITUDES = [0.1, 0.2, 0.3, 0.4, 0.6, 0.8, 1.0]
 
 

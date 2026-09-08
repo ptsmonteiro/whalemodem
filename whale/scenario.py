@@ -183,7 +183,7 @@ class FmScenario:
         )
         return _ScenarioChannel(stages, {
             "type": "fm_scenario", "preset": p.name, "seed": self.seed,
-            "profile_authority": "whalemodem_project_simulation",
+            "profile_authority": "whale_project_simulation",
             "is_propagation_standard": False})
 
     def describe(self) -> Mapping[str, object]:

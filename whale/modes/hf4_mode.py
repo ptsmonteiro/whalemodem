@@ -10,7 +10,7 @@ IC-7300 -> IC-705 audio-coupled HF SSB path. It wires
 and its
 already real-hardware qualified operating point (8PSK@1500baud, packet_bytes=2994,
 pilot_interval=150, ~4049 bps net) -- into the link's `WaveformMode`
-contract, mirroring `whale/modes/hf3_mode.py`'s pattern; it does not
+contract, mirroring the other negotiable HF mode adapters; it does not
 re-derive or re-run any of hf5's or hf13's own design or evidence. See
 `experiments/hf5_8psk_4k/RESULTS.md` for the original PHY's qualification
 record and `experiments/hf13_fast_sync_v1/RESULTS.md` for the fused-FFT
@@ -21,7 +21,7 @@ HF4 is registered as DEFAULT by an explicit owner product decision (see
 `whale/mode_qualification.py`). Availability is separate from evidence-based
 qualification; its remaining gates are documented in `MODE_QUALIFICATION.md`.
 
-Unlike HF2/HF3's OFDM waveforms, HF4's single-carrier preamble is a fixed,
+Unlike HF2's OFDM waveform, HF4's single-carrier preamble is a fixed,
 self-contained acquisition sequence (a 63-chip BPSK PN preamble, joint
 time/frequency-offset matched-filter search) -- there is no adaptive
 `whale/modes/hf_lead.py` head to negotiate, so `encode`/`decode` accept and
@@ -41,7 +41,7 @@ from whale.phy import sc_fast
 from .. import framing
 
 #: On-air identifier. 0, 1, 2 are the CPFSK profiles; 3 is VF3; 4 is HC1;
-#: 5 is HC0; 6 is VF6; 7 is HF2; 8 is VF4; 9 is HF3; 10 is HR0 -- this must
+#: 5 is HC0; 6 is VF6; 7 is HF2; 8 is VF4; 10 is HR0 -- this must
 #: stay stable once anything has shipped with it, and must not collide with
 #: any of those. The number is global across channels even though nothing
 #: currently offers HF4 alongside another mode -- a mode id names one
@@ -54,7 +54,7 @@ HF4_MODE_ID = 11
 #: a mid-frame BPSK pilot block every 150 data symbols.
 BAUD = 1500.0
 BITS_PER_SYMBOL = 3
-PACKET_BYTES = 2994
+PACKET_BYTES = 2520
 PILOT_INTERVAL = 150
 
 #: The single, shared PHY instance every encode/decode call runs against.
@@ -103,7 +103,7 @@ HF4_CODEC = Hf4Codec()
 
 @dataclass(frozen=True)
 class Hf4Mode:
-    """One negotiable HF4 setting, shaped like `hf3_mode.Hf3Mode`."""
+    """One negotiable HF4 setting."""
 
     name: str = "hf4"
     mode_id: int = HF4_MODE_ID

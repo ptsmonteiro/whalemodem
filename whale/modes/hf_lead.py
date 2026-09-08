@@ -40,7 +40,6 @@ BLOCKS = np.asarray(((9, 6, 12, 15, 0, 3),
 HC0_LABEL = 0
 HC1_LABEL = 1
 HF2_LABEL = 2
-HF3_LABEL = 3
 HR0_LABEL = 4
 
 

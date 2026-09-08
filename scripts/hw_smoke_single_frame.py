@@ -18,7 +18,7 @@ logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(name
 import bench
 from whale import afsk
 
-PAYLOAD = (b"hello whalemodem " * 4)
+PAYLOAD = (b"hello whale " * 4)
 
 
 def try_one_way(tx_name, tx, rx_name, rx, settle_s=2.0, listen_s=6.0):

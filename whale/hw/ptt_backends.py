@@ -1,6 +1,6 @@
 """Registry and built-in push-to-talk backends.
 
-Third-party packages register objects through the ``whalemodem.ptt_backends``
+Third-party packages register objects through the ``whale.ptt_backends``
 entry-point group. A backend has a name, capabilities, and an ``open`` method.
 """
 from __future__ import annotations
@@ -54,7 +54,7 @@ def discover_backends() -> None:
         return
     _DISCOVERED = True
     eps = metadata.entry_points()
-    matches = eps.select(group="whalemodem.ptt_backends") if hasattr(eps, "select") else eps.get("whalemodem.ptt_backends", ())
+    matches = eps.select(group="whale.ptt_backends") if hasattr(eps, "select") else eps.get("whale.ptt_backends", ())
     for entry_point in matches:
         candidate = entry_point.load()
         backend = candidate() if inspect.isclass(candidate) or not hasattr(candidate, "open") else candidate

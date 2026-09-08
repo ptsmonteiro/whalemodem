@@ -1,6 +1,6 @@
 # Testing and qualification
 
-whalemodem uses progressively more realistic checks: deterministic unit
+whale uses progressively more realistic checks: deterministic unit
 tests, full-stack paired audio, simulated channels, recorded radio captures,
 and finally retained-direction hardware frame trials plus bidirectional
 hardware sessions. A mode is not promoted solely
@@ -50,9 +50,7 @@ python scripts/benchmark_simulated_channels.py --model fm --policy vhf-fm \
   --points 5 10 15 20 25 30 --trials 100
 ```
 
-[CHANNELS.md](../CHANNELS.md) defines the channel contract, presets, SNR
-conventions, and trial-result schema. Keep reported results tied to their
-seed, channel parameters, mode, payload, and trial count.
+[MODES.md](MODES.md) is the maintained summary of shipped-mode results.
 
 ## Capture replay
 
@@ -102,13 +100,7 @@ lives in `scripts/bench.py`; receiver CPU measurement lives in
 `scripts/benchmark_rx.py`; session benchmarking lives in
 `scripts/benchmark_sessions.py`.
 
-The complete promotion gates—including malformed input, channel regression,
-Monte Carlo sweeps, full-stack recovery, retained-direction hardware frames,
-bidirectional hardware recovery, adjacent-rung overlap, throughput, CPU,
-memory, and required artifacts—are specified in
-[MODE_QUALIFICATION.md](../MODE_QUALIFICATION.md).
-
-For an individual mode, the qualification throughput is the net application
+For an individual mode, the documented throughput is the net application
 DATA chunk carried by one full-capacity frame divided by that encoded frame's
 airtime. Session throughput reported by acceptance and transfer benchmarks
 includes protocol timing effects and is useful system evidence, but it is not

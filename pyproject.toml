@@ -3,7 +3,7 @@ requires = ["setuptools>=61"]
 build-backend = "setuptools.build_meta"
 
 [project]
-name = "whalemodem"
+name = "whale"
 version = "0.1.0"
 description = "A VARA-API-shaped amateur radio data modem"
 requires-python = ">=3.11"
@@ -19,8 +19,8 @@ dependencies = [
 test = ["pytest"]
 
 [project.scripts]
-whalemodem-server = "whale.vara_server:main"
-whalemodem-configure = "whale.radio_config_tui:main"
+whale-server = "whale.vara_server:main"
+whale-configure = "whale.radio_config_tui:main"
 
 [tool.setuptools]
 packages = ["whale", "whale.dsp", "whale.hw", "whale.modes", "whale.phy"]

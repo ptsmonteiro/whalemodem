@@ -3,7 +3,7 @@
 # binaries for. Every leg builds *natively* on/for its own target -- there is
 # no cross-compilation of the Python/PyInstaller build itself -- so each job
 # can bundle that platform's own vendored native libraries, exactly the way
-# packaging/pyinstaller/whalemodem.spec resolves them via platform_tag() at
+# packaging/pyinstaller/whale.spec resolves them via platform_tag() at
 # build time. The linux-aarch64/linux-armv7 legs still run on amd64 GitHub
 # runners, but only the *container* is emulated (QEMU); inside that emulated
 # container the build is native to the target arch.
@@ -85,20 +85,20 @@ jobs:
       - name: Build standalone bundle
         run: |
           . .venv/bin/activate
-          pyinstaller packaging/pyinstaller/whalemodem.spec
+          pyinstaller packaging/pyinstaller/whale.spec
       - name: Smoke test
         run: |
-          dist/whalemodem-server/whalemodem-server --help
+          dist/whale-server/whale-server --help
           . .venv/bin/activate
           python3 -c "import whale.hw.hamlib, whale.hw.audio_io"
       - name: Archive bundle
         run: |
           cd dist
-          tar czf "whalemodem-server-${{ needs.compute-version.outputs.version }}-linux-x86_64.tar.gz" whalemodem-server
+          tar czf "whale-server-${{ needs.compute-version.outputs.version }}-linux-x86_64.tar.gz" whale-server
       - uses: actions/upload-artifact@v4
         with:
-          name: whalemodem-server-linux-x86_64
-          path: dist/whalemodem-server-*-linux-x86_64.tar.gz
+          name: whale-server-linux-x86_64
+          path: dist/whale-server-*-linux-x86_64.tar.gz
 
   # linux-aarch64 / linux-armv7: also amd64 GitHub runners, cross-arch via
   # QEMU user-mode emulation registered by setup-qemu-action, the same
@@ -148,18 +148,18 @@ jobs:
               pip install --upgrade pip
               pip install -e ".[test]"
               pip install pyinstaller
-              pyinstaller packaging/pyinstaller/whalemodem.spec
-              dist/whalemodem-server/whalemodem-server --help
+              pyinstaller packaging/pyinstaller/whale.spec
+              dist/whale-server/whale-server --help
               python3 -c "import whale.hw.hamlib, whale.hw.audio_io"
             '
       - name: Archive bundle
         run: |
           cd dist
-          tar czf "whalemodem-server-${{ needs.compute-version.outputs.version }}-${{ matrix.tag }}.tar.gz" whalemodem-server
+          tar czf "whale-server-${{ needs.compute-version.outputs.version }}-${{ matrix.tag }}.tar.gz" whale-server
       - uses: actions/upload-artifact@v4
         with:
-          name: whalemodem-server-${{ matrix.tag }}
-          path: dist/whalemodem-server-*-${{ matrix.tag }}.tar.gz
+          name: whale-server-${{ matrix.tag }}
+          path: dist/whale-server-*-${{ matrix.tag }}.tar.gz
 
   # macos-arm64 / macos-x86_64: real, native Apple Silicon / Intel runners.
   # No QEMU/Rosetta needed -- macos-13 is the last macOS runner generation
@@ -189,19 +189,19 @@ jobs:
           pip install -e ".[test]"
           pip install pyinstaller
       - name: Build standalone bundle
-        run: pyinstaller packaging/pyinstaller/whalemodem.spec
+        run: pyinstaller packaging/pyinstaller/whale.spec
       - name: Smoke test
         run: |
-          dist/whalemodem-server/whalemodem-server --help
+          dist/whale-server/whale-server --help
           python3 -c "import whale.hw.hamlib, whale.hw.audio_io"
       - name: Archive bundle
         run: |
           cd dist
-          zip -r "whalemodem-server-${{ needs.compute-version.outputs.version }}-${{ matrix.tag }}.zip" whalemodem-server
+          zip -r "whale-server-${{ needs.compute-version.outputs.version }}-${{ matrix.tag }}.zip" whale-server
       - uses: actions/upload-artifact@v4
         with:
-          name: whalemodem-server-${{ matrix.tag }}
-          path: dist/whalemodem-server-*-${{ matrix.tag }}.zip
+          name: whale-server-${{ matrix.tag }}
+          path: dist/whale-server-*-${{ matrix.tag }}.zip
 
   # windows-x86_64: native runner, sounddevice's wheel already bundles
   # PortAudio on Windows so there's no vendored-PortAudio preload step to
@@ -222,15 +222,15 @@ jobs:
           pip install -e ".[test]"
           pip install pyinstaller
       - name: Build standalone bundle
-        run: pyinstaller packaging/pyinstaller/whalemodem.spec
+        run: pyinstaller packaging/pyinstaller/whale.spec
       - name: Smoke test
         run: |
-          dist\whalemodem-server\whalemodem-server.exe --help
+          dist\whale-server\whale-server.exe --help
           python -c "import whale.hw.hamlib, whale.hw.audio_io"
       - name: Archive bundle
         run: |
-          Compress-Archive -Path dist\whalemodem-server -DestinationPath "dist\whalemodem-server-${{ needs.compute-version.outputs.version }}-windows-x86_64.zip"
+          Compress-Archive -Path dist\whale-server -DestinationPath "dist\whale-server-${{ needs.compute-version.outputs.version }}-windows-x86_64.zip"
       - uses: actions/upload-artifact@v4
         with:
-          name: whalemodem-server-windows-x86_64
-          path: dist/whalemodem-server-*-windows-x86_64.zip
+          name: whale-server-windows-x86_64
+          path: dist/whale-server-*-windows-x86_64.zip

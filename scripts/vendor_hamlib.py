@@ -101,7 +101,7 @@ def _ghcr_token(repository: str) -> str:
 
 def _download(url: str, dest: Path) -> None:
     print(f"  fetching {url}")
-    headers = {"User-Agent": "whalemodem-vendor-script"}
+    headers = {"User-Agent": "whale-vendor-script"}
     if url.startswith("https://ghcr.io/v2/"):
         # homebrew/core/<formula>/blobs/... -> repository is everything
         # between /v2/ and /blobs/.

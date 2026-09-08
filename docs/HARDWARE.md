@@ -30,10 +30,10 @@ An optional top-level `default_radio = "station-a"` key, placed before any
 file with only one `[radios.*]` table defaults to it implicitly even
 without `default_radio`.
 
-### `whalemodem-configure`
+### `whale-configure`
 
 ```console
-whalemodem-configure --radio-config radios.toml
+whale-configure --radio-config radios.toml
 ```
 
 A curses terminal UI for the inventory file: list, add, edit, set the
@@ -81,7 +81,7 @@ shared-mixer API that adds latency and jitter:
 `audio.input`/`audio.output` in the inventory are each matched against
 device names *within* that host API, so they must be a substring PortAudio
 reports for the card under that API specifically (check with
-`python -m sounddevice`, or use `whalemodem-configure`'s picker, which
+`python -m sounddevice`, or use `whale-configure`'s picker, which
 lists them for you and writes the exact name back).
 
 Set `WHALE_AUDIO_HOST_API` to override the default -- for example, a Linux
@@ -105,7 +105,7 @@ it on Windows and macOS but not on Linux.
 | `vox` | Audio-triggered transmit control |
 
 External packages can register GPIO, CAT, USB-interface, or other backends
-through the `whalemodem.ptt_backends` Python entry-point group. A backend
+through the `whale.ptt_backends` Python entry-point group. A backend
 implements `PttBackend` from `whale.hw.ptt_backends`; embedded applications
 may also call `register_backend()` directly.
 
@@ -125,7 +125,7 @@ exact versions, and license texts are in
 them for a hamlib version bump. On an unlisted platform (or if the bundled
 copy fails to load), it falls back to a system install
 (`brew install hamlib` / `apt install libhamlib4`). Set
-`WHALEMODEM_SYSTEM_HAMLIB=1` to force the system search even where a bundled
+`WHALE_SYSTEM_HAMLIB=1` to force the system search even where a bundled
 copy exists -- e.g. to pick up a rig model added to hamlib after the
 vendored version.
 
@@ -151,9 +151,9 @@ instead of CAT, etc).
 ## Standalone builds
 
 For an end user who doesn't want to set up Python, a venv, or `pip install`
-at all, whalemodem can be frozen into a standalone, no-Python-required
+at all, whale can be frozen into a standalone, no-Python-required
 onedir bundle with PyInstaller -- a folder containing the
-`whalemodem-server` executable plus its own Python runtime, numpy/scipy,
+`whale-server` executable plus its own Python runtime, numpy/scipy,
 and (vendored the same way `hamlib` is vendored above) hamlib and, on
 Linux, PortAudio. It is a folder you download and run directly, not yet an
 installer, system package, or service -- nothing registers it to start on
@@ -163,14 +163,14 @@ same command-line flags shown under
 executable instead of `python -m whale.vara_server`:
 
 ```console
-whalemodem-server/whalemodem-server --radio-config radios.toml --radio station-a \
+whale-server/whale-server --radio-config radios.toml --radio station-a \
   --mycall STA1 --cmd-port 8300 --data-port 8301
 ```
 
 Building one is covered in `packaging/pyinstaller/README.md`; that
 procedure, not this section, is the source of truth for the actual build
 steps. In short: install the build-only `pyinstaller` dependency, then run
-`pyinstaller packaging/pyinstaller/whalemodem.spec` from the repo root. The
+`pyinstaller packaging/pyinstaller/whale.spec` from the repo root. The
 build must run natively on each target OS/architecture -- no
 cross-compilation -- since the spec bundles the build host's own vendored
 hamlib (and, on Linux, PortAudio) binaries.
@@ -193,7 +193,7 @@ already bundles PortAudio itself on those platforms.
 
 **Validation status.** Only linux-x86_64 has actually been built and
 exercised so far, inside Docker, without real audio or rig hardware
-attached: `whalemodem-server --help` running to completion plus native
+attached: `whale-server --help` running to completion plus native
 import/load checks for `whale.hw.hamlib` and `whale.hw.audio_io`, not a
 full radio session. The other five platforms (linux-aarch64, linux-armv7,
 macos-arm64, macos-x86_64, windows-x86_64) are built by the
@@ -230,7 +230,7 @@ channel.
 
 `--mode-level` defaults to `default`. The `optional` and `experimental`
 levels are for deliberate qualification runs; see
-[MODE_QUALIFICATION.md](../MODE_QUALIFICATION.md).
+[MODES.md](MODES.md).
 
 ## Hardware checks
 

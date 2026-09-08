@@ -102,7 +102,9 @@ class Hf7Codec:
             raise ValueError(
                 f"packet is {len(payload)} bytes; {mode.name} carries at most "
                 f"{HF7_PHY.max_payload_bytes}")
-        return HF7_PHY.modulate(bytes(payload))
+        audio = HF7_PHY.modulate(bytes(payload))
+        target = int(round(5.0 * self.tx_sample_rate))
+        return np.pad(audio, (0, max(0, target - len(audio))))
 
     def decode(self, audio, mode: "Hf7Mode", *, head_seconds=None, **kwargs) -> dict:
         del mode, head_seconds
@@ -117,7 +119,7 @@ class Hf7Codec:
 
     def airtime(self, payload_len: int, mode: "Hf7Mode") -> float:
         del payload_len, mode
-        return HF7_PHY.frame_seconds()
+        return 5.0
 
 
 HF7_CODEC = Hf7Codec()

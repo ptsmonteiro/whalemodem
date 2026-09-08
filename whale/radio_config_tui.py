@@ -141,7 +141,7 @@ class RadioListView:
             _safe_addnstr(stdscr, 0, 0, "terminal too small")
             return
 
-        title = f"whalemodem radio config -- {self.path}"
+        title = f"whale radio config -- {self.path}"
         if self.is_new_file:
             title += " (new file, not yet saved)"
         _safe_addnstr(stdscr, 0, 0, title, curses.A_BOLD)

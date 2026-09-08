@@ -9,7 +9,7 @@ Examples:
     python scripts/sweep_modes.py --channel vhf-fm
     python scripts/sweep_modes.py --channel hf-ssb --trials 10
     python scripts/sweep_modes.py --channel hf-ssb --modes hc0 --direction ab
-    python scripts/sweep_modes.py --channel hf-ssb --mode-level experimental --modes hf3 --direction ab
+    python scripts/sweep_modes.py --channel hf-ssb --mode-level experimental --modes hf2 --direction ab
 """
 
 from __future__ import annotations

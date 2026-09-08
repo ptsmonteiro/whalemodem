@@ -101,7 +101,7 @@ SYNC_SYMBOLS = 24
 #: 283 symbols: the smallest payload grid that carries a whole number of
 #: packet bytes with no bits stranded and still leaves room for the largest
 #: control frame the link builds.  See `_check_constants`.
-PAYLOAD_SYMBOLS = 283
+PAYLOAD_SYMBOLS = 432
 TOTAL_SYMBOLS = SYNC_SYMBOLS + PAYLOAD_SYMBOLS
 PAYLOAD_BITS = PAYLOAD_SYMBOLS * BITS_PER_SYMBOL
 
@@ -213,7 +213,7 @@ HEAD_PATTERN = BANK.symbols_from_bits(
 
 CODEC = dsp.PacketCodec(
     payload_bits=PAYLOAD_BITS,
-    interleaver=dsp.interleave.multiplicative(PAYLOAD_BITS, 693),
+    interleaver=dsp.interleave.multiplicative(PAYLOAD_BITS, 811),
     whitener_seed=0x0C4B1,
     code=dsp.K7,
 )
@@ -406,13 +406,13 @@ def _check_constants() -> None:
     assert SPACING_HZ == 93.75 and BANK.symbol_rate == 93.75
     assert TONE_HZ[0] == 750.0 and TONE_HZ[-1] == 2156.25
     assert BANK.bandwidth_hz == 1500.0
-    assert TOTAL_SYMBOLS == 307 and PAYLOAD_BITS == 1_132
-    assert FEC_INPUT_BITS == 566
+    assert TOTAL_SYMBOLS == 456 and PAYLOAD_BITS == 1_728
+    assert FEC_INPUT_BITS == 864
     # No stranded bits: the coded grid divides exactly into whole packet
     # bytes plus the trellis tail.  This is what picked 283 payload symbols.
-    assert PACKET_BYTES == 70 and UNUSED_INFO_BITS == 0
-    assert MAX_PAYLOAD_BYTES == 64
-    assert FRAME_SAMPLES == 162_240 and FRAME_SECONDS == 3.38
+    assert PACKET_BYTES == 107 and UNUSED_INFO_BITS == 2
+    assert MAX_PAYLOAD_BYTES == 101
+    assert FRAME_SAMPLES == 238_528 and FRAME_SECONDS == 4.969333333333333
     # Every deliberate pair; a draw that happens to repeat a tone across
     # neighbouring pairs would give more, which is only more of the same
     # measurement.

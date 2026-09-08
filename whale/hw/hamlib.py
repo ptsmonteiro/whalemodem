@@ -27,7 +27,7 @@ Library discovery prefers the prebuilt binaries vendored under
 whale/hw/_vendor/hamlib/<platform-tag>/ (see scripts/vendor_hamlib.py) over
 whatever the host has installed, so a plain `pip install` works without a
 separate hamlib install on the six platforms that ships for. Set
-WHALEMODEM_SYSTEM_HAMLIB=1 to skip the bundled copy and search the system
+WHALE_SYSTEM_HAMLIB=1 to skip the bundled copy and search the system
 instead -- e.g. to pick up a rig added to hamlib after our vendored version,
 or on a platform we don't bundle for.
 """
@@ -54,7 +54,7 @@ def _load_bundled():
     search in _load_library(), not take down every platform because one of
     the six vendored copies has a problem.
     """
-    if os.environ.get("WHALEMODEM_SYSTEM_HAMLIB"):
+    if os.environ.get("WHALE_SYSTEM_HAMLIB"):
         return None, None
     tag = platform_tag()
     if tag is None:

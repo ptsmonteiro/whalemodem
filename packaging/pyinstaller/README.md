@@ -1,6 +1,6 @@
 # Standalone build (PyInstaller)
 
-Builds `whalemodem-server` into a standalone, no-Python-required onedir
+Builds `whale-server` into a standalone, no-Python-required onedir
 bundle, so an end user does not need Python, numpy/scipy, or a system
 hamlib/PortAudio install to run a station.
 
@@ -15,11 +15,11 @@ pip install pyinstaller
 Then, from the repo root:
 
 ```
-pyinstaller packaging/pyinstaller/whalemodem.spec
+pyinstaller packaging/pyinstaller/whale.spec
 ```
 
-The bundle lands in `dist/whalemodem-server/`; run it with
-`dist/whalemodem-server/whalemodem-server --help`.
+The bundle lands in `dist/whale-server/`; run it with
+`dist/whale-server/whale-server --help`.
 
 The build must run **natively** on each target OS/arch -- no
 cross-compilation -- because the spec bundles that build host's own

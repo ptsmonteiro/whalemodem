@@ -37,7 +37,7 @@ def test_fm_scenarios_expand_project_provenance_and_keep_bench_presets_separate(
     scenario = FmScenario.from_preset("disturbed", sample_rate=48_000, seed=9)
     description = scenario.describe()
     assert description["is_propagation_standard"] is False
-    assert description["profile_authority"] == "whalemodem_project_simulation"
+    assert description["profile_authority"] == "whale_project_simulation"
     fm = description["stages"][2]
     assert fm["preset"] == "vhf_bench_conservative"
     assert fm["carrier_to_noise_db"] == 8.0
