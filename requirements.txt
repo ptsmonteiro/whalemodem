@@ -2,3 +2,4 @@ numpy
 scipy
 sounddevice
 pyserial
+windows-curses; sys_platform == "win32"
