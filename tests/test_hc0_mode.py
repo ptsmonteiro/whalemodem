@@ -139,6 +139,23 @@ def test_a_partial_frame_reports_a_lock_but_no_end_index():
     assert result["payload"] is None
 
 
+def test_a_partial_current_frame_is_not_accepted_as_legacy():
+    """The retained 64-byte format must not shorten a new frame in flight."""
+    audio = HC0.encode(_packet())
+    # Let the legacy grid be available, but stop before the current grid is
+    # complete. Its CRC must not turn this partial current frame into a frame
+    # the link consumes.
+    arrived = (hf_lead.MIN_SAMPLES
+               + (hc0.SYNC_SYMBOLS + hc0.LEGACY_PAYLOAD_SYMBOLS + 1)
+               * hc0.SYMBOL_SAMPLES)
+    arrived_rx = ((4_000 + arrived) // rx_audio.DECIMATION
+                  + rx_audio.FILTER_DELAY_DECODE_SAMPLES)
+    result = HC0.decode(_snapshot(audio)[:arrived_rx])
+
+    assert result["payload"] is None
+    assert "end_index" not in result
+
+
 def test_a_corrupted_frame_is_a_near_miss_the_link_can_skip_past():
     audio = np.asarray(HC0.encode(_packet()), np.float64)
     start = hf_lead.MIN_SAMPLES + hc0.SYNC_SYMBOLS * hc0.SYMBOL_SAMPLES

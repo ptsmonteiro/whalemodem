@@ -175,6 +175,20 @@ CODEC = dsp.PacketCodec(
     code=dsp.K7,
 )
 
+# HC0 originally shipped with a 64-byte payload grid.  Keep that receive
+# shape here so captures made by that waveform remain useful after the
+# current control-frame envelope grew to 101 bytes.  This is receive-only:
+# transmitters always emit the current geometry above, and a candidate only
+# wins this fallback when its CRC validates.
+LEGACY_PAYLOAD_SYMBOLS = 283
+LEGACY_PAYLOAD_BITS = LEGACY_PAYLOAD_SYMBOLS * BITS_PER_SYMBOL
+LEGACY_CODEC = dsp.PacketCodec(
+    payload_bits=LEGACY_PAYLOAD_BITS,
+    interleaver=dsp.interleave.multiplicative(LEGACY_PAYLOAD_BITS, 693),
+    whitener_seed=0x0C4B1,
+    code=dsp.K7,
+)
+
 FEC_INPUT_BITS = CODEC.information_bits
 PACKET_BYTES = CODEC.packet_bytes
 UNUSED_INFO_BITS = CODEC.unused_information_bits
@@ -303,24 +317,63 @@ def demodulate(audio: np.ndarray, *,
     result["head_blocks_received"] = head_blocks
     result["head_match"] = head_score
 
-    values = _mfsk.analyze(RX_BANK, samples, result["sync_end_index"],
-                           PAYLOAD_SYMBOLS, offset)
-    if values is None:
-        # Still arriving.  Deliberately no end_index: the caller must keep
-        # this audio and try again rather than consume a partial frame.
-        result["failure"] = "frame truncated"
+    payload_start = result["sync_end_index"]
+
+    def decode_candidate(codec, payload_symbols):
+        values = _mfsk.analyze(RX_BANK, samples, payload_start,
+                                payload_symbols, offset)
+        if values is None:
+            return None
+        magnitudes = np.abs(values)
+        payload, meta = codec.decode_soft(
+            _mfsk.soft_bits(RX_BANK, magnitudes))
+        return magnitudes, payload, meta
+
+    # Prefer the current geometry whenever it is complete.  If it is not a
+    # valid current frame, try the old fixed-length geometry as well; this is
+    # what lets retained on-air captures survive the payload-grid expansion.
+    candidate = decode_candidate(CODEC, PAYLOAD_SYMBOLS)
+    legacy = False
+    if candidate is None or not candidate[2].get("crc_ok", False):
+        legacy_candidate = decode_candidate(LEGACY_CODEC,
+                                            LEGACY_PAYLOAD_SYMBOLS)
+        if (legacy_candidate is not None
+                and legacy_candidate[2].get("crc_ok", False)):
+            candidate = legacy_candidate
+            legacy = True
+
+    if candidate is None or not candidate[2].get("crc_ok", False):
+        # Still arriving, or a complete frame with a bad CRC.  Deliberately
+        # no end_index for the former: the caller must keep this audio and
+        # try again rather than consume a partial current frame.
+        if candidate is None:
+            result["failure"] = "frame truncated"
+            return result
+        magnitudes, payload, meta = candidate
+        result["end_index"] = min(
+            len(samples),
+            start + TOTAL_SYMBOLS * RX_SYMBOL_SAMPLES + RX_TAIL_SAMPLES)
+        result["tone_snr_db"] = _tone_snr_db(magnitudes)
+        result["raw_payload_bits"] = RX_BANK.bits_from_symbols(
+            np.argmax(magnitudes, axis=1))
+        result.update(meta)
+        result.update(payload=payload, synced=True,
+                      tone_magnitudes=magnitudes)
         return result
+
+    magnitudes, payload, meta = candidate
+    total_symbols = (LEGACY_PAYLOAD_SYMBOLS if legacy else PAYLOAD_SYMBOLS)
     result["end_index"] = min(
         len(samples),
-        start + TOTAL_SYMBOLS * RX_SYMBOL_SAMPLES + RX_TAIL_SAMPLES)
-
-    magnitudes = np.abs(values)
+        start + SYNC_SYMBOLS * RX_SYMBOL_SAMPLES
+        + total_symbols * RX_SYMBOL_SAMPLES + RX_TAIL_SAMPLES)
     result["tone_snr_db"] = _tone_snr_db(magnitudes)
     result["raw_payload_bits"] = RX_BANK.bits_from_symbols(
         np.argmax(magnitudes, axis=1))
-    payload, meta = CODEC.decode_soft(_mfsk.soft_bits(RX_BANK, magnitudes))
     result.update(meta)
     result.update(payload=payload, synced=True, tone_magnitudes=magnitudes)
+    if legacy:
+        result["legacy_frame"] = True
     return result
 
 
@@ -343,7 +396,8 @@ def demodulate_debug(audio: np.ndarray, reference_payload: bytes | None = None,
     result = demodulate(audio, head_seconds=head_seconds)
     if reference_payload is None or result.get("raw_payload_bits") is None:
         return result
-    expected = encode_payload_bits(reference_payload)
+    codec = LEGACY_CODEC if result.get("legacy_frame") else CODEC
+    expected = codec.encode(reference_payload)
     errors = result["raw_payload_bits"] != expected
     result["total_bit_errors"] = int(np.count_nonzero(errors))
     result["ber"] = float(np.mean(errors))
