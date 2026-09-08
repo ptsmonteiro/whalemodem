@@ -1,5 +1,9 @@
 """Deterministic protocol-v3 tests for in-session head-timing feedback."""
 
+import logging
+
+import numpy as np
+
 from whale import afsk, link
 from whale.modes import vf3, vf3_mode
 
@@ -52,6 +56,17 @@ def test_zero_observation_increases_safely_and_is_bounded():
     request, _ = link._head_feedback_request(
         95, 0.0, afsk.PROFILE_300.head_match_allowance_seconds)
     assert link._decode_head_duration(request) == link.HEAD_MAX_SECONDS
+
+
+def test_unavailable_or_nonfinite_observation_is_safe_and_distinct():
+    for observed, reason in ((None, "measurement unavailable"),
+                             (np.nan, "invalid observation"),
+                             (np.inf, "invalid observation"),
+                             (-np.inf, "invalid observation")):
+        request, actual = link._head_feedback_request(
+            42, observed, afsk.PROFILE_300.head_match_allowance_seconds)
+        assert request == 42
+        assert actual == reason
 
 
 def test_small_matcher_window_deficit_does_not_adjust(monkeypatch):
@@ -134,3 +149,19 @@ def test_a_vf3_head_within_one_core_of_target_is_left_alone(monkeypatch):
     request, reason = link._head_feedback_request(42, 0.29, allowance)
     assert request == 42
     assert reason == "deficit is within matcher-window allowance"
+
+
+def test_data_without_outer_head_does_not_log_nan(caplog, monkeypatch):
+    caplog.set_level(logging.INFO)
+    station = _connected()
+    sent = []
+    monkeypatch.setattr(station, "_tx_packet",
+                        lambda ptype, body: sent.append((ptype, body)))
+    body = bytes([link.EOF_BIT, link._encode_head_duration(0.42)]) + b"payload"
+
+    assert station._handle_data(body) == b"payload"
+    assert sent[-1][0] == link.PT_DATA_ACK
+    assert sent[-1][1][3] == body[1]
+    messages = [record.getMessage() for record in caplog.records]
+    assert any("head observation unavailable" in message for message in messages)
+    assert all("nan" not in message.lower() for message in messages)

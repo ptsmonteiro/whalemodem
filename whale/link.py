@@ -524,8 +524,17 @@ def _head_feedback_request(advertised_head, observed_seconds, match_allowance_se
     mode-specific unit.
     """
     sent = _decode_head_duration(advertised_head)
-    if observed_seconds is None or observed_seconds < 0:
-        return advertised_head, "missing or invalid observation"
+    if observed_seconds is None:
+        # HF7/HF8 and the other no-outer-head modes deliberately provide no
+        # measurement.  That is different from a malformed measurement and
+        # must not leak a NaN-looking diagnostic into an otherwise good run.
+        return advertised_head, "measurement unavailable"
+    try:
+        finite = bool(np.isfinite(observed_seconds))
+    except (TypeError, ValueError):
+        finite = False
+    if not finite or observed_seconds < 0:
+        return advertised_head, "invalid observation"
     if observed_seconds == 0:
         requested = min(HEAD_MAX_SECONDS, sent + HEAD_ZERO_INCREASE_SECONDS)
         return _encode_head_duration(requested), "zero observation is a lower bound"
@@ -1859,13 +1868,23 @@ class Link:
             requested_head, feedback_reason = _head_feedback_request(
                 advertised_head, observed_seconds,
                 self.rx_profile.head_match_allowance_seconds)
-            observed_ms = (observed_seconds * 1000.0
-                           if observed_seconds is not None else float("nan"))
-            if requested_head == advertised_head:
+            if observed_seconds is None:
+                logger.info("[%s] DATA seq=0x%02x head observation unavailable: "
+                            "reported unchanged %.1f ms (%s)", self.mycall, seq,
+                            _decode_head_duration(requested_head) * 1000,
+                            feedback_reason)
+            elif not bool(np.isfinite(observed_seconds)):
+                logger.info("[%s] DATA seq=0x%02x head observation invalid: "
+                            "reported unchanged %.1f ms (%s)", self.mycall, seq,
+                            _decode_head_duration(requested_head) * 1000,
+                            feedback_reason)
+            elif requested_head == advertised_head:
+                observed_ms = observed_seconds * 1000.0
                 logger.info("[%s] DATA seq=0x%02x head observation ignored: observed %.1f ms, "
                             "reported unchanged %.1f ms (%s)", self.mycall, seq, observed_ms,
                             _decode_head_duration(requested_head) * 1000, feedback_reason)
             else:
+                observed_ms = observed_seconds * 1000.0
                 logger.info("[%s] DATA seq=0x%02x head feedback: observed %.1f ms, "
                             "reported request %.1f ms (%s)", self.mycall, seq, observed_ms,
                             _decode_head_duration(requested_head) * 1000, feedback_reason)
