@@ -1,0 +1,40 @@
+# Shipped modes and measurements
+
+This is the only maintained mode-results document. It lists production modes
+from the current registry and directly recorded pass points. Rates are net
+application bits per second for one full-capacity DATA frame: DATA payload bits
+divided by complete frame airtime. They exclude ACKs, retries, and turnaround.
+
+`SNR` is the simulator's 3 kHz reference unless noted. `Watterson` names the
+simulated fading preset. HF radio results use the standard bench signal: a
+4-second deterministic equal-power multitone comb from 300 to 2700 Hz in
+60 Hz steps, measured from received audio against inter-tone noise and scaled
+to a 3 kHz reference bandwidth. The value comes from
+`scripts/measure_hf_bench_snr.py`: the signal is transmitted by the IC-7300,
+captured as 12 kHz audio from the IC-705, and measured from the received
+audio spectrum. The 2026-09-08 measurement was 33.96 dB, rounded to 34.0 dB
+in the table. Drive multipliers and decoder estimates are not SNR.
+
+## VHF FM
+
+| Mode | DATA payload/frame | Frame duration | Net/frame | Pure SNR passed | Radio tested |
+| --- | ---: | ---: | ---: | --- | --- |
+| 300baud | 88 B | 3.983 s | 177 bit/s | not retained as pure SNR | not measured |
+| 600baud | 193 B | 3.998 s | 386 bit/s | not retained as pure SNR | not measured |
+| 1200baud | 402 B | 3.999 s | 804 bit/s | not retained as pure SNR | not measured |
+| vf3 | 1,426 B | 5.200 s | 2,194 bit/s | — | not measured |
+
+## HF SSB
+
+| Mode | DATA payload/frame | Frame duration | Net/frame | Pure SNR passed | Watterson passed | Radio tested |
+| --- | ---: | ---: | ---: | --- | --- | --- |
+| hr0 | 32 B | 3.860 s | 66 bit/s | not retained as pure SNR | — | 2026-09-08, 10/10 at 34.0 dB SNR |
+| hc0 | 91 B | 5.012 s | 145 bit/s | — | quiet, moderate, disturbed: -5 dB and above | 2026-09-08, 10/10 at 34.0 dB SNR |
+| hc1 | 819 B | 5.015 s | 1,306 bit/s | — | quiet: 0 dB and above; moderate: 10 dB and above; disturbed: not passed | 2026-09-08, 10/10 at 34.0 dB SNR |
+| hf8 | 2,444 B | 4.972 s | 3,934 bit/s | 12 dB and above | quiet: 18 dB and above | 2026-09-08, 10/10 at 34.0 dB SNR |
+| hf4 | 2,504 B | 4.972 s | 4,029 bit/s | not measured | not measured | 2026-09-08, 10/10 at 34.0 dB SNR |
+| hf7 | 4,722 B | 5.000 s | 7,555 bit/s | 20 dB and above | not passed | 2026-09-08, 10/10 at 34.0 dB SNR |
+
+These are snapshots of checked-in shipped code and retained results, not
+promises for every radio, path, or direction. When a mode or measurement
+changes, edit its row; do not append a history section.

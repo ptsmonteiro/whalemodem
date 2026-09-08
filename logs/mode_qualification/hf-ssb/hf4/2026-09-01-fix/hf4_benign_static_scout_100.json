@@ -1,5 +1,5 @@
 {
-  "schema": "whalemodem.hf4-benchmark.v1",
+  "schema": "whale.hf4-benchmark.v1",
   "qualification_evidence": true,
   "completed_utc": "2026-09-01T10:43:52.171286+00:00",
   "seed": 20260901,

@@ -1,5 +1,5 @@
 {
-  "schema": "whalemodem.hf2_occupied_bandwidth.v1",
+  "schema": "whale.hf2_occupied_bandwidth.v1",
   "generated_at": "2026-09-01T08:08:10.314335+00:00",
   "method": {
     "signal": "complete keyed hf2.modulate waveform",

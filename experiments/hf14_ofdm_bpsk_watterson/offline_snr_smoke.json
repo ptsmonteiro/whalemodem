@@ -13,7 +13,7 @@
   "inputs": [
     {
       "name": "rank1_fft240_cp36_pi8",
-      "source_result": "C:\\Users\\ptsm\\Projects\\whalemodem\\experiments\\hf14_ofdm_bpsk_watterson\\hardware\\rank1_fft240_cp36_pi8\\result.json",
+      "source_result": "C:\\Users\\ptsm\\Projects\\whale\\experiments\\hf14_ofdm_bpsk_watterson\\hardware\\rank1_fft240_cp36_pi8\\result.json",
       "source_capture_count": 10,
       "noise_repeats_per_capture": 1,
       "config": {

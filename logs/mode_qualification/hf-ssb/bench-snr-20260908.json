@@ -1,0 +1,20 @@
+{
+  "date": "2026-09-08",
+  "direction": "IC-7300->IC-705",
+  "signal": {
+    "type": "deterministic_equal_power_multitone",
+    "low_hz": 300.0,
+    "high_hz": 2700.0,
+    "spacing_hz": 60.0,
+    "duration_s": 4.0,
+    "tx_rms": 0.6,
+    "reference_bandwidth_hz": 3000.0
+  },
+  "keyed_seconds": 4.152461528778076,
+  "rx_samples": 61800,
+  "snr_3khz_db": 33.96375593756914,
+  "signal_power": 59853049.872212335,
+  "noise_psd": 8.00920549663476,
+  "capture_rms": 0.4979673646475605,
+  "capture_peak": 3.584770441055298
+}

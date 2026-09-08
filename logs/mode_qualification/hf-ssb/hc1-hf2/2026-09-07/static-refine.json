@@ -114977,7 +114977,7 @@
   "metadata": {
     "benchmark": "hc1_hf2_paired_production_adapters",
     "completed_utc": "2026-09-07T05:02:41.732562+00:00",
-    "exact_command": "/tmp/whalemodem-hc1-hf2-venv/bin/python -m scripts.compare_hc1_hf2 --condition static --points 7.5 --trials 300 --workers 6 --seed 20260908 --out logs/mode_qualification/hf-ssb/hc1-hf2/2026-09-07/static-refine.json",
+    "exact_command": "/tmp/whale-hc1-hf2-venv/bin/python -m scripts.compare_hc1_hf2 --condition static --points 7.5 --trials 300 --workers 6 --seed 20260908 --out logs/mode_qualification/hf-ssb/hc1-hf2/2026-09-07/static-refine.json",
     "trials_per_mode_point": 300,
     "worker_processes": 6,
     "pairing": "mode-independent SeedSequence([master_seed, condition_index, point_index, trial]); both modes use the same Watterson and AWGN base seed",

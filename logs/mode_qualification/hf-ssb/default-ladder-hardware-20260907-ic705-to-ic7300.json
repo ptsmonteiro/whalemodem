@@ -32,16 +32,6 @@
       "failure": null
     },
     {
-      "mode": "hf3",
-      "mode_id": 9,
-      "trial": 1,
-      "decoded": false,
-      "keyed_seconds": 3.667414665222168,
-      "rx_samples": 62160,
-      "confidence": 0.9843144925338189,
-      "failure": null
-    },
-    {
       "mode": "hf4",
       "mode_id": 11,
       "trial": 1,
