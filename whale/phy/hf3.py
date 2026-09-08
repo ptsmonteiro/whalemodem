@@ -1,7 +1,7 @@
 """HF3: the HF4 waveform with an exact rate-2/3 inner FEC code.
 
-Developed as `experiments/hf3_fec34.py` and moved here unmodified when it
-became shipped product code; `experiments/hf3_fec34/README.md` records the
+Developed in the retired `experiments/hf3_fec34/` and moved here unmodified
+when it became shipped product code; that directory's `README.md` records the
 candidate and its controlled-channel screen.  (The earlier, unrelated
 36-carrier OFDM HF3 in `experiments/hf3/` is historical material and is not
 this waveform.)

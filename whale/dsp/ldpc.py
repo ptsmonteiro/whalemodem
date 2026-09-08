@@ -4,9 +4,9 @@ The matrix is the fixed 648-bit, rate-1/2 matrix from IEEE 802.11-2020,
 Table F-1 (expansion factor 27).  Positive LLR means bit zero.  The module
 knows nothing about OFDM, framing, whitening, or constellations.
 
-Developed as `experiments/qpsk29/ldpc.py` and moved here unmodified when it
-became shipped product code; the coding-gain evidence that qualified it is
-in `experiments/qpsk29/RESULTS.md`.
+Developed in the retired `experiments/qpsk29/` experiment and moved here
+unmodified when it became shipped product code; the coding-gain evidence
+that qualified it is in `experiments/qpsk29/RESULTS.md`.
 """
 
 from functools import lru_cache
@@ -187,11 +187,12 @@ def decode_batch(llrs, max_iterations=30, alpha=0.8, rate=RATE):
     termination still applies -- otherwise a single slow codeword makes every
     other one pay max_iterations.
 
-    Must return bit-identical results to calling decode() on each row; that
-    equivalence is asserted in experiments/qpsk29/test_qpsk29.py, because
-    this is an optimisation sitting on the critical decode path and a
-    divergence here
-    would quietly invalidate every on-air result.
+    Must return bit-identical results to calling decode() on each row,
+    because this is an optimisation sitting on the critical decode path and a
+    divergence here would quietly invalidate every on-air result.  That
+    equivalence was asserted by the retired `experiments/qpsk29/` test suite;
+    it is asserted now by `tests/test_ldpc.py`, which carried the check over
+    when that experiment was retired.
     """
     channel = np.asarray(llrs, dtype=float)
     if channel.ndim != 2 or channel.shape[1] != N:

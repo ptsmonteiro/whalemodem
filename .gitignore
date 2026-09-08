@@ -7,14 +7,49 @@ logs/*
 !logs/mode_qualification/**
 *.wav
 scratch_captures*/
-experiments/ofdm/results/captures/
-experiments/ofdm/results/failures/
 .venv/
 *.egg-info/
 /build/
 /dist/
-experiments/qpsk29/results/captures/
-experiments/qpsk29/results/failures/
-experiments/qpsk29/results/logs/
-experiments/hr1/results/*_captures/
 logs/mode_qualification/**/*-captures/
+
+# Experiment run output is scratch, not repository content: raw captures and
+# per-trial dumps under results/, captures/ and hardware/, plus any array or
+# payload dump anywhere under experiments/. See experiments/README.md. The
+# patterns match files rather than directories so the exceptions below can
+# still re-include an individual artifact; force-add (git add -f) any new one a
+# test or document needs to read by path, and say so in the experiment's
+# markdown.
+experiments/**/results/**/*.npy
+experiments/**/results/**/*.npz
+experiments/**/results/**/*.bin
+experiments/**/results/**/*.json
+experiments/**/results/**/*.log
+experiments/**/captures/**/*.npy
+experiments/**/captures/**/*.npz
+experiments/**/captures/**/*.bin
+experiments/**/captures/**/*.json
+experiments/**/captures/**/*.log
+experiments/**/hardware/**/*.npy
+experiments/**/hardware/**/*.npz
+experiments/**/hardware/**/*.bin
+experiments/**/hardware/**/*.json
+experiments/**/hardware/**/*.log
+experiments/**/*.npy
+experiments/**/*.npz
+experiments/**/*.bin
+experiments/**/results/**/.gitkeep
+experiments/**/captures/**/.gitkeep
+experiments/**/hardware/**/.gitkeep
+
+# Committed evidence that predates the rule above and is still read by tests,
+# scripts or documentation. These exceptions go away when their experiment is
+# retired; see experiments/RETIRED.md.
+!experiments/ofdm/results/measurements/bandwidth.json
+!experiments/vf3/results/final_dqpsk_both_3.json
+!experiments/vf3/results/captures/**
+!experiments/hf3/results/**
+!experiments/hr0_fast_control/results/**
+!experiments/hf14_ofdm_bpsk_watterson/hardware/**
+!experiments/hf16_mfsk_lowsnr/hardware/**
+!experiments/hf16_mfsk_lowsnr/*_run1/*.npy

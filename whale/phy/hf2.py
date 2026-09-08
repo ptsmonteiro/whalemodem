@@ -1,7 +1,7 @@
 """HF2: pilot-assisted coherent 16-QAM OFDM, targeting Speed Ladder Level 2.
 
-Developed as `experiments/hf2/hf2.py` and moved here unmodified when it
-became shipped product code.  See `experiments/hf2/PLAN.md` and
+Developed in the retired `experiments/hf2/` and moved here unmodified when
+it became shipped product code.  See `experiments/hf2/PLAN.md` and
 `experiments/hf2/DESIGN.md` for the experiment this waveform belongs to and
 why each choice below was made, and `experiments/hf2/RESULTS.md` for the
 measurements that qualified it; this module is stage 2 of that plan -- the

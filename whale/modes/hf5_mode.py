@@ -6,8 +6,8 @@ full-capacity frame is sized for just over 2 kbit/s net application rate,
 leaving coding margin for moderate Watterson fading.  This is an experimental
 mode until the requested 16 dB Watterson envelope has promotion-sized evidence.
 
-The waveform is `whale/phy/sc_resilient.py` (developed as
-`experiments/hf15_resilient/sc_resilient.py`).
+The waveform is `whale/phy/sc_resilient.py` (developed in
+`experiments/hf15_resilient/`, whose remaining code is the FEC-rate sweep).
 """
 
 from __future__ import annotations

@@ -1,8 +1,8 @@
 """From-scratch single-carrier audio-passband mode for the IC-7300 -> IC-705
 audio-coupled path.
 
-Developed as `experiments/hf5_8psk_4k/sc.py` and moved here unmodified when
-it became shipped product code; its qualification record is
+Developed in the retired `experiments/hf5_8psk_4k/` and moved here
+unmodified when it became shipped product code; its qualification record is
 `experiments/hf5_8psk_4k/RESULTS.md`.
 
 Independent of whale/modes/*. Reuses only whale.dsp.bits (PN whitening) as

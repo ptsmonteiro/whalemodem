@@ -1,6 +1,7 @@
 """VF3 as a WaveformMode: the contract whale/link.py actually relies on.
 
-The DSP itself is covered by `experiments/vf3/test_vf3.py` and was validated
+The DSP itself is covered by `tests/test_vf3_kernels.py` and
+`tests/test_vf3_stages.py`, and was validated
 on air (`experiments/vf3/RESULTS.md`).  What is tested here is the adapter:
 that VF3 presents the surface the link drives, that its decode results say
 the three things the link's receive loop reads them for, and that the

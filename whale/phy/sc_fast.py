@@ -1,6 +1,6 @@
 """Drop-in, fast-sync variant of `whale/phy/sc.py`'s SingleCarrierMode.
 
-Developed as `experiments/hf13_fast_sync_v1/sc_fast.py` and moved here
+Developed in the retired `experiments/hf13_fast_sync_v1/` and moved here
 unmodified when it became shipped product code; its equivalence evidence is
 `experiments/hf13_fast_sync_v1/RESULTS.md`.
 
@@ -14,8 +14,8 @@ Public API is identical to sc.SingleCarrierMode: modulate(), demodulate(),
 max_payload_bytes, frame_seconds(), so this is a drop-in replacement.
 Internally it delegates everything except the sync-search stage to
 `whale/phy/sc.py` (used read-only, never modified) and reuses the fused-FFT
-fast_sync_search from `whale/phy/fast_sync.py` (developed as
-experiments/hf5_8psk_4k_profiling/fast_sync.py, also read-only).
+fast_sync_search from `whale/phy/fast_sync.py` (developed in the retired
+experiments/hf5_8psk_4k_profiling/, also read-only).
 """
 
 from __future__ import annotations

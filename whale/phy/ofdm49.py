@@ -1,7 +1,7 @@
-"""49-subcarrier true-OFDM PHY (v6), extending
-experiments/hf9_ofdm49_v5/ofdm49.py (v5).
+"""49-subcarrier true-OFDM PHY (v6), extending the v5 PHY of the retired
+experiments/hf9_ofdm49_v5/.
 
-Developed as `experiments/hf10_ofdm49_v6/ofdm49_v6.py` and moved here
+Developed in the retired `experiments/hf10_ofdm49_v6/` and moved here
 unmodified when it became shipped product code; its qualification record is
 `experiments/hf10_ofdm49_v6/RESULTS.md`, and the configurations wired on top
 of it are measured in `experiments/hf18_ofdm49_vara/RESULTS.md` (HF7) and
@@ -22,10 +22,10 @@ history flagged as unexploited:
      i.e. simulation cannot be trusted to predict this failure mode, so
      it must be tested for real, on hardware, again, here.
   2. FEC: a rate-1/2, 2/3, or 3/4 IEEE-802.11n QC-LDPC code, reused
-     verbatim from `whale/dsp/ldpc.py` (developed as
-     experiments/qpsk29/ldpc.py; dependency-free, already used
-     successfully with real coding gain in that experiment and in
-     experiments/ofdm/ldpc.py's HF trials), applied across the packet's
+     verbatim from `whale/dsp/ldpc.py` (developed in the retired
+     experiments/qpsk29/; dependency-free, already used
+     successfully with real coding gain in that experiment and in the
+     retired experiments/ofdm/'s HF trials), applied across the packet's
      whitened bit stream. New in this module vs v5:
 
      - `fec_rate` field (None | "1/2" | "2/3" | "3/4"). When set,

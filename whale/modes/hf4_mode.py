@@ -3,10 +3,11 @@
 HF4 is a from-scratch single-carrier audio-passband data mode (8PSK @ 1500
 baud, no FEC, sparse mid-frame BPSK pilots for phase-drift tracking) for the
 IC-7300 -> IC-705 audio-coupled HF SSB path. It wires
-`whale/phy/sc_fast.py`'s `SingleCarrierMode` (developed as
-`experiments/hf13_fast_sync_v1/sc_fast.py`) -- a drop-in,
+`whale/phy/sc_fast.py`'s `SingleCarrierMode` (developed in the retired
+`experiments/hf13_fast_sync_v1/`) -- a drop-in,
 ~4.8x-cheaper-to-decode replacement for `whale/phy/sc.py`'s
-`SingleCarrierMode` (developed as `experiments/hf5_8psk_4k/sc.py`) and its
+`SingleCarrierMode` (developed in the retired `experiments/hf5_8psk_4k/`)
+and its
 already real-hardware qualified operating point (8PSK@1500baud, packet_bytes=2994,
 pilot_interval=150, ~4049 bps net) -- into the link's `WaveformMode`
 contract, mirroring `whale/modes/hf3_mode.py`'s pattern; it does not
@@ -48,7 +49,7 @@ from .. import framing
 HF4_MODE_ID = 11
 
 #: HF13's real-hardware qualified operating point (see
-#: experiments/hf13_fast_sync_v1/hardware_test.py's defaults and
+#: experiments/hf13_fast_sync_v1/RESULTS.md and
 #: experiments/hf5_8psk_4k/RESULTS.md step 28): 8PSK @ 1500 baud, no FEC,
 #: a mid-frame BPSK pilot block every 150 data symbols.
 BAUD = 1500.0

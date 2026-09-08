@@ -57,9 +57,9 @@ DEFAULT_INTER_TRIAL = 0.5
 
 def _ground_truth_bits(packet_bytes: int, payload: bytes) -> np.ndarray:
     """Same plain (pre-whitening) packet bit stream sc_fast.py's raw_bits
-    is compared against -- see experiments/hf13_fast_sync_v1/hardware_test.py's
-    identically-named helper for the reasoning; reused read-only here so
-    both scripts compute BER the same way."""
+    is compared against -- see experiments/hf13_fast_sync_v1/RESULTS.md for the
+    reasoning behind the retired hardware runner's identically-named helper;
+    kept in step here so both compute BER the same way."""
     packet = sc._pack_packet(payload, packet_bytes)
     return np.unpackbits(np.frombuffer(packet, dtype=np.uint8))
 

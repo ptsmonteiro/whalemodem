@@ -4,8 +4,8 @@ HF7 wires the configuration measured in `experiments/hf18_ofdm49_vara/`
 into the link's `WaveformMode` contract, mirroring `whale/modes/hf6_mode.py`'s
 pattern; it does not re-derive or re-run that design or its evidence.
 
-The waveform is `whale/phy/ofdm49.py` (developed as
-`experiments/hf10_ofdm49_v6/ofdm49_v6.py`) -- unmodified, the same PHY HF6
+The waveform is `whale/phy/ofdm49.py` (developed in the retired
+`experiments/hf10_ofdm49_v6/`) -- unmodified, the same PHY HF6
 already wraps -- at 50 Hz subcarrier spacing (`fft_size=240` at
 the 12 kHz design rate) with a 2 ms guard, 32-QAM, and rate-3/4 LDPC over an
 interleaved frame.  That geometry is VARA HF's top-speed arrangement, and a

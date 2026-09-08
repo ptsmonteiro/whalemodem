@@ -1,7 +1,7 @@
 """HF6: experimental high-throughput 49-carrier OFDM mode.
 
 HF6 packages the 64-QAM OFDM configuration of ``whale.phy.ofdm49`` (the PHY
-developed as ``experiments/hf10_ofdm49_v6/ofdm49_v6.py``, whose evidence is
+developed in the retired ``experiments/hf10_ofdm49_v6/``, whose evidence is
 in that directory's RESULTS.md) into the negotiable waveform contract.  It is
 deliberately experimental: the uncoded 64-QAM operating point exceeds HF4's
 peak throughput on paper, but failed the initial radio-path smoke test.

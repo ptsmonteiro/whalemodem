@@ -1,8 +1,8 @@
 """HF4-derived resilient single-carrier PHY.
 
-Developed as `experiments/hf15_resilient/sc_resilient.py` and moved here
-unmodified when it became shipped product code; the code-rate evidence
-behind it is in `experiments/hf15_resilient/`.
+Developed in `experiments/hf15_resilient/` and moved here unmodified when it
+became shipped product code; the code-rate evidence behind it is in that
+directory.
 
 The RF waveform is deliberately kept compatible with HF4's acquisition and
 pilot-tracking path.  The payload carried inside that waveform is protected

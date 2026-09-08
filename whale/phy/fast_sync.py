@@ -1,8 +1,8 @@
 """Fused FFT-based sync search for SingleCarrierMode.demodulate().
 
-Developed as `experiments/hf5_8psk_4k_profiling/fast_sync.py` -- a read-only
-investigation that did NOT modify the single-carrier PHY -- and moved here
-unmodified when `whale/phy/sc_fast.py` shipped on top of it; the
+Developed in the retired `experiments/hf5_8psk_4k_profiling/` experiment --
+a read-only investigation that did NOT modify the single-carrier PHY -- and
+moved here unmodified when `whale/phy/sc_fast.py` shipped on top of it; the
 equivalence and speedup evidence is in
 `experiments/hf13_fast_sync_v1/RESULTS.md`.
 

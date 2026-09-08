@@ -1,7 +1,7 @@
 """HF4: a from-scratch, maximum-speed HF-SSB waveform.
 
-Developed as `experiments/hf4/hf4.py` and moved here unmodified when it
-became shipped product code; `experiments/hf4/DESIGN.md` holds the design
+Developed in the retired `experiments/hf4/` and moved here unmodified when
+it became shipped product code; `experiments/hf4/DESIGN.md` holds the design
 rationale referred to throughout below, and `experiments/hf4/RESULTS.md`
 the measurements that qualified it.
 
@@ -111,8 +111,8 @@ assert SAMPLE_RATE == RX_SAMPLE_RATE * _TX_UPSAMPLE
 # (`logs/mode_qualification/hf-ssb/hf4/2026-09-01/INDEX.md`) found the
 # original guard left every frame corrupted by inter-symbol interference
 # from this filter memory, independent of SNR. 64 samples was chosen from a
-# direct empirical sweep (`experiments/hf4/test_hf4.py`'s guard-margin
-# regression test and the fix campaign's diagnostics): guard lengths from
+# direct empirical sweep (the guard-margin regression test in the retired
+# `experiments/hf4/` and the fix campaign's diagnostics): guard lengths from
 # 12 up to ~48 samples still failed the noiseless filter-only diagnostic,
 # while 64 samples and above decoded cleanly and repeatably across
 # independent random payloads/seeds -- comfortable margin above the

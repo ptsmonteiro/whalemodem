@@ -1,7 +1,8 @@
 """HF3, the HF4 waveform with a rate-2/3 inner convolutional code.
 
-The waveform is `whale/phy/hf3.py` (developed as `experiments/hf3_fec34.py`;
-see `experiments/hf3_fec34/README.md` for the candidate's screen).
+The waveform is `whale/phy/hf3.py` (developed in the retired
+`experiments/hf3_fec34/`; see that directory's `README.md` for the
+candidate's screen).
 """
 
 from __future__ import annotations

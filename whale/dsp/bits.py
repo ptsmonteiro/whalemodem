@@ -1,9 +1,10 @@
 """Bit-level kernels: PN sequences, whitening and QPSK mapping.
 
 Lifted from `whale/modes/_primitives.py`, which took them verbatim from
-`experiments/vf2/vf2.py`.  The VF2..VF5 bench results and every capture
-under `experiments/*/results/` were produced against these exact
-mappings, so they are held bit-identical rather than tidied.
+the retired `experiments/vf2/` experiment (see `experiments/RETIRED.md`).
+The VF2..VF5 bench results and every capture behind them were produced
+against these exact mappings, so they are held bit-identical rather than
+tidied.
 """
 
 from __future__ import annotations

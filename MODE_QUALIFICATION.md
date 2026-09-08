@@ -251,7 +251,7 @@ HF3 (hf-ssb mode ID `9`) is the HF4-derived rate-2/3 candidate. It reuses
 HF4's 149-carrier geometry, but uses a shorter 36-data-symbol frame with
 pilots every 6 symbols and an exact K=7 convolutional code punctured to `2/3`;
 its implementation is
-`whale/phy/hf3.py` (developed as `experiments/hf3_fec34.py`; see
+`whale/phy/hf3.py` (developed in the retired `experiments/hf3_fec34/`; see
 `experiments/hf3_fec34/README.md`). The former 36-carrier HF3 experiment and its
 qualification results below are historical and do not transfer to this new
 waveform. HF3 is now the owner-selected Default fast-data rung, replacing
@@ -305,8 +305,8 @@ maximum-speed HF data rung on 2026-09-07 by owner decision. **Default is
 availability, not qualification**; this section records exactly what the
 retained evidence does and does not establish.
 
-The waveform is `whale/phy/ofdm49.py` (developed as
-`experiments/hf10_ofdm49_v6/ofdm49_v6.py`) unmodified -- the PHY HF6
+The waveform is `whale/phy/ofdm49.py` (developed in the retired
+`experiments/hf10_ofdm49_v6/`) unmodified -- the PHY HF6
 already wraps -- at 50 Hz subcarrier spacing (`fft_size=240`),
 a 2 ms guard (`cp_len=24`), 32-QAM, rate-3/4 LDPC over an interleaved
 frame, 49 carriers spanning 300-2700 Hz, 4,732 B payload. Full derivation
@@ -418,8 +418,8 @@ wiring:
   Acquisition was 100% at every point -- every failure was `payload_failed`,
   never a missed acquisition -- and there were no `error` outcomes, so those
   two gate conditions pass across the grid. **This relocated the boundary 2 dB
-  up from the 16 dB the 40-trial screen in
-  `experiments/hf19_ofdm49_8psk/sweep.py` claimed**, and for exactly the
+  up from the 16 dB the 40-trial screen in the retired
+  `experiments/hf19_ofdm49_8psk/` claimed (see its `RESULTS.md`)**, and for exactly the
   reason §3 requires the bounded form: at 16 dB the observed rate is 90.0%,
   which a bare "90% delivered" rule passes and the Wilson bound fails.
 

@@ -13,7 +13,7 @@ layout and coding choices and why each was picked, and
 retained paired comparison for current-convention measurements.
 
 This module only wires the already-designed `whale/phy/hf2.py` waveform
-(developed as `experiments/hf2/hf2.py`) into the link's `WaveformMode`
+(developed in the retired `experiments/hf2/`) into the link's `WaveformMode`
 contract,
 mirroring `whale/modes/hc1_mode.py`'s pattern; it does not re-derive or
 re-run any of that design or evidence. The owner made HF2 a DEFAULT product
