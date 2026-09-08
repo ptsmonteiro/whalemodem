@@ -1,4 +1,11 @@
-"""HF3: the HF4 waveform with an exact rate-2/3 inner FEC code."""
+"""HF3: the HF4 waveform with an exact rate-2/3 inner FEC code.
+
+Developed as `experiments/hf3_fec34.py` and moved here unmodified when it
+became shipped product code; `experiments/hf3_fec34/README.md` records the
+candidate and its controlled-channel screen.  (The earlier, unrelated
+36-carrier OFDM HF3 in `experiments/hf3/` is historical material and is not
+this waveform.)
+"""
 
 from __future__ import annotations
 
@@ -6,8 +13,8 @@ import threading
 
 import numpy as np
 
-from experiments.hf4 import hf4
 from whale.dsp import interleave as _interleave
+from whale.phy import hf4
 
 FEC_K = 2
 FEC_N = 3

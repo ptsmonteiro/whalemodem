@@ -1,4 +1,4 @@
-"""Deterministic round-trip checks for the HF2 waveform (experiments/hf2/hf2.py).
+"""Deterministic round-trip checks for the HF2 waveform (whale/phy/hf2.py).
 
 Stage 2 of experiments/hf2/PLAN.md: prove the waveform itself -- geometry,
 16-QAM mapping, FEC/framing, acquisition and channel tracking -- round-trips
@@ -9,7 +9,7 @@ Watterson fading) is stage 3/4's benchmark harness, not this test.
 import numpy as np
 import pytest
 
-from experiments.hf2 import hf2
+from whale.phy import hf2
 from whale import rx_audio
 
 

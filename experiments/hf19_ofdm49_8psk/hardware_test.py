@@ -6,7 +6,7 @@ simulation. This file is how that choice meets a radio, which is the thing
 on this very PHY family, a 16-QAM configuration that passed simulation was
 1/5 on the air.
 
-hf10's PHY (`experiments/hf10_ofdm49_v6/ofdm49_v6.py`) and its hardware
+hf10's PHY (`whale/phy/ofdm49.py`) and its hardware
 harness are imported read-only and unmodified; this file only supplies HF8's
 parameters as defaults and points the output at this experiment's own logs,
 per the project convention of a disposable harness copy per experiment. It is
@@ -47,7 +47,7 @@ if str(SCRIPTS_DIR) not in sys.path:
     sys.path.insert(0, str(SCRIPTS_DIR))
 
 import bench
-from experiments.hf10_ofdm49_v6 import ofdm49_v6 as ofdm49  # noqa: F401
+from whale.phy import ofdm49 as ofdm49  # noqa: F401
 from experiments.hf10_ofdm49_v6.hardware_test import main as _hf10_main
 from whale.modes import hf8_mode
 

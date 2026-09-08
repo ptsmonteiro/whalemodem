@@ -1,7 +1,7 @@
 """Real-hardware trial runner for hf11_ofdm49_v6_duration.
 
 This experiment pushes FRAME DURATION (payload size) on top of hf10's
-exact PHY: `experiments/hf10_ofdm49_v6/ofdm49_v6.py` is imported read-only,
+exact PHY: `whale/phy/ofdm49.py` is imported read-only,
 unmodified -- 49-bin OFDM, 16-QAM, rate-3/4 LDPC. Nothing about the PHY
 changes here; every "step" in this experiment is a different
 --packet-bytes/--pilot-interval combination on the same code hf10
@@ -36,7 +36,7 @@ if str(SCRIPTS_DIR) not in sys.path:
     sys.path.insert(0, str(SCRIPTS_DIR))
 
 import bench
-from experiments.hf10_ofdm49_v6 import ofdm49_v6 as ofdm49  # noqa: F401  (re-exported for callers)
+from whale.phy import ofdm49 as ofdm49  # noqa: F401  (re-exported for callers)
 from experiments.hf10_ofdm49_v6.hardware_test import main as _hf10_main
 
 DEFAULT_OUTPUT_ROOT = Path("logs") / "mode_qualification" / "hf-ssb" / "hf11"

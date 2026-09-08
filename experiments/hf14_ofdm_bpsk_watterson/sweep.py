@@ -6,7 +6,7 @@ this file; its purpose is to narrow a large geometry grid down to a handful
 of configurations worth spending real airtime on later.
 
 What is reused (nothing is rewritten):
-  - ``experiments/hf10_ofdm49_v6/ofdm49_v6.py`` -- the parametric OFDM PHY
+  - ``whale/phy/ofdm49.py`` -- the parametric OFDM PHY
     (fft_size / cp_len / bits_per_symbol / pilot_interval /
     pilot_comb_stride / packet_bytes, and ``bins_in_band()`` for the
     300-2700 Hz passband). Used unmodified, always with
@@ -73,7 +73,7 @@ from whale import rx_audio
 from whale.channel import (WATTERSON_PRESETS, AwgnChannel, ChannelChain,
                            SnrSpec, WattersonChannel)
 from whale.qualification import trial_seed
-from experiments.hf10_ofdm49_v6 import ofdm49_v6 as ofdm
+from whale.phy import ofdm49 as ofdm
 
 AUDIO_RATE = 48_000
 DESIGN_RATE = ofdm.DESIGN_RATE          # 12 kHz receive rate

@@ -1,4 +1,4 @@
-"""Small-N non-orthogonal multicarrier extension of experiments/hf5_8psk_4k/sc.py.
+"""Small-N non-orthogonal multicarrier extension of whale/phy/sc.py.
 
 Motivation (see experiments/hf5_8psk_4k/RESULTS.md and
 experiments/hc2_32qam, experiments/hf4): summing MANY simultaneous tones
@@ -58,7 +58,7 @@ if str(REPOSITORY_ROOT) not in sys.path:
     sys.path.insert(0, str(REPOSITORY_ROOT))
 
 from whale.dsp import bits as _bits
-from experiments.hf5_8psk_4k import sc
+from whale.phy import sc
 
 DESIGN_RATE = sc.DESIGN_RATE
 TX_SAMPLE_RATE = sc.TX_SAMPLE_RATE

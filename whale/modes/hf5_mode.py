@@ -5,6 +5,9 @@ terminated K=7 rate-1/2 convolutional code and a block interleaver.  Its
 full-capacity frame is sized for just over 2 kbit/s net application rate,
 leaving coding margin for moderate Watterson fading.  This is an experimental
 mode until the requested 16 dB Watterson envelope has promotion-sized evidence.
+
+The waveform is `whale/phy/sc_resilient.py` (developed as
+`experiments/hf15_resilient/sc_resilient.py`).
 """
 
 from __future__ import annotations
@@ -13,7 +16,7 @@ from dataclasses import dataclass, field
 
 import numpy as np
 
-from experiments.hf15_resilient import sc_resilient as hf5
+from whale.phy import sc_resilient as hf5
 from .. import framing
 
 HF5_MODE_ID = 12

@@ -1,11 +1,16 @@
 """From-scratch single-carrier audio-passband mode for the IC-7300 -> IC-705
 audio-coupled path.
 
+Developed as `experiments/hf5_8psk_4k/sc.py` and moved here unmodified when
+it became shipped product code; its qualification record is
+`experiments/hf5_8psk_4k/RESULTS.md`.
+
 Independent of whale/modes/*. Reuses only whale.dsp.bits (PN whitening) as
 a generic primitive. Everything else -- pulse shaping, sync, carrier
 mixing, symbol mapping, framing -- is written fresh here.
 
-Design, built up in small, hardware-validated steps (see RESULTS.md):
+Design, built up in small, hardware-validated steps (see
+`experiments/hf5_8psk_4k/RESULTS.md`):
 
   - One sinusoidal carrier in the middle of the 300-2700 Hz passband
     (1500 Hz), single-sideband-friendly (real passband signal, no image
@@ -25,15 +30,9 @@ Design, built up in small, hardware-validated steps (see RESULTS.md):
 
 from __future__ import annotations
 
-import sys
 from dataclasses import dataclass
-from pathlib import Path
 
 import numpy as np
-
-REPOSITORY_ROOT = Path(__file__).resolve().parents[2]
-if str(REPOSITORY_ROOT) not in sys.path:
-    sys.path.insert(0, str(REPOSITORY_ROOT))
 
 from whale.dsp import bits as _bits
 

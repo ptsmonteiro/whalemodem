@@ -17,8 +17,12 @@ geometry and a wiring of these together -- see `whale/modes/vf3.py`.
   `interleave`    multiplicative and block bit interleavers
   `mfsk`          non-coherent M-ary FSK: tone bank, Gray map, sync
   `fec`           rate-1/2 convolutional coding, hard and soft Viterbi
+  `ldpc`          IEEE 802.11n length-648 QC-LDPC, normalized min-sum
   `framing`       the length/CRC32/whitening/FEC payload codec
   `head`          how much of a transmitted lead-in survived
+
+Nothing here imports from `whale/phy/` or `whale/modes/`: these kernels are
+the bottom of the stack, and `tests/test_layering.py` holds them there.
 
 Everything here is numerically pinned by `tests/test_dsp_kernels.py` and,
 through VF3, by the recorded-capture replay in
@@ -27,7 +31,7 @@ definitions, not a tidy-up: changing one changes what a station transmits.
 """
 
 from . import (acquire, bits, differential, equalize, fec, framing, freq,
-               head, interleave, mfsk, ofdm, timing)
+               head, interleave, ldpc, mfsk, ofdm, timing)
 from .fec import K7, K9, ConvolutionalCode
 from .framing import PacketCodec
 from .interleave import Interleaver
@@ -37,7 +41,7 @@ from .timing import TimingFit
 
 __all__ = [
     "acquire", "bits", "differential", "equalize", "fec", "framing", "freq",
-    "head", "interleave", "mfsk", "ofdm", "timing",
+    "head", "interleave", "ldpc", "mfsk", "ofdm", "timing",
     "ConvolutionalCode", "Geometry", "Interleaver", "K7", "K9", "PacketCodec",
     "TimingFit", "ToneBank",
 ]

@@ -24,8 +24,8 @@ if str(REPOSITORY_ROOT) not in sys.path:
 
 import numpy as np
 
-from experiments.hf5_8psk_4k import sc
-from experiments.hf5_8psk_4k_profiling import fast_sync
+from whale.phy import sc
+from whale.phy import fast_sync
 
 CAPTURES_DIR = Path(__file__).resolve().parent / "captures"
 

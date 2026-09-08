@@ -42,7 +42,7 @@ import numpy as np
 
 import bench
 from whale.dsp import bits as _bits
-from experiments.hf10_ofdm49_v6 import ofdm49_v6 as ofdm49
+from whale.phy import ofdm49 as ofdm49
 
 
 def truth_symbols(mode, payload: bytes) -> np.ndarray:

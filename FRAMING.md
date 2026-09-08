@@ -277,9 +277,11 @@ Three details follow from being non-coherent:
 
 Mode `7` is `whale.modes.hf2_mode.HF2`, a pilot-assisted coherent 16-QAM OFDM
 mode built and qualified in `experiments/hf2/` as a from-scratch design
-independent of HC0/HC1/VF6/HR0 (see `experiments/hf2/DESIGN.md`), then wired
-into `whale/modes/` as a thin `WaveformMode` adapter over the unchanged
-experiment module, the same shape `hc1_mode.py` uses over `hc1.py`. It
+independent of HC0/HC1/VF6/HR0 (see `experiments/hf2/DESIGN.md`). The
+waveform itself now ships as `whale/phy/hf2.py`, unchanged from the
+experiment module it was qualified as, and `whale/modes/` holds only a thin
+`WaveformMode` adapter over it -- the same shape `hc1_mode.py` uses over
+`hc1.py`. It
 targets Level 2 of the HF SSB speed ladder (`SPEED_LADDERS.md`):
 general-purpose data, quiet Watterson fading at +14 dB and above, moderate at
 +19 dB and above under the current SNR/3 kHz convention. 19 carriers

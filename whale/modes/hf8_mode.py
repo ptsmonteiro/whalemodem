@@ -4,8 +4,9 @@ HF8 wires the configuration measured in `experiments/hf19_ofdm49_8psk/` into
 the link's `WaveformMode` contract, mirroring `whale/modes/hf7_mode.py`'s
 pattern; it does not re-derive or re-run that design or its evidence.
 
-The waveform is `experiments/hf10_ofdm49_v6/ofdm49_v6.py` -- unmodified, the
-same PHY HF6 and HF7 already wrap -- on **exactly HF7's carrier plan and
+The waveform is `whale/phy/ofdm49.py` (developed as
+`experiments/hf10_ofdm49_v6/ofdm49_v6.py`) -- unmodified, the same PHY HF6
+and HF7 already wrap -- on **exactly HF7's carrier plan and
 guard**: 50 Hz subcarrier spacing (`fft_size=240` at the 12 kHz design rate),
 a 2 ms guard, 49 carriers filling 300-2700 Hz edge to edge.  Four things
 change:
@@ -94,7 +95,7 @@ from dataclasses import dataclass, field
 
 import numpy as np
 
-from experiments.hf10_ofdm49_v6 import ofdm49_v6 as hf8
+from whale.phy import ofdm49 as hf8
 
 from .. import framing
 

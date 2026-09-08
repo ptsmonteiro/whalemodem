@@ -1,34 +1,33 @@
-"""Prototype: fused FFT-based sync search for SingleCarrierMode.demodulate().
+"""Fused FFT-based sync search for SingleCarrierMode.demodulate().
 
-Read-only investigation. Does NOT modify experiments/hf5_8psk_4k/sc.py.
-Reimplements only the sync-search inner loop (lines ~330-348 of sc.py) using:
+Developed as `experiments/hf5_8psk_4k_profiling/fast_sync.py` -- a read-only
+investigation that did NOT modify the single-carrier PHY -- and moved here
+unmodified when `whale/phy/sc_fast.py` shipped on top of it; the
+equivalence and speedup evidence is in
+`experiments/hf13_fast_sync_v1/RESULTS.md`.
+
+Reimplements only the sync-search inner loop (lines ~330-348 of
+`whale/phy/sc.py`) using:
   - one FFT of the captured signal x, shared across all frequency hypotheses
   - FFT-based correlation instead of np.correlate direct/time-domain
   - fusion of the correlation-IFFT and the Hilbert-envelope FFT/IFFT into a
     single per-hypothesis forward+inverse FFT pair, at a fast (5-smooth)
     padded length chosen once for the whole search
 Everything else (packet framing, matched filter, equalizer, bit mapping) is
-imported unmodified from sc.py and reused as-is.
+imported unmodified from `whale/phy/sc.py` and reused as-is.
 """
 from __future__ import annotations
 
-import sys
 import time
-from pathlib import Path
 
 import numpy as np
 from scipy.fft import next_fast_len
 
-REPO = Path(__file__).resolve().parents[2]
-if str(REPO) not in sys.path:
-    sys.path.insert(0, str(REPO))
-sys.path.insert(0, str(REPO / "experiments" / "hf5_8psk_4k"))
-
-import sc  # noqa: E402
+from . import sc
 
 
 def fast_sync_search(mode: "sc.SingleCarrierMode", x: np.ndarray):
-    """Reimplementation of the sc.py demodulate() sync loop (lines 330-348).
+    """Reimplementation of sc.py's demodulate() sync loop (lines 330-348).
 
     Returns (best_confidence, best_start, best_freq_hz, norm, pre_shaped)
     matching what the original loop computes, using a fused FFT approach.

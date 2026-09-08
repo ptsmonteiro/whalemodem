@@ -10,10 +10,11 @@ import sys
 import numpy as np
 from scipy.signal import hilbert
 
+sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 
-import ldpc  # noqa: E402
 import qpsk29 as q  # noqa: E402
+from whale.dsp import ldpc  # noqa: E402
 
 
 def test_symbol_is_periodic_and_invertible():

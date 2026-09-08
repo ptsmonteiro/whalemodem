@@ -1,7 +1,7 @@
 """Capture real over-the-air hf5-baseline frames for fast-sync validation.
 
 Modulates known random payloads with the READ-ONLY hf5 baseline mode
-(experiments/hf5_8psk_4k/sc.py, unmodified, qualified config: 8PSK @ 1500
+(whale/phy/sc.py, unmodified, qualified config: 8PSK @ 1500
 baud, packet_bytes=2994, pilot_interval=150, ~4049 bps), keys the IC-7300,
 captures on the IC-705 (receive-only), and saves each raw 12 kHz capture
 plus its ground-truth payload to disk as .npz. This produces the raw
@@ -37,7 +37,7 @@ if str(SCRIPTS_DIR) not in sys.path:
 import numpy as np
 
 import bench
-from experiments.hf5_8psk_4k import sc
+from whale.phy import sc
 
 DEFAULT_TRIALS = 10
 DEFAULT_CAPTURE_TAIL = 1.0

@@ -10,7 +10,7 @@ its top speed level, so the arrangement is known to work on real HF
 somewhere -- the open question here is how much guard interval this
 particular radio pair's SSB filters actually require.
 
-hf10's PHY (experiments/hf10_ofdm49_v6/ofdm49_v6.py) is imported
+hf10's PHY (whale/phy/ofdm49.py) is imported
 read-only, unmodified.  Every step is a --cp-len/--bps/--fec-rate
 combination on the code hf10 qualified; no PHY code is written here.
 
@@ -41,7 +41,7 @@ if str(SCRIPTS_DIR) not in sys.path:
     sys.path.insert(0, str(SCRIPTS_DIR))
 
 import bench
-from experiments.hf10_ofdm49_v6 import ofdm49_v6 as ofdm49  # noqa: F401
+from whale.phy import ofdm49 as ofdm49  # noqa: F401
 from experiments.hf10_ofdm49_v6.hardware_test import main as _hf10_main
 
 DEFAULT_OUTPUT_ROOT = Path("logs") / "mode_qualification" / "hf-ssb" / "hf18"

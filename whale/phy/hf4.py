@@ -1,5 +1,10 @@
 """HF4: a from-scratch, maximum-speed HF-SSB waveform.
 
+Developed as `experiments/hf4/hf4.py` and moved here unmodified when it
+became shipped product code; `experiments/hf4/DESIGN.md` holds the design
+rationale referred to throughout below, and `experiments/hf4/RESULTS.md`
+the measurements that qualified it.
+
 HF4 targets Level 4 of the HF SSB speed ladder in ``SPEED_LADDERS.md``:
 maximum speed inside a deliberately narrow envelope (benign/static fading at
 +13 dB waveform SNR and above). Unlike the general-purpose and fast rungs
@@ -7,13 +12,13 @@ below it, a Level-4 waveform is not expected to spend any margin on fading
 robustness, so this design spends its whole budget on raw bits/second inside
 a 2,400 Hz slot (300-2,700 Hz) rather than on diversity or heavy coding.
 
-This module is a standalone experiment. It is independent of every other
+This waveform is self-contained. It is independent of every other
 mode's specific frame geometry, carrier plan, or coding choice -- see
-``DESIGN.md`` in this directory for the full rationale -- and reuses only
+``experiments/hf4/DESIGN.md`` for the full rationale -- and reuses only
 the project's generic, mode-agnostic DSP library (``whale.dsp``), the same
 way any mode may reuse NumPy.
 
-Design summary (see DESIGN.md for the numbers behind each choice):
+Design summary (see that DESIGN.md for the numbers behind each choice):
 
 * Coherent OFDM, 149 carriers, 15.625 Hz spacing, 343.75-2,656.25 Hz -- well
   inside the 300-2,700 Hz ceiling, with headroom at both edges for real SSB

@@ -4,7 +4,7 @@ from dataclasses import replace
 import json
 from pathlib import Path
 import numpy as np
-from experiments.hf10_ofdm49_v6 import ofdm49_v6 as phy
+from whale.phy import ofdm49 as phy
 
 
 def compare(path, trackers=('off','legacy','common','residual'), widths=(1,3)):

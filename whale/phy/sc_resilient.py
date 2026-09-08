@@ -1,5 +1,9 @@
 """HF4-derived resilient single-carrier PHY.
 
+Developed as `experiments/hf15_resilient/sc_resilient.py` and moved here
+unmodified when it became shipped product code; the code-rate evidence
+behind it is in `experiments/hf15_resilient/`.
+
 The RF waveform is deliberately kept compatible with HF4's acquisition and
 pilot-tracking path.  The payload carried inside that waveform is protected
 by a terminated K=7 rate-1/2 convolutional code and a block interleaver.  A
@@ -11,10 +15,10 @@ from __future__ import annotations
 
 import numpy as np
 
-from experiments.hf13_fast_sync_v1 import sc_fast
 from whale.dsp import bits as _bits
 from whale.dsp import fec as _fec
 from whale.dsp import interleave as _interleave
+from whale.phy import sc_fast
 
 
 TX_SAMPLE_RATE = sc_fast.TX_SAMPLE_RATE

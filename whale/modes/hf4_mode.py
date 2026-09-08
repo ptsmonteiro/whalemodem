@@ -3,10 +3,11 @@
 HF4 is a from-scratch single-carrier audio-passband data mode (8PSK @ 1500
 baud, no FEC, sparse mid-frame BPSK pilots for phase-drift tracking) for the
 IC-7300 -> IC-705 audio-coupled HF SSB path. It wires
-`experiments/hf13_fast_sync_v1/sc_fast.SingleCarrierMode` -- a drop-in,
-~4.8x-cheaper-to-decode replacement for
-`experiments/hf5_8psk_4k/sc.SingleCarrierMode`'s already real-hardware
-qualified operating point (8PSK@1500baud, packet_bytes=2994,
+`whale/phy/sc_fast.py`'s `SingleCarrierMode` (developed as
+`experiments/hf13_fast_sync_v1/sc_fast.py`) -- a drop-in,
+~4.8x-cheaper-to-decode replacement for `whale/phy/sc.py`'s
+`SingleCarrierMode` (developed as `experiments/hf5_8psk_4k/sc.py`) and its
+already real-hardware qualified operating point (8PSK@1500baud, packet_bytes=2994,
 pilot_interval=150, ~4049 bps net) -- into the link's `WaveformMode`
 contract, mirroring `whale/modes/hf3_mode.py`'s pattern; it does not
 re-derive or re-run any of hf5's or hf13's own design or evidence. See
@@ -34,7 +35,7 @@ from dataclasses import dataclass, field
 
 import numpy as np
 
-from experiments.hf13_fast_sync_v1 import sc_fast
+from whale.phy import sc_fast
 
 from .. import framing
 
@@ -73,7 +74,7 @@ CONFIDENCE_THRESHOLD = 0.12
 
 
 class Hf4Codec:
-    """Bridges the link's codec calls onto `experiments.hf13_fast_sync_v1.sc_fast`."""
+    """Bridges the link's codec calls onto `whale.phy.sc_fast`."""
 
     tx_sample_rate = sc_fast.TX_SAMPLE_RATE
     rx_sample_rate = sc_fast.RX_SAMPLE_RATE

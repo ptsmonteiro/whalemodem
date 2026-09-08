@@ -1,5 +1,5 @@
 """Real-hardware qualification-style batch for sc_fast.SingleCarrierMode,
-the fused-FFT-sync drop-in for experiments/hf5_8psk_4k/sc.py.
+the fused-FFT-sync drop-in for whale/phy/sc.py.
 
 sc_fast is a pure CPU optimization of the sync-search stage (see
 RESULTS.md) -- same PHY as hf5's qualified 8PSK@1500baud/~4049bps
@@ -36,8 +36,8 @@ if str(SCRIPTS_DIR) not in sys.path:
 import numpy as np
 
 import bench
-from experiments.hf5_8psk_4k import sc
-from experiments.hf13_fast_sync_v1 import sc_fast
+from whale.phy import sc
+from whale.phy import sc_fast
 
 DEFAULT_TRIALS = 12
 DEFAULT_CAPTURE_TAIL = 1.0
@@ -194,7 +194,7 @@ def main(argv=None, *, pair_factory=bench.radio_pair):
 
     out = {
         "note": "hf13_fast_sync_v1 qualification-style batch: sc_fast.py, "
-                "fused-FFT sync drop-in for hf5_8psk_4k/sc.py. No FEC in this "
+                "fused-FFT sync drop-in for whale/phy/sc.py. No FEC in this "
                 "mode: post_fec_ber is always null, never fabricated.",
         "channel": {"type": "hardware", "radio_a": args.a, "radio_b": args.b},
         "config": {"baud": args.baud, "bits_per_symbol": args.bps,

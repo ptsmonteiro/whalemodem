@@ -1,10 +1,10 @@
 """Single-carrier PHY with optional LDPC FEC, built on top of the v1
-baseline (`experiments/hf5_8psk_4k/sc.py`, read-only reference).
+baseline (`whale/phy/sc.py`, read-only reference).
 
 Reuses sc.py's carrier, RRC pulse shaping, PN preamble, mid-frame pilot
 tracking (linear complex-gain interpolation), and symbol mapping tables
 verbatim (imported, not copied) -- everything below is additive: an
-optional LDPC codec stage (IEEE 802.11n QC-LDPC, `experiments/qpsk29/ldpc.py`,
+optional LDPC codec stage (IEEE 802.11n QC-LDPC, `whale/dsp/ldpc.py`,
 also read-only) inserted between the whitened packet bitstream and the
 symbol mapper, plus an optional block interleaver to spread each LDPC
 codeword's bits across the whole frame in time (the ALC/compression
@@ -30,8 +30,8 @@ if str(REPOSITORY_ROOT) not in sys.path:
     sys.path.insert(0, str(REPOSITORY_ROOT))
 
 from whale.dsp import bits as _bits
-from experiments.hf5_8psk_4k import sc as _sc
-from experiments.qpsk29 import ldpc as _ldpc
+from whale.phy import sc as _sc
+from whale.dsp import ldpc as _ldpc
 
 # Re-exported constants (identical to sc.py; kept as names here so
 # hardware_test.py can refer to one module).

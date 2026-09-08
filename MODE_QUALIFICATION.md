@@ -251,7 +251,8 @@ HF3 (hf-ssb mode ID `9`) is the HF4-derived rate-2/3 candidate. It reuses
 HF4's 149-carrier geometry, but uses a shorter 36-data-symbol frame with
 pilots every 6 symbols and an exact K=7 convolutional code punctured to `2/3`;
 its implementation is
-`experiments/hf3_fec34.py`. The former 36-carrier HF3 experiment and its
+`whale/phy/hf3.py` (developed as `experiments/hf3_fec34.py`; see
+`experiments/hf3_fec34/README.md`). The former 36-carrier HF3 experiment and its
 qualification results below are historical and do not transfer to this new
 waveform. HF3 is now the owner-selected Default fast-data rung, replacing
 HF2 in the normal registry despite incomplete qualification evidence. The
@@ -304,8 +305,9 @@ maximum-speed HF data rung on 2026-09-07 by owner decision. **Default is
 availability, not qualification**; this section records exactly what the
 retained evidence does and does not establish.
 
-The waveform is `experiments/hf10_ofdm49_v6/ofdm49_v6.py` unmodified --
-the PHY HF6 already wraps -- at 50 Hz subcarrier spacing (`fft_size=240`),
+The waveform is `whale/phy/ofdm49.py` (developed as
+`experiments/hf10_ofdm49_v6/ofdm49_v6.py`) unmodified -- the PHY HF6
+already wraps -- at 50 Hz subcarrier spacing (`fft_size=240`),
 a 2 ms guard (`cp_len=24`), 32-QAM, rate-3/4 LDPC over an interleaved
 frame, 49 carriers spanning 300-2700 Hz, 4,732 B payload. Full derivation
 and every negative result behind those choices are in

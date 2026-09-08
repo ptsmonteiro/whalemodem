@@ -47,7 +47,7 @@ import numpy as np
 
 import bench
 from whale import framing, mode_qualification
-from experiments.hf5_8psk_4k import sc  # read-only: ground-truth packing only
+from whale.phy import sc  # read-only: ground-truth packing only
 from whale.modes.hf4_mode import HF4_PHY  # read-only: packet_bytes for ground truth
 
 DEFAULT_TRIALS = 12

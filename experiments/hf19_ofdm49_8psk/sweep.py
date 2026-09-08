@@ -9,7 +9,7 @@ for the smallest loss of net rate, and to bracket both modes' failure
 boundaries on the same seeded channels.
 
 What is reused (nothing is rewritten):
-  - ``experiments/hf10_ofdm49_v6/ofdm49_v6.py`` -- the parametric OFDM PHY
+  - ``whale/phy/ofdm49.py`` -- the parametric OFDM PHY
     that HF6 and HF7 already wrap, used unmodified. HF7's configuration
     (``whale/modes/hf7_mode.py``) is the fixed baseline arm.
   - ``whale/channel.py`` -- ``WattersonChannel`` + ``WATTERSON_PRESETS`` +
@@ -78,7 +78,7 @@ from whale import rx_audio
 from whale.channel import (WATTERSON_PRESETS, AwgnChannel, ChannelChain,
                            SnrSpec, WattersonChannel)
 from whale.qualification import trial_seed
-from experiments.hf10_ofdm49_v6 import ofdm49_v6 as ofdm
+from whale.phy import ofdm49 as ofdm
 
 AUDIO_RATE = 48_000
 DESIGN_RATE = ofdm.DESIGN_RATE          # 12 kHz receive rate

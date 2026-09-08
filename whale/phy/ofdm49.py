@@ -1,6 +1,12 @@
 """49-subcarrier true-OFDM PHY (v6), extending
 experiments/hf9_ofdm49_v5/ofdm49.py (v5).
 
+Developed as `experiments/hf10_ofdm49_v6/ofdm49_v6.py` and moved here
+unmodified when it became shipped product code; its qualification record is
+`experiments/hf10_ofdm49_v6/RESULTS.md`, and the configurations wired on top
+of it are measured in `experiments/hf18_ofdm49_vara/RESULTS.md` (HF7) and
+`experiments/hf19_ofdm49_8psk/RESULTS.md` (HF8).
+
 v5 established, on real hardware, that 49 contiguous 8PSK subcarriers
 spanning the full 300-2700 Hz passband decode reliably at ~4014 bps net
 (10/10, zero bit errors), matching the project's single-carrier record.
@@ -8,15 +14,17 @@ v6's job is to push further on TWO independent levers the project's own
 history flagged as unexploited:
 
   1. Higher-order modulation (16-QAM) reusing v5's already-4-bit-capable
-     `bits_to_symbols`/`symbols_to_bits` (from hf5's sc.py) directly on
-     the 49-bin structure, to re-test (on THIS design) the project's
-     repeatedly-confirmed real-hardware 16-QAM fragility (hf5, hf7),
+     `bits_to_symbols`/`symbols_to_bits` (from `whale/phy/sc.py`,
+     developed as hf5's sc.py) directly on the 49-bin structure, to
+     re-test (on THIS design) the project's repeatedly-confirmed
+     real-hardware 16-QAM fragility (hf5, hf7),
      which was never reproduced in this project's own AWGN simulation --
      i.e. simulation cannot be trusted to predict this failure mode, so
      it must be tested for real, on hardware, again, here.
   2. FEC: a rate-1/2, 2/3, or 3/4 IEEE-802.11n QC-LDPC code, reused
-     verbatim from experiments/qpsk29/ldpc.py (dependency-free, already
-     used successfully with real coding gain in that experiment and in
+     verbatim from `whale/dsp/ldpc.py` (developed as
+     experiments/qpsk29/ldpc.py; dependency-free, already used
+     successfully with real coding gain in that experiment and in
      experiments/ofdm/ldpc.py's HF trials), applied across the packet's
      whitened bit stream. New in this module vs v5:
 
@@ -29,7 +37,7 @@ history flagged as unexploited:
      - A generic `_soft_bit_llrs()` demapper works for any
        `bits_per_symbol` (1-6) by brute-force max-log distance over the
        constellation returned by `_constellation_table()`, built directly
-       from hf5's own `bits_to_symbols` so the mapping is guaranteed
+       from `sc.bits_to_symbols` so the mapping is guaranteed
        consistent with the hard-decision path.
      - `raw_bits`/`raw_packet_bits` in the demod result are now the
        POST-FEC-DECODE bits when FEC is enabled (for CRC/payload
@@ -39,10 +47,11 @@ history flagged as unexploited:
 
   3. Frame/geometry and receiver levers found on hardware on 2026-09-07,
      which together took this mode from 4332 bps to 7213 bps net (see
-     RESULTS.md, "2026-09-07"): a 32-QAM mapping at `bits_per_symbol=5`
-     (absent from hf5's mapper, added above); an `interleave` flag that
-     spreads each LDPC codeword over the whole frame; and, as pure
-     parameters needing no code change, a larger `fft_size` (the same
+     `experiments/hf10_ofdm49_v6/RESULTS.md`, "2026-09-07"): a 32-QAM
+     mapping at `bits_per_symbol=5` (absent from sc.py's original mapper,
+     added above); an `interleave` flag that spreads each LDPC codeword
+     over the whole frame; and, as pure parameters needing no code
+     change, a larger `fft_size` (the same
      absolute guard time amortized over a longer symbol) and a much
      lower `drive_scale`.
 
@@ -51,27 +60,22 @@ phase_slope/comb-pilot options, edge guard/taper) is v5's code,
 unmodified in behaviour when fec_rate=None, interleave=False and
 bits_per_symbol<=3.
 
-None of hf5/hf6/hf7/hf8/hf9/path_probe are modified; this is a fresh
-copy in this experiment's own directory per the task's constraints.
-`experiments/qpsk29/ldpc.py` is imported read-only (not copied) since
-it is a generic, dependency-free codec with no qpsk29-specific state.
+None of the hf5/hf6/hf7/hf8/hf9/path_probe experiments were modified when
+this waveform was written; it began life as a fresh copy in hf10's own
+directory per that task's constraints.  `whale/dsp/ldpc.py` is used as a
+shared kernel rather than copied, since it is a generic, dependency-free
+codec with no qpsk29-specific state.
 """
 
 from __future__ import annotations
 
-import sys
 from dataclasses import dataclass, field
-from pathlib import Path
 
 import numpy as np
 
-REPOSITORY_ROOT = Path(__file__).resolve().parents[2]
-if str(REPOSITORY_ROOT) not in sys.path:
-    sys.path.insert(0, str(REPOSITORY_ROOT))
-
 from whale.dsp import bits as _bits
-from experiments.hf5_8psk_4k import sc as _sc
-from experiments.qpsk29 import ldpc as _ldpc
+from whale.dsp import ldpc as _ldpc
+from whale.phy import sc as _sc
 
 TX_SAMPLE_RATE = _sc.TX_SAMPLE_RATE
 RX_SAMPLE_RATE = _sc.RX_SAMPLE_RATE
@@ -199,7 +203,7 @@ def _constellation_table(bps: int) -> tuple[np.ndarray, np.ndarray]:
 def _soft_bit_llrs(rx_syms: np.ndarray, bps: int, noise_var) -> np.ndarray:
     """Generic max-log-MAP soft bit LLR demapper: LLR = (min dist^2 over
     constellation points with bit=1) - (min dist^2 over points with bit=0),
-    scaled by per-symbol noise variance, matching whale/qpsk29's LDPC
+    scaled by per-symbol noise variance, matching qpsk29's LDPC
     convention that a positive LLR means bit zero. Works for any
     `bits_per_symbol` supported by `bits_to_symbols` (1-6 here) via
     brute-force distance over the (<=16-point) constellation -- no
@@ -239,7 +243,7 @@ class OFDM49Mode:
     edge_taper: int = 0               # taper (reduce power on) this many bins
                                        # at each end of the surviving active set
     fec_rate: str | None = None       # None | "1/2" | "2/3" | "3/4" -- IEEE
-                                       # 802.11n QC-LDPC (experiments/qpsk29/ldpc.py),
+                                       # 802.11n QC-LDPC (whale/dsp/ldpc.py),
                                        # applied to the whitened packet bit
                                        # stream before symbol mapping.
 

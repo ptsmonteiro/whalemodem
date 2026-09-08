@@ -5,7 +5,7 @@ import numpy as np
 from whale import framing, rx_audio
 from whale.mode_qualification import registry
 from whale.modes.hf7_mode import HF7, HF7_PHY, BAND_LO_HZ, BAND_HI_HZ
-from experiments.hf10_ofdm49_v6 import ofdm49_v6 as ofdm49
+from whale.phy import ofdm49 as ofdm49
 
 # SPEED_LADDERS.md: HF rungs occupy the 300-2,700 Hz channel, gated on a
 # 99%-power occupied bandwidth of no more than 2,500 Hz. The allowance over

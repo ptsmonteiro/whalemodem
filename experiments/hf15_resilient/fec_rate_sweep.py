@@ -11,7 +11,7 @@ from dataclasses import dataclass
 
 import numpy as np
 
-from experiments.hf13_fast_sync_v1 import sc_fast
+from whale.phy import sc_fast
 from whale.dsp import bits as _bits
 from whale.dsp import fec as _fec
 from whale.dsp import interleave as _interleave

@@ -1,6 +1,6 @@
 """Unit tests for the standalone HF4 experiment.
 
-HF4 (`experiments/hf4/hf4.py`, wired for the link ABI by
+HF4 (`whale/phy/hf4.py`, wired for the link ABI by
 `whale/modes/hf4_mode.py`) is not registered in any `ModeRegistry` or in
 `whale.mode_qualification.MANIFEST`. These tests exercise it directly and
 through its `WaveformMode` adapter, following the shape of
@@ -15,7 +15,7 @@ from __future__ import annotations
 import numpy as np
 import pytest
 
-from experiments.hf4 import hf4
+from whale.phy import hf4
 from whale import rx_audio
 from whale.modes.hf4_mode import HF4
 

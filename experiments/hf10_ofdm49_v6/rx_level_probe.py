@@ -39,7 +39,7 @@ if str(SCRIPTS_DIR) not in sys.path:
 import numpy as np
 
 import bench
-from experiments.hf10_ofdm49_v6 import ofdm49_v6 as ofdm49
+from whale.phy import ofdm49 as ofdm49
 from experiments.hf10_ofdm49_v6.evm_probe import analyse
 
 

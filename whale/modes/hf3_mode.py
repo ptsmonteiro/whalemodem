@@ -1,4 +1,8 @@
-"""HF3, the HF4 waveform with a rate-2/3 inner convolutional code."""
+"""HF3, the HF4 waveform with a rate-2/3 inner convolutional code.
+
+The waveform is `whale/phy/hf3.py` (developed as `experiments/hf3_fec34.py`;
+see `experiments/hf3_fec34/README.md` for the candidate's screen).
+"""
 
 from __future__ import annotations
 
@@ -6,7 +10,7 @@ from dataclasses import dataclass, field
 
 import numpy as np
 
-from experiments import hf3_fec34 as hf3
+from whale.phy import hf3 as hf3
 
 from .. import framing
 

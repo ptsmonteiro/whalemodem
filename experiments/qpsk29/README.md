@@ -145,7 +145,7 @@ see it was a decision.
 | File | Role |
 |---|---|
 | `qpsk29.py` | the modem — constants, profile, `modulate`, `demodulate`, `demodulate_debug` |
-| `ldpc.py` | IEEE 802.11n length-648 QC-LDPC, copied so this experiment stands alone |
+| `whale/dsp/ldpc.py` | IEEE 802.11n length-648 QC-LDPC, written here as `ldpc.py` and since promoted to the shared DSP layer |
 | `test_qpsk29.py` | software invariants, no hardware |
 | `run_qpsk29.py` | on-air frame runner |
 | `RESULTS.md` | dated on-air outcomes |

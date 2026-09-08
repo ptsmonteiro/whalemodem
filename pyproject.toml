@@ -23,7 +23,7 @@ whalemodem-server = "whale.vara_server:main"
 whalemodem-configure = "whale.radio_config_tui:main"
 
 [tool.setuptools]
-packages = ["whale", "whale.hw", "whale.modes"]
+packages = ["whale", "whale.dsp", "whale.hw", "whale.modes", "whale.phy"]
 
 [tool.setuptools.package-data]
 "whale.hw" = ["_vendor/hamlib/**/*"]

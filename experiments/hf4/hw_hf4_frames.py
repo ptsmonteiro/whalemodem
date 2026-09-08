@@ -4,7 +4,7 @@ demodulate per trial, no ARQ and no sockets.
 HF4 has no `whale.mode_qualification.MANIFEST` entry (see
 `whale/modes/hf4_mode.py` and `experiments/hf4/RESULTS.md`), so it is not
 reachable through `scripts/sweep_modes.py`'s registry-based mode selection.
-This is a bench-only hardware harness that drives `experiments.hf4.hf4`'s
+This is a bench-only hardware harness that drives `whale.phy.hf4`'s
 raw `modulate`/`demodulate` directly, mirroring `scripts/hw_hf_frames.py`'s
 method and reusing `scripts/bench.py`'s radio_pair open/warm-up/close dance,
 without touching the permanent MANIFEST -- the same "no manifest, no
@@ -34,7 +34,7 @@ for path in (REPOSITORY_ROOT, SCRIPTS_DIR):
         sys.path.insert(0, str(path))
 
 import bench  # noqa: E402  (scripts/bench.py)
-from experiments.hf4 import hf4  # noqa: E402
+from whale.phy import hf4  # noqa: E402
 
 CAPTURE_TAIL = 9.0
 INTER_TRIAL = 0.5

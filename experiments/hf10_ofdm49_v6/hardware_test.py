@@ -1,7 +1,7 @@
 """Real-hardware trial runner for the 49-subcarrier true-OFDM mode (v6),
 extending experiments/hf9_ofdm49_v5/hardware_test.py with higher-order
 modulation (already-latent 16-QAM support in the shared symbol mapper)
-and optional LDPC FEC (experiments/qpsk29/ldpc.py, reused read-only).
+and optional LDPC FEC (whale/dsp/ldpc.py, reused read-only).
 
 Run (from the repository root), e.g. v5's exact winning baseline:
     python experiments/hf10_ofdm49_v6/hardware_test.py --fft-size 240 --cp-len 60 \
@@ -47,7 +47,7 @@ if str(SCRIPTS_DIR) not in sys.path:
 import numpy as np
 
 import bench
-from experiments.hf10_ofdm49_v6 import ofdm49_v6 as ofdm49
+from whale.phy import ofdm49 as ofdm49
 
 DEFAULT_TRIALS = 3
 DEFAULT_CAPTURE_TAIL = 1.0
@@ -232,7 +232,7 @@ def main(argv=None, *, pair_factory=bench.radio_pair):
     ap.add_argument("--edge-taper", type=int, default=0)
     ap.add_argument("--fec-rate", choices=("1/2", "2/3", "3/4"), default=None,
                      help="IEEE 802.11n QC-LDPC rate applied to the packet "
-                          "bit stream (experiments/qpsk29/ldpc.py); default "
+                          "bit stream (whale/dsp/ldpc.py); default "
                           "None = no FEC (v5's original behaviour)")
     ap.add_argument("--interleave", action="store_true",
                      help="spread each LDPC codeword over the whole frame so a "

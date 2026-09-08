@@ -38,7 +38,7 @@ if str(REPOSITORY_ROOT) not in sys.path:
 
 import numpy as np
 
-from experiments.hf5_8psk_4k import sc as _sc
+from whale.phy import sc as _sc
 from whale.transport import RadioTransport
 
 DESIGN_RATE = 12000.0

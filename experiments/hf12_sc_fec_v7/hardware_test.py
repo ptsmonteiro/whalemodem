@@ -1,7 +1,7 @@
 """Real-hardware trial runner for the FEC-extended single-carrier mode
-(`sc_fec.py`), which reuses experiments/hf5_8psk_4k/sc.py's carrier/RRC/
+(`sc_fec.py`), which reuses whale/phy/sc.py's carrier/RRC/
 preamble/pilot machinery and adds optional IEEE 802.11n QC-LDPC FEC
-(experiments/qpsk29/ldpc.py) plus a block interleaver.
+(whale/dsp/ldpc.py) plus a block interleaver.
 
 Run (from the repository root), e.g. the v1 8PSK baseline re-check
 (fec_rate=None must reproduce hf5's numbers exactly):
@@ -159,7 +159,7 @@ def main(argv=None, *, pair_factory=bench.radio_pair):
     ap.add_argument("--packet-bytes", type=int, default=294)
     ap.add_argument("--pilot-interval", type=int, default=150)
     ap.add_argument("--fec-rate", choices=("1/2", "2/3", "3/4"), default=None,
-                     help="IEEE 802.11n QC-LDPC rate (experiments/qpsk29/ldpc.py); "
+                     help="IEEE 802.11n QC-LDPC rate (whale/dsp/ldpc.py); "
                           "default None = no FEC (identical to sc.py's baseline)")
     ap.add_argument("--no-interleave", action="store_true",
                      help="disable the block interleaver (only meaningful with --fec-rate)")

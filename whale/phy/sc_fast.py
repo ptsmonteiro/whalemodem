@@ -1,32 +1,29 @@
-"""Drop-in, fast-sync variant of experiments/hf5_8psk_4k/sc.py's
-SingleCarrierMode.
+"""Drop-in, fast-sync variant of `whale/phy/sc.py`'s SingleCarrierMode.
+
+Developed as `experiments/hf13_fast_sync_v1/sc_fast.py` and moved here
+unmodified when it became shipped product code; its equivalence evidence is
+`experiments/hf13_fast_sync_v1/RESULTS.md`.
 
 Same PHY as hf5 (8PSK@1500baud-class single-carrier, no FEC) -- this is a
 pure CPU optimization of the sync-search stage, not a waveform change.
-Validated against real over-the-air captures in RESULTS.md (0/10
-discrepancies vs. the original sc.py, ~4.8x real measured speedup).
+Validated against real over-the-air captures in
+`experiments/hf13_fast_sync_v1/RESULTS.md` (0/10 discrepancies vs. the
+original sc.py, ~4.8x real measured speedup).
 
 Public API is identical to sc.SingleCarrierMode: modulate(), demodulate(),
 max_payload_bytes, frame_seconds(), so this is a drop-in replacement.
-Internally it delegates everything except the sync-search stage to sc.py
-(imported read-only, never modified) and reuses the fused-FFT
-fast_sync_search from experiments/hf5_8psk_4k_profiling/fast_sync.py
-(also read-only).
+Internally it delegates everything except the sync-search stage to
+`whale/phy/sc.py` (used read-only, never modified) and reuses the fused-FFT
+fast_sync_search from `whale/phy/fast_sync.py` (developed as
+experiments/hf5_8psk_4k_profiling/fast_sync.py, also read-only).
 """
 
 from __future__ import annotations
 
-import sys
-from pathlib import Path
-
-REPOSITORY_ROOT = Path(__file__).resolve().parents[2]
-if str(REPOSITORY_ROOT) not in sys.path:
-    sys.path.insert(0, str(REPOSITORY_ROOT))
-
 import numpy as np
 
-from experiments.hf5_8psk_4k import sc
-from experiments.hf5_8psk_4k_profiling.fast_sync import fast_sync_search
+from whale.phy.fast_sync import fast_sync_search
+from whale.phy import sc
 
 # Re-exported so callers of this module see the same constants as sc.py.
 CARRIER_HZ = sc.CARRIER_HZ

@@ -67,7 +67,7 @@ from scipy.signal import hilbert
 sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 
-import ldpc  # noqa: E402  (sibling module, see sys.path above)
+from whale.dsp import ldpc  # noqa: E402  (see sys.path above)
 
 # -- waveform geometry -----------------------------------------------------
 

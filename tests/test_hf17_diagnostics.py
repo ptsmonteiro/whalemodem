@@ -3,7 +3,7 @@ import numpy as np
 import pytest
 from dataclasses import replace
 from whale import rx_audio
-from experiments.hf10_ofdm49_v6 import ofdm49_v6 as phy
+from whale.phy import ofdm49 as phy
 
 
 @pytest.mark.parametrize('bps', [4, 6])

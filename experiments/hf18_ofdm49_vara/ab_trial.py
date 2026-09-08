@@ -63,7 +63,7 @@ if str(SCRIPTS_DIR) not in sys.path:
 import numpy as np
 
 import bench
-from experiments.hf10_ofdm49_v6 import ofdm49_v6 as ofdm49
+from whale.phy import ofdm49 as ofdm49
 from experiments.hf10_ofdm49_v6.hardware_test import run_direction
 
 KEYING_OVERHEAD_S = 0.155   # measured on this bench, flat across configs

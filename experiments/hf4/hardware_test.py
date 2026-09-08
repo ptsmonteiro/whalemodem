@@ -26,7 +26,7 @@ if str(SCRIPTS_DIR) not in sys.path:
 import numpy as np
 
 import bench
-from experiments.hf4 import hf4
+from whale.phy import hf4
 
 DEFAULT_TRIALS = 3
 DEFAULT_CAPTURE_TAIL = 1.0

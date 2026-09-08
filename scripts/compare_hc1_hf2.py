@@ -252,7 +252,7 @@ def git_state() -> dict:
 
 def source_hashes() -> dict[str, str]:
     paths = (Path("whale/modes/hc1_mode.py"), Path("whale/modes/hc1.py"),
-             Path("whale/modes/hf2_mode.py"), Path("experiments/hf2/hf2.py"))
+             Path("whale/modes/hf2_mode.py"), Path("whale/phy/hf2.py"))
     return {str(path): hashlib.sha256(path.read_bytes()).hexdigest()
             for path in paths}
 

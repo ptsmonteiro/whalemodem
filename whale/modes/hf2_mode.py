@@ -12,8 +12,9 @@ layout and coding choices and why each was picked, and
 `experiments/hf2/RESULTS.md` for the original Monte Carlo evidence and the
 retained paired comparison for current-convention measurements.
 
-This module only wires the already-designed
-`experiments/hf2/hf2.py` waveform into the link's `WaveformMode` contract,
+This module only wires the already-designed `whale/phy/hf2.py` waveform
+(developed as `experiments/hf2/hf2.py`) into the link's `WaveformMode`
+contract,
 mirroring `whale/modes/hc1_mode.py`'s pattern; it does not re-derive or
 re-run any of that design or evidence. The owner made HF2 a DEFAULT product
 mode despite its still-failing occupied-bandwidth gate; see
@@ -27,7 +28,7 @@ from dataclasses import dataclass, field
 
 import numpy as np
 
-from experiments.hf2 import hf2
+from whale.phy import hf2
 
 from .. import framing
 from . import hf_lead
@@ -48,7 +49,7 @@ CONFIDENCE_THRESHOLD = hf2.ACQUISITION_THRESHOLD
 
 
 class Hf2Codec:
-    """Bridges the link's codec calls onto `experiments.hf2.hf2`."""
+    """Bridges the link's codec calls onto `whale.phy.hf2`."""
 
     tx_sample_rate = hf2.SAMPLE_RATE
     rx_sample_rate = hf2.RX_SAMPLE_RATE

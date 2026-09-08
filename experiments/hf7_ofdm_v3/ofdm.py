@@ -75,7 +75,7 @@ if str(REPOSITORY_ROOT) not in sys.path:
     sys.path.insert(0, str(REPOSITORY_ROOT))
 
 from whale.dsp import bits as _bits
-from experiments.hf5_8psk_4k import sc as _sc
+from whale.phy import sc as _sc
 
 # ---------------------------------------------------------------------------
 # Fixed channel constants (same convention as sc.py / mc.py)

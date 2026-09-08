@@ -3,7 +3,7 @@
 import numpy as np
 
 from whale import framing, rx_audio
-from experiments.hf5_8psk_4k.sc import bits_to_symbols, symbols_to_bits
+from whale.phy.sc import bits_to_symbols, symbols_to_bits
 from whale.modes.hf6_mode import HF6
 
 

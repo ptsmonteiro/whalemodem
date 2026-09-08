@@ -1,9 +1,12 @@
 """HF2: pilot-assisted coherent 16-QAM OFDM, targeting Speed Ladder Level 2.
 
-See `experiments/hf2/PLAN.md` and `DESIGN.md` for the experiment this
-waveform belongs to and why each choice below was made; this module is
-stage 2 of that plan -- the raw waveform (geometry, mapping, FEC, framing,
-acquisition/timing/frequency recovery) -- not the `WaveformMode` promotion,
+Developed as `experiments/hf2/hf2.py` and moved here unmodified when it
+became shipped product code.  See `experiments/hf2/PLAN.md` and
+`experiments/hf2/DESIGN.md` for the experiment this waveform belongs to and
+why each choice below was made, and `experiments/hf2/RESULTS.md` for the
+measurements that qualified it; this module is stage 2 of that plan -- the
+raw waveform (geometry, mapping, FEC, framing, acquisition/timing/frequency
+recovery) -- not the `WaveformMode` promotion,
 which is a later stage.
 
 Like HC1 and VF3, this is geometry and wiring on top of the shared
@@ -13,7 +16,7 @@ rate-1/2 K=7 convolutional code and CRC32/length framing
 (`whale.dsp.acquire`), frequency and timing recovery (`whale.dsp.freq`,
 `whale.dsp.timing`), and header equalization (`whale.dsp.equalize`).  Every
 geometry number, the pilot layout and the 16-QAM mapping are HF2's own,
-picked independently of HC0/HC1/VF6/HR0 per DESIGN.md.
+picked independently of HC0/HC1/VF6/HR0 per that DESIGN.md.
 
 Frame shape:
 
@@ -30,7 +33,7 @@ Each of the `PAYLOAD_SYMBOLS` OFDM symbols carries 19 carriers split into 8
 fixed-value BPSK comb pilots (bins 7, 10, 12, 15, 17, 20, 22, 25 -- roughly
 evenly spread across the 19-carrier band) and 11 16-QAM (Gray-coded, 4
 bits/carrier) data carriers. This is denser than the original 4-pilot/
-15-data-carrier layout; see DESIGN.md's stage-4 dated note for why (a
+15-data-carrier layout; see that DESIGN.md's stage-4 dated note for why (a
 Watterson channel-tracking bug found on the stage-3 screen, fixed in three
 parts: fresh per-symbol pilot-based channel estimation rather than a ratio
 against a stale header fit, a widened pilot comb, and per-symbol per-carrier
@@ -47,12 +50,12 @@ whitening, rate-1/2 K=7 soft-Viterbi and a multiplicative bit interleaver,
 all inside the payload grid (`whale.framing`'s PN-sync format is bypassed,
 the same choice VF3/HC0/HC1 each made independently).
 
-Frame size: DESIGN.md's starting point of 40 payload symbols does not
+Frame size: that DESIGN.md's starting point of 40 payload symbols does not
 divide into a whole number of packet bytes at any pilot/data-carrier split
 tried. A rate-1/2 K=7 grid with 11 data carriers (44 raw bits/symbol) needs
 `payload_symbols * 22 - 6` divisible by 8, i.e. `payload_symbols % 4 == 1`;
 45 is the nearest value satisfying that at/above the 40-symbol starting
-point, and is used here.  See DESIGN.md's "Implementation note" and stage-4
+point, and is used here.  See its "Implementation note" and stage-4
 dated note for the record of this and the pilot-count deviations.
 
 The shared HF lead-in (`whale.modes.hf_lead`, label `HF2_LABEL`) is
