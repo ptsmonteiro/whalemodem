@@ -250,6 +250,33 @@ MAX_RETRIES = VHF_FM.max_retries
 _RESIZE = object()
 DECODE_POLL_INTERVAL = 0.15
 
+#: The lead detector can return many plausible boundaries in a noisy HF
+#: buffer.  Decoding every boundary defeats the decode-poll budget: a single
+#: HC1W candidate costs little, but 32 of them can delay a control ACK long
+#: enough for the sender's DATA timeout to expire.  Four boundaries per poll
+#: preserves the strongest hypotheses while bounding the work; the ordinary
+#: whole-buffer decoder remains the fallback for a missed lead.
+HF_LEAD_CANDIDATE_LIMIT = 4
+
+#: Wall-clock share of the RX buffer's own recency window (_rx_keep_seconds)
+#: that one decode poll may spend. A poll re-searches the whole retained
+#: buffer, so as long as it finishes well inside that window, consecutive
+#: polls overlap and no audio goes unexamined; a poll that routinely runs
+#: longer than the window leaves gaps the receiver is deaf in. Half is the
+#: margin: the poll that finds a frame also has to hand it on and let the
+#: reply be sent.
+DECODE_POLL_BUDGET_FRACTION = 0.5
+
+#: The most of the decode thread any single over-budget candidate may take,
+#: as a fraction of wall time. A candidate too expensive to fit the budget is
+#: not dropped -- it still has to be able to acquire -- but it runs on a duty
+#: cycle instead of every poll, and only one such candidate runs per poll.
+DECODE_EXPENSIVE_DUTY = 0.2
+
+#: A profile that decoded a frame this recently is attempted every poll
+#: whatever it costs: it is carrying the session.
+DECODE_RECENT_SUCCESS_SECONDS = 60.0
+
 # The one byte of session identity in PT_CONNECT/PT_CONNECT_ACK. See the
 # module docstring for why it is on air at all. 0 is reserved for "not
 # stated" so a body that decoded short reads as unknown rather than as
@@ -534,23 +561,47 @@ class _DecodeCost:
     visible next to the far rarer `frames`.
     """
 
-    __slots__ = ("attempts", "frames", "cpu", "wall", "max_cpu")
+    __slots__ = ("attempts", "frames", "cpu", "wall", "max_cpu",
+                 "audio_seconds", "last_attempt_at", "last_frame_at")
 
     def __init__(self):
         self.attempts = self.frames = 0
         self.cpu = self.wall = self.max_cpu = 0.0
+        # Attempt cost is very nearly proportional to how much audio the
+        # attempt searched (every candidate correlates its preamble over the
+        # whole snapshot), so cost *per second of audio* is the number that
+        # predicts what the next attempt on a differently-sized buffer will
+        # cost. A plain per-attempt mean does not, and the buffer's length
+        # varies by an order of magnitude within one session.
+        self.audio_seconds = 0.0
+        self.last_attempt_at = None
+        self.last_frame_at = None
 
-    def add(self, cpu, wall):
+    def add(self, cpu, wall, audio_seconds=0.0, now=None):
         self.attempts += 1
         self.cpu += cpu
         self.wall += wall
         self.max_cpu = max(self.max_cpu, cpu)
+        self.audio_seconds += max(0.0, audio_seconds)
+        self.last_attempt_at = time.monotonic() if now is None else now
+
+    def estimate(self, audio_seconds):
+        """Predicted wall seconds for one attempt over `audio_seconds`.
+
+        None while nothing has been measured yet -- the caller must then run
+        the attempt, since that is the only way a measurement appears."""
+        if self.attempts == 0 or self.audio_seconds <= 0.0:
+            return None
+        return self.wall / self.audio_seconds * audio_seconds
 
     def summary(self):
         mean = (self.cpu / self.attempts * 1000.0) if self.attempts else 0.0
+        rate = ((self.wall / self.audio_seconds * 1000.0)
+                if self.audio_seconds > 0.0 else 0.0)
         return (f"{self.attempts} attempt(s)/{self.frames} frame(s), "
                 f"cpu {self.cpu:.2f}s total, {mean:.1f} ms mean, "
-                f"{self.max_cpu * 1000.0:.1f} ms max, wall {self.wall:.2f}s")
+                f"{self.max_cpu * 1000.0:.1f} ms max, wall {self.wall:.2f}s, "
+                f"{rate:.1f} ms per audio second")
 
 
 class Link:
@@ -791,7 +842,8 @@ class Link:
         result = profile.decode(audio, head_seconds=self._rx_head_seconds)
         cpu = time.thread_time() - cpu0
         self._decode_cost.setdefault(profile.name, _DecodeCost()).add(
-            cpu, time.perf_counter() - wall0)
+            cpu, time.perf_counter() - wall0,
+            len(audio) / profile.rx_sample_rate)
         result["decode_cpu_seconds"] = cpu
         return self._offset_decode_result(result, offset)
 
@@ -878,11 +930,17 @@ class Link:
         # interpretations at each boundary, but accept none until the mode's
         # payload CRC and the checked air header below agree. Cropping keeps a
         # false early boundary from changing which later acquisition wins.
-        if profiles and all(hasattr(p, "lead_label") for p in profiles):
+        by_label = {p.lead_label: p for p in profiles if hasattr(p, "lead_label")}
+        if by_label:
             from .modes import hf_lead
-            by_label = {p.lead_label: p for p in profiles}
             tolerance = hf_lead.RX_BLOCK_SAMPLES // hf_lead.BLOCK_SYMBOLS
-            for candidate in hf_lead.candidates(snap):
+            lead_candidates = hf_lead.candidates(
+                snap, limit=HF_LEAD_CANDIDATE_LIMIT)
+            # Keep the bound local as well as passing it to the detector.  It
+            # is a cheap defensive guard against a future detector returning
+            # more entries than requested, and makes the decode cost contract
+            # explicit at the call site.
+            for candidate in lead_candidates[:HF_LEAD_CANDIDATE_LIMIT * len(by_label)]:
                 profile = by_label.get(candidate.label)
                 if profile is None:
                     continue
@@ -896,8 +954,11 @@ class Link:
 
         # Mandatory body-acquisition fallback: erased, wrong, or low-scoring
         # lead audio cannot suppress either eligible checked decoder. One
-        # whole-buffer attempt per profile also bounds fallback work.
-        for profile in profiles:
+        # whole-buffer attempt per profile also bounds fallback work -- but
+        # "one attempt each" is not on its own a bound the receiver can live
+        # with: a single attempt by an OFDM candidate on a full buffer costs
+        # seconds. _budgeted_candidates is what bounds the poll.
+        for profile in self._budgeted_candidates(profiles, snap):
             result = self._decode_attempt(profile, snap)
             results.append((profile, result))
             if accept_checked(profile, result):
@@ -905,20 +966,75 @@ class Link:
         pending = [result for candidate, result in results
                    if result.get("confidence", 0) >= candidate.confidence_threshold
                    and "end_index" not in result]
-        if pending:
-            return False
-        near_misses = [result for _, result in results if "end_index" in result]
-        if near_misses:
-            result = min(near_misses,
-                         key=lambda item: item.get("sync_end_index", item["end_index"]))
-            skip = result.get("sync_end_index", result["end_index"])
-            self._capture_near_miss(snap, result.get("confidence", 0))
-            self.transport.consume_rx(skip)
-            return True
-        if all(result.get("confidence", 0) < profile.confidence_threshold
-               for profile, result in results):
-            self._prune_stale(len(snap))
+        if not pending:
+            near_misses = [result for _, result in results if "end_index" in result]
+            if near_misses:
+                result = min(near_misses,
+                             key=lambda item: item.get("sync_end_index",
+                                                       item["end_index"]))
+                skip = result.get("sync_end_index", result["end_index"])
+                self._capture_near_miss(snap, result.get("confidence", 0))
+                self.transport.consume_rx(skip)
+                return True
+        # Unconditional, `pending` included. A candidate that reports a sync
+        # it can never resolve -- a false lock on noise, or a real frame whose
+        # CRC is never going to pass -- would otherwise hold the entire buffer
+        # for the rest of the session, and every later poll re-searches all of
+        # it. Pruning is safe here because it keeps a whole frame's worth of
+        # recent audio (_rx_keep_seconds): a frame that is genuinely still
+        # arriving is never cut into, and anything older than that has
+        # finished arriving and has already been searched and rejected.
+        self._prune_stale(len(snap))
         return False
+
+    def _budgeted_candidates(self, profiles, snap):
+        """Which candidates to actually run this poll, cheapest first.
+
+        A poll re-searches the entire retained buffer at every candidate
+        profile, so its cost is the sum of the candidates' costs -- and those
+        differ by three orders of magnitude (a 10 s buffer is about 11 ms at
+        hc0 and seconds at hf7/hf8, whose acquisition correlates a preamble
+        over the whole buffer at 41 frequency hypotheses). Unbounded, that is
+        a receiver that spends longer examining the buffer than the buffer
+        holds: audio ages out unexamined between polls and the peer's frames
+        land in the gap. Not hypothetical -- it is what took an on-air session
+        down on a 33 dB path.
+
+        So: cheapest first, since an expensive candidate must never cost a
+        cheap one its attempt; everything that fits
+        DECODE_POLL_BUDGET_FRACTION of the recency window; and at most one
+        over-budget candidate per poll, the one most overdue against its own
+        DECODE_EXPENSIVE_DUTY share of wall time. Over-budget is a duty cycle,
+        not a ban: a mode nobody ever tries is a mode nobody can ever receive.
+        A profile that decoded a frame within DECODE_RECENT_SUCCESS_SECONDS is
+        exempt from all of it -- it is carrying the session.
+        """
+        now = time.monotonic()
+        seconds = len(snap) / max(p.rx_sample_rate for p in profiles)
+        budget = DECODE_POLL_BUDGET_FRACTION * self._rx_keep_seconds
+
+        def estimate(profile):
+            cost = self._decode_cost.get(profile.name)
+            # Never measured: run it, because that is how it gets measured.
+            return 0.0 if cost is None else (cost.estimate(seconds) or 0.0)
+
+        plan, deferred, spent = [], [], 0.0
+        for profile in sorted(profiles, key=estimate):
+            cost = self._decode_cost.get(profile.name)
+            recent = (cost is not None and cost.last_frame_at is not None
+                      and now - cost.last_frame_at <= DECODE_RECENT_SUCCESS_SECONDS)
+            estimated = estimate(profile)
+            if recent or spent + estimated <= budget:
+                plan.append(profile)
+                spent += estimated
+                continue
+            since = now - (cost.last_attempt_at or 0.0)
+            deferred.append((since - estimated / DECODE_EXPENSIVE_DUTY, profile))
+        if deferred:
+            overdue, profile = max(deferred, key=lambda item: item[0])
+            if overdue >= 0.0:
+                plan.append(profile)
+        return plan
 
     def _finish_air_packet(self, ptype, body, profile, snap, end, decode_result):
         trailing = max(0, len(snap) - end)
@@ -926,6 +1042,7 @@ class Link:
         cost = self._decode_cost.get(profile.name)
         if cost is not None:
             cost.frames += 1
+            cost.last_frame_at = time.monotonic()
         cpu = decode_result.get("decode_cpu_seconds")
         logger.info("[%s] decoded %s body at profile %s (%s; %s)", self.mycall,
                     _ptype_name(ptype), profile.name,
@@ -982,7 +1099,7 @@ class Link:
             logger.exception("[%s] near-miss capture failed", self.mycall)
 
     def _prune_stale(self, snap_len):
-        """Drops audio this poll searched and found nothing whatsoever in.
+        """Drops audio this poll searched and did not consume.
 
         Without it the buffer grows to transport.RX_BUFFER_SECONDS through
         any idle stretch and every later poll re-searches all of it.
@@ -990,9 +1107,19 @@ class Link:
         VHF ladder still takes about 105 ms to search all four candidates in
         a full 10-second buffer (see scripts/benchmark_rx.py), and that lands
         directly on the turnaround because the reply cannot be sent until
-        the poll that decodes the frame finishes. Keeping the most recent
-        _rx_keep_seconds bounds the cost at about one frame's worth while
-        leaving any part-arrived frame intact."""
+        the poll that decodes the frame finishes.  The HF ladder is far worse:
+        one hf7 or hf8 acquisition attempt on a full buffer costs seconds.
+        Keeping the most recent _rx_keep_seconds bounds the cost at about one
+        frame's worth while leaving any part-arrived frame intact.
+
+        _rx_keep_seconds is a whole frame plus a second, which is what makes
+        this safe to run on every poll that consumed nothing, including one
+        where a candidate claims a sync it has not resolved yet: audio older
+        than one frame cannot belong to a frame that is still arriving.  This
+        must stay unconditional.  When it was gated on every candidate scoring
+        below its confidence threshold, a single mode whose threshold sat
+        under its own noise floor was enough to pin the buffer at full length
+        for an entire session and take the receiver off the air."""
         keep = int(self._rx_keep_seconds * max(
             p.rx_sample_rate for p in self._candidate_decode_profiles()))
         if snap_len > keep:
