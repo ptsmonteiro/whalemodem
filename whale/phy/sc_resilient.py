@@ -1,14 +1,14 @@
-"""HF4-derived resilient single-carrier PHY.
+"""Resilient single-carrier PHY.
 
 Developed in `experiments/hf15_resilient/` and moved here unmodified when it
 became shipped product code; the code-rate evidence behind it is in that
 directory.
 
-The RF waveform is deliberately kept compatible with HF4's acquisition and
-pilot-tracking path.  The payload carried inside that waveform is protected
+The RF waveform uses the shared single-carrier acquisition and pilot-tracking
+path.  The payload carried inside that waveform is protected
 by a terminated K=7 rate-1/2 convolutional code and a block interleaver.  A
-small outer HF4 packet wrapper is retained so the mature HF4 demodulator can
-still provide its synchronizer, equalizer, and raw hard bits.
+small outer packet wrapper is retained so the mature single-carrier demodulator
+can provide its synchronizer, equalizer, and raw hard bits.
 """
 
 from __future__ import annotations
@@ -25,7 +25,7 @@ TX_SAMPLE_RATE = sc_fast.TX_SAMPLE_RATE
 RX_SAMPLE_RATE = sc_fast.RX_SAMPLE_RATE
 DESIGN_RATE = sc_fast.DESIGN_RATE
 
-# Inner packet: length + link payload + CRC.  The outer HF4 wrapper needs
+# Inner packet: length + link payload + CRC.  The outer wrapper needs
 # 2*N+2 coded bytes, plus its own six-byte length/CRC wrapper.  2991 is the
 # smallest packet size divisible by 3 that carries that complete wrapper.
 INNER_PACKET_BYTES = 1491

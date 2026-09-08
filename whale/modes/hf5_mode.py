@@ -1,6 +1,6 @@
-"""HF5: HF4-derived level-3 resilient single-carrier data mode.
+"""HF5: resilient level-3 single-carrier data mode.
 
-HF5 keeps HF4's 8PSK/1500-baud waveform and fast acquisition, but adds a
+HF5 uses the 8PSK/1500-baud single-carrier waveform and fast acquisition, but adds a
 terminated K=7 rate-1/2 convolutional code and a block interleaver.  Its
 full-capacity frame is sized for just over 2 kbit/s net application rate,
 leaving coding margin for moderate Watterson fading.  This is an experimental

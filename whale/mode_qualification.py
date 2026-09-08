@@ -54,7 +54,6 @@ MANIFEST = (
     # unproven 3 dB measured margin; Default is availability, not qualification.
     QualificationEntry("hf-ssb", 10, QualificationLevel.DEFAULT),
     QualificationEntry("hf-ssb", 7, QualificationLevel.EXPERIMENTAL),
-    QualificationEntry("hf-ssb", 11, QualificationLevel.DEFAULT),
     QualificationEntry("hf-ssb", 12, QualificationLevel.EXPERIMENTAL),
     QualificationEntry("hf-ssb", 13, QualificationLevel.EXPERIMENTAL),
     # HF7 is the maximum-speed HF data rung, installed as DEFAULT on
@@ -108,14 +107,12 @@ def registry(policy: str, level: QualificationLevel | str =
         from .modes.hr0_mode import HR0
         from .modes.hc0_mode import HC0
         from .modes.hc1_mode import HC1
-        from .modes.hf4_mode import HF4
         from .modes.hf5_mode import HF5
         from .modes.hf6_mode import HF6
         from .modes.hf7_mode import HF7
         from .modes.hf8_mode import HF8
-        # Rate order, which is the order _maybe_adapt climbs: HF8's 3,299 bit/s
-        # sits between HC1 and HF4.
-        candidates, control = (HR0, HC0, HC1, HF8, HF4, HF5, HF6, HF7), HR0
+        # Rate order, which is the order _maybe_adapt climbs.
+        candidates, control = (HR0, HC0, HC1, HF8, HF5, HF6, HF7), HR0
         # HF2 remains available only at experimental level as a historical
         # fallback.
         if requested >= QualificationLevel.EXPERIMENTAL:

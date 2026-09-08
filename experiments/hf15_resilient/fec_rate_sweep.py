@@ -1,7 +1,7 @@
 """Matched HF15 FEC-rate measurement modes.
 
 This module is intentionally a benchmark harness, not a production mode.  It
-keeps the inner packet and HF4-derived waveform fixed while changing only the
+keeps the inner packet and shared single-carrier waveform fixed while changing only the
 K=7 puncturing rate.
 """
 

@@ -4,7 +4,7 @@ Developed in the retired `experiments/hf13_fast_sync_v1/` and moved here
 unmodified when it became shipped product code; its equivalence evidence is
 `experiments/hf13_fast_sync_v1/RESULTS.md`.
 
-Same PHY as hf5 (8PSK@1500baud-class single-carrier, no FEC) -- this is a
+Same PHY as the 8PSK@1500baud-class single-carrier mode (no FEC) -- this is a
 pure CPU optimization of the sync-search stage, not a waveform change.
 Validated against real over-the-air captures in
 `experiments/hf13_fast_sync_v1/RESULTS.md` (0/10 discrepancies vs. the
@@ -147,7 +147,7 @@ class SingleCarrierMode(sc.SingleCarrierMode):
         result["raw_bits"] = raw_bits
         # A lightweight reliability stream for FEC users.  The sign is the
         # hard bit hypothesis and the magnitude is the equalized symbol
-        # magnitude; this preserves fade confidence without changing HF4's
+        # magnitude; this preserves fade confidence without changing the
         # public decode result or its hard-decision behavior.
         if self.bits_per_symbol == 3:
             result["raw_soft_bits"] = ((1.0 - 2.0 * raw_bits.astype(np.float64))
