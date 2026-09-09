@@ -1,0 +1,1000 @@
+{
+  "generated": "2026-09-08T15:54:38.826988+00:00",
+  "model": "awgn",
+  "watterson_preset": null,
+  "points_db": [
+    3.0,
+    4.0,
+    5.0,
+    6.0,
+    7.0,
+    8.0
+  ],
+  "trials": 100,
+  "seed": 20260908,
+  "arms": [
+    "baseline: 0 pilots, 352 data symbols, 1005 B (0.0% of HC1W's capacity), differential detection",
+    "diff-s16: 22 pilots, 330 data symbols, 941 B (6.4% of HC1W's capacity), differential detection",
+    "diff-s24: 15 pilots, 337 data symbols, 961 B (4.4% of HC1W's capacity), differential detection",
+    "diff-s32: 11 pilots, 341 data symbols, 973 B (3.2% of HC1W's capacity), differential detection",
+    "diff-s48: 7 pilots, 345 data symbols, 984 B (2.1% of HC1W's capacity), differential detection",
+    "cohe-s16: 22 pilots, 330 data symbols, 941 B (6.4% of HC1W's capacity), coherent detection",
+    "cohe-s24: 15 pilots, 337 data symbols, 961 B (4.4% of HC1W's capacity), coherent detection",
+    "cohe-s32: 11 pilots, 341 data symbols, 973 B (3.2% of HC1W's capacity), coherent detection",
+    "cohe-s48: 7 pilots, 345 data symbols, 984 B (2.1% of HC1W's capacity), coherent detection"
+  ],
+  "results": [
+    {
+      "arm": "baseline",
+      "stride": 0,
+      "detection": "differential",
+      "max_payload_bytes": 1005,
+      "capacity_loss": 0.0,
+      "trials": 100,
+      "delivered": 0,
+      "delivery_rate": 0.0,
+      "delivery_ci95": [
+        3.469446951953614e-18,
+        0.03699349820698568
+      ],
+      "acquired": 0,
+      "errors": 0,
+      "point_db": 3.0,
+      "point_label": "AWGN SNR/3 kHz 3 dB"
+    },
+    {
+      "arm": "diff-s16",
+      "stride": 16,
+      "detection": "differential",
+      "max_payload_bytes": 941,
+      "capacity_loss": 0.0637,
+      "trials": 100,
+      "delivered": 0,
+      "delivery_rate": 0.0,
+      "delivery_ci95": [
+        3.469446951953614e-18,
+        0.03699349820698568
+      ],
+      "acquired": 0,
+      "errors": 0,
+      "point_db": 3.0,
+      "point_label": "AWGN SNR/3 kHz 3 dB"
+    },
+    {
+      "arm": "diff-s24",
+      "stride": 24,
+      "detection": "differential",
+      "max_payload_bytes": 961,
+      "capacity_loss": 0.0438,
+      "trials": 100,
+      "delivered": 0,
+      "delivery_rate": 0.0,
+      "delivery_ci95": [
+        3.469446951953614e-18,
+        0.03699349820698568
+      ],
+      "acquired": 0,
+      "errors": 0,
+      "point_db": 3.0,
+      "point_label": "AWGN SNR/3 kHz 3 dB"
+    },
+    {
+      "arm": "diff-s32",
+      "stride": 32,
+      "detection": "differential",
+      "max_payload_bytes": 973,
+      "capacity_loss": 0.0318,
+      "trials": 100,
+      "delivered": 0,
+      "delivery_rate": 0.0,
+      "delivery_ci95": [
+        3.469446951953614e-18,
+        0.03699349820698568
+      ],
+      "acquired": 0,
+      "errors": 0,
+      "point_db": 3.0,
+      "point_label": "AWGN SNR/3 kHz 3 dB"
+    },
+    {
+      "arm": "diff-s48",
+      "stride": 48,
+      "detection": "differential",
+      "max_payload_bytes": 984,
+      "capacity_loss": 0.0209,
+      "trials": 100,
+      "delivered": 0,
+      "delivery_rate": 0.0,
+      "delivery_ci95": [
+        3.469446951953614e-18,
+        0.03699349820698568
+      ],
+      "acquired": 0,
+      "errors": 0,
+      "point_db": 3.0,
+      "point_label": "AWGN SNR/3 kHz 3 dB"
+    },
+    {
+      "arm": "cohe-s16",
+      "stride": 16,
+      "detection": "coherent",
+      "max_payload_bytes": 941,
+      "capacity_loss": 0.0637,
+      "trials": 100,
+      "delivered": 0,
+      "delivery_rate": 0.0,
+      "delivery_ci95": [
+        3.469446951953614e-18,
+        0.03699349820698568
+      ],
+      "acquired": 0,
+      "errors": 0,
+      "point_db": 3.0,
+      "point_label": "AWGN SNR/3 kHz 3 dB"
+    },
+    {
+      "arm": "cohe-s24",
+      "stride": 24,
+      "detection": "coherent",
+      "max_payload_bytes": 961,
+      "capacity_loss": 0.0438,
+      "trials": 100,
+      "delivered": 0,
+      "delivery_rate": 0.0,
+      "delivery_ci95": [
+        3.469446951953614e-18,
+        0.03699349820698568
+      ],
+      "acquired": 0,
+      "errors": 0,
+      "point_db": 3.0,
+      "point_label": "AWGN SNR/3 kHz 3 dB"
+    },
+    {
+      "arm": "cohe-s32",
+      "stride": 32,
+      "detection": "coherent",
+      "max_payload_bytes": 973,
+      "capacity_loss": 0.0318,
+      "trials": 100,
+      "delivered": 0,
+      "delivery_rate": 0.0,
+      "delivery_ci95": [
+        3.469446951953614e-18,
+        0.03699349820698568
+      ],
+      "acquired": 0,
+      "errors": 0,
+      "point_db": 3.0,
+      "point_label": "AWGN SNR/3 kHz 3 dB"
+    },
+    {
+      "arm": "cohe-s48",
+      "stride": 48,
+      "detection": "coherent",
+      "max_payload_bytes": 984,
+      "capacity_loss": 0.0209,
+      "trials": 100,
+      "delivered": 0,
+      "delivery_rate": 0.0,
+      "delivery_ci95": [
+        3.469446951953614e-18,
+        0.03699349820698568
+      ],
+      "acquired": 0,
+      "errors": 0,
+      "point_db": 3.0,
+      "point_label": "AWGN SNR/3 kHz 3 dB"
+    },
+    {
+      "arm": "baseline",
+      "stride": 0,
+      "detection": "differential",
+      "max_payload_bytes": 1005,
+      "capacity_loss": 0.0,
+      "trials": 100,
+      "delivered": 0,
+      "delivery_rate": 0.0,
+      "delivery_ci95": [
+        3.469446951953614e-18,
+        0.03699349820698568
+      ],
+      "acquired": 1,
+      "errors": 0,
+      "point_db": 4.0,
+      "point_label": "AWGN SNR/3 kHz 4 dB"
+    },
+    {
+      "arm": "diff-s16",
+      "stride": 16,
+      "detection": "differential",
+      "max_payload_bytes": 941,
+      "capacity_loss": 0.0637,
+      "trials": 100,
+      "delivered": 0,
+      "delivery_rate": 0.0,
+      "delivery_ci95": [
+        3.469446951953614e-18,
+        0.03699349820698568
+      ],
+      "acquired": 1,
+      "errors": 0,
+      "point_db": 4.0,
+      "point_label": "AWGN SNR/3 kHz 4 dB"
+    },
+    {
+      "arm": "diff-s24",
+      "stride": 24,
+      "detection": "differential",
+      "max_payload_bytes": 961,
+      "capacity_loss": 0.0438,
+      "trials": 100,
+      "delivered": 0,
+      "delivery_rate": 0.0,
+      "delivery_ci95": [
+        3.469446951953614e-18,
+        0.03699349820698568
+      ],
+      "acquired": 1,
+      "errors": 0,
+      "point_db": 4.0,
+      "point_label": "AWGN SNR/3 kHz 4 dB"
+    },
+    {
+      "arm": "diff-s32",
+      "stride": 32,
+      "detection": "differential",
+      "max_payload_bytes": 973,
+      "capacity_loss": 0.0318,
+      "trials": 100,
+      "delivered": 0,
+      "delivery_rate": 0.0,
+      "delivery_ci95": [
+        3.469446951953614e-18,
+        0.03699349820698568
+      ],
+      "acquired": 2,
+      "errors": 0,
+      "point_db": 4.0,
+      "point_label": "AWGN SNR/3 kHz 4 dB"
+    },
+    {
+      "arm": "diff-s48",
+      "stride": 48,
+      "detection": "differential",
+      "max_payload_bytes": 984,
+      "capacity_loss": 0.0209,
+      "trials": 100,
+      "delivered": 0,
+      "delivery_rate": 0.0,
+      "delivery_ci95": [
+        3.469446951953614e-18,
+        0.03699349820698568
+      ],
+      "acquired": 2,
+      "errors": 0,
+      "point_db": 4.0,
+      "point_label": "AWGN SNR/3 kHz 4 dB"
+    },
+    {
+      "arm": "cohe-s16",
+      "stride": 16,
+      "detection": "coherent",
+      "max_payload_bytes": 941,
+      "capacity_loss": 0.0637,
+      "trials": 100,
+      "delivered": 0,
+      "delivery_rate": 0.0,
+      "delivery_ci95": [
+        3.469446951953614e-18,
+        0.03699349820698568
+      ],
+      "acquired": 1,
+      "errors": 0,
+      "point_db": 4.0,
+      "point_label": "AWGN SNR/3 kHz 4 dB"
+    },
+    {
+      "arm": "cohe-s24",
+      "stride": 24,
+      "detection": "coherent",
+      "max_payload_bytes": 961,
+      "capacity_loss": 0.0438,
+      "trials": 100,
+      "delivered": 1,
+      "delivery_rate": 0.01,
+      "delivery_ci95": [
+        0.0017674320641406505,
+        0.054486196178705315
+      ],
+      "acquired": 2,
+      "errors": 0,
+      "point_db": 4.0,
+      "point_label": "AWGN SNR/3 kHz 4 dB"
+    },
+    {
+      "arm": "cohe-s32",
+      "stride": 32,
+      "detection": "coherent",
+      "max_payload_bytes": 973,
+      "capacity_loss": 0.0318,
+      "trials": 100,
+      "delivered": 0,
+      "delivery_rate": 0.0,
+      "delivery_ci95": [
+        3.469446951953614e-18,
+        0.03699349820698568
+      ],
+      "acquired": 1,
+      "errors": 0,
+      "point_db": 4.0,
+      "point_label": "AWGN SNR/3 kHz 4 dB"
+    },
+    {
+      "arm": "cohe-s48",
+      "stride": 48,
+      "detection": "coherent",
+      "max_payload_bytes": 984,
+      "capacity_loss": 0.0209,
+      "trials": 100,
+      "delivered": 0,
+      "delivery_rate": 0.0,
+      "delivery_ci95": [
+        3.469446951953614e-18,
+        0.03699349820698568
+      ],
+      "acquired": 1,
+      "errors": 0,
+      "point_db": 4.0,
+      "point_label": "AWGN SNR/3 kHz 4 dB"
+    },
+    {
+      "arm": "baseline",
+      "stride": 0,
+      "detection": "differential",
+      "max_payload_bytes": 1005,
+      "capacity_loss": 0.0,
+      "trials": 100,
+      "delivered": 18,
+      "delivery_rate": 0.18,
+      "delivery_ci95": [
+        0.11700225498946351,
+        0.2666735838630073
+      ],
+      "acquired": 38,
+      "errors": 0,
+      "point_db": 5.0,
+      "point_label": "AWGN SNR/3 kHz 5 dB"
+    },
+    {
+      "arm": "diff-s16",
+      "stride": 16,
+      "detection": "differential",
+      "max_payload_bytes": 941,
+      "capacity_loss": 0.0637,
+      "trials": 100,
+      "delivered": 4,
+      "delivery_rate": 0.04,
+      "delivery_ci95": [
+        0.01566330399154762,
+        0.0983707143588792
+      ],
+      "acquired": 38,
+      "errors": 0,
+      "point_db": 5.0,
+      "point_label": "AWGN SNR/3 kHz 5 dB"
+    },
+    {
+      "arm": "diff-s24",
+      "stride": 24,
+      "detection": "differential",
+      "max_payload_bytes": 961,
+      "capacity_loss": 0.0438,
+      "trials": 100,
+      "delivered": 6,
+      "delivery_rate": 0.06,
+      "delivery_ci95": [
+        0.027786123963188192,
+        0.1247681544589592
+      ],
+      "acquired": 38,
+      "errors": 0,
+      "point_db": 5.0,
+      "point_label": "AWGN SNR/3 kHz 5 dB"
+    },
+    {
+      "arm": "diff-s32",
+      "stride": 32,
+      "detection": "differential",
+      "max_payload_bytes": 973,
+      "capacity_loss": 0.0318,
+      "trials": 100,
+      "delivered": 6,
+      "delivery_rate": 0.06,
+      "delivery_ci95": [
+        0.027786123963188192,
+        0.1247681544589592
+      ],
+      "acquired": 39,
+      "errors": 0,
+      "point_db": 5.0,
+      "point_label": "AWGN SNR/3 kHz 5 dB"
+    },
+    {
+      "arm": "diff-s48",
+      "stride": 48,
+      "detection": "differential",
+      "max_payload_bytes": 984,
+      "capacity_loss": 0.0209,
+      "trials": 100,
+      "delivered": 5,
+      "delivery_rate": 0.05,
+      "delivery_ci95": [
+        0.02154367915436796,
+        0.11175046923191913
+      ],
+      "acquired": 37,
+      "errors": 0,
+      "point_db": 5.0,
+      "point_label": "AWGN SNR/3 kHz 5 dB"
+    },
+    {
+      "arm": "cohe-s16",
+      "stride": 16,
+      "detection": "coherent",
+      "max_payload_bytes": 941,
+      "capacity_loss": 0.0637,
+      "trials": 100,
+      "delivered": 33,
+      "delivery_rate": 0.33,
+      "delivery_ci95": [
+        0.24563122734128034,
+        0.4269465620490947
+      ],
+      "acquired": 37,
+      "errors": 0,
+      "point_db": 5.0,
+      "point_label": "AWGN SNR/3 kHz 5 dB"
+    },
+    {
+      "arm": "cohe-s24",
+      "stride": 24,
+      "detection": "coherent",
+      "max_payload_bytes": 961,
+      "capacity_loss": 0.0438,
+      "trials": 100,
+      "delivered": 30,
+      "delivery_rate": 0.3,
+      "delivery_ci95": [
+        0.2189488529493276,
+        0.3958485463334666
+      ],
+      "acquired": 38,
+      "errors": 0,
+      "point_db": 5.0,
+      "point_label": "AWGN SNR/3 kHz 5 dB"
+    },
+    {
+      "arm": "cohe-s32",
+      "stride": 32,
+      "detection": "coherent",
+      "max_payload_bytes": 973,
+      "capacity_loss": 0.0318,
+      "trials": 100,
+      "delivered": 32,
+      "delivery_rate": 0.32,
+      "delivery_ci95": [
+        0.23669147324999093,
+        0.41662618610452384
+      ],
+      "acquired": 38,
+      "errors": 0,
+      "point_db": 5.0,
+      "point_label": "AWGN SNR/3 kHz 5 dB"
+    },
+    {
+      "arm": "cohe-s48",
+      "stride": 48,
+      "detection": "coherent",
+      "max_payload_bytes": 984,
+      "capacity_loss": 0.0209,
+      "trials": 100,
+      "delivered": 23,
+      "delivery_rate": 0.23,
+      "delivery_ci95": [
+        0.15843265880303448,
+        0.3215438302287378
+      ],
+      "acquired": 38,
+      "errors": 0,
+      "point_db": 5.0,
+      "point_label": "AWGN SNR/3 kHz 5 dB"
+    },
+    {
+      "arm": "baseline",
+      "stride": 0,
+      "detection": "differential",
+      "max_payload_bytes": 1005,
+      "capacity_loss": 0.0,
+      "trials": 100,
+      "delivered": 92,
+      "delivery_rate": 0.92,
+      "delivery_ci95": [
+        0.8500189229905127,
+        0.9589065385156194
+      ],
+      "acquired": 95,
+      "errors": 0,
+      "point_db": 6.0,
+      "point_label": "AWGN SNR/3 kHz 6 dB"
+    },
+    {
+      "arm": "diff-s16",
+      "stride": 16,
+      "detection": "differential",
+      "max_payload_bytes": 941,
+      "capacity_loss": 0.0637,
+      "trials": 100,
+      "delivered": 82,
+      "delivery_rate": 0.82,
+      "delivery_ci95": [
+        0.7333264161369926,
+        0.8829977450105364
+      ],
+      "acquired": 97,
+      "errors": 0,
+      "point_db": 6.0,
+      "point_label": "AWGN SNR/3 kHz 6 dB"
+    },
+    {
+      "arm": "diff-s24",
+      "stride": 24,
+      "detection": "differential",
+      "max_payload_bytes": 961,
+      "capacity_loss": 0.0438,
+      "trials": 100,
+      "delivered": 82,
+      "delivery_rate": 0.82,
+      "delivery_ci95": [
+        0.7333264161369926,
+        0.8829977450105364
+      ],
+      "acquired": 96,
+      "errors": 0,
+      "point_db": 6.0,
+      "point_label": "AWGN SNR/3 kHz 6 dB"
+    },
+    {
+      "arm": "diff-s32",
+      "stride": 32,
+      "detection": "differential",
+      "max_payload_bytes": 973,
+      "capacity_loss": 0.0318,
+      "trials": 100,
+      "delivered": 86,
+      "delivery_rate": 0.86,
+      "delivery_ci95": [
+        0.7786281178903616,
+        0.9147365634006086
+      ],
+      "acquired": 96,
+      "errors": 0,
+      "point_db": 6.0,
+      "point_label": "AWGN SNR/3 kHz 6 dB"
+    },
+    {
+      "arm": "diff-s48",
+      "stride": 48,
+      "detection": "differential",
+      "max_payload_bytes": 984,
+      "capacity_loss": 0.0209,
+      "trials": 100,
+      "delivered": 78,
+      "delivery_rate": 0.78,
+      "delivery_ci95": [
+        0.6892964648501421,
+        0.8499871761539459
+      ],
+      "acquired": 96,
+      "errors": 0,
+      "point_db": 6.0,
+      "point_label": "AWGN SNR/3 kHz 6 dB"
+    },
+    {
+      "arm": "cohe-s16",
+      "stride": 16,
+      "detection": "coherent",
+      "max_payload_bytes": 941,
+      "capacity_loss": 0.0637,
+      "trials": 100,
+      "delivered": 94,
+      "delivery_rate": 0.94,
+      "delivery_ci95": [
+        0.8752318455410406,
+        0.9722138760368118
+      ],
+      "acquired": 96,
+      "errors": 0,
+      "point_db": 6.0,
+      "point_label": "AWGN SNR/3 kHz 6 dB"
+    },
+    {
+      "arm": "cohe-s24",
+      "stride": 24,
+      "detection": "coherent",
+      "max_payload_bytes": 961,
+      "capacity_loss": 0.0438,
+      "trials": 100,
+      "delivered": 95,
+      "delivery_rate": 0.95,
+      "delivery_ci95": [
+        0.8882495307680808,
+        0.9784563208456319
+      ],
+      "acquired": 95,
+      "errors": 0,
+      "point_db": 6.0,
+      "point_label": "AWGN SNR/3 kHz 6 dB"
+    },
+    {
+      "arm": "cohe-s32",
+      "stride": 32,
+      "detection": "coherent",
+      "max_payload_bytes": 973,
+      "capacity_loss": 0.0318,
+      "trials": 100,
+      "delivered": 92,
+      "delivery_rate": 0.92,
+      "delivery_ci95": [
+        0.8500189229905127,
+        0.9589065385156194
+      ],
+      "acquired": 95,
+      "errors": 0,
+      "point_db": 6.0,
+      "point_label": "AWGN SNR/3 kHz 6 dB"
+    },
+    {
+      "arm": "cohe-s48",
+      "stride": 48,
+      "detection": "coherent",
+      "max_payload_bytes": 984,
+      "capacity_loss": 0.0209,
+      "trials": 100,
+      "delivered": 87,
+      "delivery_rate": 0.87,
+      "delivery_ci95": [
+        0.7901964855992357,
+        0.9224283257275948
+      ],
+      "acquired": 96,
+      "errors": 0,
+      "point_db": 6.0,
+      "point_label": "AWGN SNR/3 kHz 6 dB"
+    },
+    {
+      "arm": "baseline",
+      "stride": 0,
+      "detection": "differential",
+      "max_payload_bytes": 1005,
+      "capacity_loss": 0.0,
+      "trials": 100,
+      "delivered": 100,
+      "delivery_rate": 1.0,
+      "delivery_ci95": [
+        0.9630065017930143,
+        1.0
+      ],
+      "acquired": 100,
+      "errors": 0,
+      "point_db": 7.0,
+      "point_label": "AWGN SNR/3 kHz 7 dB"
+    },
+    {
+      "arm": "diff-s16",
+      "stride": 16,
+      "detection": "differential",
+      "max_payload_bytes": 941,
+      "capacity_loss": 0.0637,
+      "trials": 100,
+      "delivered": 99,
+      "delivery_rate": 0.99,
+      "delivery_ci95": [
+        0.9455138038212946,
+        0.9982325679358593
+      ],
+      "acquired": 100,
+      "errors": 0,
+      "point_db": 7.0,
+      "point_label": "AWGN SNR/3 kHz 7 dB"
+    },
+    {
+      "arm": "diff-s24",
+      "stride": 24,
+      "detection": "differential",
+      "max_payload_bytes": 961,
+      "capacity_loss": 0.0438,
+      "trials": 100,
+      "delivered": 100,
+      "delivery_rate": 1.0,
+      "delivery_ci95": [
+        0.9630065017930143,
+        1.0
+      ],
+      "acquired": 100,
+      "errors": 0,
+      "point_db": 7.0,
+      "point_label": "AWGN SNR/3 kHz 7 dB"
+    },
+    {
+      "arm": "diff-s32",
+      "stride": 32,
+      "detection": "differential",
+      "max_payload_bytes": 973,
+      "capacity_loss": 0.0318,
+      "trials": 100,
+      "delivered": 100,
+      "delivery_rate": 1.0,
+      "delivery_ci95": [
+        0.9630065017930143,
+        1.0
+      ],
+      "acquired": 100,
+      "errors": 0,
+      "point_db": 7.0,
+      "point_label": "AWGN SNR/3 kHz 7 dB"
+    },
+    {
+      "arm": "diff-s48",
+      "stride": 48,
+      "detection": "differential",
+      "max_payload_bytes": 984,
+      "capacity_loss": 0.0209,
+      "trials": 100,
+      "delivered": 99,
+      "delivery_rate": 0.99,
+      "delivery_ci95": [
+        0.9455138038212946,
+        0.9982325679358593
+      ],
+      "acquired": 100,
+      "errors": 0,
+      "point_db": 7.0,
+      "point_label": "AWGN SNR/3 kHz 7 dB"
+    },
+    {
+      "arm": "cohe-s16",
+      "stride": 16,
+      "detection": "coherent",
+      "max_payload_bytes": 941,
+      "capacity_loss": 0.0637,
+      "trials": 100,
+      "delivered": 100,
+      "delivery_rate": 1.0,
+      "delivery_ci95": [
+        0.9630065017930143,
+        1.0
+      ],
+      "acquired": 100,
+      "errors": 0,
+      "point_db": 7.0,
+      "point_label": "AWGN SNR/3 kHz 7 dB"
+    },
+    {
+      "arm": "cohe-s24",
+      "stride": 24,
+      "detection": "coherent",
+      "max_payload_bytes": 961,
+      "capacity_loss": 0.0438,
+      "trials": 100,
+      "delivered": 100,
+      "delivery_rate": 1.0,
+      "delivery_ci95": [
+        0.9630065017930143,
+        1.0
+      ],
+      "acquired": 100,
+      "errors": 0,
+      "point_db": 7.0,
+      "point_label": "AWGN SNR/3 kHz 7 dB"
+    },
+    {
+      "arm": "cohe-s32",
+      "stride": 32,
+      "detection": "coherent",
+      "max_payload_bytes": 973,
+      "capacity_loss": 0.0318,
+      "trials": 100,
+      "delivered": 100,
+      "delivery_rate": 1.0,
+      "delivery_ci95": [
+        0.9630065017930143,
+        1.0
+      ],
+      "acquired": 100,
+      "errors": 0,
+      "point_db": 7.0,
+      "point_label": "AWGN SNR/3 kHz 7 dB"
+    },
+    {
+      "arm": "cohe-s48",
+      "stride": 48,
+      "detection": "coherent",
+      "max_payload_bytes": 984,
+      "capacity_loss": 0.0209,
+      "trials": 100,
+      "delivered": 96,
+      "delivery_rate": 0.96,
+      "delivery_ci95": [
+        0.9016292856411208,
+        0.9843366960084523
+      ],
+      "acquired": 100,
+      "errors": 0,
+      "point_db": 7.0,
+      "point_label": "AWGN SNR/3 kHz 7 dB"
+    },
+    {
+      "arm": "baseline",
+      "stride": 0,
+      "detection": "differential",
+      "max_payload_bytes": 1005,
+      "capacity_loss": 0.0,
+      "trials": 100,
+      "delivered": 100,
+      "delivery_rate": 1.0,
+      "delivery_ci95": [
+        0.9630065017930143,
+        1.0
+      ],
+      "acquired": 100,
+      "errors": 0,
+      "point_db": 8.0,
+      "point_label": "AWGN SNR/3 kHz 8 dB"
+    },
+    {
+      "arm": "diff-s16",
+      "stride": 16,
+      "detection": "differential",
+      "max_payload_bytes": 941,
+      "capacity_loss": 0.0637,
+      "trials": 100,
+      "delivered": 100,
+      "delivery_rate": 1.0,
+      "delivery_ci95": [
+        0.9630065017930143,
+        1.0
+      ],
+      "acquired": 100,
+      "errors": 0,
+      "point_db": 8.0,
+      "point_label": "AWGN SNR/3 kHz 8 dB"
+    },
+    {
+      "arm": "diff-s24",
+      "stride": 24,
+      "detection": "differential",
+      "max_payload_bytes": 961,
+      "capacity_loss": 0.0438,
+      "trials": 100,
+      "delivered": 100,
+      "delivery_rate": 1.0,
+      "delivery_ci95": [
+        0.9630065017930143,
+        1.0
+      ],
+      "acquired": 100,
+      "errors": 0,
+      "point_db": 8.0,
+      "point_label": "AWGN SNR/3 kHz 8 dB"
+    },
+    {
+      "arm": "diff-s32",
+      "stride": 32,
+      "detection": "differential",
+      "max_payload_bytes": 973,
+      "capacity_loss": 0.0318,
+      "trials": 100,
+      "delivered": 100,
+      "delivery_rate": 1.0,
+      "delivery_ci95": [
+        0.9630065017930143,
+        1.0
+      ],
+      "acquired": 100,
+      "errors": 0,
+      "point_db": 8.0,
+      "point_label": "AWGN SNR/3 kHz 8 dB"
+    },
+    {
+      "arm": "diff-s48",
+      "stride": 48,
+      "detection": "differential",
+      "max_payload_bytes": 984,
+      "capacity_loss": 0.0209,
+      "trials": 100,
+      "delivered": 100,
+      "delivery_rate": 1.0,
+      "delivery_ci95": [
+        0.9630065017930143,
+        1.0
+      ],
+      "acquired": 100,
+      "errors": 0,
+      "point_db": 8.0,
+      "point_label": "AWGN SNR/3 kHz 8 dB"
+    },
+    {
+      "arm": "cohe-s16",
+      "stride": 16,
+      "detection": "coherent",
+      "max_payload_bytes": 941,
+      "capacity_loss": 0.0637,
+      "trials": 100,
+      "delivered": 100,
+      "delivery_rate": 1.0,
+      "delivery_ci95": [
+        0.9630065017930143,
+        1.0
+      ],
+      "acquired": 100,
+      "errors": 0,
+      "point_db": 8.0,
+      "point_label": "AWGN SNR/3 kHz 8 dB"
+    },
+    {
+      "arm": "cohe-s24",
+      "stride": 24,
+      "detection": "coherent",
+      "max_payload_bytes": 961,
+      "capacity_loss": 0.0438,
+      "trials": 100,
+      "delivered": 100,
+      "delivery_rate": 1.0,
+      "delivery_ci95": [
+        0.9630065017930143,
+        1.0
+      ],
+      "acquired": 100,
+      "errors": 0,
+      "point_db": 8.0,
+      "point_label": "AWGN SNR/3 kHz 8 dB"
+    },
+    {
+      "arm": "cohe-s32",
+      "stride": 32,
+      "detection": "coherent",
+      "max_payload_bytes": 973,
+      "capacity_loss": 0.0318,
+      "trials": 100,
+      "delivered": 100,
+      "delivery_rate": 1.0,
+      "delivery_ci95": [
+        0.9630065017930143,
+        1.0
+      ],
+      "acquired": 100,
+      "errors": 0,
+      "point_db": 8.0,
+      "point_label": "AWGN SNR/3 kHz 8 dB"
+    },
+    {
+      "arm": "cohe-s48",
+      "stride": 48,
+      "detection": "coherent",
+      "max_payload_bytes": 984,
+      "capacity_loss": 0.0209,
+      "trials": 100,
+      "delivered": 97,
+      "delivery_rate": 0.97,
+      "delivery_ci95": [
+        0.9154806357094724,
+        0.9897454759759611
+      ],
+      "acquired": 100,
+      "errors": 0,
+      "point_db": 8.0,
+      "point_label": "AWGN SNR/3 kHz 8 dB"
+    }
+  ]
+}

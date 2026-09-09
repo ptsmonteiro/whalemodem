@@ -1,0 +1,837 @@
+{
+  "generated": "2026-09-08T15:57:17.674501+00:00",
+  "model": "watterson",
+  "watterson_preset": "mid_latitude_quiet",
+  "points_db": [
+    8.0,
+    11.0,
+    14.0,
+    17.0,
+    20.0
+  ],
+  "trials": 100,
+  "seed": 20260908,
+  "arms": [
+    "baseline: 0 pilots, 352 data symbols, 1005 B (0.0% of HC1W's capacity), differential detection",
+    "diff-s16: 22 pilots, 330 data symbols, 941 B (6.4% of HC1W's capacity), differential detection",
+    "diff-s24: 15 pilots, 337 data symbols, 961 B (4.4% of HC1W's capacity), differential detection",
+    "diff-s32: 11 pilots, 341 data symbols, 973 B (3.2% of HC1W's capacity), differential detection",
+    "diff-s48: 7 pilots, 345 data symbols, 984 B (2.1% of HC1W's capacity), differential detection",
+    "cohe-s16: 22 pilots, 330 data symbols, 941 B (6.4% of HC1W's capacity), coherent detection",
+    "cohe-s24: 15 pilots, 337 data symbols, 961 B (4.4% of HC1W's capacity), coherent detection",
+    "cohe-s32: 11 pilots, 341 data symbols, 973 B (3.2% of HC1W's capacity), coherent detection",
+    "cohe-s48: 7 pilots, 345 data symbols, 984 B (2.1% of HC1W's capacity), coherent detection"
+  ],
+  "results": [
+    {
+      "arm": "baseline",
+      "stride": 0,
+      "detection": "differential",
+      "max_payload_bytes": 1005,
+      "capacity_loss": 0.0,
+      "trials": 100,
+      "delivered": 25,
+      "delivery_rate": 0.25,
+      "delivery_ci95": [
+        0.17545211362287674,
+        0.34304463548061603
+      ],
+      "acquired": 83,
+      "errors": 0,
+      "point_db": 8.0,
+      "point_label": "mid_latitude_quiet, SNR/3 kHz 8 dB"
+    },
+    {
+      "arm": "diff-s16",
+      "stride": 16,
+      "detection": "differential",
+      "max_payload_bytes": 941,
+      "capacity_loss": 0.0637,
+      "trials": 100,
+      "delivered": 52,
+      "delivery_rate": 0.52,
+      "delivery_ci95": [
+        0.4231657776522397,
+        0.615354482419481
+      ],
+      "acquired": 83,
+      "errors": 0,
+      "point_db": 8.0,
+      "point_label": "mid_latitude_quiet, SNR/3 kHz 8 dB"
+    },
+    {
+      "arm": "diff-s24",
+      "stride": 24,
+      "detection": "differential",
+      "max_payload_bytes": 961,
+      "capacity_loss": 0.0438,
+      "trials": 100,
+      "delivered": 48,
+      "delivery_rate": 0.48,
+      "delivery_ci95": [
+        0.384645517580519,
+        0.5768342223477603
+      ],
+      "acquired": 83,
+      "errors": 0,
+      "point_db": 8.0,
+      "point_label": "mid_latitude_quiet, SNR/3 kHz 8 dB"
+    },
+    {
+      "arm": "diff-s32",
+      "stride": 32,
+      "detection": "differential",
+      "max_payload_bytes": 973,
+      "capacity_loss": 0.0318,
+      "trials": 100,
+      "delivered": 49,
+      "delivery_rate": 0.49,
+      "delivery_ci95": [
+        0.3942199893044113,
+        0.5865198806597283
+      ],
+      "acquired": 84,
+      "errors": 0,
+      "point_db": 8.0,
+      "point_label": "mid_latitude_quiet, SNR/3 kHz 8 dB"
+    },
+    {
+      "arm": "diff-s48",
+      "stride": 48,
+      "detection": "differential",
+      "max_payload_bytes": 984,
+      "capacity_loss": 0.0209,
+      "trials": 100,
+      "delivered": 47,
+      "delivery_rate": 0.47,
+      "delivery_ci95": [
+        0.3751081795934127,
+        0.5671114302990063
+      ],
+      "acquired": 84,
+      "errors": 0,
+      "point_db": 8.0,
+      "point_label": "mid_latitude_quiet, SNR/3 kHz 8 dB"
+    },
+    {
+      "arm": "cohe-s16",
+      "stride": 16,
+      "detection": "coherent",
+      "max_payload_bytes": 941,
+      "capacity_loss": 0.0637,
+      "trials": 100,
+      "delivered": 47,
+      "delivery_rate": 0.47,
+      "delivery_ci95": [
+        0.3751081795934127,
+        0.5671114302990063
+      ],
+      "acquired": 83,
+      "errors": 0,
+      "point_db": 8.0,
+      "point_label": "mid_latitude_quiet, SNR/3 kHz 8 dB"
+    },
+    {
+      "arm": "cohe-s24",
+      "stride": 24,
+      "detection": "coherent",
+      "max_payload_bytes": 961,
+      "capacity_loss": 0.0438,
+      "trials": 100,
+      "delivered": 51,
+      "delivery_rate": 0.51,
+      "delivery_ci95": [
+        0.4134801193402717,
+        0.6057800106955886
+      ],
+      "acquired": 83,
+      "errors": 0,
+      "point_db": 8.0,
+      "point_label": "mid_latitude_quiet, SNR/3 kHz 8 dB"
+    },
+    {
+      "arm": "cohe-s32",
+      "stride": 32,
+      "detection": "coherent",
+      "max_payload_bytes": 973,
+      "capacity_loss": 0.0318,
+      "trials": 100,
+      "delivered": 43,
+      "delivery_rate": 0.43,
+      "delivery_ci95": [
+        0.33733298524110106,
+        0.5278461045078768
+      ],
+      "acquired": 83,
+      "errors": 0,
+      "point_db": 8.0,
+      "point_label": "mid_latitude_quiet, SNR/3 kHz 8 dB"
+    },
+    {
+      "arm": "cohe-s48",
+      "stride": 48,
+      "detection": "coherent",
+      "max_payload_bytes": 984,
+      "capacity_loss": 0.0209,
+      "trials": 100,
+      "delivered": 29,
+      "delivery_rate": 0.29,
+      "delivery_ci95": [
+        0.2101483574912227,
+        0.3853889117557111
+      ],
+      "acquired": 83,
+      "errors": 0,
+      "point_db": 8.0,
+      "point_label": "mid_latitude_quiet, SNR/3 kHz 8 dB"
+    },
+    {
+      "arm": "baseline",
+      "stride": 0,
+      "detection": "differential",
+      "max_payload_bytes": 1005,
+      "capacity_loss": 0.0,
+      "trials": 100,
+      "delivered": 80,
+      "delivery_rate": 0.8,
+      "delivery_ci95": [
+        0.7111708344068411,
+        0.8666330666689676
+      ],
+      "acquired": 98,
+      "errors": 0,
+      "point_db": 11.0,
+      "point_label": "mid_latitude_quiet, SNR/3 kHz 11 dB"
+    },
+    {
+      "arm": "diff-s16",
+      "stride": 16,
+      "detection": "differential",
+      "max_payload_bytes": 941,
+      "capacity_loss": 0.0637,
+      "trials": 100,
+      "delivered": 95,
+      "delivery_rate": 0.95,
+      "delivery_ci95": [
+        0.8882495307680808,
+        0.9784563208456319
+      ],
+      "acquired": 98,
+      "errors": 0,
+      "point_db": 11.0,
+      "point_label": "mid_latitude_quiet, SNR/3 kHz 11 dB"
+    },
+    {
+      "arm": "diff-s24",
+      "stride": 24,
+      "detection": "differential",
+      "max_payload_bytes": 961,
+      "capacity_loss": 0.0438,
+      "trials": 100,
+      "delivered": 96,
+      "delivery_rate": 0.96,
+      "delivery_ci95": [
+        0.9016292856411208,
+        0.9843366960084523
+      ],
+      "acquired": 98,
+      "errors": 0,
+      "point_db": 11.0,
+      "point_label": "mid_latitude_quiet, SNR/3 kHz 11 dB"
+    },
+    {
+      "arm": "diff-s32",
+      "stride": 32,
+      "detection": "differential",
+      "max_payload_bytes": 973,
+      "capacity_loss": 0.0318,
+      "trials": 100,
+      "delivered": 94,
+      "delivery_rate": 0.94,
+      "delivery_ci95": [
+        0.8752318455410406,
+        0.9722138760368118
+      ],
+      "acquired": 98,
+      "errors": 0,
+      "point_db": 11.0,
+      "point_label": "mid_latitude_quiet, SNR/3 kHz 11 dB"
+    },
+    {
+      "arm": "diff-s48",
+      "stride": 48,
+      "detection": "differential",
+      "max_payload_bytes": 984,
+      "capacity_loss": 0.0209,
+      "trials": 100,
+      "delivered": 95,
+      "delivery_rate": 0.95,
+      "delivery_ci95": [
+        0.8882495307680808,
+        0.9784563208456319
+      ],
+      "acquired": 98,
+      "errors": 0,
+      "point_db": 11.0,
+      "point_label": "mid_latitude_quiet, SNR/3 kHz 11 dB"
+    },
+    {
+      "arm": "cohe-s16",
+      "stride": 16,
+      "detection": "coherent",
+      "max_payload_bytes": 941,
+      "capacity_loss": 0.0637,
+      "trials": 100,
+      "delivered": 81,
+      "delivery_rate": 0.81,
+      "delivery_ci95": [
+        0.7222115462093562,
+        0.8748524849023126
+      ],
+      "acquired": 98,
+      "errors": 0,
+      "point_db": 11.0,
+      "point_label": "mid_latitude_quiet, SNR/3 kHz 11 dB"
+    },
+    {
+      "arm": "cohe-s24",
+      "stride": 24,
+      "detection": "coherent",
+      "max_payload_bytes": 961,
+      "capacity_loss": 0.0438,
+      "trials": 100,
+      "delivered": 84,
+      "delivery_rate": 0.84,
+      "delivery_ci95": [
+        0.7557973061072976,
+        0.8990471151119521
+      ],
+      "acquired": 98,
+      "errors": 0,
+      "point_db": 11.0,
+      "point_label": "mid_latitude_quiet, SNR/3 kHz 11 dB"
+    },
+    {
+      "arm": "cohe-s32",
+      "stride": 32,
+      "detection": "coherent",
+      "max_payload_bytes": 973,
+      "capacity_loss": 0.0318,
+      "trials": 100,
+      "delivered": 77,
+      "delivery_rate": 0.77,
+      "delivery_ci95": [
+        0.6784561697712622,
+        0.8415673411969654
+      ],
+      "acquired": 98,
+      "errors": 0,
+      "point_db": 11.0,
+      "point_label": "mid_latitude_quiet, SNR/3 kHz 11 dB"
+    },
+    {
+      "arm": "cohe-s48",
+      "stride": 48,
+      "detection": "coherent",
+      "max_payload_bytes": 984,
+      "capacity_loss": 0.0209,
+      "trials": 100,
+      "delivered": 55,
+      "delivery_rate": 0.55,
+      "delivery_ci95": [
+        0.45244602997442135,
+        0.6438546202048803
+      ],
+      "acquired": 98,
+      "errors": 0,
+      "point_db": 11.0,
+      "point_label": "mid_latitude_quiet, SNR/3 kHz 11 dB"
+    },
+    {
+      "arm": "baseline",
+      "stride": 0,
+      "detection": "differential",
+      "max_payload_bytes": 1005,
+      "capacity_loss": 0.0,
+      "trials": 100,
+      "delivered": 91,
+      "delivery_rate": 0.91,
+      "delivery_ci95": [
+        0.837737871472837,
+        0.9519274599974348
+      ],
+      "acquired": 98,
+      "errors": 0,
+      "point_db": 14.0,
+      "point_label": "mid_latitude_quiet, SNR/3 kHz 14 dB"
+    },
+    {
+      "arm": "diff-s16",
+      "stride": 16,
+      "detection": "differential",
+      "max_payload_bytes": 941,
+      "capacity_loss": 0.0637,
+      "trials": 100,
+      "delivered": 98,
+      "delivery_rate": 0.98,
+      "delivery_ci95": [
+        0.929988209271456,
+        0.9944980324498376
+      ],
+      "acquired": 98,
+      "errors": 0,
+      "point_db": 14.0,
+      "point_label": "mid_latitude_quiet, SNR/3 kHz 14 dB"
+    },
+    {
+      "arm": "diff-s24",
+      "stride": 24,
+      "detection": "differential",
+      "max_payload_bytes": 961,
+      "capacity_loss": 0.0438,
+      "trials": 100,
+      "delivered": 97,
+      "delivery_rate": 0.97,
+      "delivery_ci95": [
+        0.9154806357094724,
+        0.9897454759759611
+      ],
+      "acquired": 98,
+      "errors": 0,
+      "point_db": 14.0,
+      "point_label": "mid_latitude_quiet, SNR/3 kHz 14 dB"
+    },
+    {
+      "arm": "diff-s32",
+      "stride": 32,
+      "detection": "differential",
+      "max_payload_bytes": 973,
+      "capacity_loss": 0.0318,
+      "trials": 100,
+      "delivered": 98,
+      "delivery_rate": 0.98,
+      "delivery_ci95": [
+        0.929988209271456,
+        0.9944980324498376
+      ],
+      "acquired": 98,
+      "errors": 0,
+      "point_db": 14.0,
+      "point_label": "mid_latitude_quiet, SNR/3 kHz 14 dB"
+    },
+    {
+      "arm": "diff-s48",
+      "stride": 48,
+      "detection": "differential",
+      "max_payload_bytes": 984,
+      "capacity_loss": 0.0209,
+      "trials": 100,
+      "delivered": 97,
+      "delivery_rate": 0.97,
+      "delivery_ci95": [
+        0.9154806357094724,
+        0.9897454759759611
+      ],
+      "acquired": 98,
+      "errors": 0,
+      "point_db": 14.0,
+      "point_label": "mid_latitude_quiet, SNR/3 kHz 14 dB"
+    },
+    {
+      "arm": "cohe-s16",
+      "stride": 16,
+      "detection": "coherent",
+      "max_payload_bytes": 941,
+      "capacity_loss": 0.0637,
+      "trials": 100,
+      "delivered": 89,
+      "delivery_rate": 0.89,
+      "delivery_ci95": [
+        0.8136870349691969,
+        0.9374580364293543
+      ],
+      "acquired": 98,
+      "errors": 0,
+      "point_db": 14.0,
+      "point_label": "mid_latitude_quiet, SNR/3 kHz 14 dB"
+    },
+    {
+      "arm": "cohe-s24",
+      "stride": 24,
+      "detection": "coherent",
+      "max_payload_bytes": 961,
+      "capacity_loss": 0.0438,
+      "trials": 100,
+      "delivered": 88,
+      "delivery_rate": 0.88,
+      "delivery_ci95": [
+        0.8018790057328857,
+        0.9300059356298052
+      ],
+      "acquired": 98,
+      "errors": 0,
+      "point_db": 14.0,
+      "point_label": "mid_latitude_quiet, SNR/3 kHz 14 dB"
+    },
+    {
+      "arm": "cohe-s32",
+      "stride": 32,
+      "detection": "coherent",
+      "max_payload_bytes": 973,
+      "capacity_loss": 0.0318,
+      "trials": 100,
+      "delivered": 88,
+      "delivery_rate": 0.88,
+      "delivery_ci95": [
+        0.8018790057328857,
+        0.9300059356298052
+      ],
+      "acquired": 98,
+      "errors": 0,
+      "point_db": 14.0,
+      "point_label": "mid_latitude_quiet, SNR/3 kHz 14 dB"
+    },
+    {
+      "arm": "cohe-s48",
+      "stride": 48,
+      "detection": "coherent",
+      "max_payload_bytes": 984,
+      "capacity_loss": 0.0209,
+      "trials": 100,
+      "delivered": 79,
+      "delivery_rate": 0.79,
+      "delivery_ci95": [
+        0.7002003116591013,
+        0.858343459380847
+      ],
+      "acquired": 98,
+      "errors": 0,
+      "point_db": 14.0,
+      "point_label": "mid_latitude_quiet, SNR/3 kHz 14 dB"
+    },
+    {
+      "arm": "baseline",
+      "stride": 0,
+      "detection": "differential",
+      "max_payload_bytes": 1005,
+      "capacity_loss": 0.0,
+      "trials": 100,
+      "delivered": 95,
+      "delivery_rate": 0.95,
+      "delivery_ci95": [
+        0.8882495307680808,
+        0.9784563208456319
+      ],
+      "acquired": 100,
+      "errors": 0,
+      "point_db": 17.0,
+      "point_label": "mid_latitude_quiet, SNR/3 kHz 17 dB"
+    },
+    {
+      "arm": "diff-s16",
+      "stride": 16,
+      "detection": "differential",
+      "max_payload_bytes": 941,
+      "capacity_loss": 0.0637,
+      "trials": 100,
+      "delivered": 100,
+      "delivery_rate": 1.0,
+      "delivery_ci95": [
+        0.9630065017930143,
+        1.0
+      ],
+      "acquired": 100,
+      "errors": 0,
+      "point_db": 17.0,
+      "point_label": "mid_latitude_quiet, SNR/3 kHz 17 dB"
+    },
+    {
+      "arm": "diff-s24",
+      "stride": 24,
+      "detection": "differential",
+      "max_payload_bytes": 961,
+      "capacity_loss": 0.0438,
+      "trials": 100,
+      "delivered": 100,
+      "delivery_rate": 1.0,
+      "delivery_ci95": [
+        0.9630065017930143,
+        1.0
+      ],
+      "acquired": 100,
+      "errors": 0,
+      "point_db": 17.0,
+      "point_label": "mid_latitude_quiet, SNR/3 kHz 17 dB"
+    },
+    {
+      "arm": "diff-s32",
+      "stride": 32,
+      "detection": "differential",
+      "max_payload_bytes": 973,
+      "capacity_loss": 0.0318,
+      "trials": 100,
+      "delivered": 99,
+      "delivery_rate": 0.99,
+      "delivery_ci95": [
+        0.9455138038212946,
+        0.9982325679358593
+      ],
+      "acquired": 100,
+      "errors": 0,
+      "point_db": 17.0,
+      "point_label": "mid_latitude_quiet, SNR/3 kHz 17 dB"
+    },
+    {
+      "arm": "diff-s48",
+      "stride": 48,
+      "detection": "differential",
+      "max_payload_bytes": 984,
+      "capacity_loss": 0.0209,
+      "trials": 100,
+      "delivered": 100,
+      "delivery_rate": 1.0,
+      "delivery_ci95": [
+        0.9630065017930143,
+        1.0
+      ],
+      "acquired": 100,
+      "errors": 0,
+      "point_db": 17.0,
+      "point_label": "mid_latitude_quiet, SNR/3 kHz 17 dB"
+    },
+    {
+      "arm": "cohe-s16",
+      "stride": 16,
+      "detection": "coherent",
+      "max_payload_bytes": 941,
+      "capacity_loss": 0.0637,
+      "trials": 100,
+      "delivered": 95,
+      "delivery_rate": 0.95,
+      "delivery_ci95": [
+        0.8882495307680808,
+        0.9784563208456319
+      ],
+      "acquired": 100,
+      "errors": 0,
+      "point_db": 17.0,
+      "point_label": "mid_latitude_quiet, SNR/3 kHz 17 dB"
+    },
+    {
+      "arm": "cohe-s24",
+      "stride": 24,
+      "detection": "coherent",
+      "max_payload_bytes": 961,
+      "capacity_loss": 0.0438,
+      "trials": 100,
+      "delivered": 95,
+      "delivery_rate": 0.95,
+      "delivery_ci95": [
+        0.8882495307680808,
+        0.9784563208456319
+      ],
+      "acquired": 100,
+      "errors": 0,
+      "point_db": 17.0,
+      "point_label": "mid_latitude_quiet, SNR/3 kHz 17 dB"
+    },
+    {
+      "arm": "cohe-s32",
+      "stride": 32,
+      "detection": "coherent",
+      "max_payload_bytes": 973,
+      "capacity_loss": 0.0318,
+      "trials": 100,
+      "delivered": 97,
+      "delivery_rate": 0.97,
+      "delivery_ci95": [
+        0.9154806357094724,
+        0.9897454759759611
+      ],
+      "acquired": 100,
+      "errors": 0,
+      "point_db": 17.0,
+      "point_label": "mid_latitude_quiet, SNR/3 kHz 17 dB"
+    },
+    {
+      "arm": "cohe-s48",
+      "stride": 48,
+      "detection": "coherent",
+      "max_payload_bytes": 984,
+      "capacity_loss": 0.0209,
+      "trials": 100,
+      "delivered": 81,
+      "delivery_rate": 0.81,
+      "delivery_ci95": [
+        0.7222115462093562,
+        0.8748524849023126
+      ],
+      "acquired": 100,
+      "errors": 0,
+      "point_db": 17.0,
+      "point_label": "mid_latitude_quiet, SNR/3 kHz 17 dB"
+    },
+    {
+      "arm": "baseline",
+      "stride": 0,
+      "detection": "differential",
+      "max_payload_bytes": 1005,
+      "capacity_loss": 0.0,
+      "trials": 100,
+      "delivered": 99,
+      "delivery_rate": 0.99,
+      "delivery_ci95": [
+        0.9455138038212946,
+        0.9982325679358593
+      ],
+      "acquired": 100,
+      "errors": 0,
+      "point_db": 20.0,
+      "point_label": "mid_latitude_quiet, SNR/3 kHz 20 dB"
+    },
+    {
+      "arm": "diff-s16",
+      "stride": 16,
+      "detection": "differential",
+      "max_payload_bytes": 941,
+      "capacity_loss": 0.0637,
+      "trials": 100,
+      "delivered": 100,
+      "delivery_rate": 1.0,
+      "delivery_ci95": [
+        0.9630065017930143,
+        1.0
+      ],
+      "acquired": 100,
+      "errors": 0,
+      "point_db": 20.0,
+      "point_label": "mid_latitude_quiet, SNR/3 kHz 20 dB"
+    },
+    {
+      "arm": "diff-s24",
+      "stride": 24,
+      "detection": "differential",
+      "max_payload_bytes": 961,
+      "capacity_loss": 0.0438,
+      "trials": 100,
+      "delivered": 100,
+      "delivery_rate": 1.0,
+      "delivery_ci95": [
+        0.9630065017930143,
+        1.0
+      ],
+      "acquired": 100,
+      "errors": 0,
+      "point_db": 20.0,
+      "point_label": "mid_latitude_quiet, SNR/3 kHz 20 dB"
+    },
+    {
+      "arm": "diff-s32",
+      "stride": 32,
+      "detection": "differential",
+      "max_payload_bytes": 973,
+      "capacity_loss": 0.0318,
+      "trials": 100,
+      "delivered": 100,
+      "delivery_rate": 1.0,
+      "delivery_ci95": [
+        0.9630065017930143,
+        1.0
+      ],
+      "acquired": 100,
+      "errors": 0,
+      "point_db": 20.0,
+      "point_label": "mid_latitude_quiet, SNR/3 kHz 20 dB"
+    },
+    {
+      "arm": "diff-s48",
+      "stride": 48,
+      "detection": "differential",
+      "max_payload_bytes": 984,
+      "capacity_loss": 0.0209,
+      "trials": 100,
+      "delivered": 100,
+      "delivery_rate": 1.0,
+      "delivery_ci95": [
+        0.9630065017930143,
+        1.0
+      ],
+      "acquired": 100,
+      "errors": 0,
+      "point_db": 20.0,
+      "point_label": "mid_latitude_quiet, SNR/3 kHz 20 dB"
+    },
+    {
+      "arm": "cohe-s16",
+      "stride": 16,
+      "detection": "coherent",
+      "max_payload_bytes": 941,
+      "capacity_loss": 0.0637,
+      "trials": 100,
+      "delivered": 98,
+      "delivery_rate": 0.98,
+      "delivery_ci95": [
+        0.929988209271456,
+        0.9944980324498376
+      ],
+      "acquired": 100,
+      "errors": 0,
+      "point_db": 20.0,
+      "point_label": "mid_latitude_quiet, SNR/3 kHz 20 dB"
+    },
+    {
+      "arm": "cohe-s24",
+      "stride": 24,
+      "detection": "coherent",
+      "max_payload_bytes": 961,
+      "capacity_loss": 0.0438,
+      "trials": 100,
+      "delivered": 96,
+      "delivery_rate": 0.96,
+      "delivery_ci95": [
+        0.9016292856411208,
+        0.9843366960084523
+      ],
+      "acquired": 100,
+      "errors": 0,
+      "point_db": 20.0,
+      "point_label": "mid_latitude_quiet, SNR/3 kHz 20 dB"
+    },
+    {
+      "arm": "cohe-s32",
+      "stride": 32,
+      "detection": "coherent",
+      "max_payload_bytes": 973,
+      "capacity_loss": 0.0318,
+      "trials": 100,
+      "delivered": 97,
+      "delivery_rate": 0.97,
+      "delivery_ci95": [
+        0.9154806357094724,
+        0.9897454759759611
+      ],
+      "acquired": 100,
+      "errors": 0,
+      "point_db": 20.0,
+      "point_label": "mid_latitude_quiet, SNR/3 kHz 20 dB"
+    },
+    {
+      "arm": "cohe-s48",
+      "stride": 48,
+      "detection": "coherent",
+      "max_payload_bytes": 984,
+      "capacity_loss": 0.0209,
+      "trials": 100,
+      "delivered": 82,
+      "delivery_rate": 0.82,
+      "delivery_ci95": [
+        0.7333264161369926,
+        0.8829977450105364
+      ],
+      "acquired": 100,
+      "errors": 0,
+      "point_db": 20.0,
+      "point_label": "mid_latitude_quiet, SNR/3 kHz 20 dB"
+    }
+  ]
+}

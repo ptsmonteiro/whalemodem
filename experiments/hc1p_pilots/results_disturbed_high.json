@@ -1,0 +1,181 @@
+{
+  "generated": "2026-09-08T16:15:27.829391+00:00",
+  "model": "watterson",
+  "watterson_preset": "mid_latitude_disturbed",
+  "points_db": [
+    24.0,
+    28.0,
+    32.0
+  ],
+  "trials": 100,
+  "seed": 20260908,
+  "arms": [
+    "baseline: 0 pilots, 352 data symbols, 1005 B (0.0% of HC1W's capacity), differential detection",
+    "diff-s16: 22 pilots, 330 data symbols, 941 B (6.4% of HC1W's capacity), differential detection",
+    "diff-s24: 15 pilots, 337 data symbols, 961 B (4.4% of HC1W's capacity), differential detection"
+  ],
+  "results": [
+    {
+      "arm": "baseline",
+      "stride": 0,
+      "detection": "differential",
+      "max_payload_bytes": 1005,
+      "capacity_loss": 0.0,
+      "trials": 100,
+      "delivered": 18,
+      "delivery_rate": 0.18,
+      "delivery_ci95": [
+        0.11700225498946351,
+        0.2666735838630073
+      ],
+      "acquired": 100,
+      "errors": 0,
+      "point_db": 24.0,
+      "point_label": "mid_latitude_disturbed, SNR/3 kHz 24 dB"
+    },
+    {
+      "arm": "diff-s16",
+      "stride": 16,
+      "detection": "differential",
+      "max_payload_bytes": 941,
+      "capacity_loss": 0.0637,
+      "trials": 100,
+      "delivered": 67,
+      "delivery_rate": 0.67,
+      "delivery_ci95": [
+        0.5730534379509052,
+        0.7543687726587197
+      ],
+      "acquired": 100,
+      "errors": 0,
+      "point_db": 24.0,
+      "point_label": "mid_latitude_disturbed, SNR/3 kHz 24 dB"
+    },
+    {
+      "arm": "diff-s24",
+      "stride": 24,
+      "detection": "differential",
+      "max_payload_bytes": 961,
+      "capacity_loss": 0.0438,
+      "trials": 100,
+      "delivered": 54,
+      "delivery_rate": 0.54,
+      "delivery_ci95": [
+        0.44264860323368227,
+        0.6343919169097589
+      ],
+      "acquired": 100,
+      "errors": 0,
+      "point_db": 24.0,
+      "point_label": "mid_latitude_disturbed, SNR/3 kHz 24 dB"
+    },
+    {
+      "arm": "baseline",
+      "stride": 0,
+      "detection": "differential",
+      "max_payload_bytes": 1005,
+      "capacity_loss": 0.0,
+      "trials": 100,
+      "delivered": 19,
+      "delivery_rate": 0.19,
+      "delivery_ci95": [
+        0.12514751509768735,
+        0.27778845379064376
+      ],
+      "acquired": 100,
+      "errors": 0,
+      "point_db": 28.0,
+      "point_label": "mid_latitude_disturbed, SNR/3 kHz 28 dB"
+    },
+    {
+      "arm": "diff-s16",
+      "stride": 16,
+      "detection": "differential",
+      "max_payload_bytes": 941,
+      "capacity_loss": 0.0637,
+      "trials": 100,
+      "delivered": 70,
+      "delivery_rate": 0.7,
+      "delivery_ci95": [
+        0.6041514536665332,
+        0.7810511470506724
+      ],
+      "acquired": 100,
+      "errors": 0,
+      "point_db": 28.0,
+      "point_label": "mid_latitude_disturbed, SNR/3 kHz 28 dB"
+    },
+    {
+      "arm": "diff-s24",
+      "stride": 24,
+      "detection": "differential",
+      "max_payload_bytes": 961,
+      "capacity_loss": 0.0438,
+      "trials": 100,
+      "delivered": 54,
+      "delivery_rate": 0.54,
+      "delivery_ci95": [
+        0.44264860323368227,
+        0.6343919169097589
+      ],
+      "acquired": 100,
+      "errors": 0,
+      "point_db": 28.0,
+      "point_label": "mid_latitude_disturbed, SNR/3 kHz 28 dB"
+    },
+    {
+      "arm": "baseline",
+      "stride": 0,
+      "detection": "differential",
+      "max_payload_bytes": 1005,
+      "capacity_loss": 0.0,
+      "trials": 100,
+      "delivered": 14,
+      "delivery_rate": 0.14,
+      "delivery_ci95": [
+        0.08526343659939135,
+        0.22137188210963837
+      ],
+      "acquired": 100,
+      "errors": 0,
+      "point_db": 32.0,
+      "point_label": "mid_latitude_disturbed, SNR/3 kHz 32 dB"
+    },
+    {
+      "arm": "diff-s16",
+      "stride": 16,
+      "detection": "differential",
+      "max_payload_bytes": 941,
+      "capacity_loss": 0.0637,
+      "trials": 100,
+      "delivered": 73,
+      "delivery_rate": 0.73,
+      "delivery_ci95": [
+        0.63567883232055,
+        0.8073041585042364
+      ],
+      "acquired": 100,
+      "errors": 0,
+      "point_db": 32.0,
+      "point_label": "mid_latitude_disturbed, SNR/3 kHz 32 dB"
+    },
+    {
+      "arm": "diff-s24",
+      "stride": 24,
+      "detection": "differential",
+      "max_payload_bytes": 961,
+      "capacity_loss": 0.0438,
+      "trials": 100,
+      "delivered": 58,
+      "delivery_rate": 0.58,
+      "delivery_ci95": [
+        0.4820648670304296,
+        0.6720161732564526
+      ],
+      "acquired": 100,
+      "errors": 0,
+      "point_db": 32.0,
+      "point_label": "mid_latitude_disturbed, SNR/3 kHz 32 dB"
+    }
+  ]
+}

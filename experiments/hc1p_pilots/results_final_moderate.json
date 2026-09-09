@@ -1,0 +1,236 @@
+{
+  "generated": "2026-09-08T16:26:15.016885+00:00",
+  "model": "watterson",
+  "watterson_preset": "mid_latitude_moderate",
+  "points_db": [
+    8.0,
+    12.0,
+    16.0
+  ],
+  "trials": 100,
+  "seed": 20260908,
+  "arms": [
+    "diff-s24: 15 pilots, 337 data symbols, 961 B (4.4% of HC1W's capacity), differential detection",
+    "diff-s24-i5633: 15 pilots, 337 data symbols, 961 B (4.4% of HC1W's capacity), differential detection",
+    "diff-s16: 22 pilots, 330 data symbols, 941 B (6.4% of HC1W's capacity), differential detection",
+    "diff-s16-i1009: 22 pilots, 330 data symbols, 941 B (6.4% of HC1W's capacity), differential detection"
+  ],
+  "results": [
+    {
+      "arm": "diff-s24",
+      "stride": 24,
+      "detection": "differential",
+      "max_payload_bytes": 961,
+      "capacity_loss": 0.0438,
+      "trials": 100,
+      "delivered": 5,
+      "delivery_rate": 0.05,
+      "delivery_ci95": [
+        0.02154367915436796,
+        0.11175046923191913
+      ],
+      "acquired": 78,
+      "errors": 0,
+      "point_db": 8.0,
+      "point_label": "mid_latitude_moderate, SNR/3 kHz 8 dB"
+    },
+    {
+      "arm": "diff-s24-i5633",
+      "stride": 24,
+      "detection": "differential",
+      "max_payload_bytes": 961,
+      "capacity_loss": 0.0438,
+      "trials": 100,
+      "delivered": 0,
+      "delivery_rate": 0.0,
+      "delivery_ci95": [
+        3.469446951953614e-18,
+        0.03699349820698568
+      ],
+      "acquired": 78,
+      "errors": 0,
+      "point_db": 8.0,
+      "point_label": "mid_latitude_moderate, SNR/3 kHz 8 dB"
+    },
+    {
+      "arm": "diff-s16",
+      "stride": 16,
+      "detection": "differential",
+      "max_payload_bytes": 941,
+      "capacity_loss": 0.0637,
+      "trials": 100,
+      "delivered": 1,
+      "delivery_rate": 0.01,
+      "delivery_ci95": [
+        0.0017674320641406505,
+        0.054486196178705315
+      ],
+      "acquired": 78,
+      "errors": 0,
+      "point_db": 8.0,
+      "point_label": "mid_latitude_moderate, SNR/3 kHz 8 dB"
+    },
+    {
+      "arm": "diff-s16-i1009",
+      "stride": 16,
+      "detection": "differential",
+      "max_payload_bytes": 941,
+      "capacity_loss": 0.0637,
+      "trials": 100,
+      "delivered": 1,
+      "delivery_rate": 0.01,
+      "delivery_ci95": [
+        0.0017674320641406505,
+        0.054486196178705315
+      ],
+      "acquired": 78,
+      "errors": 0,
+      "point_db": 8.0,
+      "point_label": "mid_latitude_moderate, SNR/3 kHz 8 dB"
+    },
+    {
+      "arm": "diff-s24",
+      "stride": 24,
+      "detection": "differential",
+      "max_payload_bytes": 961,
+      "capacity_loss": 0.0438,
+      "trials": 100,
+      "delivered": 77,
+      "delivery_rate": 0.77,
+      "delivery_ci95": [
+        0.6784561697712622,
+        0.8415673411969654
+      ],
+      "acquired": 94,
+      "errors": 0,
+      "point_db": 12.0,
+      "point_label": "mid_latitude_moderate, SNR/3 kHz 12 dB"
+    },
+    {
+      "arm": "diff-s24-i5633",
+      "stride": 24,
+      "detection": "differential",
+      "max_payload_bytes": 961,
+      "capacity_loss": 0.0438,
+      "trials": 100,
+      "delivered": 35,
+      "delivery_rate": 0.35,
+      "delivery_ci95": [
+        0.26364248243097527,
+        0.44745556703112027
+      ],
+      "acquired": 94,
+      "errors": 0,
+      "point_db": 12.0,
+      "point_label": "mid_latitude_moderate, SNR/3 kHz 12 dB"
+    },
+    {
+      "arm": "diff-s16",
+      "stride": 16,
+      "detection": "differential",
+      "max_payload_bytes": 941,
+      "capacity_loss": 0.0637,
+      "trials": 100,
+      "delivered": 70,
+      "delivery_rate": 0.7,
+      "delivery_ci95": [
+        0.6041514536665332,
+        0.7810511470506724
+      ],
+      "acquired": 94,
+      "errors": 0,
+      "point_db": 12.0,
+      "point_label": "mid_latitude_moderate, SNR/3 kHz 12 dB"
+    },
+    {
+      "arm": "diff-s16-i1009",
+      "stride": 16,
+      "detection": "differential",
+      "max_payload_bytes": 941,
+      "capacity_loss": 0.0637,
+      "trials": 100,
+      "delivered": 71,
+      "delivery_rate": 0.71,
+      "delivery_ci95": [
+        0.6146110882442888,
+        0.7898516425087772
+      ],
+      "acquired": 94,
+      "errors": 0,
+      "point_db": 12.0,
+      "point_label": "mid_latitude_moderate, SNR/3 kHz 12 dB"
+    },
+    {
+      "arm": "diff-s24",
+      "stride": 24,
+      "detection": "differential",
+      "max_payload_bytes": 961,
+      "capacity_loss": 0.0438,
+      "trials": 100,
+      "delivered": 98,
+      "delivery_rate": 0.98,
+      "delivery_ci95": [
+        0.929988209271456,
+        0.9944980324498376
+      ],
+      "acquired": 100,
+      "errors": 0,
+      "point_db": 16.0,
+      "point_label": "mid_latitude_moderate, SNR/3 kHz 16 dB"
+    },
+    {
+      "arm": "diff-s24-i5633",
+      "stride": 24,
+      "detection": "differential",
+      "max_payload_bytes": 961,
+      "capacity_loss": 0.0438,
+      "trials": 100,
+      "delivered": 87,
+      "delivery_rate": 0.87,
+      "delivery_ci95": [
+        0.7901964855992357,
+        0.9224283257275948
+      ],
+      "acquired": 100,
+      "errors": 0,
+      "point_db": 16.0,
+      "point_label": "mid_latitude_moderate, SNR/3 kHz 16 dB"
+    },
+    {
+      "arm": "diff-s16",
+      "stride": 16,
+      "detection": "differential",
+      "max_payload_bytes": 941,
+      "capacity_loss": 0.0637,
+      "trials": 100,
+      "delivered": 97,
+      "delivery_rate": 0.97,
+      "delivery_ci95": [
+        0.9154806357094724,
+        0.9897454759759611
+      ],
+      "acquired": 100,
+      "errors": 0,
+      "point_db": 16.0,
+      "point_label": "mid_latitude_moderate, SNR/3 kHz 16 dB"
+    },
+    {
+      "arm": "diff-s16-i1009",
+      "stride": 16,
+      "detection": "differential",
+      "max_payload_bytes": 941,
+      "capacity_loss": 0.0637,
+      "trials": 100,
+      "delivered": 90,
+      "delivery_rate": 0.9,
+      "delivery_ci95": [
+        0.8256343384950865,
+        0.9447708629393249
+      ],
+      "acquired": 100,
+      "errors": 0,
+      "point_db": 16.0,
+      "point_label": "mid_latitude_moderate, SNR/3 kHz 16 dB"
+    }
+  ]
+}

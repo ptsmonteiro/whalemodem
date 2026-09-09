@@ -1,0 +1,919 @@
+{
+  "generated": "2026-09-08T16:02:37.002392+00:00",
+  "model": "watterson",
+  "watterson_preset": "mid_latitude_moderate",
+  "points_db": [
+    8.0,
+    12.0,
+    16.0,
+    20.0,
+    24.0
+  ],
+  "trials": 100,
+  "seed": 20260908,
+  "arms": [
+    "baseline: 0 pilots, 352 data symbols, 1005 B (0.0% of HC1W's capacity), differential detection",
+    "diff-s16: 22 pilots, 330 data symbols, 941 B (6.4% of HC1W's capacity), differential detection",
+    "diff-s24: 15 pilots, 337 data symbols, 961 B (4.4% of HC1W's capacity), differential detection",
+    "diff-s32: 11 pilots, 341 data symbols, 973 B (3.2% of HC1W's capacity), differential detection",
+    "diff-s48: 7 pilots, 345 data symbols, 984 B (2.1% of HC1W's capacity), differential detection",
+    "cohe-s16: 22 pilots, 330 data symbols, 941 B (6.4% of HC1W's capacity), coherent detection",
+    "cohe-s24: 15 pilots, 337 data symbols, 961 B (4.4% of HC1W's capacity), coherent detection",
+    "cohe-s32: 11 pilots, 341 data symbols, 973 B (3.2% of HC1W's capacity), coherent detection",
+    "cohe-s48: 7 pilots, 345 data symbols, 984 B (2.1% of HC1W's capacity), coherent detection"
+  ],
+  "results": [
+    {
+      "arm": "baseline",
+      "stride": 0,
+      "detection": "differential",
+      "max_payload_bytes": 1005,
+      "capacity_loss": 0.0,
+      "trials": 100,
+      "delivered": 0,
+      "delivery_rate": 0.0,
+      "delivery_ci95": [
+        3.469446951953614e-18,
+        0.03699349820698568
+      ],
+      "acquired": 78,
+      "errors": 0,
+      "point_db": 8.0,
+      "point_label": "mid_latitude_moderate, SNR/3 kHz 8 dB"
+    },
+    {
+      "arm": "diff-s16",
+      "stride": 16,
+      "detection": "differential",
+      "max_payload_bytes": 941,
+      "capacity_loss": 0.0637,
+      "trials": 100,
+      "delivered": 1,
+      "delivery_rate": 0.01,
+      "delivery_ci95": [
+        0.0017674320641406505,
+        0.054486196178705315
+      ],
+      "acquired": 78,
+      "errors": 0,
+      "point_db": 8.0,
+      "point_label": "mid_latitude_moderate, SNR/3 kHz 8 dB"
+    },
+    {
+      "arm": "diff-s24",
+      "stride": 24,
+      "detection": "differential",
+      "max_payload_bytes": 961,
+      "capacity_loss": 0.0438,
+      "trials": 100,
+      "delivered": 5,
+      "delivery_rate": 0.05,
+      "delivery_ci95": [
+        0.02154367915436796,
+        0.11175046923191913
+      ],
+      "acquired": 78,
+      "errors": 0,
+      "point_db": 8.0,
+      "point_label": "mid_latitude_moderate, SNR/3 kHz 8 dB"
+    },
+    {
+      "arm": "diff-s32",
+      "stride": 32,
+      "detection": "differential",
+      "max_payload_bytes": 973,
+      "capacity_loss": 0.0318,
+      "trials": 100,
+      "delivered": 1,
+      "delivery_rate": 0.01,
+      "delivery_ci95": [
+        0.0017674320641406505,
+        0.054486196178705315
+      ],
+      "acquired": 78,
+      "errors": 0,
+      "point_db": 8.0,
+      "point_label": "mid_latitude_moderate, SNR/3 kHz 8 dB"
+    },
+    {
+      "arm": "diff-s48",
+      "stride": 48,
+      "detection": "differential",
+      "max_payload_bytes": 984,
+      "capacity_loss": 0.0209,
+      "trials": 100,
+      "delivered": 3,
+      "delivery_rate": 0.03,
+      "delivery_ci95": [
+        0.010254524024038925,
+        0.0845193642905276
+      ],
+      "acquired": 78,
+      "errors": 0,
+      "point_db": 8.0,
+      "point_label": "mid_latitude_moderate, SNR/3 kHz 8 dB"
+    },
+    {
+      "arm": "cohe-s16",
+      "stride": 16,
+      "detection": "coherent",
+      "max_payload_bytes": 941,
+      "capacity_loss": 0.0637,
+      "trials": 100,
+      "delivered": 18,
+      "delivery_rate": 0.18,
+      "delivery_ci95": [
+        0.11700225498946351,
+        0.2666735838630073
+      ],
+      "acquired": 78,
+      "errors": 0,
+      "point_db": 8.0,
+      "point_label": "mid_latitude_moderate, SNR/3 kHz 8 dB"
+    },
+    {
+      "arm": "cohe-s24",
+      "stride": 24,
+      "detection": "coherent",
+      "max_payload_bytes": 961,
+      "capacity_loss": 0.0438,
+      "trials": 100,
+      "delivered": 17,
+      "delivery_rate": 0.17,
+      "delivery_ci95": [
+        0.10893566114059931,
+        0.25548004767601123
+      ],
+      "acquired": 78,
+      "errors": 0,
+      "point_db": 8.0,
+      "point_label": "mid_latitude_moderate, SNR/3 kHz 8 dB"
+    },
+    {
+      "arm": "cohe-s32",
+      "stride": 32,
+      "detection": "coherent",
+      "max_payload_bytes": 973,
+      "capacity_loss": 0.0318,
+      "trials": 100,
+      "delivered": 7,
+      "delivery_rate": 0.07,
+      "delivery_ci95": [
+        0.03431926106727268,
+        0.137495147390735
+      ],
+      "acquired": 78,
+      "errors": 0,
+      "point_db": 8.0,
+      "point_label": "mid_latitude_moderate, SNR/3 kHz 8 dB"
+    },
+    {
+      "arm": "cohe-s48",
+      "stride": 48,
+      "detection": "coherent",
+      "max_payload_bytes": 984,
+      "capacity_loss": 0.0209,
+      "trials": 100,
+      "delivered": 3,
+      "delivery_rate": 0.03,
+      "delivery_ci95": [
+        0.010254524024038925,
+        0.0845193642905276
+      ],
+      "acquired": 78,
+      "errors": 0,
+      "point_db": 8.0,
+      "point_label": "mid_latitude_moderate, SNR/3 kHz 8 dB"
+    },
+    {
+      "arm": "baseline",
+      "stride": 0,
+      "detection": "differential",
+      "max_payload_bytes": 1005,
+      "capacity_loss": 0.0,
+      "trials": 100,
+      "delivered": 18,
+      "delivery_rate": 0.18,
+      "delivery_ci95": [
+        0.11700225498946351,
+        0.2666735838630073
+      ],
+      "acquired": 94,
+      "errors": 0,
+      "point_db": 12.0,
+      "point_label": "mid_latitude_moderate, SNR/3 kHz 12 dB"
+    },
+    {
+      "arm": "diff-s16",
+      "stride": 16,
+      "detection": "differential",
+      "max_payload_bytes": 941,
+      "capacity_loss": 0.0637,
+      "trials": 100,
+      "delivered": 70,
+      "delivery_rate": 0.7,
+      "delivery_ci95": [
+        0.6041514536665332,
+        0.7810511470506724
+      ],
+      "acquired": 94,
+      "errors": 0,
+      "point_db": 12.0,
+      "point_label": "mid_latitude_moderate, SNR/3 kHz 12 dB"
+    },
+    {
+      "arm": "diff-s24",
+      "stride": 24,
+      "detection": "differential",
+      "max_payload_bytes": 961,
+      "capacity_loss": 0.0438,
+      "trials": 100,
+      "delivered": 77,
+      "delivery_rate": 0.77,
+      "delivery_ci95": [
+        0.6784561697712622,
+        0.8415673411969654
+      ],
+      "acquired": 94,
+      "errors": 0,
+      "point_db": 12.0,
+      "point_label": "mid_latitude_moderate, SNR/3 kHz 12 dB"
+    },
+    {
+      "arm": "diff-s32",
+      "stride": 32,
+      "detection": "differential",
+      "max_payload_bytes": 973,
+      "capacity_loss": 0.0318,
+      "trials": 100,
+      "delivered": 67,
+      "delivery_rate": 0.67,
+      "delivery_ci95": [
+        0.5730534379509052,
+        0.7543687726587197
+      ],
+      "acquired": 94,
+      "errors": 0,
+      "point_db": 12.0,
+      "point_label": "mid_latitude_moderate, SNR/3 kHz 12 dB"
+    },
+    {
+      "arm": "diff-s48",
+      "stride": 48,
+      "detection": "differential",
+      "max_payload_bytes": 984,
+      "capacity_loss": 0.0209,
+      "trials": 100,
+      "delivered": 49,
+      "delivery_rate": 0.49,
+      "delivery_ci95": [
+        0.3942199893044113,
+        0.5865198806597283
+      ],
+      "acquired": 94,
+      "errors": 0,
+      "point_db": 12.0,
+      "point_label": "mid_latitude_moderate, SNR/3 kHz 12 dB"
+    },
+    {
+      "arm": "cohe-s16",
+      "stride": 16,
+      "detection": "coherent",
+      "max_payload_bytes": 941,
+      "capacity_loss": 0.0637,
+      "trials": 100,
+      "delivered": 75,
+      "delivery_rate": 0.75,
+      "delivery_ci95": [
+        0.656955364519384,
+        0.8245478863771232
+      ],
+      "acquired": 94,
+      "errors": 0,
+      "point_db": 12.0,
+      "point_label": "mid_latitude_moderate, SNR/3 kHz 12 dB"
+    },
+    {
+      "arm": "cohe-s24",
+      "stride": 24,
+      "detection": "coherent",
+      "max_payload_bytes": 961,
+      "capacity_loss": 0.0438,
+      "trials": 100,
+      "delivered": 72,
+      "delivery_rate": 0.72,
+      "delivery_ci95": [
+        0.6251197129007884,
+        0.7986031478881379
+      ],
+      "acquired": 94,
+      "errors": 0,
+      "point_db": 12.0,
+      "point_label": "mid_latitude_moderate, SNR/3 kHz 12 dB"
+    },
+    {
+      "arm": "cohe-s32",
+      "stride": 32,
+      "detection": "coherent",
+      "max_payload_bytes": 973,
+      "capacity_loss": 0.0318,
+      "trials": 100,
+      "delivered": 49,
+      "delivery_rate": 0.49,
+      "delivery_ci95": [
+        0.3942199893044113,
+        0.5865198806597283
+      ],
+      "acquired": 94,
+      "errors": 0,
+      "point_db": 12.0,
+      "point_label": "mid_latitude_moderate, SNR/3 kHz 12 dB"
+    },
+    {
+      "arm": "cohe-s48",
+      "stride": 48,
+      "detection": "coherent",
+      "max_payload_bytes": 984,
+      "capacity_loss": 0.0209,
+      "trials": 100,
+      "delivered": 22,
+      "delivery_rate": 0.22,
+      "delivery_ci95": [
+        0.15001282384605402,
+        0.31070353514985793
+      ],
+      "acquired": 94,
+      "errors": 0,
+      "point_db": 12.0,
+      "point_label": "mid_latitude_moderate, SNR/3 kHz 12 dB"
+    },
+    {
+      "arm": "baseline",
+      "stride": 0,
+      "detection": "differential",
+      "max_payload_bytes": 1005,
+      "capacity_loss": 0.0,
+      "trials": 100,
+      "delivered": 51,
+      "delivery_rate": 0.51,
+      "delivery_ci95": [
+        0.4134801193402717,
+        0.6057800106955886
+      ],
+      "acquired": 100,
+      "errors": 0,
+      "point_db": 16.0,
+      "point_label": "mid_latitude_moderate, SNR/3 kHz 16 dB"
+    },
+    {
+      "arm": "diff-s16",
+      "stride": 16,
+      "detection": "differential",
+      "max_payload_bytes": 941,
+      "capacity_loss": 0.0637,
+      "trials": 100,
+      "delivered": 97,
+      "delivery_rate": 0.97,
+      "delivery_ci95": [
+        0.9154806357094724,
+        0.9897454759759611
+      ],
+      "acquired": 100,
+      "errors": 0,
+      "point_db": 16.0,
+      "point_label": "mid_latitude_moderate, SNR/3 kHz 16 dB"
+    },
+    {
+      "arm": "diff-s24",
+      "stride": 24,
+      "detection": "differential",
+      "max_payload_bytes": 961,
+      "capacity_loss": 0.0438,
+      "trials": 100,
+      "delivered": 98,
+      "delivery_rate": 0.98,
+      "delivery_ci95": [
+        0.929988209271456,
+        0.9944980324498376
+      ],
+      "acquired": 100,
+      "errors": 0,
+      "point_db": 16.0,
+      "point_label": "mid_latitude_moderate, SNR/3 kHz 16 dB"
+    },
+    {
+      "arm": "diff-s32",
+      "stride": 32,
+      "detection": "differential",
+      "max_payload_bytes": 973,
+      "capacity_loss": 0.0318,
+      "trials": 100,
+      "delivered": 94,
+      "delivery_rate": 0.94,
+      "delivery_ci95": [
+        0.8752318455410406,
+        0.9722138760368118
+      ],
+      "acquired": 100,
+      "errors": 0,
+      "point_db": 16.0,
+      "point_label": "mid_latitude_moderate, SNR/3 kHz 16 dB"
+    },
+    {
+      "arm": "diff-s48",
+      "stride": 48,
+      "detection": "differential",
+      "max_payload_bytes": 984,
+      "capacity_loss": 0.0209,
+      "trials": 100,
+      "delivered": 89,
+      "delivery_rate": 0.89,
+      "delivery_ci95": [
+        0.8136870349691969,
+        0.9374580364293543
+      ],
+      "acquired": 100,
+      "errors": 0,
+      "point_db": 16.0,
+      "point_label": "mid_latitude_moderate, SNR/3 kHz 16 dB"
+    },
+    {
+      "arm": "cohe-s16",
+      "stride": 16,
+      "detection": "coherent",
+      "max_payload_bytes": 941,
+      "capacity_loss": 0.0637,
+      "trials": 100,
+      "delivered": 85,
+      "delivery_rate": 0.85,
+      "delivery_ci95": [
+        0.7671644040916763,
+        0.9069401471634337
+      ],
+      "acquired": 100,
+      "errors": 0,
+      "point_db": 16.0,
+      "point_label": "mid_latitude_moderate, SNR/3 kHz 16 dB"
+    },
+    {
+      "arm": "cohe-s24",
+      "stride": 24,
+      "detection": "coherent",
+      "max_payload_bytes": 961,
+      "capacity_loss": 0.0438,
+      "trials": 100,
+      "delivered": 84,
+      "delivery_rate": 0.84,
+      "delivery_ci95": [
+        0.7557973061072976,
+        0.8990471151119521
+      ],
+      "acquired": 100,
+      "errors": 0,
+      "point_db": 16.0,
+      "point_label": "mid_latitude_moderate, SNR/3 kHz 16 dB"
+    },
+    {
+      "arm": "cohe-s32",
+      "stride": 32,
+      "detection": "coherent",
+      "max_payload_bytes": 973,
+      "capacity_loss": 0.0318,
+      "trials": 100,
+      "delivered": 75,
+      "delivery_rate": 0.75,
+      "delivery_ci95": [
+        0.656955364519384,
+        0.8245478863771232
+      ],
+      "acquired": 100,
+      "errors": 0,
+      "point_db": 16.0,
+      "point_label": "mid_latitude_moderate, SNR/3 kHz 16 dB"
+    },
+    {
+      "arm": "cohe-s48",
+      "stride": 48,
+      "detection": "coherent",
+      "max_payload_bytes": 984,
+      "capacity_loss": 0.0209,
+      "trials": 100,
+      "delivered": 29,
+      "delivery_rate": 0.29,
+      "delivery_ci95": [
+        0.2101483574912227,
+        0.3853889117557111
+      ],
+      "acquired": 100,
+      "errors": 0,
+      "point_db": 16.0,
+      "point_label": "mid_latitude_moderate, SNR/3 kHz 16 dB"
+    },
+    {
+      "arm": "baseline",
+      "stride": 0,
+      "detection": "differential",
+      "max_payload_bytes": 1005,
+      "capacity_loss": 0.0,
+      "trials": 100,
+      "delivered": 76,
+      "delivery_rate": 0.76,
+      "delivery_ci95": [
+        0.6676766365018553,
+        0.8330867444305122
+      ],
+      "acquired": 99,
+      "errors": 0,
+      "point_db": 20.0,
+      "point_label": "mid_latitude_moderate, SNR/3 kHz 20 dB"
+    },
+    {
+      "arm": "diff-s16",
+      "stride": 16,
+      "detection": "differential",
+      "max_payload_bytes": 941,
+      "capacity_loss": 0.0637,
+      "trials": 100,
+      "delivered": 98,
+      "delivery_rate": 0.98,
+      "delivery_ci95": [
+        0.929988209271456,
+        0.9944980324498376
+      ],
+      "acquired": 99,
+      "errors": 0,
+      "point_db": 20.0,
+      "point_label": "mid_latitude_moderate, SNR/3 kHz 20 dB"
+    },
+    {
+      "arm": "diff-s24",
+      "stride": 24,
+      "detection": "differential",
+      "max_payload_bytes": 961,
+      "capacity_loss": 0.0438,
+      "trials": 100,
+      "delivered": 98,
+      "delivery_rate": 0.98,
+      "delivery_ci95": [
+        0.929988209271456,
+        0.9944980324498376
+      ],
+      "acquired": 99,
+      "errors": 0,
+      "point_db": 20.0,
+      "point_label": "mid_latitude_moderate, SNR/3 kHz 20 dB"
+    },
+    {
+      "arm": "diff-s32",
+      "stride": 32,
+      "detection": "differential",
+      "max_payload_bytes": 973,
+      "capacity_loss": 0.0318,
+      "trials": 100,
+      "delivered": 96,
+      "delivery_rate": 0.96,
+      "delivery_ci95": [
+        0.9016292856411208,
+        0.9843366960084523
+      ],
+      "acquired": 99,
+      "errors": 0,
+      "point_db": 20.0,
+      "point_label": "mid_latitude_moderate, SNR/3 kHz 20 dB"
+    },
+    {
+      "arm": "diff-s48",
+      "stride": 48,
+      "detection": "differential",
+      "max_payload_bytes": 984,
+      "capacity_loss": 0.0209,
+      "trials": 100,
+      "delivered": 92,
+      "delivery_rate": 0.92,
+      "delivery_ci95": [
+        0.8500189229905127,
+        0.9589065385156194
+      ],
+      "acquired": 99,
+      "errors": 0,
+      "point_db": 20.0,
+      "point_label": "mid_latitude_moderate, SNR/3 kHz 20 dB"
+    },
+    {
+      "arm": "cohe-s16",
+      "stride": 16,
+      "detection": "coherent",
+      "max_payload_bytes": 941,
+      "capacity_loss": 0.0637,
+      "trials": 100,
+      "delivered": 90,
+      "delivery_rate": 0.9,
+      "delivery_ci95": [
+        0.8256343384950865,
+        0.9447708629393249
+      ],
+      "acquired": 99,
+      "errors": 0,
+      "point_db": 20.0,
+      "point_label": "mid_latitude_moderate, SNR/3 kHz 20 dB"
+    },
+    {
+      "arm": "cohe-s24",
+      "stride": 24,
+      "detection": "coherent",
+      "max_payload_bytes": 961,
+      "capacity_loss": 0.0438,
+      "trials": 100,
+      "delivered": 88,
+      "delivery_rate": 0.88,
+      "delivery_ci95": [
+        0.8018790057328857,
+        0.9300059356298052
+      ],
+      "acquired": 99,
+      "errors": 0,
+      "point_db": 20.0,
+      "point_label": "mid_latitude_moderate, SNR/3 kHz 20 dB"
+    },
+    {
+      "arm": "cohe-s32",
+      "stride": 32,
+      "detection": "coherent",
+      "max_payload_bytes": 973,
+      "capacity_loss": 0.0318,
+      "trials": 100,
+      "delivered": 75,
+      "delivery_rate": 0.75,
+      "delivery_ci95": [
+        0.656955364519384,
+        0.8245478863771232
+      ],
+      "acquired": 99,
+      "errors": 0,
+      "point_db": 20.0,
+      "point_label": "mid_latitude_moderate, SNR/3 kHz 20 dB"
+    },
+    {
+      "arm": "cohe-s48",
+      "stride": 48,
+      "detection": "coherent",
+      "max_payload_bytes": 984,
+      "capacity_loss": 0.0209,
+      "trials": 100,
+      "delivered": 30,
+      "delivery_rate": 0.3,
+      "delivery_ci95": [
+        0.2189488529493276,
+        0.3958485463334666
+      ],
+      "acquired": 99,
+      "errors": 0,
+      "point_db": 20.0,
+      "point_label": "mid_latitude_moderate, SNR/3 kHz 20 dB"
+    },
+    {
+      "arm": "baseline",
+      "stride": 0,
+      "detection": "differential",
+      "max_payload_bytes": 1005,
+      "capacity_loss": 0.0,
+      "trials": 100,
+      "delivered": 81,
+      "delivery_rate": 0.81,
+      "delivery_ci95": [
+        0.7222115462093562,
+        0.8748524849023126
+      ],
+      "acquired": 100,
+      "errors": 0,
+      "point_db": 24.0,
+      "point_label": "mid_latitude_moderate, SNR/3 kHz 24 dB"
+    },
+    {
+      "arm": "diff-s16",
+      "stride": 16,
+      "detection": "differential",
+      "max_payload_bytes": 941,
+      "capacity_loss": 0.0637,
+      "trials": 100,
+      "delivered": 99,
+      "delivery_rate": 0.99,
+      "delivery_ci95": [
+        0.9455138038212946,
+        0.9982325679358593
+      ],
+      "acquired": 100,
+      "errors": 0,
+      "point_db": 24.0,
+      "point_label": "mid_latitude_moderate, SNR/3 kHz 24 dB"
+    },
+    {
+      "arm": "diff-s24",
+      "stride": 24,
+      "detection": "differential",
+      "max_payload_bytes": 961,
+      "capacity_loss": 0.0438,
+      "trials": 100,
+      "delivered": 99,
+      "delivery_rate": 0.99,
+      "delivery_ci95": [
+        0.9455138038212946,
+        0.9982325679358593
+      ],
+      "acquired": 100,
+      "errors": 0,
+      "point_db": 24.0,
+      "point_label": "mid_latitude_moderate, SNR/3 kHz 24 dB"
+    },
+    {
+      "arm": "diff-s32",
+      "stride": 32,
+      "detection": "differential",
+      "max_payload_bytes": 973,
+      "capacity_loss": 0.0318,
+      "trials": 100,
+      "delivered": 97,
+      "delivery_rate": 0.97,
+      "delivery_ci95": [
+        0.9154806357094724,
+        0.9897454759759611
+      ],
+      "acquired": 100,
+      "errors": 0,
+      "point_db": 24.0,
+      "point_label": "mid_latitude_moderate, SNR/3 kHz 24 dB"
+    },
+    {
+      "arm": "diff-s48",
+      "stride": 48,
+      "detection": "differential",
+      "max_payload_bytes": 984,
+      "capacity_loss": 0.0209,
+      "trials": 100,
+      "delivered": 100,
+      "delivery_rate": 1.0,
+      "delivery_ci95": [
+        0.9630065017930143,
+        1.0
+      ],
+      "acquired": 100,
+      "errors": 0,
+      "point_db": 24.0,
+      "point_label": "mid_latitude_moderate, SNR/3 kHz 24 dB"
+    },
+    {
+      "arm": "cohe-s16",
+      "stride": 16,
+      "detection": "coherent",
+      "max_payload_bytes": 941,
+      "capacity_loss": 0.0637,
+      "trials": 100,
+      "delivered": 93,
+      "delivery_rate": 0.93,
+      "delivery_ci95": [
+        0.8625048526092651,
+        0.9656807389327273
+      ],
+      "acquired": 100,
+      "errors": 0,
+      "point_db": 24.0,
+      "point_label": "mid_latitude_moderate, SNR/3 kHz 24 dB"
+    },
+    {
+      "arm": "cohe-s24",
+      "stride": 24,
+      "detection": "coherent",
+      "max_payload_bytes": 961,
+      "capacity_loss": 0.0438,
+      "trials": 100,
+      "delivered": 92,
+      "delivery_rate": 0.92,
+      "delivery_ci95": [
+        0.8500189229905127,
+        0.9589065385156194
+      ],
+      "acquired": 100,
+      "errors": 0,
+      "point_db": 24.0,
+      "point_label": "mid_latitude_moderate, SNR/3 kHz 24 dB"
+    },
+    {
+      "arm": "cohe-s32",
+      "stride": 32,
+      "detection": "coherent",
+      "max_payload_bytes": 973,
+      "capacity_loss": 0.0318,
+      "trials": 100,
+      "delivered": 79,
+      "delivery_rate": 0.79,
+      "delivery_ci95": [
+        0.7002003116591013,
+        0.858343459380847
+      ],
+      "acquired": 100,
+      "errors": 0,
+      "point_db": 24.0,
+      "point_label": "mid_latitude_moderate, SNR/3 kHz 24 dB"
+    },
+    {
+      "arm": "cohe-s48",
+      "stride": 48,
+      "detection": "coherent",
+      "max_payload_bytes": 984,
+      "capacity_loss": 0.0209,
+      "trials": 100,
+      "delivered": 34,
+      "delivery_rate": 0.34,
+      "delivery_ci95": [
+        0.25461520797348164,
+        0.43722271145275377
+      ],
+      "acquired": 100,
+      "errors": 0,
+      "point_db": 24.0,
+      "point_label": "mid_latitude_moderate, SNR/3 kHz 24 dB"
+    }
+  ],
+  "drift": [
+    {
+      "arm": "diff-s16",
+      "frames": 20,
+      "point_db": 8.0,
+      "phase_drift_rad": {
+        "median": 12.552022107336967,
+        "max": 23.82654259176007,
+        "samples": 19
+      }
+    },
+    {
+      "arm": "diff-s24",
+      "frames": 20,
+      "point_db": 8.0,
+      "phase_drift_rad": {
+        "median": 12.232154126938058,
+        "max": 21.968162878603692,
+        "samples": 19
+      }
+    },
+    {
+      "arm": "diff-s32",
+      "frames": 20,
+      "point_db": 8.0,
+      "phase_drift_rad": {
+        "median": 9.757555148489896,
+        "max": 19.63705725692478,
+        "samples": 19
+      }
+    },
+    {
+      "arm": "diff-s48",
+      "frames": 20,
+      "point_db": 8.0,
+      "phase_drift_rad": {
+        "median": 10.199206594701653,
+        "max": 13.644262829361931,
+        "samples": 19
+      }
+    },
+    {
+      "arm": "cohe-s16",
+      "frames": 20,
+      "point_db": 8.0,
+      "phase_drift_rad": {
+        "median": 12.804079695731211,
+        "max": 23.95351172743261,
+        "samples": 19
+      }
+    },
+    {
+      "arm": "cohe-s24",
+      "frames": 20,
+      "point_db": 8.0,
+      "phase_drift_rad": {
+        "median": 11.713652817056348,
+        "max": 30.96816858069278,
+        "samples": 19
+      }
+    },
+    {
+      "arm": "cohe-s32",
+      "frames": 20,
+      "point_db": 8.0,
+      "phase_drift_rad": {
+        "median": 10.656045106207385,
+        "max": 20.41693804808841,
+        "samples": 19
+      }
+    },
+    {
+      "arm": "cohe-s48",
+      "frames": 20,
+      "point_db": 8.0,
+      "phase_drift_rad": {
+        "median": 10.3898435034211,
+        "max": 15.19502871757367,
+        "samples": 19
+      }
+    }
+  ]
+}
