@@ -564,6 +564,10 @@ class OFDM49Mode:
         if confidence < 0.12 or needed > len(x):
             return result
         result["synced"] = True
+        # The mode adapter uses the checked OFDM start to measure the common
+        # outer HF lead.  Keep this scalar diagnostic available on the normal
+        # decode path; the large diagnostics arrays remain opt-in below.
+        result["start_sample"] = int(start)
 
         span = x[start:start + total_symbols * symlen + symlen]
 
@@ -620,6 +624,7 @@ class OFDM49Mode:
 
         layout = self._layout()
         eq_data = np.empty((self.n_data_ofdm_symbols, self.n_active), dtype=np.complex128)
+        data_gain = np.empty_like(eq_data)
         cursor = self.n_preamble_symbols
         data_cursor = 0
         pending: list[tuple[int, int, int]] = []
@@ -713,6 +718,7 @@ class OFDM49Mode:
                     # the time-interpolated anchor gain
                     gt = 0.5 * gt + 0.5 * comb_interp
                 eq_data[start_eq + i] = bins / gt
+                data_gain[start_eq + i] = gt
 
         snr_db = 10 * np.log10(np.mean(sig_powers) / (np.mean(noise_powers) + 1e-15))
         result["channel_snr_db"] = float(snr_db)
@@ -751,7 +757,6 @@ class OFDM49Mode:
             result["equalized_symbols"] = data_syms_full[:, self._data_idx].copy()
             result["anchor_gain"] = anchors_gain.copy()
             result["anchor_index"] = anchors_idx.copy()
-            result["start_sample"] = int(start)
 
         # Hard-decision, pre-FEC bits in the coded-bit domain (== payload
         # domain when fec_rate is None): this is v5's original path,
@@ -768,7 +773,18 @@ class OFDM49Mode:
         result["pre_fec_bits"] = pre_fec_bits.copy()
 
         if self.fec_rate:
-            data_bin_noise = np.tile(bin_noise_var[self._data_idx], self.n_data_ofdm_symbols)
+            if noise_estimator == "repeat" and len(pre_bins_seq) >= 2:
+                # The repeat estimator measures variance in raw FFT-bin units.
+                # Convert each value with the same final gain used to equalize
+                # that data symbol, including any per-symbol comb correction.
+                # Selecting data bins before row-major flattening preserves the
+                # exact symbol order used by data_syms_flat.
+                variance = raw_variance[None, :] / np.maximum(
+                    np.abs(data_gain) ** 2, 1e-18)
+                data_bin_noise = variance[:, self._data_idx].reshape(-1)
+            else:
+                data_bin_noise = np.tile(
+                    bin_noise_var[self._data_idx], self.n_data_ofdm_symbols)
             llrs = _soft_bit_llrs(data_syms_flat, self.bits_per_symbol, data_bin_noise)
             llrs = llrs[: self.coded_bit_count] if len(llrs) > self.coded_bit_count else llrs
             whitener_llr = _bits.pn_bits(len(llrs), WHITENER_SEED)
