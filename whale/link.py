@@ -879,9 +879,10 @@ class Link:
                 result[key] += offset
         return result
 
-    def _decode_attempt(self, profile, audio, offset=0):
+    def _decode_attempt(self, profile, audio, offset=0, **decode_kwargs):
         cpu0, wall0 = time.thread_time(), time.perf_counter()
-        result = profile.decode(audio, head_seconds=self._rx_head_seconds)
+        result = profile.decode(audio, head_seconds=self._rx_head_seconds,
+                                **decode_kwargs)
         cpu = time.thread_time() - cpu0
         self._decode_cost.setdefault(profile.name, _DecodeCost()).add(
             cpu, time.perf_counter() - wall0,
@@ -1009,7 +1010,17 @@ class Link:
                 if profile is None:
                     continue
                 offset = max(0, candidate.body_start - tolerance)
-                result = self._decode_attempt(profile, snap[offset:], offset)
+                # Hand the boundary over rather than making the codec find it
+                # again. Without this the lead correlation runs once here and
+                # once more inside every profile.decode() below -- and each of
+                # those could also fall through to its own whole-buffer
+                # acquisition, so one poll paid for up to four unwindowed
+                # scans of audio this loop had already narrowed down.
+                extra = ({"lead_body_start": candidate.body_start - offset}
+                         if getattr(profile, "accepts_lead_body_start", False)
+                         else {})
+                result = self._decode_attempt(profile, snap[offset:], offset,
+                                              **extra)
                 start = result.get("start_index")
                 if start is not None and abs(start - candidate.body_start) <= tolerance:
                     results.append((profile, result))

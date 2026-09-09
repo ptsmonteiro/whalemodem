@@ -151,6 +151,22 @@ HF8_PHY = hf8.OFDM49Mode(
     interleave=INTERLEAVE,
 )
 
+# How far past the lead's proposed boundary the OFDM preamble search still
+# looks. The lead locates the body only to its own resolution:
+# `hf_lead.refine_body_start` snaps onto the RX symbol grid, and link.py
+# derives its boundary tolerance from that same quantum
+# (RX_BLOCK_SAMPLES // BLOCK_SYMBOLS -- one RX symbol). The dominant term is a
+# whole lead block: a long head is a run of identical two-block windows, so
+# the boundary `measured_candidates` ranks first can sit one block early, and
+# that is a case it is built to tolerate rather than a malfunction. One block
+# plus one symbol of grid tolerance plus two OFDM symbols of slack for the
+# decimator's group delay costs ~1 ms of search against ~240 ms for the whole
+# buffer. A boundary wrong by more than this falls through to the whole-buffer
+# fallback below.
+HF8_LEAD_SEARCH_SPAN = (hf_lead.RX_BLOCK_SAMPLES
+                        + hf_lead.RX_BLOCK_SAMPLES // hf_lead.BLOCK_SYMBOLS
+                        + 2 * HF8_PHY.symbol_len)
+
 CHUNK_SIZE = HF8_PHY.max_payload_bytes - framing.AIR_HEADER_BYTES
 CONFIDENCE_THRESHOLD = 0.12
 
@@ -172,7 +188,8 @@ class Hf8Codec:
         lead = hf_lead.modulate(hf_lead.HF8_LABEL, head_seconds)
         return np.concatenate((lead, HF8_PHY.modulate(bytes(payload))))
 
-    def decode(self, audio, mode: "Hf8Mode", *, head_seconds=None, **kwargs) -> dict:
+    def decode(self, audio, mode: "Hf8Mode", *, head_seconds=None,
+               lead_body_start=None, **kwargs) -> dict:
         del mode
         if np.asarray(audio).ndim != 1:
             return {"synced": False, "payload": None}
@@ -185,12 +202,24 @@ class Hf8Codec:
         # the MFSK head cannot win the OFDM preamble search. Erased or clipped
         # leads still use the body-only acquisition fallback.
         captured = np.asarray(audio)
-        lead_candidates = hf_lead.measured_candidates(
-            captured, hf_lead.HF8_LABEL, head_seconds)
+        if lead_body_start is None:
+            lead_candidates = hf_lead.measured_candidates(
+                captured, hf_lead.HF8_LABEL, head_seconds)
+        else:
+            # The caller already located this boundary and cropped to it, so
+            # rediscovering it here would repeat the whole lead correlation
+            # once per boundary the caller is trying. Take the one it names
+            # and let it own the fallback: link._decode_one's mandatory
+            # body-acquisition pass is the whole-buffer safety net, so a
+            # boundary that turns out to be wrong costs one windowed search
+            # rather than a second unwindowed scan of the same audio.
+            lead_candidates = ((None, int(lead_body_start)),)
         result = None
         body_start = None
         for candidate, body_offset in lead_candidates:
-            attempt = HF8_PHY.demodulate(captured[body_offset:], **kwargs)
+            attempt = HF8_PHY.demodulate(
+                captured[body_offset:],
+                search_span=HF8_LEAD_SEARCH_SPAN, **kwargs)
             local_start = attempt.get("start_sample")
             if local_start is not None:
                 body_start = body_offset + local_start
@@ -198,7 +227,8 @@ class Hf8Codec:
             result = attempt
             if result.get("payload") is not None and body_start is not None:
                 break
-        if result is None or result.get("payload") is None:
+        if (lead_body_start is None
+                and (result is None or result.get("payload") is None)):
             result = HF8_PHY.demodulate(captured, **kwargs)
             body_start = result.get("start_sample")
         if result.get("payload") is not None and body_start is not None:
@@ -226,6 +256,11 @@ class Hf8Mode:
     chunk_size: int = CHUNK_SIZE
     confidence_threshold: float = CONFIDENCE_THRESHOLD
     lead_label: int = hf_lead.HF8_LABEL
+    # Deliberately unannotated, so it is a class constant and not a
+    # dataclass field: it describes what this codec's decode() accepts, not
+    # part of the mode's identity. link._decode_one uses it to hand over a
+    # lead boundary it has already located instead of paying for it twice.
+    accepts_lead_body_start = True
     fec_rate: str | None = FEC_RATE
     codec: Hf8Codec = field(default=HF8_CODEC, compare=False, repr=False)
 
