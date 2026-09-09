@@ -11,6 +11,11 @@ scratch_captures*/
 *.egg-info/
 /build/
 /dist/
+
+# Generated JSON and log artifacts at the project root.
+/*.json
+/*.log
+
 logs/mode_qualification/**/*-captures/
 
 # Experiment run output is scratch, not repository content: raw captures and
