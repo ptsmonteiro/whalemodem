@@ -747,6 +747,11 @@ def _try_sync(diff, i_star, sps, confidence, max_credible_bits, n_sync, baud,
         "synced": payload is not None,
         "confidence": confidence,
         "_hard_bits": decoded_bits,
+        # The live streaming adapter can schedule the terminal decode as soon
+        # as the length field arrives; it must not wait for the maximum DATA
+        # frame when this is a short control or ACK packet.  This is an
+        # internal receive hint, not part of the public wire/result contract.
+        "_declared_length": length,
         "start_index": i_star,
         # Where the sync word itself ends. A caller giving up on this
         # position only has to step past the sync to guarantee the same

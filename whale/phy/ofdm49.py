@@ -561,14 +561,17 @@ class OFDM49Mode:
         total_symbols = self.total_ofdm_symbols()
         symlen = self.symbol_len
         needed = start + total_symbols * symlen
+        # Publish the acquisition point before the complete-frame gate. Live
+        # receivers use it to keep feeding this mode's locked stream instead
+        # of re-searching a rolling buffer after the preamble has passed.
+        if confidence >= 0.12:
+            result["start_sample"] = int(start)
         if confidence < 0.12 or needed > len(x):
             return result
         result["synced"] = True
         # The mode adapter uses the checked OFDM start to measure the common
         # outer HF lead.  Keep this scalar diagnostic available on the normal
         # decode path; the large diagnostics arrays remain opt-in below.
-        result["start_sample"] = int(start)
-
         span = x[start:start + total_symbols * symlen + symlen]
 
         def _corrected(offset_hz: float) -> np.ndarray:

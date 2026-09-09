@@ -126,6 +126,8 @@ class RadioTransport:
         # snapshot_rx(), called from the (non-realtime) decode thread.
         self._chunks = collections.deque()
         self._chunks_len = 0
+        self._rx_total_samples = 0
+        self._rx_buffer_generation = 0
         self._buf_lock = threading.Lock()
         self._stream = None
         self._tx_lock = threading.Lock()  # serializes TX attempts
@@ -141,6 +143,7 @@ class RadioTransport:
             decoded = self._rx_decimator.process(indata[:, 0])
             self._chunks.append(decoded)
             self._chunks_len += len(decoded)
+            self._rx_total_samples += len(decoded)
             max_len = int(RX_BUFFER_SECONDS * RX_SAMPLE_RATE)
             while self._chunks_len - len(self._chunks[0]) > max_len:
                 self._chunks_len -= len(self._chunks.popleft())
@@ -165,6 +168,9 @@ class RadioTransport:
         with self._buf_lock:
             self._chunks.clear()
             self._chunks_len = 0
+            self._rx_total_samples = 0
+            self._rx_buffer_generation = (
+                getattr(self, "_rx_buffer_generation", 0) + 1)
             if hasattr(self, "_rx_decimator"):
                 self._rx_decimator.reset()
             else:
@@ -186,6 +192,23 @@ class RadioTransport:
                 self._chunks[0] = flat
                 self._chunks_len = len(flat)
             return flat.copy()
+
+    @property
+    def rx_stream_position(self):
+        """Monotonic position of captured samples since the last clear.
+
+        Unlike the bounded snapshot length, this still advances when the
+        oldest retained audio is trimmed. Live incremental decoders use it to
+        distinguish "no new audio" from "the rolling buffer slid forward".
+        """
+        with self._buf_lock:
+            return getattr(self, "_rx_total_samples", 0)
+
+    @property
+    def rx_buffer_generation(self):
+        """Generation incremented whenever the receive buffer is cleared."""
+        with self._buf_lock:
+            return getattr(self, "_rx_buffer_generation", 0)
 
     def is_transmitting(self):
         """True for the whole span of a send() call, so callers polling the

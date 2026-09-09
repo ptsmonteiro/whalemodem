@@ -95,6 +95,7 @@ import time
 import numpy as np
 
 from whale import afsk, mode_history
+from whale.streaming import decoder_for
 from whale import link_protocol as protocol
 from whale.policy import VHF_FM
 
@@ -735,6 +736,13 @@ class Link:
         # thread (and by stop(), after it has been asked to finish).
         self._decode_cost = {}
         self._decode_cost_reported_at = None
+        # One incremental decoder per eligible waveform.  The map is owned by
+        # the decode thread; entries are reset when the transport buffer is
+        # consumed or a negotiated candidate set changes.
+        self._stream_decoders = {}
+        self._rx_stream_fed = 0
+        self._rx_stream_position = None
+        self._rx_stream_generation = None
         self._decode_thread = threading.Thread(target=self._decode_loop, daemon=True)
 
     def start(self):
@@ -904,11 +912,131 @@ class Link:
                 continue
             snap = self.transport.snapshot_rx()
             if len(snap) > 0:
-                if self._decode_one(snap):
+                if self._decode_stream(snap):
                     self._report_decode_cost()
                     continue  # try again immediately in case another frame follows
             self._report_decode_cost()
             time.sleep(DECODE_POLL_INTERVAL)
+
+    def _reset_stream_decoders(self):
+        for decoder in self._stream_decoders.values():
+            decoder.reset()
+        self._rx_stream_fed = 0
+        self._rx_stream_position = None
+
+    def _stream_candidates(self, profiles):
+        wanted = set(profiles)
+        for profile in tuple(self._stream_decoders):
+            if profile not in wanted:
+                del self._stream_decoders[profile]
+        for profile in profiles:
+            if profile not in self._stream_decoders:
+                self._stream_decoders[profile] = decoder_for(
+                    profile, head_seconds=self._rx_head_seconds)
+        return tuple(self._stream_decoders[p] for p in profiles)
+
+    def _record_stream_decode_cost(self, profile, decoder):
+        if decoder.decode_count <= getattr(decoder, "_link_cost_count", 0):
+            return
+        decoder._link_cost_count = decoder.decode_count
+        self._decode_cost.setdefault(profile.name, _DecodeCost()).add(
+            decoder.last_decode_cpu_seconds,
+            decoder.last_decode_wall_seconds,
+            decoder.last_decode_samples / profile.rx_sample_rate,
+        )
+
+    def _stream_result_is_valid(self, profile, result):
+        payload = result.get("payload")
+        if payload is None:
+            return None
+        decoded = _decode_air_header(payload[:_AIR_HEADER_LEN])
+        if decoded is None:
+            return None
+        ptype, mode_id, body_len, inline = decoded
+        body_profile = self.modes.by_id.get(mode_id)
+        remainder = payload[_AIR_HEADER_LEN:]
+        if (body_profile is not profile or len(remainder) != body_len
+                or not _valid_air_shape(ptype, body_profile, body_len, inline,
+                                         self.modes.control.mode_id)):
+            return None
+        return ptype, inline + remainder
+
+    def _decode_stream(self, snap) -> bool:
+        """Feed only newly captured samples to all eligible mode decoders."""
+        stream_position = getattr(self.transport, "rx_stream_position", None)
+        stream_generation = getattr(self.transport, "rx_buffer_generation", None)
+        if (stream_generation is not None
+                and self._rx_stream_generation is not None
+                and stream_generation != self._rx_stream_generation):
+            self._reset_stream_decoders()
+        if stream_generation is not None:
+            self._rx_stream_generation = stream_generation
+        if stream_position is not None:
+            if (self._rx_stream_position is not None
+                    and stream_position < self._rx_stream_position):
+                self._reset_stream_decoders()
+            if self._rx_stream_position is None:
+                new_audio = snap
+            else:
+                new_count = stream_position - self._rx_stream_position
+                new_audio = (snap if new_count >= len(snap) else snap[-new_count:]
+                             if new_count else snap[:0])
+            self._rx_stream_position = stream_position
+        else:
+            new_audio = None
+        if len(snap) < self._rx_stream_fed:
+            # The link consumed or the transport cleared the front of the
+            # capture. Stream coordinates now start at zero again.
+            self._reset_stream_decoders()
+            if stream_position is not None:
+                # The unconsumed tail is present in this same snapshot and
+                # must be presented again after the decoder reset.
+                self._rx_stream_position = None
+        profiles = self._candidate_decode_profiles(snap)
+        decoders = self._stream_candidates(profiles)
+        if new_audio is None:
+            new_audio = snap[self._rx_stream_fed:]
+            self._rx_stream_fed = len(snap)
+        if not len(new_audio):
+            return False
+
+        outcomes = []
+        for profile, decoder in zip(profiles, decoders):
+            result = decoder.feed(new_audio)
+            self._record_stream_decode_cost(profile, decoder)
+            if result is not None:
+                result["decode_cpu_seconds"] = decoder.last_decode_cpu_seconds
+                outcomes.append((profile, result))
+
+        # A frame can be visible to more than one decoder. The earliest
+        # checked result wins, just as in the legacy whole-buffer path.
+        for profile, result in sorted(
+                outcomes, key=lambda item: item[1].get("start_index", len(snap))):
+            checked = self._stream_result_is_valid(profile, result)
+            if checked is None:
+                continue
+            ptype, body = checked
+            end = result.get("end_index", len(snap))
+            self.transport.consume_rx(end)
+            self._finish_air_packet(ptype, body, profile, snap, end, result)
+            self._reset_stream_decoders()
+            return True
+
+        # A terminal near miss is safe to skip. Decoder results with no end
+        # index are locks that are still being fed and must remain intact.
+        near_misses = [(profile, result) for profile, result in outcomes
+                       if result.get("end_index") is not None]
+        if near_misses:
+            profile, result = min(
+                near_misses,
+                key=lambda item: item[1].get("sync_end_index",
+                                             item[1]["end_index"]),
+            )
+            self._capture_near_miss(snap, result.get("confidence", 0.0))
+            self.transport.consume_rx(result["end_index"])
+            self._reset_stream_decoders()
+            return True
+        return False
 
     def _report_decode_cost(self, final=False):
         """Logs per-profile decode cost every DECODE_COST_REPORT_INTERVAL.

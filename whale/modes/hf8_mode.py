@@ -201,8 +201,9 @@ class Hf8Codec:
         if result is None or result.get("payload") is None:
             result = HF8_PHY.demodulate(captured, **kwargs)
             body_start = result.get("start_sample")
-        if result.get("payload") is not None and body_start is not None:
+        if body_start is not None:
             result["start_index"] = body_start
+        if result.get("payload") is not None and body_start is not None:
             observed, score = hf_lead.measure(
                 captured, body_start, hf_lead.HF8_LABEL, head_seconds)
             result.update(

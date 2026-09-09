@@ -149,8 +149,12 @@ class Hf7Codec:
             # OFDM acquisition fallback.
             result = HF7_PHY.demodulate(captured, **kwargs)
             body_start = result.get("start_sample")
-        if result.get("payload") is not None and body_start is not None:
+        if body_start is not None:
+            # Keep a provisional acquisition point while the body is still
+            # arriving. The live streaming adapter uses it to stop scanning
+            # old audio and feed this decoder's locked frame buffer.
             result["start_index"] = body_start
+        if result.get("payload") is not None and body_start is not None:
             observed, score = hf_lead.measure(
                 captured, body_start, hf_lead.HF7_LABEL, head_seconds)
             result.update(
