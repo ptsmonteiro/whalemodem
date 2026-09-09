@@ -24,13 +24,14 @@ from whale.modes.hf5_mode import HF5
 from whale.modes.hf6_mode import HF6
 from whale.modes.hf7_mode import HF7
 from whale.modes.hf8_mode import HF8
+from whale.modes.hf9_mode import HF9
 from whale.modes.hr0_mode import HR0
 from whale.modes.vf3_mode import VF3
 from whale.modes.vf4_mode import VF4
 from whale.modes.vf6_mode import VF6
 
 MODES = (afsk.PROFILE_300, afsk.PROFILE_600, afsk.PROFILE_1200,
-         VF3, VF4, VF6, HC1W, HC0, HR0, HF2, HF5, HF6, HF7, HF8)
+         VF3, VF4, VF6, HC1W, HC0, HR0, HF2, HF5, HF6, HF7, HF8, HF9)
 
 RNG = np.random.default_rng(20260830)
 CAPTURE_SECONDS = 3
@@ -85,6 +86,34 @@ def test_hostile_input_is_rejected_without_raising(mode, case):
     audio = CASES[case]()
     result = mode.decode(audio)
     assert result.get("payload") is None, (mode.name, case)
+
+
+# Attributes whale/link.py dereferences on an rx/tx profile. A mode missing
+# one of these does not fail a decode -- it raises an AttributeError deep in
+# Link._handle_data, which escapes ModemService's LinkError handler and
+# disconnects the link mid-transfer. That is how hf7/hf8/hf9 shipped without
+# `head_match_allowance_seconds`: nothing decodes those modes until a session
+# is healthy enough to climb to them, so the first on-air session that ever
+# reached hf8 tore itself down on the frame it had just decoded correctly.
+# `lead_label` is deliberately absent from this list: it is genuinely optional
+# and every call site hasattr-guards it.
+REQUIRED_PROFILE_ATTRS = (
+    "name",
+    "mode_id",
+    "rx_sample_rate",
+    "tx_sample_rate",
+    "chunk_size",
+    "confidence_threshold",
+    "head_match_allowance_seconds",
+    "encode",
+    "decode",
+)
+
+
+@pytest.mark.parametrize("attr", REQUIRED_PROFILE_ATTRS)
+@pytest.mark.parametrize("mode", MODES, ids=lambda m: m.name)
+def test_mode_exposes_every_attribute_the_link_dereferences(mode, attr):
+    assert hasattr(mode, attr), f"{mode.name} is missing {attr}"
 
 
 if __name__ == "__main__":

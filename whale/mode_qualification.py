@@ -79,6 +79,7 @@ MANIFEST = (
     # is still simulation only. Default is availability, not qualification.
     QualificationEntry("hf-ssb", 15, QualificationLevel.DEFAULT),
     QualificationEntry("hf-ssb", 16, QualificationLevel.DEFAULT),
+    QualificationEntry("hf-ssb", 17, QualificationLevel.EXPERIMENTAL),
 )
 
 
@@ -111,8 +112,9 @@ def registry(policy: str, level: QualificationLevel | str =
         from .modes.hf6_mode import HF6
         from .modes.hf7_mode import HF7
         from .modes.hf8_mode import HF8
+        from .modes.hf9_mode import HF9
         # Rate order, which is the order _maybe_adapt climbs.
-        candidates, control = (HR0, HC0, HC1W, HF8, HF5, HF6, HF7), HR0
+        candidates, control = (HR0, HC0, HF9, HC1W, HF8, HF5, HF6, HF7), HR0
         # HF2 remains available only at experimental level as a historical
         # fallback.
         if requested >= QualificationLevel.EXPERIMENTAL:
