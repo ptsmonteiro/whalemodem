@@ -29,7 +29,6 @@ RESULTS.md that measured it.  Those directories keep the benches and the
 evidence; the shipped code lives here.
 
 Dependencies point downward only: `whale/phy/` may use `whale/dsp/`, and
-`whale/modes/` may use both.  `whale/phy/` must not import `whale/modes/`
--- `tests/test_layering.py` enforces that, with the one exception noted
-there for the shared on-air lead-in.
+`whale/modes/` may use both.  `whale/phy/` must not import `whale/modes/`;
+`tests/test_layering.py` enforces that.
 """

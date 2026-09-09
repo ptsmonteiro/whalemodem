@@ -132,10 +132,10 @@ DATA_FRAME_HEADER_BYTES = 0
 # field claims, because the CRC validating it sits *after* the payload it
 # describes. So a declared length is a promise the decoder has to honour or
 # reject on its face, and honouring an implausible one is not free: _try_sync
-# reports it as "still arriving", which tells whale/link.py's decode loop to
-# stop pruning and re-search the whole RX buffer every poll (see
-# _prune_stale), turning a ~40ms poll into a ~300ms one that lands straight
-# on the turnaround.
+# reports it as "still arriving", which tells the live decoder
+# (whale/streaming.py) to hold that audio and keep re-decoding a growing
+# window, turning a ~40ms poll into a ~300ms one that lands straight on the
+# turnaround.
 #
 # With the old 8-bit length field this could not arise. 255 bytes at 300 baud
 # is 7.1s, inside transport.RX_BUFFER_SECONDS, so *every* value a garbage
@@ -757,8 +757,7 @@ def _try_sync(diff, i_star, sps, confidence, max_credible_bits, n_sync, baud,
         # position only has to step past the sync to guarantee the same
         # peak cannot win again, and stepping past just that discards far
         # less unexamined audio than skipping to the end of a frame whose
-        # declared length it has no reason to trust. See whale/link.py's
-        # _decode_one.
+        # declared length it has no reason to trust.
         "sync_end_index": i_star + sps * n_sync,
         "payload": payload,
     }

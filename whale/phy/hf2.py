@@ -58,9 +58,9 @@ tried. A rate-1/2 K=7 grid with 11 data carriers (44 raw bits/symbol) needs
 point, and is used here.  See its "Implementation note" and stage-4
 dated note for the record of this and the pilot-count deviations.
 
-The shared HF lead-in (`whale.modes.hf_lead`, label `HF2_LABEL`) is
-prepended by `modulate` and measured by `demodulate`, the same calling
-convention `whale/modes/hc1w_mode.py` uses around `whale/modes/hc1w.py`.
+The adaptive head is built from HF2's own OFDM geometry and known symbols.
+It uses a different training word from the body sync symbols, so the receiver
+can measure a variable-length native head without mistaking it for the body.
 """
 
 from __future__ import annotations
@@ -72,8 +72,8 @@ from scipy.signal import hilbert
 
 from whale import dsp, rx_audio
 from whale.dsp import (acquire as _acquire_kernel, equalize as _eq,
-                       freq as _freq, ofdm as _ofdm, timing as _timing)
-from whale.modes import hf_lead
+                       freq as _freq, head as _head, ofdm as _ofdm,
+                       timing as _timing)
 
 # -- geometry ---------------------------------------------------------------
 
@@ -186,13 +186,26 @@ CARRIER_FLOOR_DB = 35.0
 COARSE_OFFSET_LIMIT_HZ = SAMPLE_RATE / (2.0 * CORE_SAMPLES)
 FINE_OFFSET_LIMIT_HZ = SAMPLE_RATE / (2.0 * SYMBOL_SAMPLES)
 
+HEAD_SYMBOLS = 8
+HEAD_VALUES = dsp.bits.qpsk_from_bits(
+    dsp.bits.pn_bits(2 * N_CARRIERS, 0x136E9))
+HEAD_BLOCK_SAMPLES = SYMBOL_SAMPLES
+RX_HEAD_BLOCK_SAMPLES = RX_SYMBOL_SAMPLES
+LEAD_IN_SAMPLES = HEAD_SYMBOLS * HEAD_BLOCK_SAMPLES
+DEFAULT_HEAD_SECONDS = LEAD_IN_SAMPLES / SAMPLE_RATE
+MAX_HEAD_SAMPLES = SAMPLE_RATE + HEAD_BLOCK_SAMPLES
+MAX_RX_HEAD_SAMPLES = RX_SAMPLE_RATE + RX_HEAD_BLOCK_SAMPLES
+HEAD_PHASE_TOLERANCE = 1
+
 
 def lead_in_samples(head_seconds: float | None = None) -> int:
-    """Leading `hf_lead` samples for a requested head duration."""
-    return hf_lead.lead_samples(head_seconds)
-
-
-DEFAULT_HEAD_SECONDS = hf_lead.MIN_SECONDS
+    if head_seconds is None:
+        wanted = LEAD_IN_SAMPLES
+    elif head_seconds < 0:
+        raise ValueError("head duration must not be negative")
+    else:
+        wanted = max(LEAD_IN_SAMPLES, int(round(head_seconds * SAMPLE_RATE)))
+    return -(-wanted // HEAD_BLOCK_SAMPLES) * HEAD_BLOCK_SAMPLES
 
 
 def frame_samples(head_seconds: float = DEFAULT_HEAD_SECONDS) -> int:
@@ -202,6 +215,26 @@ def frame_samples(head_seconds: float = DEFAULT_HEAD_SECONDS) -> int:
 
 def frame_seconds(head_seconds: float = DEFAULT_HEAD_SECONDS) -> float:
     return frame_samples(head_seconds) / SAMPLE_RATE
+
+
+def head_block() -> np.ndarray:
+    return _ofdm.build_symbol(GEOMETRY, HEAD_VALUES)
+
+
+def rx_head_block() -> np.ndarray:
+    return _ofdm.build_symbol(RX_GEOMETRY, HEAD_VALUES)
+
+
+def _measure_head(samples: np.ndarray, start: int,
+                  offset_hz: float) -> tuple[int, float]:
+    span = min(start, MAX_RX_HEAD_SAMPLES)
+    if span < RX_HEAD_BLOCK_SAMPLES:
+        return 0, 0.0
+    window = np.asarray(samples[start - span:start], dtype=np.float64)
+    corrected = np.real(_freq.derotate(
+        hilbert(window), offset_hz, RX_SAMPLE_RATE))
+    return _head.measure(corrected, len(corrected), rx_head_block(),
+                         phase_tolerance=HEAD_PHASE_TOLERANCE)
 
 
 # -- reference constellations and the payload codec --------------------------
@@ -321,7 +354,8 @@ def modulate(payload: bytes, *,
             f"{MAX_PAYLOAD_BYTES}")
     values = frame_constellation(payload)
     symbols = np.concatenate([build_symbol(row) for row in values])
-    lead = hf_lead.modulate(hf_lead.HF2_LABEL, head_seconds)
+    lead = np.resize(head_block(), lead_in_samples(head_seconds)).copy()
+    lead[:240] *= np.linspace(0.0, 1.0, 240)
     audio = np.concatenate((lead, symbols, np.zeros(TAIL_SAMPLES)))
     if len(audio) != frame_samples(head_seconds):
         raise AssertionError(f"internal frame length error: {len(audio)}")
@@ -485,6 +519,10 @@ def demodulate(audio: np.ndarray, *,
     coarse_hz = _coarse_offset(analytic, start)
     corrected = _freq.derotate(analytic, coarse_hz, RX_SAMPLE_RATE)
     result["coarse_cfo_hz"] = coarse_hz
+    head_symbols, head_score = _measure_head(
+        samples, start, coarse_hz)
+    result["head_symbols_received"] = head_symbols
+    result["head_match"] = head_score
 
     fit = _timing.estimate(RX_GEOMETRY, corrected, start, _TIMING_SYMBOLS)
     result["timing_drift_samples"] = fit.drift_samples(TOTAL_SYMBOLS)

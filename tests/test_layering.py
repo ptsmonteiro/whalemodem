@@ -24,12 +24,7 @@ from pathlib import Path
 
 WHALE = Path(__file__).resolve().parents[1] / "whale"
 
-#: `whale/phy/hf2.py` prepends the shared on-air lead-in that every HF
-#: waveform carries. `hf_lead` is a wire format, not a link-facing adapter,
-#: but it lives in `whale/modes/` next to the MFSK tone bank it is built
-#: from. Allowed by name so the rest of `whale/modes/` stays off limits to
-#: the PHYs; moving it down into `whale/dsp/` would retire this exception.
-PHY_MODES_EXCEPTIONS = frozenset({"whale.modes.hf_lead"})
+PHY_MODES_EXCEPTIONS = frozenset()
 
 
 def _python_files(root: Path) -> list[Path]:
@@ -40,9 +35,7 @@ def _python_files(root: Path) -> list[Path]:
 def _imported_modules(path: Path) -> list[tuple[str, int]]:
     """Every module name `path` imports, with the line it is imported on.
 
-    Relative imports are resolved against the file's own package, so
-    `from ..modes import hf_lead` inside `whale/phy/` reads as
-    `whale.modes.hf_lead` exactly like the absolute form would.
+    Relative imports are resolved against the file's own package.
     """
     tree = ast.parse(path.read_text(encoding="utf-8"), filename=str(path))
     package = list(path.relative_to(WHALE.parent).with_suffix("").parts)
@@ -58,9 +51,6 @@ def _imported_modules(path: Path) -> list[tuple[str, int]]:
                 prefix = ".".join(base + ([node.module] if node.module else []))
             else:
                 prefix = node.module or ""
-            # Only the fully qualified names, so `from whale.modes import
-            # hf_lead` reads as `whale.modes.hf_lead` and can be excepted by
-            # name rather than dragging in the bare package.
             found.extend((f"{prefix}.{alias.name}" if prefix else alias.name,
                           node.lineno) for alias in node.names)
     return found

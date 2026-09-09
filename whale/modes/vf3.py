@@ -278,8 +278,8 @@ def demodulate(audio: np.ndarray, *,
     link's receive loop reads: `confidence`, `sync_end_index` and
     `end_index`.  `end_index` is present only once the frame has been seen
     through to its end -- its absence, with confidence above threshold, is
-    how the caller is told to wait for more audio rather than consume what
-    it has.  See whale/link.py's _decode_one.
+    how the caller is told to wait for more audio rather than step past
+    what it has.  See whale/streaming.py.
     """
     del head_seconds  # acquisition finds the header wherever the head ended
     result = _base_result()

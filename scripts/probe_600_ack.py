@@ -88,12 +88,10 @@ def _demod_debug(audio, profile):
 
 def _run_trial(tx, rx, payload, profile, trial_dir, index):
     # snapshot_rx() does NOT consume the buffer -- it just returns
-    # everything captured since the last read (up to RX_BUFFER_SECONDS).
-    # Actually flush stale audio from prior trials by consuming what we
-    # just read, or every trial after the first accumulates the whole
-    # session's audio instead of just this trial's frame.
-    stale = rx.snapshot_rx()
-    rx.consume_rx(len(stale))
+    # everything currently retained (up to RX_BUFFER_SECONDS). Void the
+    # stale audio from prior trials, or every trial after the first
+    # captures the whole session instead of just this trial's frame.
+    rx.discard_rx()
     tx_audio = afsk.modulate(payload, profile=profile)
     frame_seconds = len(tx_audio) / SAMPLE_RATE
     t0 = time.time()

@@ -96,8 +96,7 @@ def run_direction(tx, rx, mode, direction, trials, seed, *, capture_dir=None,
     payload_bytes = full_packet_bytes(mode)
     print(f"\n  {direction}: {trials} x {payload_bytes} B")
     for trial in range(1, trials + 1):
-        stale = rx.snapshot_rx()
-        rx.consume_rx(len(stale))
+        rx.discard_rx()
         rng = np.random.default_rng(np.random.SeedSequence(
             [seed, mode.mode_id, direction_code, trial]))
         payload = rng.integers(0, 256, payload_bytes, dtype=np.uint8).tobytes()

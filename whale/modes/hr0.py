@@ -1,7 +1,8 @@
 """HR0 short/full 32-FSK control waveform, promoted from MARGIN32.
 
 The 2026-09-06 revision trades the previous 128-FSK margin for short ACK
-latency: 1.812 s for 12 bytes and 3.860 s for 42 bytes with the common lead.
+latency: 1.812 s for 12 bytes and 3.860 s for 42 bytes with HR0's native
+adaptive head.
 This is wire-incompatible with the previous mode-10 body. Both peers must
 upgrade; the frozen old waveform lives only in the comparison experiment.
 """
@@ -12,7 +13,7 @@ import numpy as np
 from scipy.signal import hilbert
 
 from .. import dsp, rx_audio
-from ..dsp import mfsk
+from ..dsp import freq as _freq, head as _head, mfsk
 
 SAMPLE_RATE = 48_000
 RX_SAMPLE_RATE = rx_audio.DECODE_SAMPLE_RATE
@@ -36,6 +37,21 @@ ACQUISITION_THRESHOLD = 0.10
 SYNC_PATTERN = np.repeat(
     BANK.symbols_from_bits(dsp.bits.pn_bits((SYNC_SYMBOLS // 2) *
                                            BITS_PER_SYMBOL, 0x1D35B)), 2)
+# Native adaptive head. It uses the same 32-FSK bank and amplitude as the
+# frame, but a different PN word from SYNC_PATTERN so body acquisition cannot
+# lock on the head and the body boundary remains unambiguous.
+HEAD_BLOCK_SYMBOLS = 3
+HEAD_BLOCK_SAMPLES = HEAD_BLOCK_SYMBOLS * SYMBOL_SAMPLES
+RX_HEAD_BLOCK_SAMPLES = HEAD_BLOCK_SYMBOLS * RX_SYMBOL_SAMPLES
+HEAD_PATTERN = BANK.symbols_from_bits(
+    dsp.bits.pn_bits(HEAD_BLOCK_SYMBOLS * BITS_PER_SYMBOL, 0x136E9))
+LEAD_IN_BLOCKS = 2
+LEAD_IN_SAMPLES = LEAD_IN_BLOCKS * HEAD_BLOCK_SAMPLES
+LEAD_IN_FADE_SAMPLES = 240
+DEFAULT_HEAD_SECONDS = LEAD_IN_SAMPLES / SAMPLE_RATE
+MAX_HEAD_SAMPLES = SAMPLE_RATE + HEAD_BLOCK_SAMPLES
+MAX_RX_HEAD_SAMPLES = RX_SAMPLE_RATE + RX_HEAD_BLOCK_SAMPLES
+HEAD_PHASE_TOLERANCE = 2
 CODEC = dsp.PacketCodec(
     payload_bits=PAYLOAD_BITS,
     interleaver=dsp.interleave.multiplicative(PAYLOAD_BITS, 301),
@@ -66,12 +82,47 @@ def payload_symbols(payload_len: int) -> int:
             else PAYLOAD_SYMBOLS)
 
 
-def modulate(payload: bytes) -> np.ndarray:
+def lead_in_samples(head_seconds: float | None = None) -> int:
+    if head_seconds is None:
+        wanted = LEAD_IN_SAMPLES
+    elif head_seconds < 0:
+        raise ValueError("head duration must not be negative")
+    else:
+        wanted = max(LEAD_IN_SAMPLES, int(round(head_seconds * SAMPLE_RATE)))
+    return -(-wanted // HEAD_BLOCK_SAMPLES) * HEAD_BLOCK_SAMPLES
+
+
+def head_block() -> np.ndarray:
+    return mfsk.modulate(BANK, HEAD_PATTERN, TX_AMPLITUDE)
+
+
+def rx_head_block() -> np.ndarray:
+    return mfsk.modulate(RX_BANK, HEAD_PATTERN, TX_AMPLITUDE)
+
+
+def _measure_head(samples: np.ndarray, start: int,
+                  offset_hz: float) -> tuple[int, float]:
+    span = min(start, MAX_RX_HEAD_SAMPLES)
+    if span < RX_HEAD_BLOCK_SAMPLES:
+        return 0, 0.0
+    window = np.asarray(samples[start - span:start], dtype=np.float64)
+    corrected = np.real(
+        _freq.derotate(hilbert(window), offset_hz, RX_SAMPLE_RATE))
+    return _head.measure(corrected, len(corrected), rx_head_block(),
+                         phase_tolerance=HEAD_PHASE_TOLERANCE)
+
+
+def modulate(payload: bytes, *,
+             head_seconds: float = DEFAULT_HEAD_SECONDS) -> np.ndarray:
     symbols = payload_symbols(len(payload))
     codec = SHORT_CODEC if symbols == SHORT_PAYLOAD_SYMBOLS else CODEC
     tones = np.concatenate((SYNC_PATTERN, BANK.symbols_from_bits(codec.encode(payload))))
     body = mfsk.modulate(BANK, tones, TX_AMPLITUDE)
-    return np.concatenate((body, np.zeros(TAIL_SAMPLES))).astype(np.float32)
+    lead = np.resize(head_block(), lead_in_samples(head_seconds)).copy()
+    lead[:LEAD_IN_FADE_SAMPLES] *= np.linspace(0.0, 1.0,
+                                                LEAD_IN_FADE_SAMPLES)
+    audio = np.concatenate((lead, body, np.zeros(TAIL_SAMPLES)))
+    return audio.astype(np.float32)
 
 
 def _base_result() -> dict:
@@ -79,7 +130,9 @@ def _base_result() -> dict:
             "start_index": None, "cfo_hz": 0.0, "raw_payload_bits": None}
 
 
-def demodulate(audio: np.ndarray) -> dict:
+def demodulate(audio: np.ndarray, *,
+               head_seconds: float = DEFAULT_HEAD_SECONDS) -> dict:
+    del head_seconds
     result = _base_result()
     try:
         samples = np.asarray(audio, dtype=np.float64)
@@ -121,6 +174,10 @@ def demodulate(audio: np.ndarray) -> dict:
     result["sync_end_index"] = start + SYNC_SYMBOLS * RX_SYMBOL_SAMPLES
     residual = mfsk.offset_hz(RX_BANK, working, start, SYNC_PATTERN)
     result["cfo_hz"] = coarse_hz + residual
+    head_blocks, head_score = _measure_head(
+        samples, start, coarse_hz + residual)
+    result["head_blocks_received"] = head_blocks
+    result["head_match"] = head_score
     for symbols, codec in ((SHORT_PAYLOAD_SYMBOLS, SHORT_CODEC),
                            (PAYLOAD_SYMBOLS, CODEC)):
         values = mfsk.analyze(RX_BANK, working, result["sync_end_index"],

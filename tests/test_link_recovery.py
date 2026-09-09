@@ -51,6 +51,141 @@ def _stop(*links):
 # -- 1. a lost PT_MODE_ACK ---------------------------------------------
 
 
+def test_duplicate_after_mode_recut_acks_the_version_that_was_accepted():
+    """A smaller duplicate must not rewrite what an advancing ACK means.
+
+    The receiver may finish decoding an old, larger-mode DATA after the
+    sender has timed out and re-cut that sequence for a smaller mode.  If
+    the smaller retry is then decoded as a duplicate, its ACK must still
+    identify the larger DATA body already appended to reassembly.
+    """
+    registry = afsk.default_registry()
+    receiver = link.Link(harness.FakeTransport(), "STA2",
+                         mode_registry=registry)
+    receiver.state = "CONNECTED"
+    receiver._apply_rx_profile(afsk.PROFILE_600)
+    acks = []
+    receiver._tx_packet = lambda ptype, body: acks.append((ptype, body))
+    receiver._await_turnaround = lambda: None
+
+    advertised_head = link._encode_head_duration(receiver._tx_head_seconds)
+    original = b"A" * 120
+    receiver._handle_data(bytes([0, advertised_head]) + original)
+    receiver._apply_rx_profile(afsk.PROFILE_300)
+    receiver._handle_data(bytes([0, advertised_head]) + original[:88])
+
+    assert bytes(receiver._partial_rx_buf) == original
+    assert receiver._rx_expect_seq == 1
+    assert receiver.qualification_metrics["duplicate_data"] == 1
+    assert [body[2] for _, body in acks] == [
+        afsk.PROFILE_600.mode_id, afsk.PROFILE_600.mode_id]
+
+
+def test_late_ack_after_mode_recut_restores_the_accepted_chunk_geometry():
+    """Do not advance by 88 bytes when the peer accepted the 193-byte try."""
+    registry = afsk.default_registry()
+    sender = link.Link(harness.FakeTransport(), "STA1",
+                       mode_registry=registry)
+    sender.state = "CONNECTED"
+    sender.role = "ISS"
+    sender.peer_supported_modes = set(registry.supported_ids)
+    sender._apply_tx_profile(afsk.PROFILE_600)
+    sender._data_ack_to_speed_up = 100
+    sender._await_turnaround = lambda: None
+
+    keyings = []
+    sender._tx_packet = lambda ptype, body: keyings.append(
+        (sender.tx_profile, ptype, body))
+    head = link._encode_head_duration(sender._tx_head_seconds)
+    replies = [
+        None,
+        (link.PT_DATA_ACK,
+         bytes([0, 1, afsk.PROFILE_600.mode_id, head])),
+        (link.PT_DATA_ACK,
+         bytes([1, 2, afsk.PROFILE_300.mode_id, head])),
+    ]
+    sender._wait_packet = lambda types, timeout: replies.pop(0)
+
+    old_retries = link.MAX_RETRIES
+    old_step = link.STEP_DOWN_AFTER_ATTEMPTS
+    link.MAX_RETRIES = 2
+    link.STEP_DOWN_AFTER_ATTEMPTS = 1
+    data = bytes(range(200))
+    try:
+        sender.send_message(data)
+    finally:
+        link.MAX_RETRIES = old_retries
+        link.STEP_DOWN_AFTER_ATTEMPTS = old_step
+
+    assert [(profile.mode_id, len(body) - 2)
+            for profile, ptype, body in keyings] == [
+        (afsk.PROFILE_600.mode_id, 193),
+        (afsk.PROFILE_300.mode_id, 88),
+        (afsk.PROFILE_300.mode_id, 7),
+    ]
+    # The delayed-ACK version is the 193-byte prefix the receiver retained;
+    # the current 88-byte re-cut was only a duplicate. The next sequence must
+    # therefore begin at byte 193.
+    assert keyings[0][2][2:] + keyings[2][2][2:] == data
+    assert sender._tx_seq == 2
+
+
+def test_delayed_ack_crossing_a_real_mode_recut_preserves_the_message():
+    """Integration: accept 193 B at 600, then delay its ACK past an 88-B re-cut."""
+    history = {}
+    a, b, ta, tb = harness.make_pair(history=history)
+    old_retries = link.MAX_RETRIES
+    old_step = link.STEP_DOWN_AFTER_ATTEMPTS
+    try:
+        mode_history.record_good_mode(
+            history, a.mycall, b.mycall, afsk.PROFILE_600.mode_id)
+        ok, _ = harness.handshake(a, b)
+        assert ok
+        a.data_ack_timeout = 1.0
+        a._data_ack_to_speed_up = 100
+        link.MAX_RETRIES = 3
+        link.STEP_DOWN_AFTER_ATTEMPTS = 1
+
+        original_a_tx = a._tx_packet
+        original_b_tx = b._tx_packet
+        held_ack = []
+        released = threading.Event()
+
+        def delay_first_ack(ptype, body):
+            if ptype == link.PT_DATA_ACK and not held_ack:
+                held_ack.append(body)
+                return
+            original_b_tx(ptype, body)
+
+        def release_after_recut(ptype, body):
+            original_a_tx(ptype, body)
+            if (ptype == link.PT_DATA and a.tx_profile is afsk.PROFILE_300
+                    and held_ack and not released.is_set()):
+                released.set()
+                original_b_tx(link.PT_DATA_ACK, held_ack[0])
+
+        b._tx_packet = delay_first_ack
+        a._tx_packet = release_after_recut
+        data = bytes(range(200))
+        got = {}
+        receiver = threading.Thread(
+            target=lambda: got.update(msg=b.recv_message(timeout=30)))
+        receiver.start()
+        try:
+            a.send_message(data)
+        finally:
+            receiver.join(timeout=30)
+
+        assert released.is_set(), "the 600-baud ACK never crossed the 300-baud re-cut"
+        assert got.get("msg") == data
+        assert a.tx_profile is afsk.PROFILE_300
+        assert a._tx_seq == b._rx_expect_seq == 2
+    finally:
+        link.MAX_RETRIES = old_retries
+        link.STEP_DOWN_AFTER_ATTEMPTS = old_step
+        _stop(a, b)
+
+
 def test_three_silent_attempts_downgrade_and_retry_the_same_chunk():
     """No ACK can carry a recommendation when DATA never decoded. The ISS
     therefore steps down locally, while the IRS's all-mode search lets the

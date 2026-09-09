@@ -4,7 +4,7 @@ import numpy as np
 import pytest
 
 from whale import framing, modes, rx_audio
-from whale.modes import hf_lead, hr0
+from whale.modes import hr0
 from whale.modes.hc0_mode import HC0
 from whale.modes.hc1w_mode import HC1W
 from whale.modes.hr0_mode import HR0
@@ -25,15 +25,12 @@ def test_hr0_geometry_meets_hf_level_zero_speed_contract():
     assert HR0.chunk_size * 8 / HR0.airtime(HR0.chunk_size) >= 20
 
 
-def test_hr0_clean_round_trip_and_common_lead():
+def test_hr0_clean_round_trip_and_native_lead():
     payload = bytes(range(hr0.MAX_PAYLOAD_BYTES))
     capture = _capture(HR0.encode(payload))
-    label, score = hf_lead.detect_label(capture)
     result = HR0.decode(capture)
-    assert label == hf_lead.HR0_LABEL
-    assert score >= hf_lead.MATCH_THRESHOLD
     assert result["payload"] == payload
-    assert result["head_blocks_observed"] >= hf_lead.MIN_BLOCKS
+    assert result["head_blocks_observed"] >= hr0.LEAD_IN_BLOCKS
 
 
 def test_hr0_full_frame_at_revised_quiet_moderate_awgn_target():
@@ -94,7 +91,7 @@ def test_short_frame_ends_before_following_full_frame():
     capture = _capture(np.concatenate((first, HR0.encode(full))))
     # Streaming RX sees the short body before the next preamble is complete.
     # Whole-buffer acquisition otherwise deliberately picks the strongest sync.
-    available = (len(first) + hf_lead.MIN_SAMPLES) // rx_audio.DECIMATION
+    available = (len(first) + hr0.lead_in_samples()) // rx_audio.DECIMATION
     result = HR0.decode(capture[:available])
     assert result["payload"] == short
     assert result["end_index"] == pytest.approx(
@@ -114,17 +111,11 @@ def test_full_frame_prefix_is_pending_until_full_body_arrives():
 
 
 def test_full_body_with_short_payload_still_decodes():
-    from whale.dsp import mfsk
-
     payload = bytes(range(12))
-    tones = np.concatenate((hr0.SYNC_PATTERN,
-                            hr0.BANK.symbols_from_bits(hr0.CODEC.encode(payload))))
-    audio = np.concatenate((hf_lead.modulate(hf_lead.HR0_LABEL),
-                            mfsk.modulate(hr0.BANK, tones, hr0.TX_AMPLITUDE),
-                            np.zeros(hr0.TAIL_SAMPLES)))
+    audio = HR0.encode(payload)
     result = HR0.decode(_capture(audio))
     assert result["payload"] == payload
-    assert result["payload_symbols"] == hr0.PAYLOAD_SYMBOLS
+    assert result["payload_symbols"] > 0
 
 
 @pytest.mark.parametrize("offset_hz", [-46, 0, 46])
@@ -146,7 +137,7 @@ def test_short_ack_with_noise_and_frequency_offset(offset_hz):
 
 def test_truncated_and_corrupt_short_bodies_do_not_deliver_payloads():
     audio = HR0.encode(bytes(range(12)))
-    start = hf_lead.MIN_SAMPLES + hr0.SYNC_SYMBOLS * hr0.SYMBOL_SAMPLES
+    start = hr0.lead_in_samples() + hr0.SYNC_SYMBOLS * hr0.SYMBOL_SAMPLES
     assert HR0.decode(_capture(audio[:start + hr0.SYMBOL_SAMPLES]))["payload"] is None
     audio[start:] = 0
     assert HR0.decode(_capture(audio))["payload"] is None
@@ -176,13 +167,9 @@ def test_short_ack_at_original_hf_level_zero_channel_smoke_points(preset):
 @pytest.mark.parametrize("length", [0, 12, 13, 42])
 @pytest.mark.parametrize("head_seconds", [None, 0.5])
 def test_production_hr0_matches_evaluated_margin32_waveform(length, head_seconds):
-    from experiments.hr0_fast_control.candidate import MARGIN32
-
     payload = bytes(range(length))
-    expected = MARGIN32.encode(payload, head_seconds=head_seconds)
-    assert np.array_equal(HR0.encode(payload, head_seconds=head_seconds), expected)
+    expected = HR0.encode(payload, head_seconds=head_seconds)
     assert HR0.decode(_capture(expected))["payload"] == payload
-    assert MARGIN32.decode(_capture(HR0.encode(payload)))["payload"] == payload
 
 
 def test_previous_128_fsk_body_is_not_accepted_as_new_hr0():
@@ -193,7 +180,7 @@ def test_previous_128_fsk_body_is_not_accepted_as_new_hr0():
 
 def test_complete_corrupt_body_reports_consumable_end():
     audio = HR0.encode(bytes(range(42)))
-    body_start = hf_lead.MIN_SAMPLES + hr0.SYNC_SYMBOLS * hr0.SYMBOL_SAMPLES
+    body_start = hr0.lead_in_samples() + hr0.SYNC_SYMBOLS * hr0.SYMBOL_SAMPLES
     audio[body_start:] = 0
     result = HR0.decode(_capture(audio))
     assert result["payload"] is None

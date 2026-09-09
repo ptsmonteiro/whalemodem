@@ -28,7 +28,7 @@ def main():
             print(f'\n== {mode.name} ({mode.mode_id}) ==')
             for trial in range(1, args.trials + 1):
                 payload = rng.integers(0, 256, mode.chunk_size, dtype=np.uint8).tobytes()
-                stale = rx.snapshot_rx(); rx.consume_rx(len(stale))
+                rx.discard_rx()
                 audio = mode.encode(payload)
                 keyed = tx.send(audio)
                 time.sleep(1.5)

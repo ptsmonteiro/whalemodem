@@ -133,8 +133,7 @@ def run_leg(tx, rx, label, seconds, trials):
     print(f"\n-- {label} --")
     results = []
     for i in range(1, trials + 1):
-        stale = rx.snapshot_rx()
-        rx.consume_rx(len(stale))
+        rx.discard_rx()
         tx.send(_tone(seconds))
         time.sleep(CAPTURE_TAIL)
         captured = rx.snapshot_rx()

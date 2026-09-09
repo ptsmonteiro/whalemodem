@@ -2,7 +2,7 @@
 
 The receiver correlates a known tone pattern, estimates carrier offset, and
 decodes an interleaved terminated rate-1/2 K=7 packet with length and CRC32.
-Frames use the shared adaptive HF lead.
+Frames use a repeated native HC0 FSK head for adaptive leading-loss protection.
 """
 
 from __future__ import annotations
@@ -291,8 +291,8 @@ def demodulate(audio: np.ndarray, *,
     link's receive loop reads: `confidence`, `sync_end_index` and
     `end_index`.  `end_index` is present only once the frame has been seen
     through to its end -- its absence, with confidence above threshold, is
-    how the caller is told to wait for more audio rather than consume what
-    it has.  See whale/link.py's _decode_one.
+    how the caller is told to wait for more audio rather than step past
+    what it has.  See whale/streaming.py.
     """
     del head_seconds  # acquisition finds the preamble, not the head
     result = _base_result()

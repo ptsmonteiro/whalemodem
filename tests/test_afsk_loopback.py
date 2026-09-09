@@ -650,9 +650,9 @@ def test_an_implausible_declared_length_is_a_dead_sync_not_a_frame_in_flight():
     has to judge the claim on its face. A false sync on noise yields a
     uniformly random 16-bit value, and at 1200 baud ~98% of those describe a
     frame longer than transport.RX_BUFFER_SECONDS can ever hold. Reporting
-    one of those as 'still arriving' tells whale/link.py's decode loop to
-    stop pruning and re-search the whole buffer every poll (see
-    _prune_stale), which lands straight on the turnaround.
+    one of those as 'still arriving' tells the live decoder (whale/streaming.py)
+    to hold that audio and keep re-decoding a growing window, which lands
+    straight on the turnaround.
 
     Under the old 8-bit field this could not happen: 255 bytes at 300 baud
     is 7.1s, inside the buffer, so every value a garbage length byte could
@@ -796,7 +796,7 @@ def test_link_uses_waveform_mode_contract():
 
     a._tx_packet(link.PT_DATA, bytes([link.EOF_BIT, 100]) + b"contract")
     assert codec.encoded == 1
-    assert b._decode_one(tb.snapshot_rx())
+    assert b._decode_stream()
     assert codec.decoded >= 1
     ptype, body = b._rx_packets.get_nowait()
     assert ptype == link.PT_DATA

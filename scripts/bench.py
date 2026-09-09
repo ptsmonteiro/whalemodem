@@ -168,8 +168,7 @@ def run_trials(tx, rx, profile, payload, label, trials=None, pad=False,
     for i in range(1, trials + 1):
         # snapshot_rx() does not consume the buffer -- flush stale audio
         # from prior trials or captures accumulate across the whole run.
-        stale = rx.snapshot_rx()
-        rx.consume_rx(len(stale))
+        rx.discard_rx()
 
         frame_audio = afsk.modulate(payload, profile=profile)
         tx_audio = np.concatenate([noise_pad(), frame_audio, noise_pad()]) if pad else frame_audio

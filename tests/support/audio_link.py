@@ -16,12 +16,16 @@ import numpy as np
 
 from acceptance_test import StationClient
 from whale import afsk, link, rx_audio
+from whale import transport as transport_mod
 from whale.channel import AudioChannel, ChannelResult, IdentityChannel
 from whale.link import Link
 from whale.policy import ChannelPolicy, VHF_FM
 from whale.service import ModemService
 from whale.vara_server import StationServer
 
+
+#: 100 ms of 12 kHz audio: what the real capture callback delivers.
+CHUNK_SAMPLES = 1200
 
 FrameDropHook = Callable[[str, int, np.ndarray], bool]
 TransportFaultHook = Callable[[str, int, np.ndarray], np.ndarray]
@@ -47,8 +51,9 @@ class PairedAudioTransport:
         self.direction = direction
         self.tx_channel = tx_channel
         self.peer: PairedAudioTransport | None = None
-        self._audio = np.zeros(0, dtype=np.float32)
-        self._lock = threading.Lock()
+        # The real receive ring, so this fake honours the same coordinate
+        # and half-duplex contract the radio does.
+        self._rx = transport_mod.ReceiveStream()
         self._transmitting = threading.Event()
         self.channel_results: list[ChannelResult] = []
         self.airtime = 0.0
@@ -62,17 +67,35 @@ class PairedAudioTransport:
     def is_transmitting(self):
         return self._transmitting.is_set()
 
-    def snapshot_rx(self):
-        with self._lock:
-            return self._audio.copy()
+    def read_rx(self, since=None):
+        return self._rx.read(since)
 
-    def consume_rx(self, upto_sample):
-        with self._lock:
-            self._audio = self._audio[upto_sample:]
+    def snapshot_rx(self):
+        return self._rx.read().audio
+
+    def discard_rx(self):
+        return self._rx.discard()
+
+    @property
+    def rx_stream_position(self):
+        return self._rx.position
+
+    @property
+    def rx_discard_position(self):
+        return self._rx.discard_position
+
+    def deliver(self, decoded):
+        """Write 12 kHz samples in, in capture-callback-sized pieces."""
+        decoded = np.asarray(decoded, dtype=np.float32)
+        for start in range(0, len(decoded), CHUNK_SAMPLES):
+            self._rx.write(decoded[start:start + CHUNK_SAMPLES])
 
     def send(self, tx_audio, **kwargs):
         del kwargs
         self._transmitting.set()
+        # Half duplex: whatever our own keying leaks into our capture is not
+        # a frame worth decoding, before or after.
+        self.discard_rx()
         try:
             waveform = np.asarray(tx_audio, dtype=np.float32)
             if waveform.ndim != 1:
@@ -106,15 +129,14 @@ class PairedAudioTransport:
                 np.zeros(rx_audio.FILTER_DELAY_CAPTURE_SAMPLES, dtype=np.float32),
             )))
             assert self.peer is not None
-            with self.peer._lock:
-                self.peer._audio = np.concatenate((self.peer._audio, received))
+            self.peer.deliver(received)
             return keyed
         finally:
+            self.discard_rx()
             self._transmitting.clear()
 
     def _reset(self):
-        with self._lock:
-            self._audio = np.zeros(0, dtype=np.float32)
+        self._rx = transport_mod.ReceiveStream()
         self.channel_results.clear()
         self.airtime = 0.0
         self._transmitting.clear()

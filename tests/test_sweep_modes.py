@@ -41,8 +41,8 @@ class FakeTransport:
     def snapshot_rx(self):
         return self.audio.copy()
 
-    def consume_rx(self, count):
-        self.audio = self.audio[count:]
+    def discard_rx(self):
+        self.audio = np.zeros(0, np.float32)
 
     def send(self, audio):
         self.peer.audio = np.asarray(audio, np.float32).copy()

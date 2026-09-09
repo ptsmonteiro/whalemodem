@@ -68,7 +68,7 @@ def run_trial(tx, rx, mode, label, trial, trials, seed, *, capture_tail,
     before it, purely because a fade covered its whole block. Configs are
     therefore round-robined, so every config sees the same slow variation.
     """
-    rx.consume_rx(len(rx.snapshot_rx()))
+    rx.discard_rx()
 
     rng = np.random.default_rng(np.random.SeedSequence([seed, trial]))
     payload = rng.integers(0, 256, mode.max_payload_bytes,

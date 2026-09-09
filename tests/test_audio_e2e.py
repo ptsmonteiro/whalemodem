@@ -74,14 +74,16 @@ def test_paired_transports_apply_independent_directional_channels():
     ta, tb = pair.a, pair.b
     waveform = np.ones(400, dtype=np.float32)
 
-    ta.send(waveform)
-    tb.send(waveform)
-
     expected_ab = rx_audio.downsample(np.concatenate((
         waveform * 0.5, np.zeros(rx_audio.FILTER_DELAY_CAPTURE_SAMPLES))))
     expected_ba = rx_audio.downsample(np.concatenate((
         waveform * -0.25, np.zeros(rx_audio.FILTER_DELAY_CAPTURE_SAMPLES))))
+
+    # Read each capture before that station keys up: send() voids its own
+    # capture, on the fake exactly as on the radio.
+    ta.send(waveform)
     assert np.allclose(tb.snapshot_rx(), expected_ab)
+    tb.send(waveform)
     assert np.allclose(ta.snapshot_rx(), expected_ba)
     assert ta.channel_results[0].measurements == {"path": "A->B"}
     assert tb.channel_results[0].measurements == {"path": "B->A"}
@@ -119,12 +121,13 @@ def test_directional_audio_link_drop_and_transport_fault_hooks():
     waveform = np.ones(400, dtype=np.float32)
 
     pair.a.send(waveform)
-    pair.b.send(waveform)
-
     assert pair.records[0].dropped
     assert pair.records[0].result.measurements == {"transport_dropped": True}
+    # Read before b keys up -- send() voids the sender's own capture.
     assert pair.b.snapshot_rx().size == rx_audio.downsample(np.zeros(
         rx_audio.FILTER_DELAY_CAPTURE_SAMPLES, dtype=np.float32)).size
+
+    pair.b.send(waveform)
     expected = rx_audio.downsample(np.concatenate((
         -waveform, np.zeros(rx_audio.FILTER_DELAY_CAPTURE_SAMPLES))))
     assert np.allclose(pair.a.snapshot_rx(), expected)

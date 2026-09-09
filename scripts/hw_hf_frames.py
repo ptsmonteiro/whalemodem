@@ -54,8 +54,7 @@ def _payload(size, rng):
 
 
 def one_trial(mode, tx, rx, payload, label, capture_tail=CAPTURE_TAIL):
-    stale = rx.snapshot_rx()
-    rx.consume_rx(len(stale))
+    rx.discard_rx()
 
     audio = mode.modulate(payload)
     keyed = tx.send(audio)

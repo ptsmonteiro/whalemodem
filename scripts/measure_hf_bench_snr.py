@@ -114,7 +114,7 @@ def main(argv=None) -> int:
           f"RMS={SIGNAL_RMS:.3f}")
     with bench.radio_pair("ic7300", "ic705", warmup=3.0,
                           b_receive_only=True) as (tx, rx):
-        rx.consume_rx(len(rx.snapshot_rx()))
+        rx.discard_rx()
         keyed = tx.send(signal)
         time.sleep(1.0)
         captured = rx.snapshot_rx()

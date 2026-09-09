@@ -11,7 +11,6 @@ import pytest
 
 from whale import framing, rx_audio
 from whale.mode_qualification import registry
-from whale.modes import hf_lead
 from whale.modes.hf7_mode import HF7
 from whale.modes.hf8_mode import HF8, HF8_PHY, BAND_LO_HZ, BAND_HI_HZ
 from whale.phy import ofdm49 as ofdm49
@@ -50,10 +49,10 @@ def test_hf8_clean_loopback_and_throughput():
     result = HF8.decode(captured)
     assert result["payload"] == payload
     assert result["crc_ok"]
-    assert result["head_blocks_observed"] >= hf_lead.MIN_BLOCKS
+    assert result["head_symbols_received"] >= ofdm49.DEFAULT_HEAD_SYMBOLS
     assert result["head_seconds_received"] == pytest.approx(
-        hf_lead.MIN_SECONDS)
-    assert result["head_match"] >= hf_lead.MATCH_THRESHOLD
+        HF8_PHY.head_seconds())
+    assert result["head_match"] >= 0.5
     # SPEED_LADDERS.md: net application bits per full DATA frame over that
     # frame's complete airtime.
     assert 8 * HF8.chunk_size / HF8.airtime(len(payload)) > LEVEL3_MIN_NET_BPS
@@ -105,7 +104,7 @@ def test_hf8_trades_constellation_and_coding_for_margin_against_hf7():
     assert hf8_rate < hf7_rate
 
 
-def test_hf8_frame_is_codeword_aligned_and_includes_the_common_lead():
+def test_hf8_frame_is_codeword_aligned_and_includes_the_native_head():
     """270 B is 5 whole rate-2/3 codewords with no padding, in a 0.616 s
     frame.
 
@@ -118,7 +117,7 @@ def test_hf8_frame_is_codeword_aligned_and_includes_the_common_lead():
     """
     assert HF8_PHY.n_codewords == 46
     assert HF8.airtime(HF8.chunk_size) == pytest.approx(
-        hf_lead.MIN_SECONDS + HF8_PHY.frame_seconds())
+        HF8_PHY.head_seconds() + HF8_PHY.frame_seconds())
 
 
 def test_hf8_rejects_oversize_payload():
@@ -131,7 +130,7 @@ def test_hf8_rejects_oversize_payload():
 
 
 @pytest.mark.parametrize("head_seconds", [0.0, 0.31, 0.75, 1.0])
-def test_hf8_common_lead_round_trip_measures_minimum_or_requested_duration(
+def test_hf8_native_head_round_trip_measures_minimum_or_requested_duration(
         head_seconds):
     payload = bytes((i * 19 + 3) & 0xFF
                     for i in range(HF8.chunk_size + framing.AIR_HEADER_BYTES))
@@ -140,14 +139,14 @@ def test_hf8_common_lead_round_trip_measures_minimum_or_requested_duration(
         tx, np.zeros(rx_audio.FILTER_DELAY_CAPTURE_SAMPLES, dtype=np.float32))))
     result = HF8.decode(captured, head_seconds=head_seconds)
 
-    expected_blocks = hf_lead.lead_samples(head_seconds) // hf_lead.BLOCK_SAMPLES
+    expected_blocks = HF8_PHY.head_samples(head_seconds) // HF8_PHY.symbol_len
     assert result["payload"] == payload
-    assert result["head_blocks_observed"] == expected_blocks
+    assert result["head_symbols_received"] == expected_blocks
     assert result["head_seconds_received"] == pytest.approx(
-        hf_lead.seconds_received(expected_blocks))
+        expected_blocks * HF8_PHY.symbol_len / ofdm49.DESIGN_RATE)
 
 
-def test_hf8_include_head_false_keeps_the_minimum_common_lead():
+def test_hf8_include_head_false_keeps_the_minimum_native_head():
     payload = bytes(range(16))
     tx = HF8.encode(payload, include_head=False)
     assert len(tx) == round(HF8.airtime(len(payload)) * HF8.tx_sample_rate)
@@ -174,6 +173,6 @@ def test_default_hf_ladder_is_ordered_by_rate():
 
 def test_every_default_hf_mode_has_a_measurable_outer_head():
     modes = registry("hf-ssb", "default").modes
-    assert all(hasattr(mode, "lead_label") for mode in modes)
-    assert all(mode.head_match_allowance_seconds > 0 for mode in modes)
-    assert len({mode.lead_label for mode in modes}) == len(modes)
+    assert all(not hasattr(mode, "lead_label") for mode in modes)
+    assert HF8 in modes
+    assert HF7 in modes

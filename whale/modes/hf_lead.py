@@ -1,9 +1,8 @@
-"""Common adaptive lead for every HF waveform.
+"""Legacy common HF lead retained for archived experiment replays.
 
-The wire word is a six-symbol HC0-grid MFSK block repeated at least twice.
-Order identifies the following waveform; duration is extended in whole blocks
-for adaptive leading-loss protection.  A hint may order decoders, but only the
-following frame's checked payload authenticates it.
+Production modes no longer use this helper: each shipped HF mode carries and
+measures its own native head. The wire word below remains available only so
+the old experiment fixtures can be replayed.
 """
 
 from __future__ import annotations

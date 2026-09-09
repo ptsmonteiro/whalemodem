@@ -15,10 +15,11 @@ keying ends at the final CRC and PTT is released when those samples finish.
 ## Head sequence and measurement
 
 On VHF/FM, CPFSK retains its order-15 PN head in the implementation; VF3
-retains its sync-core lead. On HF, HR0, HC0, and HC1W use the common
-93.75-baud 16-FSK lead: a six-symbol mode-identifying block repeated at least
-twice. Calibration repeats it for one second and ordinary frames repeat it for
-the current adaptive duration, rounded upward to a complete block.
+retains its sync-core lead. HR0 and HC0 use native FSK head blocks, HC1W and
+HF2 uses native OFDM symbols, and HF7/HF8 repeat two-symbol native OFDM
+blocks populated from their own data constellations.
+Each head is repeated for the current adaptive duration, rounded upward to a
+complete mode-native block. HF5, HF6, and HF9 have no outer adaptive head.
 
 The decoder reports:
 
@@ -28,12 +29,10 @@ head_seconds_received
 
 Seconds, because the head measurement crosses layers that do not share a
 symbol. The CPFSK profiles count matched pad symbols and divide by their baud;
-mode 3 (VF3) counts 12 kHz receive-rate sync cores and divides by 12 kHz;
-these HF modes count common six-symbol MFSK blocks. These durations are
-identical to dividing the corresponding on-air counts by 48 kHz. Each also
-reports its native count as a diagnostic -- `head_symbols_received` for
-CPFSK, `head_cores_observed` for VF3, and `head_blocks_observed` for HC0/HC1W --
-but nothing in the link reads those.
+VF3 counts 12 kHz receive-rate sync cores and divides by 12 kHz; HF modes
+divide their native matched-block count by the mode's transmit rate. Each
+also reports its native count as a diagnostic, but the link only consumes the
+cross-mode duration.
 
 Only a frame whose checked header, optional body, and CRC validate can produce
 a timing observation. Near misses and CRC failures cannot affect timing.
@@ -47,12 +46,12 @@ separate detector from both of them. A frame can therefore acquire and pass
 FEC/CRC while noise or distortion makes the adjacent head detector stop
 early.
 
-This matters especially on HF. These modes measure the common MFSK lead by
-walking its repeated identity block backward from a body that has already
-passed CRC. Counting stops at the first block that falls below the pattern or
-relative-energy gate. At low SNR that can yield a short or zero count even
-when the lead audio was physically present. HC1W can independently fail its
-OFDM acquisition on the same weak direction.
+This matters especially on HF. Each mode measures its own repeated native
+head by walking the mode-specific block or symbol backward from a body that
+has already passed CRC. Counting stops at the first block or symbol that falls
+below the pattern or relative-energy gate. At low SNR that can yield a short
+or zero count even when the head audio was physically present. HC1W can
+independently fail its OFDM acquisition on the same weak direction.
 
 Capture replay is needed to distinguish actual leading loss from a lead that
 was physically present but too weak for the measurement gate.
@@ -86,8 +85,9 @@ session_id head_time_received
 calibration_seconds)`. Values 1 through 255 represent the observed fraction of
 the protocol-fixed one-second calibration head; zero is invalid. An
 observation above the calibration head is clamped to 255 rather than rejected,
-because a mode whose head is quantized -- HF rounds its head up to whole MFSK
-blocks -- can legitimately measure a little more than was asked for. The sender
+because a mode whose head is quantized -- HF rounds its head up to whole native
+blocks or symbols -- can legitimately measure a little more than was asked for.
+The sender
 derives:
 
 ```text
@@ -107,9 +107,9 @@ piggybacks an absolute requested duration in the same units.
 
 No increase is requested when the apparent deficit is no larger than the
 mode's own measurement resolution: one 16-symbol matcher window at the DATA
-baud for CPFSK, or one six-symbol MFSK block (64 ms) for either HF mode. A zero
-observation is a lower bound and requests a bounded 100 ms increase. Requests
-are capped at the documented one-second maximum.
+baud for CPFSK, or one native head block or symbol at the active HF mode's
+resolution. A zero observation is a lower bound and requests a bounded 100 ms
+increase. Requests are capped at the documented one-second maximum.
 
 The request is absolute, not incremental. The ISS accepts it only in a
 sequence- and mode-valid ACK for the outstanding DATA frame, then applies
@@ -117,8 +117,8 @@ sequence- and mode-valid ACK for the outstanding DATA frame, then applies
 stale or smaller feedback cannot decrease padding, and floor or mode changes
 do not reset it. Durations are stored in seconds and converted upward to the
 active channel's head granularity -- whole symbols at the active baud for
-CPFSK, or whole common-lead blocks on HF -- so protection remains constant
-across mode changes.
+CPFSK, or whole native blocks or symbols on HF -- so protection remains
+constant across mode changes.
 Each endpoint owns only its transmit direction's value.
 
 ## Packet summary

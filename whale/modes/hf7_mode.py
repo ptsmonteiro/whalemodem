@@ -48,7 +48,6 @@ import numpy as np
 from whale.phy import ofdm49 as hf7
 
 from .. import framing
-from . import hf_lead
 
 
 HF7_MODE_ID = 14
@@ -104,15 +103,12 @@ class Hf7Codec:
                 f"{HF7_PHY.max_payload_bytes}")
         # A minimum lead remains present even when the caller disables the
         # negotiated extension.  Shipped HF modes must never have a headless
-        # default path: the common lead is both the leading-loss guard and
-        # the timing measurement source.
+        # default path: the native OFDM head is both the leading-loss guard
+        # and the timing measurement source.
         if not include_head or head_seconds is None:
-            head_seconds = hf_lead.MIN_SECONDS
-        lead = hf_lead.modulate(hf_lead.HF7_LABEL, head_seconds)
-        audio = HF7_PHY.modulate(bytes(payload))
-        target = int(round(5.0 * self.tx_sample_rate))
-        body = np.pad(audio, (0, max(0, target - len(audio))))
-        return np.concatenate((lead, body))
+            head_seconds = HF7_PHY.head_seconds()
+        return HF7_PHY.modulate_with_head(
+            bytes(payload), head_seconds, body_seconds=5.0)
 
     def decode(self, audio, mode: "Hf7Mode", *, head_seconds=None, **kwargs) -> dict:
         del mode
@@ -123,49 +119,31 @@ class Hf7Codec:
         # preamble, so its residual is biased low and the LLRs handed to the
         # LDPC decoder are mis-scaled. Raw BER is identical either way.
         kwargs.setdefault("noise_estimator", NOISE_ESTIMATOR)
-        # Strip the latest matching lead boundary before OFDM acquisition.
-        # This prevents the MFSK head from looking like a false OFDM
-        # preamble. If the lead is erased or clipped, retain the existing
-        # body-only acquisition fallback.
         captured = np.asarray(audio)
-        lead_candidates = hf_lead.measured_candidates(
-            captured, hf_lead.HF7_LABEL, head_seconds)
-        result = None
-        body_start = None
-        # Correlation ranking is advisory; the checked OFDM payload chooses
-        # the winning boundary. Keep attempts bounded because each OFDM
-        # acquisition scans the retained audio at multiple CFO hypotheses.
-        for candidate, body_offset in lead_candidates:
-            attempt = HF7_PHY.demodulate(captured[body_offset:], **kwargs)
-            local_start = attempt.get("start_sample")
-            if local_start is not None:
-                body_start = body_offset + local_start
-                attempt["start_sample"] = body_start
-            result = attempt
-            if result.get("payload") is not None and body_start is not None:
-                break
-        if result is None or result.get("payload") is None:
-            # A damaged/erased lead must not prevent the existing body-only
-            # OFDM acquisition fallback.
-            result = HF7_PHY.demodulate(captured, **kwargs)
-            body_start = result.get("start_sample")
+        result = HF7_PHY.demodulate(captured, **kwargs)
+        body_start = result.get("start_sample")
         if body_start is not None:
             # Keep a provisional acquisition point while the body is still
             # arriving. The live streaming adapter uses it to stop scanning
             # old audio and feed this decoder's locked frame buffer.
             result["start_index"] = body_start
         if result.get("payload") is not None and body_start is not None:
-            observed, score = hf_lead.measure(
-                captured, body_start, hf_lead.HF7_LABEL, head_seconds)
+            observed, score = HF7_PHY.measure_head(
+                captured, body_start, result.get("freq_offset_hz") or 0.0)
+            symbols = observed * hf7.HEAD_BLOCK_SYMBOLS
             result.update(
                 head_blocks_observed=observed,
-                head_seconds_received=hf_lead.seconds_received(observed),
+                head_symbols_observed=symbols,
+                head_symbols_received=symbols,
+                head_seconds_received=(
+                    observed * HF7_PHY.head_block_samples
+                    / hf7.DESIGN_RATE),
                 head_match=score)
         return result
 
     def airtime(self, payload_len: int, mode: "Hf7Mode") -> float:
         del payload_len, mode
-        return hf_lead.MIN_SECONDS + 5.0
+        return HF7_PHY.head_seconds() + 5.0
 
 
 HF7_CODEC = Hf7Codec()
@@ -177,7 +155,6 @@ class Hf7Mode:
     mode_id: int = HF7_MODE_ID
     chunk_size: int = CHUNK_SIZE
     confidence_threshold: float = CONFIDENCE_THRESHOLD
-    lead_label: int = hf_lead.HF7_LABEL
     fec_rate: str | None = FEC_RATE
     codec: Hf7Codec = field(default=HF7_CODEC, compare=False, repr=False)
 
@@ -195,8 +172,9 @@ class Hf7Mode:
 
     @property
     def head_match_allowance_seconds(self) -> float:
-        """One common HF lead block, the measurement resolution."""
-        return hf_lead.BLOCK_SAMPLES / self.tx_sample_rate
+        """One native HF7 head block, the measurement resolution."""
+        return (hf7.HEAD_BLOCK_SYMBOLS * HF7_PHY.symbol_len
+                / hf7.DESIGN_RATE)
 
     def encode(self, payload: bytes, *, include_head=True, head_seconds=None):
         return self.codec.encode(payload, self, include_head=include_head,

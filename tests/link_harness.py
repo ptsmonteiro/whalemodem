@@ -28,55 +28,19 @@ import time
 
 import numpy as np
 
-from whale import afsk, link, rx_audio
+from whale import link
+
+from support.ring_transport import RingTransport
 
 
-class FakeTransport:
+class FakeTransport(RingTransport):
     """In-memory stand-in for whale.transport.RadioTransport: send() writes
-    straight into the paired transport's buffer instead of playing audio."""
+    straight into the paired transport's capture instead of playing audio.
 
-    def __init__(self):
-        self._buf = np.zeros(0, dtype=np.float32)
-        self._lock = threading.Lock()
-        self.peer = None
-        # Optional f(audio) -> audio applied to one transmission, so a test
-        # can lose a DATA frame or an ACK outright.
-        self.corrupt = None
-        self.keyings = 0
-
-    def start_receiving(self):
-        pass
-
-    def stop_receiving(self):
-        pass
-
-    def is_transmitting(self):
-        # send() below writes straight into the peer's buffer synchronously,
-        # so there's no "mid-transmit" window for the decode loop to race.
-        return False
-
-    def snapshot_rx(self):
-        with self._lock:
-            return self._buf.copy()
-
-    def consume_rx(self, upto_sample):
-        with self._lock:
-            self._buf = self._buf[upto_sample:]
-
-    def send(self, tx_audio, **kwargs):
-        self.keyings += 1
-        if self.corrupt is not None:
-            tx_audio = self.corrupt(tx_audio)
-        # A real capture continues through the radio turnaround, giving the
-        # causal RX filter time to emit its tail.  Model that gap so adjacent
-        # in-memory keyings do not overlap by the filter's group delay.
-        rx = rx_audio.downsample(np.concatenate((
-            tx_audio,
-            np.zeros(rx_audio.FILTER_DELAY_CAPTURE_SAMPLES, dtype=np.float32),
-        )))
-        with self.peer._lock:
-            self.peer._buf = np.concatenate([self.peer._buf, rx])
-        return len(tx_audio) / afsk.SAMPLE_RATE
+    The receive side is the real one -- see tests/support/ring_transport.py --
+    so the rolling ring, the monotonic stream position, the half-duplex
+    discard and the gap report all behave here as they do on the radio.
+    Only the air is faked."""
 
 
 def silence_once(transport):

@@ -5,7 +5,6 @@ import pytest
 
 from whale import framing, rx_audio
 from whale.mode_qualification import registry
-from whale.modes import hf_lead
 from whale.modes.hf7_mode import HF7, HF7_PHY, BAND_LO_HZ, BAND_HI_HZ
 from whale.phy import ofdm49 as ofdm49
 
@@ -39,10 +38,10 @@ def test_hf7_clean_loopback_and_throughput():
     result = HF7.decode(captured)
     assert result["payload"] == payload
     assert result["crc_ok"]
-    assert result["head_blocks_observed"] >= hf_lead.MIN_BLOCKS
+    assert result["head_symbols_received"] >= ofdm49.DEFAULT_HEAD_SYMBOLS
     assert result["head_seconds_received"] == pytest.approx(
-        hf_lead.MIN_SECONDS)
-    assert result["head_match"] >= hf_lead.MATCH_THRESHOLD
+        HF7_PHY.head_seconds())
+    assert result["head_match"] >= 0.5
     # SPEED_LADDERS.md Level 4: net application bits per full DATA frame over
     # that frame's complete airtime.
     assert 8 * HF7.chunk_size / HF7.airtime(len(payload)) > LEVEL4_MIN_NET_BPS
@@ -101,7 +100,7 @@ def test_hf7_rejects_oversize_payload():
 
 
 @pytest.mark.parametrize("head_seconds", [0.0, 0.31, 0.75, 1.0])
-def test_hf7_common_lead_round_trip_measures_minimum_or_requested_duration(
+def test_hf7_native_head_round_trip_measures_minimum_or_requested_duration(
         head_seconds):
     payload = bytes(i & 0xFF for i in range(
         HF7.chunk_size + framing.AIR_HEADER_BYTES))
@@ -110,14 +109,14 @@ def test_hf7_common_lead_round_trip_measures_minimum_or_requested_duration(
         tx, np.zeros(rx_audio.FILTER_DELAY_CAPTURE_SAMPLES, dtype=np.float32))))
     result = HF7.decode(captured, head_seconds=head_seconds)
 
-    expected_blocks = hf_lead.lead_samples(head_seconds) // hf_lead.BLOCK_SAMPLES
+    expected_blocks = HF7_PHY.head_samples(head_seconds) // HF7_PHY.symbol_len
     assert result["payload"] == payload
-    assert result["head_blocks_observed"] == expected_blocks
+    assert result["head_symbols_received"] == expected_blocks
     assert result["head_seconds_received"] == pytest.approx(
-        hf_lead.seconds_received(expected_blocks))
+        expected_blocks * HF7_PHY.symbol_len / ofdm49.DESIGN_RATE)
 
 
-def test_hf7_include_head_false_keeps_the_minimum_common_lead():
+def test_hf7_include_head_false_keeps_the_minimum_native_head():
     payload = bytes(range(16))
     tx = HF7.encode(payload, include_head=False)
     assert len(tx) == round(HF7.airtime(len(payload)) * HF7.tx_sample_rate)

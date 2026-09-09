@@ -91,6 +91,10 @@ INTERLEAVER_SEED = 0x5EED1A
 
 SYNC_SEARCH_HZ = 20.0
 SYNC_SEARCH_STEP_HZ = 1.0
+DEFAULT_HEAD_SYMBOLS = 6
+HEAD_BLOCK_SYMBOLS = 2
+HEAD_SEEDS_BY_BITS_PER_SYMBOL = {3: 15, 5: 14}
+PREAMBLE_REPEAT_THRESHOLD = 0.80
 
 # 32-QAM (bits_per_symbol=5) is not in hf5's shared mapper, which jumps
 # straight from 16-QAM to 64-QAM, and hf5 is not modified by this
@@ -178,6 +182,33 @@ def _freq_shift_real(x: np.ndarray, hz: float, rate: float) -> np.ndarray:
     n = np.arange(len(x))
     shifted = analytic * np.exp(1j * 2 * np.pi * hz * n / rate)
     return shifted.real
+
+
+def _adjacent_symbol_coherence(x: np.ndarray,
+                               symbol_len: int) -> np.ndarray:
+    """Sliding normalized coherence of adjacent symbol-length windows.
+
+    Magnitude makes this insensitive to carrier-offset phase rotation.  A
+    repeated OFDM symbol approaches one; independently populated symbols and
+    noise remain small.
+    """
+    analytic = _hilbert_analytic(np.asarray(x, dtype=np.float64))
+    n_positions = len(analytic) - 2 * symbol_len + 1
+    if n_positions <= 0:
+        return np.zeros(0, dtype=np.float64)
+
+    cross_terms = np.conj(analytic[:-symbol_len]) * analytic[symbol_len:]
+    cross_sum = np.concatenate((np.zeros(1, dtype=np.complex128),
+                                np.cumsum(cross_terms)))
+    cross = cross_sum[symbol_len:] - cross_sum[:-symbol_len]
+
+    power = np.abs(analytic) ** 2
+    power_sum = np.concatenate(([0.0], np.cumsum(power)))
+    first = (power_sum[symbol_len:len(analytic) - symbol_len + 1]
+             - power_sum[:len(analytic) - 2 * symbol_len + 1])
+    second = (power_sum[2 * symbol_len:]
+              - power_sum[symbol_len:len(analytic) - symbol_len + 1])
+    return np.abs(cross) / np.sqrt(np.maximum(first * second, 1e-18))
 
 
 _CONSTELLATION_CACHE: dict[int, tuple[np.ndarray, np.ndarray]] = {}
@@ -300,9 +331,109 @@ class OFDM49Mode:
                             (pilot_bpsk * np.exp(1j * phases) * amp).astype(np.complex128))
         object.__setattr__(self, "_phase_schedule", phases)
 
+        # The adaptive head must look like this mode to the radio without
+        # looking like its acquisition preamble to the decoder.  Two
+        # deterministic, independently populated data-constellation OFDM
+        # symbols form one repeated block.  The block is periodic at two
+        # symbols, while adjacent symbols have low coherence.  That keeps the
+        # head mode-native and repetitive without resembling the body's two
+        # identical acquisition-preamble symbols.  The pair is level-matched
+        # exactly to each encoded body in modulate_with_head().
+        rng = np.random.default_rng(
+            HEAD_SEEDS_BY_BITS_PER_SYMBOL.get(self.bits_per_symbol, 14))
+        head_symbols = []
+        for _ in range(HEAD_BLOCK_SYMBOLS):
+            head_bits = rng.integers(
+                0, 2, len(self._data_idx) * self.bits_per_symbol,
+                dtype=np.uint8)
+            head_grid = np.zeros(n_active, dtype=np.complex128)
+            head_grid[self._data_idx] = bits_to_symbols(
+                head_bits, self.bits_per_symbol)
+            head_grid[self._comb_idx] = self._comb_bin_symbols[self._comb_idx]
+            head_grid *= np.exp(1j * phases) * amp
+            head_symbols.append(self._add_cp(self._ifft_symbol(head_grid)))
+        object.__setattr__(self, "_native_head_block",
+                           np.concatenate(head_symbols))
+
     @property
     def n_active(self) -> int:
         return len(self.active_bins)
+
+    def head_samples(self, head_seconds: float | None = None) -> int:
+        """Native OFDM head length in design-rate samples."""
+        minimum = DEFAULT_HEAD_SYMBOLS * self.symbol_len
+        if head_seconds is None:
+            wanted = minimum
+        elif head_seconds < 0:
+            raise ValueError("head duration must not be negative")
+        else:
+            wanted = max(minimum, int(round(head_seconds * DESIGN_RATE)))
+        block_samples = HEAD_BLOCK_SYMBOLS * self.symbol_len
+        return -(-wanted // block_samples) * block_samples
+
+    def head_seconds(self) -> float:
+        return self.head_samples() / DESIGN_RATE
+
+    @property
+    def head_block_samples(self) -> int:
+        return len(self._native_head_block)
+
+    def native_head(self, head_seconds: float | None = None) -> np.ndarray:
+        """Render a mode-native adaptive head at the TX sample rate.
+
+        The repeated block uses this mode's data constellation, carrier plan,
+        phase schedule, taper, cyclic prefix, and calibrated drive.  Normal
+        frame encoding uses modulate_with_head(), which additionally matches
+        the head to that particular body's RMS and renders both continuously.
+        """
+        count = self.head_samples(head_seconds) // self.head_block_samples
+        head = np.tile(self._native_head_block, count)
+        head = self._render_tx(head)
+        head[:min(240, len(head))] *= np.linspace(
+            0.0, 1.0, min(240, len(head)))
+        return head.astype(np.float32)
+
+    def measure_head(self, captured: np.ndarray, body_start: int,
+                     freq_offset_hz: float = 0.0) -> tuple[int, float]:
+        """Count complete native head blocks immediately before the body."""
+        block_samples = self.head_block_samples
+        span = min(body_start,
+                   int(round((1.0 + block_samples / DESIGN_RATE)
+                             * DESIGN_RATE)))
+        n_blocks = span // block_samples
+        if n_blocks < 2:
+            return 0, 0.0
+        window = np.asarray(captured[body_start - n_blocks * block_samples:
+                                     body_start],
+                            dtype=np.float64)
+        corrected = _freq_shift_real(window, -freq_offset_hz, DESIGN_RATE)
+        analytic = _hilbert_analytic(corrected)
+
+        newer = analytic[-block_samples:]
+        newer_energy = float(np.linalg.norm(newer))
+        if newer_energy <= 0.0:
+            return 0, 0.0
+        reference_energy = newer_energy
+        count = 1
+        first = 0.0
+        for block_index in range(2, n_blocks + 1):
+            stop = len(analytic) - (block_index - 1) * block_samples
+            older = analytic[stop - block_samples:stop]
+            older_energy = float(np.linalg.norm(older))
+            if older_energy < 0.75 * reference_energy:
+                break
+            score = float(abs(np.vdot(older, newer)) /
+                          (older_energy * float(np.linalg.norm(newer))
+                           + 1e-12))
+            if count == 1:
+                first = score
+            if score < 0.5:
+                break
+            count += 1
+            newer = older
+        # A single block cannot be distinguished from arbitrary preceding
+        # audio; report only a run proven by at least one repetition.
+        return (count, first) if count >= 2 else (0, first)
 
     @property
     def n_data_bins(self) -> int:
@@ -446,7 +577,8 @@ class OFDM49Mode:
                                  for row in info_padded.reshape(n_cw, k)])
         return raw_bits, coded
 
-    def modulate(self, payload: bytes) -> np.ndarray:
+    def _body_passband(self, payload: bytes) -> np.ndarray:
+        """Build the design-rate OFDM body before DAC interpolation/scaling."""
         _, coded_bits = self.pack_and_encode_bits(payload)
         coded_bits = coded_bits[self._interleaver()] if self.interleave else coded_bits
         whitener = _bits.pn_bits(len(coded_bits), WHITENER_SEED)
@@ -477,7 +609,50 @@ class OFDM49Mode:
             else:
                 pieces.append(self._add_cp(self._ifft_symbol(self._pilot_bin_symbols)))
 
-        passband = np.concatenate(pieces)
+        return np.concatenate(pieces)
+
+    def modulate(self, payload: bytes) -> np.ndarray:
+        return self._render_tx(self._body_passband(payload))
+
+    def modulate_with_head(self, payload: bytes,
+                           head_seconds: float | None = None, *,
+                           body_seconds: float | None = None) -> np.ndarray:
+        """Render one level-matched native head and OFDM body continuously.
+
+        ``modulate()`` remains the qualified body-only waveform.  This method
+        builds that same design-rate body, matches the repeated head block to
+        its active RMS, joins the two before interpolation, and performs the
+        peak calibration once over the resulting keying.  The radio therefore
+        sees no foreign waveform and no independently normalized level step.
+        ``body_seconds`` may add only trailing silence; it is excluded from
+        the RMS measurement.
+        """
+        body = self._body_passband(payload)
+        active_body = body
+        if body_seconds is not None:
+            if body_seconds < 0:
+                raise ValueError("body duration must not be negative")
+            wanted = int(round(body_seconds * DESIGN_RATE))
+            if wanted < len(body):
+                raise ValueError(
+                    f"body duration {body_seconds:g}s is shorter than the "
+                    f"{len(body) / DESIGN_RATE:g}s OFDM frame")
+            body = np.pad(body, (0, wanted - len(body)))
+
+        blocks = self.head_samples(head_seconds) // self.head_block_samples
+        head = np.tile(self._native_head_block, blocks)
+        head_rms = float(np.sqrt(np.mean(head ** 2)))
+        body_rms = float(np.sqrt(np.mean(active_body ** 2)))
+        if head_rms <= 0.0 or body_rms <= 0.0:
+            raise AssertionError("native OFDM head/body has zero power")
+        head = head * (body_rms / head_rms)
+
+        tx = self._render_tx(np.concatenate((head, body)))
+        fade = min(240, len(tx))
+        tx[:fade] *= np.linspace(0.0, 1.0, fade)
+        return tx.astype(np.float32)
+
+    def _render_tx(self, passband: np.ndarray) -> np.ndarray:
         passband = passband / (np.max(np.abs(passband)) + 1e-12)
         passband = passband * self.drive_scale
 
@@ -531,6 +706,7 @@ class OFDM49Mode:
         x = np.asarray(captured_12k, dtype=np.float64)
         result = {"synced": False, "crc_ok": False, "payload": None,
                   "confidence": 0.0, "freq_offset_hz": None,
+                  "preamble_repeat_coherence": None,
                   "channel_snr_db": None, "raw_bits": None,
                   "raw_packet_bits": None, "phase_slope_rad_per_bin": None,
                   "pre_fec_bits": None, "ldpc_ok": None, "ldpc_iterations": None}
@@ -543,20 +719,33 @@ class OFDM49Mode:
             return result
 
         norm = np.sqrt(np.sum(preamble_wave ** 2)) * (np.std(x) + 1e-12) * np.sqrt(len(preamble_wave))
+        repeat_coherence = _adjacent_symbol_coherence(x, self.symbol_len)
 
-        best = (-1.0, 0, 0.0)
+        best = (-1.0, 0, 0.0, 0.0)
         for hz in np.arange(-SYNC_SEARCH_HZ, SYNC_SEARCH_HZ + 1e-9, SYNC_SEARCH_STEP_HZ):
             template = _freq_shift_real(preamble_wave, hz, DESIGN_RATE)
             corr = np.correlate(x, template, mode="valid")
             env = np.abs(_sc._hilbert_envelope(corr))
-            peak = int(np.argmax(env))
+            # The body starts with two identical OFDM symbols.  Require that
+            # structure before ranking a correlation peak.  A mode-native
+            # head deliberately repeats only every two symbols, so neither
+            # its symbols nor noise can publish a provisional body start.
+            structural = repeat_coherence[:len(env)]
+            eligible = structural >= PREAMBLE_REPEAT_THRESHOLD
+            if not np.any(eligible):
+                continue
+            gated = np.where(eligible, env, -np.inf)
+            peak = int(np.argmax(gated))
             conf = float(env[peak] / (norm + 1e-12))
             if conf > best[0]:
-                best = (conf, peak, float(hz))
+                best = (conf, peak, float(hz), float(structural[peak]))
 
-        confidence, start, freq_offset = best
+        confidence, start, freq_offset, repeat_score = best
+        if confidence < 0.0:
+            return result
         result["confidence"] = confidence
         result["freq_offset_hz"] = freq_offset
+        result["preamble_repeat_coherence"] = repeat_score
 
         total_symbols = self.total_ofdm_symbols()
         symlen = self.symbol_len
@@ -566,11 +755,21 @@ class OFDM49Mode:
         # of re-searching a rolling buffer after the preamble has passed.
         if confidence >= 0.12:
             result["start_sample"] = int(start)
-        if confidence < 0.12 or needed > len(x):
+            result["sync_end_index"] = int(
+                start + self.n_preamble_symbols * symlen)
+        if confidence < 0.12:
+            return result
+        if needed > len(x):
+            result["failure"] = "frame truncated"
             return result
         result["synced"] = True
-        # The mode adapter uses the checked OFDM start to measure the common
-        # outer HF lead.  Keep this scalar diagnostic available on the normal
+        # From here onward the complete fixed-geometry OFDM frame is present.
+        # Any later return is terminal, even when FEC or CRC fails.  The live
+        # streaming adapter relies on end_index to release a failed lock so
+        # the next ARQ attempt (possibly in another mode) can be acquired.
+        result["end_index"] = int(needed)
+        # The mode adapter uses the checked OFDM start to measure the native
+        # outer HF head.  Keep this scalar diagnostic available on the normal
         # decode path; the large diagnostics arrays remain opt-in below.
         span = x[start:start + total_symbols * symlen + symlen]
 

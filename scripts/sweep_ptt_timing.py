@@ -93,8 +93,7 @@ def run_point(tx, rx, profile, payload, cfg, trials, label, verbose=True):
     confidences = []
     keyed = []
     for i in range(1, trials + 1):
-        stale = rx.snapshot_rx()
-        rx.consume_rx(len(stale))
+        rx.discard_rx()
         # Pass durations explicitly. afsk.modulate()'s defaults are bound at
         # import time, so mutating framing constants here would not sweep the
         # value placed on air.

@@ -10,8 +10,11 @@ life, including while transmitting -- stopping/restarting it around every TX
 output intermittently refuse to start right afterwards (PaErrorCode -9999,
 WdmSyncIoctl), evidently a driver settling-time issue on this USB codec.
 Simultaneous in+out on this hardware is fine; it is the stop/start churn
-that isn't. So RX just stays open, and half duplex is enforced by discarding
-whatever it captured immediately before/during/after our own TX instead.
+that isn't. So RX just stays open, and half duplex is enforced by voiding
+whatever it captured immediately before/during/after our own TX instead --
+see discard_rx(): the capture position keeps counting, and everything before
+the discard marker is simply declared void, so a live decoder learns it has
+been cut off rather than silently seeing the stream restart at zero.
 """
 
 import collections
@@ -20,6 +23,7 @@ import logging
 import sys
 import threading
 import time
+from typing import NamedTuple
 
 import numpy as np
 import sounddevice as sd
@@ -85,17 +89,135 @@ if abs(_KEYING_OVERHEAD - afsk.KEYING_OVERHEAD_SECONDS) > 0.005:
         f"but afsk.KEYING_OVERHEAD_SECONDS is {afsk.KEYING_OVERHEAD_SECONDS:.3f}s; "
         "the profiles' chunk_size was derived from the latter")
 
-# How much recent audio the receiver keeps around for the decoder to search.
+# How much captured audio the ring keeps before the oldest is dropped.
 # Generous relative to one frame's ~7s worst case (255-byte payload at 300
-# baud) so a frame straddling two decode attempts is never lost.
+# baud) so a frame straddling two reads is never lost.
 #
-# Note this is the *cap*, not the working size -- whale/link.py's decode
-# loop prunes audio it has already searched and found nothing in, so the
-# buffer only approaches this length while a frame is actually arriving.
-# That matters because demodulate() costs time proportional to buffer
-# length (currently about 3 ms per second for each CPFSK candidate on the
-# development machine; scripts/benchmark_rx.py keeps this reproducible).
+# This is the transport's own bound and nothing else's: each live decoder
+# keeps its own, much shorter, working window (whale/streaming.py), so decode
+# cost does not grow with this. What this length buys is slack -- a reader
+# that falls this far behind is told it lost audio (RxRead.gap) instead of
+# being handed a discontinuity it cannot see.
 RX_BUFFER_SECONDS = 10.0
+
+
+class RxRead(NamedTuple):
+    """One read of the receive stream.
+
+    `start`/`end` are stream positions (see RadioTransport.rx_stream_position),
+    not indices into anything the caller previously held. `gap` says audio
+    between the requested position and `start` is gone -- trimmed by the ring
+    or voided by discard_rx() -- so the reader must resynchronise rather than
+    treat `audio` as continuous with its last read.
+    """
+
+    audio: np.ndarray
+    start: int
+    end: int
+    gap: bool
+
+
+class ReceiveStream:
+    """The bounded receive ring and its one monotonic coordinate.
+
+    Split out from RadioTransport because it is the whole receive contract:
+    samples are written at one end, read by position at the other, and the
+    only thing that can move discontinuously is announced (`RxRead.gap`).
+    A test transport that reuses this class cannot drift from what the radio
+    actually does, which is how a coordinate bug reached the air the last
+    time the two were written separately.
+
+    Writes come off the audio callback's realtime thread, so `write` is a
+    deque append -- O(1) -- and the concatenate happens lazily in `read`, on
+    whatever thread is decoding.
+    """
+
+    def __init__(self, sample_rate=RX_SAMPLE_RATE, seconds=RX_BUFFER_SECONDS):
+        self.max_samples = int(seconds * sample_rate)
+        self._chunks = collections.deque()
+        self._chunks_len = 0
+        # _total counts every sample ever written and never restarts, so a
+        # position stays meaningful across a trim and across discard().
+        # _origin is the position of _chunks[0][0]; _discarded is the
+        # position before which the capture has been declared void, or None
+        # if nothing ever has been.
+        self._total = 0
+        self._origin = 0
+        self._discarded = None
+        self._lock = threading.Lock()
+
+    def write(self, samples):
+        with self._lock:
+            self._chunks.append(np.asarray(samples, dtype=np.float32))
+            self._chunks_len += len(samples)
+            self._total += len(samples)
+            while self._chunks_len - len(self._chunks[0]) > self.max_samples:
+                dropped = len(self._chunks.popleft())
+                self._chunks_len -= dropped
+                self._origin += dropped
+            return self._total
+
+    def discard(self):
+        """Declares everything written so far void; returns the new floor."""
+        with self._lock:
+            self._chunks.clear()
+            self._chunks_len = 0
+            self._origin = self._total
+            self._discarded = self._total
+            return self._discarded
+
+    def read(self, since=None):
+        """Retained audio from stream position `since` onward.
+
+        Non-destructive: the stream owns its ring and no reader may shorten
+        it. `since=None` means "whatever is retained". A read comes back with
+        `gap` set whenever the reader has to resynchronise instead of joining
+        what follows onto what it already had:
+
+          - it starts later than asked, because the ring trimmed that audio;
+          - or it starts at or after a discard(), because everything before
+            that marker is void -- including audio the reader has already
+            taken and may still be holding in a decode window, which is
+            exactly what half duplex has to throw away.
+        """
+        with self._lock:
+            flat = self._flatten_locked()
+            origin, total = self._origin, self._total
+            discarded = self._discarded
+            floor = origin if discarded is None else max(origin, discarded)
+            if since is None:
+                start, gap = floor, False
+            else:
+                since = int(since)
+                start = min(max(since, floor), total)
+                gap = start > since or (discarded is not None
+                                        and since <= discarded)
+            return RxRead(flat[start - origin:].copy(), start,
+                          origin + len(flat), gap)
+
+    def _flatten_locked(self):
+        if not self._chunks:
+            return np.zeros(0, dtype=np.float32)
+        flat = np.concatenate(self._chunks)
+        if len(flat) > self.max_samples:
+            self._origin += len(flat) - self.max_samples
+            flat = flat[-self.max_samples:]
+        self._chunks.clear()
+        self._chunks.append(flat)
+        self._chunks_len = len(flat)
+        return flat
+
+    @property
+    def position(self):
+        """Total samples ever written: the stream's write position."""
+        with self._lock:
+            return self._total
+
+    @property
+    def discard_position(self):
+        """Position before which the capture is void; 0 if none ever was."""
+        with self._lock:
+            return 0 if self._discarded is None else self._discarded
 
 
 class RadioTransport:
@@ -118,17 +240,10 @@ class RadioTransport:
         self.receive_only = bool(receive_only)
         self.ptt = None if self.receive_only else self.radio.ptt()
 
-        # A deque of 12 kHz receive chunks rather than one growing array: the audio
-        # callback runs on PortAudio's realtime thread, and re-concatenating
-        # an array that can be RX_BUFFER_SECONDS long on every
-        # callback -- ~10x/sec -- is real work on that thread. Appending a
-        # chunk is O(1); the expensive concatenate+trim happens lazily in
-        # snapshot_rx(), called from the (non-realtime) decode thread.
-        self._chunks = collections.deque()
-        self._chunks_len = 0
-        self._rx_total_samples = 0
-        self._rx_buffer_generation = 0
-        self._buf_lock = threading.Lock()
+        # The receive ring and its monotonic coordinate live in
+        # ReceiveStream, shared with the test transports so the fake and the
+        # radio cannot disagree about the contract.
+        self._rx = ReceiveStream()
         self._stream = None
         self._tx_lock = threading.Lock()  # serializes TX attempts
         self._transmitting = threading.Event()
@@ -137,16 +252,9 @@ class RadioTransport:
     # -- receive ------------------------------------------------------
 
     def _in_callback(self, indata, frames, time_info, status):
-        with self._buf_lock:
-            if not hasattr(self, "_rx_decimator"):
-                self._rx_decimator = rx_audio.ReceiveDecimator()
-            decoded = self._rx_decimator.process(indata[:, 0])
-            self._chunks.append(decoded)
-            self._chunks_len += len(decoded)
-            self._rx_total_samples += len(decoded)
-            max_len = int(RX_BUFFER_SECONDS * RX_SAMPLE_RATE)
-            while self._chunks_len - len(self._chunks[0]) > max_len:
-                self._chunks_len -= len(self._chunks.popleft())
+        if not hasattr(self, "_rx_decimator"):
+            self._rx_decimator = rx_audio.ReceiveDecimator()
+        self._rx.write(self._rx_decimator.process(indata[:, 0]))
 
     def start_receiving(self):
         if self._stream is not None:
@@ -164,71 +272,54 @@ class RadioTransport:
             self._stream.close()
             self._stream = None
 
-    def _clear_buffer(self):
-        with self._buf_lock:
-            self._chunks.clear()
-            self._chunks_len = 0
-            self._rx_total_samples = 0
-            self._rx_buffer_generation = (
-                getattr(self, "_rx_buffer_generation", 0) + 1)
-            if hasattr(self, "_rx_decimator"):
-                self._rx_decimator.reset()
-            else:
-                # Some safety tests construct a transport without running
-                # __init__; keep the emergency send/close paths valid.
-                self._rx_decimator = rx_audio.ReceiveDecimator()
+    def discard_rx(self):
+        """Declares everything captured so far void and returns the stream
+        position the capture resumes from.
+
+        This is how half duplex is enforced (see send()) and how the bench
+        scripts flush audio left over from a previous trial. Deliberately
+        *not* a reset: rx_stream_position keeps counting, so a reader holding
+        an older position is told it was cut off (read_rx().gap) instead of
+        being handed audio whose coordinates silently moved under it.
+        """
+        # Some safety tests construct a transport without running __init__;
+        # keep the emergency send/close paths valid.
+        if not hasattr(self, "_rx_decimator"):
+            self._rx_decimator = rx_audio.ReceiveDecimator()
+        if not hasattr(self, "_rx"):
+            self._rx = ReceiveStream()
+        self._rx_decimator.reset()
+        return self._rx.discard()
+
+    def read_rx(self, since=None):
+        """Captured audio from stream position `since` onward. See
+        ReceiveStream.read -- this is the whole receive interface."""
+        return self._rx.read(since)
 
     def snapshot_rx(self):
-        """Everything captured so far, flattened into one array."""
-        with self._buf_lock:
-            if not self._chunks:
-                return np.zeros(0, dtype=np.float32)
-            flat = np.concatenate(self._chunks)
-            self._chunks.clear()
-            self._chunks.append(flat)
-            max_len = int(RX_BUFFER_SECONDS * RX_SAMPLE_RATE)
-            if len(flat) > max_len:
-                flat = flat[-max_len:]
-                self._chunks[0] = flat
-                self._chunks_len = len(flat)
-            return flat.copy()
+        """Everything currently retained, flattened into one array."""
+        return self._rx.read().audio
 
     @property
     def rx_stream_position(self):
-        """Monotonic position of captured samples since the last clear.
+        """Total 12 kHz samples ever captured: the stream's write position.
 
-        Unlike the bounded snapshot length, this still advances when the
-        oldest retained audio is trimmed. Live incremental decoders use it to
-        distinguish "no new audio" from "the rolling buffer slid forward".
+        Monotonic for the transport's whole life -- it survives the ring
+        trimming its front and it survives discard_rx() -- so it is the one
+        coordinate every receive index in the system is expressed in.
         """
-        with self._buf_lock:
-            return getattr(self, "_rx_total_samples", 0)
+        return self._rx.position
 
     @property
-    def rx_buffer_generation(self):
-        """Generation incremented whenever the receive buffer is cleared."""
-        with self._buf_lock:
-            return getattr(self, "_rx_buffer_generation", 0)
+    def rx_discard_position(self):
+        """Stream position before which the capture has been declared void."""
+        return self._rx.discard_position
 
     def is_transmitting(self):
         """True for the whole span of a send() call, so callers polling the
         RX buffer (the decode thread) can sit out our own TX instead of
         racing send()'s pre/post clears and decoding our own leaked audio."""
         return self._transmitting.is_set()
-
-    def consume_rx(self, upto_sample: int):
-        """Drops everything up to `upto_sample` (index into the array
-        `snapshot_rx()` returned) from the buffer. Must be called shortly
-        after snapshot_rx() -- it assumes the buffer's front chunk is still
-        the array snapshot_rx() flattened, so it can just slice it."""
-        with self._buf_lock:
-            if not self._chunks:
-                return
-            front = self._chunks[0]
-            n = min(upto_sample, len(front))
-            if n > 0:
-                self._chunks[0] = front[n:]
-                self._chunks_len -= n
 
     # -- transmit -------------------------------------------------------
 
@@ -263,7 +354,7 @@ class RadioTransport:
         with self._tx_lock:
             _ensure_com_initialized()
             self._transmitting.set()
-            self._clear_buffer()
+            self.discard_rx()
             try:
                 last_exc = None
                 keyed_seconds = None
@@ -297,7 +388,7 @@ class RadioTransport:
                 # protocol layer (Link._handle_raw), by callsign, since a
                 # blanket post-TX mute risks eating the peer's real reply
                 # when turnaround is fast.
-                self._clear_buffer()
+                self.discard_rx()
                 self._transmitting.clear()
 
     def _reresolve_out_device(self):

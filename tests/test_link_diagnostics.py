@@ -1,14 +1,9 @@
-"""Decode-loop diagnostics and the two limits that keep the receiver awake.
+"""Decode-loop diagnostics and the limit that keeps the receiver awake.
 
-The SNR summaries below are the readouts. The tests after them are the
-budget: an on-air HF session went deaf because one candidate mode reported a
-sync lock on plain noise on every poll, which stopped the RX buffer from ever
-being pruned, which left every later poll re-searching a full 10-second buffer
-at five profiles -- about 17 seconds of work per poll against a buffer holding
-10 seconds of audio, so ~41% of the timeline was never examined at all and the
-peer's retransmissions landed in the gaps.  Both halves of that have to be
-impossible: a speculative lock must not be able to pin the buffer, and a poll
-must not be able to cost more than the buffer window it is searching.
+The SNR summaries below are the readouts. The tests after them are the limit:
+a decode attempt must not be able to cost more than the window it searches,
+and nothing a candidate mode claims to see may enlarge that window. See the
+comment above them for the on-air incident that is.
 """
 
 import time
@@ -16,9 +11,9 @@ from dataclasses import dataclass, field
 
 import numpy as np
 
-from whale import link, rx_audio
+from whale import link, rx_audio, streaming
+from whale.modes import hc0
 from whale.modes.hc0_mode import HC0
-from whale.modes import hf_lead
 from whale.waveform import ModeRegistry
 
 import link_harness as harness
@@ -44,18 +39,31 @@ def test_decode_snr_summary_uses_effective_sync_estimate():
         "SNR 8.2 dB (effective sync)")
 
 
-# -- the decode poll's two limits ---------------------------------------
+# -- what keeps the receiver awake -----------------------------------
+#
+# The budget below is an incident, not a preference. An on-air HF session went
+# deaf because one candidate mode reported a sync lock on plain noise on every
+# poll, which stopped the RX buffer from ever being pruned, which left every
+# later poll re-searching a full 10-second buffer at five profiles -- about 17
+# seconds of work per poll against a buffer holding 10 seconds of audio, so
+# ~41% of the timeline was never examined at all and the peer's
+# retransmissions landed in the gaps.
+#
+# What answers it now is ownership rather than arbitration: the transport's
+# ring is not what any decoder searches. Each mode keeps its own short window
+# (whale/streaming.py) and gives up a lock that never resolves, so the work a
+# poll does is bounded by that window and by nothing else -- not by how long
+# the channel was idle, not by how far behind the loop has fallen, and not by
+# what any other candidate claims to see.
 #
 # Deliberately unit-level and deliberately tiny. tests/test_audio_e2e.py hands
 # audio between stations instantly -- its own docstring says wall-clock time is
 # meaningless there, it measures airtime -- and the single-frame tests decode
 # one frame at a time, so neither can see a receiver that has fallen behind
 # real time. Costs below are simulated by burning a known amount of CPU inside
-# a stub decoder against a fraction-of-a-second buffer, so the whole section
-# runs in a few seconds.
+# a stub decoder, so the whole section runs in a few seconds.
 
 RX_RATE = 12_000
-BUFFER_SECONDS = 0.5
 FRAME_SECONDS = 0.2
 
 
@@ -66,9 +74,11 @@ class _StubCodec:
         self.rate = seconds_per_audio_second
         self.result = {} if result is None else result
         self.attempts = 0
+        self.longest_audio = 0
 
     def decode(self, audio):
         self.attempts += 1
+        self.longest_audio = max(self.longest_audio, len(audio))
         if self.rate:
             deadline = (time.perf_counter()
                         + len(audio) / RX_RATE * self.rate)
@@ -108,144 +118,90 @@ def _stub_link(*modes):
     return a_link, transport
 
 
-def _fill(transport, seconds):
-    transport._buf = np.zeros(int(seconds * RX_RATE), dtype=np.float32)
+def _poll(a_link, transport, seconds):
+    """`seconds` of capture arrive, then one decode poll, as the loop runs."""
+    transport.deliver(np.zeros(int(seconds * RX_RATE), dtype=np.float32))
+    while a_link._decode_stream():
+        pass
 
 
-def test_a_perpetual_speculative_lock_cannot_pin_the_rx_buffer():
+def test_a_perpetual_speculative_lock_cannot_pin_the_receiver():
     """A candidate reports a sync it never resolves -- confidence over its own
     threshold, no frame boundary, on every poll forever. That is what pure
     noise does to hf7/hf8, whose threshold sits below their own noise floor.
 
-    The buffer must be pruned anyway. Left pinned at full length it makes
-    every later poll re-search all of it, and once a poll costs more than the
-    buffer holds, audio ages out unexamined between polls and the receiver is
-    deaf to a peer it can hear perfectly well."""
-    liar = _StubMode("liar", 1, _StubCodec(result={"confidence": 0.99}))
+    It must not be able to accumulate audio behind it. Left unbounded it makes
+    every later attempt search more, and once an attempt costs more than the
+    interval it runs on, audio ages out unexamined and the receiver is deaf to
+    a peer it can hear perfectly well."""
+    liar = _StubMode("liar", 1, _StubCodec(result={"confidence": 0.99,
+                                                   "start_index": 0}))
     a_link, transport = _stub_link(liar)
 
-    for _ in range(8):
-        # More audio arrives between polls than any poll consumes.
-        transport._buf = np.concatenate(
-            [transport.snapshot_rx(),
-             np.zeros(int(BUFFER_SECONDS * RX_RATE), dtype=np.float32)])
-        a_link._decode_one(transport.snapshot_rx())
+    for _ in range(20):  # 20 s: twice the transport's whole ring
+        _poll(a_link, transport, 1.0)
 
-    held = len(transport.snapshot_rx()) / RX_RATE
-    assert held <= a_link._rx_keep_seconds + 0.01, (
-        f"a speculative lock pinned {held:.2f}s of audio")
+    examined = liar.codec.longest_audio / RX_RATE
+    assert examined <= 3.0, (
+        f"a speculative lock grew an attempt to {examined:.2f}s of audio")
 
 
-def test_pruning_keeps_a_frame_that_is_still_arriving():
-    """Why the prune is bounded rather than absolute: a frame that is only
-    half here must not have its head cut off."""
+def test_an_attempt_never_searches_more_than_its_own_window():
+    """The property the incident turned on, stated directly: how long the
+    channel was idle before a frame arrives changes nothing about what one
+    decode attempt costs."""
     quiet = _StubMode("quiet", 1, _StubCodec(result={"confidence": 0.0}))
     a_link, transport = _stub_link(quiet)
-    _fill(transport, 30.0)
 
-    a_link._decode_one(transport.snapshot_rx())
+    for _ in range(5):
+        _poll(a_link, transport, 1.0)
+    settled = quiet.codec.longest_audio
+    quiet.codec.longest_audio = 0
 
-    held = len(transport.snapshot_rx()) / RX_RATE
-    assert held >= FRAME_SECONDS, (
-        f"kept {held:.2f}s, less than one {FRAME_SECONDS:.2f}s frame")
+    for _ in range(30):  # 30 s of nothing at all, well past the ring's length
+        _poll(a_link, transport, 1.0)
+
+    assert quiet.codec.longest_audio <= settled, (
+        "attempt size grew with the idle stretch before it")
+    assert (settled / RX_RATE
+            <= streaming.StreamingDecoder.ACQUISITION_SECONDS + 0.01)
 
 
-def test_an_expensive_candidate_cannot_spend_the_whole_poll():
-    """One candidate costing seconds per attempt must not take the poll with
-    it: it is rate-limited, the poll stays inside its budget, and the cheap
-    candidates are attempted every single time."""
+def test_one_expensive_candidate_cannot_starve_a_cheap_one():
+    """Every candidate is fed the same stream. Cost differs between them by
+    orders of magnitude, so what has to be true is that an expensive
+    candidate's cost is bounded, not that it is scheduled away: a mode nobody
+    ever tries is a mode nobody can receive."""
     cheap = _StubMode("cheap", 1, _StubCodec(0.002, {"confidence": 0.0}))
-    dear = _StubMode("dear", 2, _StubCodec(2.0, {"confidence": 0.0}))
-    a_link, transport = _stub_link(cheap, dear)
-    budget = link.DECODE_POLL_BUDGET_FRACTION * a_link._rx_keep_seconds
-
-    polls = []
-    for _ in range(6):
-        _fill(transport, BUFFER_SECONDS)
-        started = time.perf_counter()
-        a_link._decode_one(transport.snapshot_rx())
-        polls.append(time.perf_counter() - started)
-
-    # The first poll is how an unmeasured candidate gets measured at all, so
-    # it is allowed to overrun. Nothing after it is.
-    assert max(polls[1:]) <= budget, (
-        f"polls {polls[1:]} exceed the {budget:.2f}s budget")
-    assert cheap.codec.attempts == 6, "the cheap candidate was starved"
-    assert dear.codec.attempts < 6, "the expensive candidate was never limited"
-
-
-def test_an_expensive_candidate_is_rate_limited_rather_than_dropped():
-    """A mode nobody ever tries is a mode nobody can receive, so the duty
-    cycle has to let it back in."""
-    cheap = _StubMode("cheap", 1, _StubCodec(0.002, {"confidence": 0.0}))
-    dear = _StubMode("dear", 2, _StubCodec(1.0, {"confidence": 0.0}))
+    dear = _StubMode("dear", 2, _StubCodec(0.2, {"confidence": 0.0}))
     a_link, transport = _stub_link(cheap, dear)
 
     for _ in range(8):
-        _fill(transport, BUFFER_SECONDS)
-        a_link._decode_one(transport.snapshot_rx())
+        _poll(a_link, transport, 1.0)
 
-    assert dear.codec.attempts >= 2, "the expensive candidate never ran again"
-
-
-def test_a_candidate_that_is_decoding_frames_keeps_its_attempt():
-    """Cost is not the only thing that matters: the mode carrying the session
-    is attempted whatever it costs."""
-    cheap = _StubMode("cheap", 1, _StubCodec(0.002, {"confidence": 0.0}))
-    dear = _StubMode("dear", 2, _StubCodec(2.0, {"confidence": 0.0}))
-    a_link, transport = _stub_link(cheap, dear)
-
-    _fill(transport, BUFFER_SECONDS)
-    a_link._decode_one(transport.snapshot_rx())
-    cost = a_link._decode_cost["dear"]
-    cost.frames, cost.last_frame_at = 1, time.monotonic()
-
-    before = dear.codec.attempts
-    for _ in range(3):
-        _fill(transport, BUFFER_SECONDS)
-        a_link._decode_one(transport.snapshot_rx())
-    assert dear.codec.attempts == before + 3, (
-        "a mode that is delivering frames was skipped for cost")
+    assert cheap.codec.attempts == dear.codec.attempts > 0, (
+        "candidates on one stream must be attempted alike")
+    window = streaming.StreamingDecoder.ACQUISITION_SECONDS
+    assert dear.codec.longest_audio / RX_RATE <= window + 0.01
 
 
-def test_candidates_are_attempted_cheapest_first():
-    """Ordering is what stops an expensive candidate costing a cheap one its
-    acquisition."""
-    cheap = _StubMode("cheap", 1, _StubCodec(0.002, {"confidence": 0.0}))
-    dear = _StubMode("dear", 2, _StubCodec(0.2, {"confidence": 0.0}))
-    a_link, transport = _stub_link(dear, cheap)
+def test_decode_cost_is_recorded_per_mode_across_a_resynchronisation():
+    """The cost accounting rides on the decoder, so voiding the capture
+    around our own TX does not strand it."""
+    quiet = _StubMode("quiet", 1, _StubCodec(0.001, {"confidence": 0.0}))
+    a_link, transport = _stub_link(quiet)
 
-    _fill(transport, BUFFER_SECONDS)
-    a_link._decode_one(transport.snapshot_rx())
-    _fill(transport, BUFFER_SECONDS)
-    plan = a_link._budgeted_candidates((dear, cheap), transport.snapshot_rx())
-    assert [mode.name for mode in plan][:2] == ["cheap", "dear"]
+    _poll(a_link, transport, 2.0)
+    before = a_link._decode_cost["quiet"].attempts
+    assert before > 0
 
+    transport.send(np.zeros(4_800, dtype=np.float32))
+    _poll(a_link, transport, 2.0)
 
-def test_hf_lead_candidates_cannot_starve_control_decode(monkeypatch):
-    """A noisy lead may offer dozens of boundaries, but only a few body
-    decodes may run in one poll.  Before the bound, this path sat outside the
-    regular candidate budget and could postpone a DATA_ACK past the sender's
-    timeout, producing the seq-04 late-ACK/duplicate pattern in the radio log.
-    """
-    mode = _LeadStubMode("lead", 1, _StubCodec(), lead_label=0)
-    a_link, transport = _stub_link(mode)
-    offered = [hf_lead.LeadCandidate(1.0, 0, i * 100)
-               for i in range(40)]
-
-    def candidates(_audio, limit=hf_lead.MAX_CANDIDATE_BOUNDARIES):
-        del limit  # Deliberately ignore it: the link owns the safety bound.
-        return tuple(offered)
-
-    monkeypatch.setattr(hf_lead, "candidates", candidates)
-    a_link._decode_one(transport.snapshot_rx())
-
-    # The lead path is bounded to four body attempts.  One fallback attempt is
-    # acceptable and verifies that a missed lead still has a recovery path.
-    assert mode.codec.attempts <= link.HF_LEAD_CANDIDATE_LIMIT + 1
+    assert a_link._decode_cost["quiet"].attempts > before
 
 
-def test_hf_head_measurement_uses_the_full_snapshot_after_a_cropped_decode():
+def test_native_head_measurement_is_reported_by_the_mode_decoder():
     payload = bytes(range(16))
     tx = HC0.encode(payload, head_seconds=0.3)
     captured = rx_audio.downsample(np.concatenate((
@@ -253,10 +209,5 @@ def test_hf_head_measurement_uses_the_full_snapshot_after_a_cropped_decode():
     decoded = HC0.decode(captured, head_seconds=0.3)
     assert decoded["payload"] == payload
 
-    # A lead-candidate decoder may have reported a stale/short measurement;
-    # the link must replace it using the absolute body start on the full RX
-    # snapshot before producing DATA feedback.
-    decoded["head_seconds_received"] = 0.0
-    link._refresh_hf_head_measurement(HC0, captured, decoded, 0.3)
-    assert decoded["head_blocks_observed"] >= hf_lead.MIN_BLOCKS
+    assert decoded["head_blocks_observed"] >= hc0.LEAD_IN_BLOCKS
     assert decoded["head_seconds_received"] > 0.0

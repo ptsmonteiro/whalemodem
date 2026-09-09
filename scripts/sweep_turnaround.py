@@ -157,7 +157,7 @@ def responder(rx, profile, reply_audio, turnaround, out, ready, give_up_at):
             if result.get("payload") is not None:
                 end = result.get("end_index", len(snap))
                 anchor = time.monotonic() - max(0, len(snap) - end) / SAMPLE_RATE
-                rx.consume_rx(end)
+                rx.discard_rx()
                 out["decoded_at"] = time.monotonic()
                 out["anchor"] = anchor
                 remaining = (anchor + turnaround) - time.monotonic()
@@ -187,8 +187,7 @@ def run_point(tx, rx, profile, frames, turnaround, probe_pad, trials, label, ver
         thread.start()
         ready.wait(2.0)
 
-        stale = tx.snapshot_rx()
-        tx.consume_rx(len(stale))
+        tx.discard_rx()
         tx.send(data_audio)
         tx_returned = time.monotonic()
         thread.join(timeout=30.0)

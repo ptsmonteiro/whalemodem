@@ -230,7 +230,7 @@ def main(argv=None):
     try:
         rxp.start_receiving()
         time.sleep(args.settle_seconds)
-        rxp.consume_rx(len(rxp.snapshot_rx()))
+        rxp.discard_rx()
 
         # --- idle control: transmitter never keyed ---
         print(f"\n  capturing idle control ({args.seconds:.1f}s, tx not keyed)...")
@@ -253,7 +253,7 @@ def main(argv=None):
                   f"amplitude={args.amplitude})...")
             tx_audio = make_tone(args.freq, args.seconds, args.amplitude,
                                  TX_SAMPLE_RATE)
-            rxp.consume_rx(len(rxp.snapshot_rx()))
+            rxp.discard_rx()
             keyed = txp.send(tx_audio)
             time.sleep(args.capture_tail)
             cap = np.asarray(rxp.snapshot_rx(), dtype=np.float64)
