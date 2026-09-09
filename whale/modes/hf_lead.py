@@ -36,11 +36,15 @@ BLOCKS = np.asarray(((9, 6, 12, 15, 0, 3),
                      (12, 3, 15, 6, 9, 0),
                      (2, 11, 5, 14, 8, 0),
                      (7, 13, 1, 10, 4, 15),
-                     (1, 14, 5, 11, 8, 2)), dtype=np.int64)
+                     (1, 14, 5, 11, 8, 2),
+                     (4, 10, 0, 13, 6, 2),
+                     (15, 1, 8, 3, 12, 5)), dtype=np.int64)
 HC0_LABEL = 0
 HF2_LABEL = 2
 HC1W_LABEL = 3
 HR0_LABEL = 4
+HF7_LABEL = 5
+HF8_LABEL = 6
 
 
 @dataclass(frozen=True)
@@ -127,6 +131,46 @@ def detect_label(audio: np.ndarray) -> tuple[int | None, float]:
     if not ranked:
         return None, 0.0
     return ranked[0].label, ranked[0].score
+
+
+def refine_body_start(audio: np.ndarray, candidate: LeadCandidate) -> int:
+    """Refine a candidate's body boundary to the receiver sample grid."""
+    pattern = np.tile(BLOCKS[candidate.label], 2)
+    if candidate.body_start < 2 * RX_BLOCK_SAMPLES:
+        return candidate.body_start
+    aligned = mfsk.refine(
+        hc0.RX_BANK, audio, pattern,
+        candidate.body_start - 2 * RX_BLOCK_SAMPLES,
+        radius=hc0.RX_SYMBOL_SAMPLES // 2, step=2)
+    return aligned + 2 * RX_BLOCK_SAMPLES
+
+
+def measured_candidates(audio: np.ndarray, label: int,
+                        expected_seconds: float | None = None,
+                        limit: int = MAX_CANDIDATE_BOUNDARIES,
+                        decode_limit: int = 4):
+    """Return likely body boundaries ranked by measured head duration.
+
+    A long head contains many identical two-block windows, all with nearly
+    the same correlation score.  The body boundary is the one whose backward
+    measurement contains the expected number of contiguous blocks, so use
+    that cheap measurement to keep expensive OFDM decodes out of the wrong
+    repeated windows.
+    """
+    expected_blocks = (lead_samples(expected_seconds)
+                       // BLOCK_SAMPLES)
+    ranked = []
+    for candidate in candidates(audio, limit=limit):
+        if candidate.label != label:
+            continue
+        body_start = refine_body_start(audio, candidate)
+        observed, score = measure(audio, body_start, label, expected_seconds)
+        if observed < max(MIN_BLOCKS, expected_blocks - 1):
+            continue
+        ranked.append((abs(observed - expected_blocks), -candidate.score,
+                       candidate, body_start))
+    ranked.sort(key=lambda item: (item[0], item[1]))
+    return tuple(item[2:] for item in ranked[:max(0, decode_limit)])
 
 
 def measure(audio: np.ndarray, body_start: int, label: int,

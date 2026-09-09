@@ -16,7 +16,8 @@ from dataclasses import dataclass, field
 
 import numpy as np
 
-from whale import link
+from whale import link, rx_audio
+from whale.modes.hc0_mode import HC0
 from whale.modes import hf_lead
 from whale.waveform import ModeRegistry
 
@@ -242,3 +243,20 @@ def test_hf_lead_candidates_cannot_starve_control_decode(monkeypatch):
     # The lead path is bounded to four body attempts.  One fallback attempt is
     # acceptable and verifies that a missed lead still has a recovery path.
     assert mode.codec.attempts <= link.HF_LEAD_CANDIDATE_LIMIT + 1
+
+
+def test_hf_head_measurement_uses_the_full_snapshot_after_a_cropped_decode():
+    payload = bytes(range(16))
+    tx = HC0.encode(payload, head_seconds=0.3)
+    captured = rx_audio.downsample(np.concatenate((
+        tx, np.zeros(rx_audio.FILTER_DELAY_CAPTURE_SAMPLES, dtype=np.float32))))
+    decoded = HC0.decode(captured, head_seconds=0.3)
+    assert decoded["payload"] == payload
+
+    # A lead-candidate decoder may have reported a stale/short measurement;
+    # the link must replace it using the absolute body start on the full RX
+    # snapshot before producing DATA feedback.
+    decoded["head_seconds_received"] = 0.0
+    link._refresh_hf_head_measurement(HC0, captured, decoded, 0.3)
+    assert decoded["head_blocks_observed"] >= hf_lead.MIN_BLOCKS
+    assert decoded["head_seconds_received"] > 0.0

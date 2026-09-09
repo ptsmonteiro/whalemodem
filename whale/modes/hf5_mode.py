@@ -66,6 +66,16 @@ class Hf5Mode:
     def baud(self) -> float:
         return hf5.BAUD
 
+    @property
+    def head_match_allowance_seconds(self) -> float:
+        """This PHY carries no outer head, so it never reports an observation
+        and `_head_feedback_request` returns before consulting the allowance.
+        The value is still dereferenced eagerly at that call site, so it has
+        to exist: without it the first frame this mode ever receives raises
+        an AttributeError that escapes ModemService's LinkError handler and
+        tears the link down mid-transfer."""
+        return 0.0
+
     def encode(self, payload: bytes, *, include_head=True, head_seconds=None):
         return self.codec.encode(payload, self, include_head=include_head,
                                  head_seconds=head_seconds)

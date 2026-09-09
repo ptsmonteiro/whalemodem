@@ -98,6 +98,7 @@ import numpy as np
 from whale.phy import ofdm49 as hf8
 
 from .. import framing
+from . import hf_lead
 
 
 HF8_MODE_ID = 15
@@ -160,15 +161,19 @@ class Hf8Codec:
 
     def encode(self, payload: bytes, mode: "Hf8Mode", *, include_head=True,
                head_seconds=None) -> np.ndarray:
-        del include_head, head_seconds
         if len(payload) > HF8_PHY.max_payload_bytes:
             raise ValueError(
                 f"packet is {len(payload)} bytes; {mode.name} carries at most "
                 f"{HF8_PHY.max_payload_bytes}")
-        return HF8_PHY.modulate(bytes(payload))
+        # Keep the minimum common lead when include_head=False; disabling the
+        # negotiated extension must not create a headless shipped waveform.
+        if not include_head or head_seconds is None:
+            head_seconds = hf_lead.MIN_SECONDS
+        lead = hf_lead.modulate(hf_lead.HF8_LABEL, head_seconds)
+        return np.concatenate((lead, HF8_PHY.modulate(bytes(payload))))
 
     def decode(self, audio, mode: "Hf8Mode", *, head_seconds=None, **kwargs) -> dict:
-        del mode, head_seconds
+        del mode
         if np.asarray(audio).ndim != 1:
             return {"synced": False, "payload": None}
         # The soft-decision path needs the "repeat" noise estimator, for the
@@ -176,11 +181,39 @@ class Hf8Codec:
         # gain derived from that same preamble, so its residual is biased low
         # and the LLRs handed to the LDPC decoder are mis-scaled.
         kwargs.setdefault("noise_estimator", NOISE_ESTIMATOR)
-        return HF8_PHY.demodulate(audio, **kwargs)
+        # Strip the latest matching lead boundary before OFDM acquisition so
+        # the MFSK head cannot win the OFDM preamble search. Erased or clipped
+        # leads still use the body-only acquisition fallback.
+        captured = np.asarray(audio)
+        lead_candidates = hf_lead.measured_candidates(
+            captured, hf_lead.HF8_LABEL, head_seconds)
+        result = None
+        body_start = None
+        for candidate, body_offset in lead_candidates:
+            attempt = HF8_PHY.demodulate(captured[body_offset:], **kwargs)
+            local_start = attempt.get("start_sample")
+            if local_start is not None:
+                body_start = body_offset + local_start
+                attempt["start_sample"] = body_start
+            result = attempt
+            if result.get("payload") is not None and body_start is not None:
+                break
+        if result is None or result.get("payload") is None:
+            result = HF8_PHY.demodulate(captured, **kwargs)
+            body_start = result.get("start_sample")
+        if result.get("payload") is not None and body_start is not None:
+            result["start_index"] = body_start
+            observed, score = hf_lead.measure(
+                captured, body_start, hf_lead.HF8_LABEL, head_seconds)
+            result.update(
+                head_blocks_observed=observed,
+                head_seconds_received=hf_lead.seconds_received(observed),
+                head_match=score)
+        return result
 
     def airtime(self, payload_len: int, mode: "Hf8Mode") -> float:
         del payload_len, mode
-        return HF8_PHY.frame_seconds()
+        return hf_lead.MIN_SECONDS + HF8_PHY.frame_seconds()
 
 
 HF8_CODEC = Hf8Codec()
@@ -192,6 +225,7 @@ class Hf8Mode:
     mode_id: int = HF8_MODE_ID
     chunk_size: int = CHUNK_SIZE
     confidence_threshold: float = CONFIDENCE_THRESHOLD
+    lead_label: int = hf_lead.HF8_LABEL
     fec_rate: str | None = FEC_RATE
     codec: Hf8Codec = field(default=HF8_CODEC, compare=False, repr=False)
 
@@ -206,6 +240,11 @@ class Hf8Mode:
     @property
     def baud(self) -> float:
         return hf8.DESIGN_RATE / HF8_PHY.symbol_len
+
+    @property
+    def head_match_allowance_seconds(self) -> float:
+        """One common HF lead block, the measurement resolution."""
+        return hf_lead.BLOCK_SAMPLES / self.tx_sample_rate
 
     def encode(self, payload: bytes, *, include_head=True, head_seconds=None):
         return self.codec.encode(payload, self, include_head=include_head,

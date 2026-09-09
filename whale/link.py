@@ -547,6 +547,33 @@ def _head_feedback_request(advertised_head, observed_seconds, match_allowance_se
     return _encode_head_duration(requested), "residual guard below target"
 
 
+def _refresh_hf_head_measurement(profile, audio, decode_result,
+                                  expected_seconds):
+    """Measure a common HF lead against the un-sliced receive snapshot.
+
+    Lead-candidate acquisition may give a mode decoder a cropped view of the
+    buffer.  That is sufficient to decode the body, but it can remove most of
+    the preceding lead and make the mode-local measurement report zero.  The
+    link has the absolute body start after applying the crop offset, so repeat
+    the cheap measurement here against the original snapshot before storing
+    feedback state.
+    """
+    label = getattr(profile, "lead_label", None)
+    body_start = decode_result.get("start_index")
+    if label is None or body_start is None:
+        return
+    try:
+        from .modes import hf_lead
+        observed, score = hf_lead.measure(
+            audio, body_start, label, expected_seconds)
+    except (TypeError, ValueError, IndexError):
+        return
+    decode_result.update(
+        head_blocks_observed=observed,
+        head_seconds_received=hf_lead.seconds_received(observed),
+        head_match=score)
+
+
 class LinkError(Exception):
     pass
 
@@ -830,6 +857,12 @@ class Link:
         A sender may step down after silence, when it cannot notify us first.
         Therefore every mutually advertised data mode remains a candidate;
         the DATA frame itself is authoritative notification of a change."""
+        # Before the connection handshake completes, every legal inbound
+        # packet is on the robust control waveform.  Do not spend seconds
+        # probing newly advertised OFDM data modes against CONNECT/TIMING
+        # frames; the negotiated DATA profile is not active yet.
+        if self.state in {"CONNECTING", "LISTENING"}:
+            return (self.modes.control,)
         candidates = [self.modes.control]
         data_profiles = [p for p in self.modes.modes
                          if p.mode_id in self.peer_supported_modes]
@@ -935,11 +968,31 @@ class Link:
                                     result)
             return True
 
+        # Control traffic is always on the robust control waveform, including
+        # DISC/DISC_ACK while a fast DATA profile is active. Decode it before
+        # probing any expensive data-mode lead candidates; a false HF lead
+        # correlation must not delay a control response long enough to look
+        # like a lost disconnect or timeout.
+        control = self.modes.control
+        control_result = self._decode_attempt(control, snap)
+        results.append((control, control_result))
+        if accept_checked(control, control_result):
+            return True
+
         # A common HF lead proposes ranked body boundaries. Decode both mode
         # interpretations at each boundary, but accept none until the mode's
         # payload CRC and the checked air header below agree. Cropping keeps a
         # false early boundary from changing which later acquisition wins.
-        by_label = {p.lead_label: p for p in profiles if hasattr(p, "lead_label")}
+        # The control mode and the peer's currently expected DATA mode are
+        # the only lead-labelled decoders worth trying on the fast path.
+        # Every mutually supported mode remains in the bounded fallback below
+        # for an unannounced mode step, but probing every expensive OFDM lead
+        # against every control frame lets unrelated lead patterns consume the
+        # whole receive budget before the cheap control decoder runs.
+        expected_profiles = {self.rx_profile}
+        by_label = {p.lead_label: p for p in profiles
+                    if hasattr(p, "lead_label") and p in expected_profiles
+                    and p is not control}
         if by_label:
             from .modes import hf_lead
             tolerance = hf_lead.RX_BLOCK_SAMPLES // hf_lead.BLOCK_SYMBOLS
@@ -949,7 +1002,9 @@ class Link:
             # is a cheap defensive guard against a future detector returning
             # more entries than requested, and makes the decode cost contract
             # explicit at the call site.
-            for candidate in lead_candidates[:HF_LEAD_CANDIDATE_LIMIT * len(by_label)]:
+            labelled_count = len({p.lead_label for p in profiles
+                                  if hasattr(p, "lead_label")})
+            for candidate in lead_candidates[:HF_LEAD_CANDIDATE_LIMIT * labelled_count]:
                 profile = by_label.get(candidate.label)
                 if profile is None:
                     continue
@@ -967,7 +1022,9 @@ class Link:
         # "one attempt each" is not on its own a bound the receiver can live
         # with: a single attempt by an OFDM candidate on a full buffer costs
         # seconds. _budgeted_candidates is what bounds the poll.
-        for profile in self._budgeted_candidates(profiles, snap):
+        data_profiles = tuple(profile for profile in profiles if profile is not control)
+        for profile in (self._budgeted_candidates(data_profiles, snap)
+                        if data_profiles else ()):
             result = self._decode_attempt(profile, snap)
             results.append((profile, result))
             if accept_checked(profile, result):
@@ -1046,6 +1103,8 @@ class Link:
         return plan
 
     def _finish_air_packet(self, ptype, body, profile, snap, end, decode_result):
+        _refresh_hf_head_measurement(profile, snap, decode_result,
+                                     self._rx_head_seconds)
         trailing = max(0, len(snap) - end)
         self._peer_unkeyed_at = time.monotonic() - trailing / profile.rx_sample_rate
         cost = self._decode_cost.get(profile.name)
