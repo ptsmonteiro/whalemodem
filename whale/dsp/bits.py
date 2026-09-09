@@ -9,14 +9,31 @@ tidied.
 
 from __future__ import annotations
 
+import functools
+
 import numpy as np
 
 
+@functools.lru_cache(maxsize=None)
 def pn_bits(count: int, seed: int) -> np.ndarray:
     """Deterministic order-17 PN sequence, returned as uint8 bits.
 
     Used for sync and training constellations and for payload whitening.
     The taps are fixed: changing them changes every mode's on-air signal.
+
+    Cached, for the same reason `whale.framing.sync_bits` is: this is a
+    pure-Python per-bit loop, and the OFDM whiteners ask for it twice per
+    `ofdm49.demodulate()` at a constant, mode-determined length (50,544 and
+    50,715 bits at HF7 -- ~100 k iterations, 35 ms measured). An acquisition
+    can run five times per decode, and every one of those calls asks for
+    exactly the same sequence.
+
+    The cached array is returned read-only rather than copied. A copy would
+    re-pay the allocation the cache exists to avoid, and would let a
+    mutating caller diverge from the master silently; a read-only view makes
+    that mutation raise at the offending line instead. No caller mutates it
+    today -- every one consumes it through `^`, `np.repeat`, `reshape` plus
+    `astype`, or fancy indexing, all of which allocate.
     """
     state = seed & 0x1FFFF
     if state == 0:
@@ -26,6 +43,7 @@ def pn_bits(count: int, seed: int) -> np.ndarray:
         out[i] = state & 1
         feedback = ((state >> 0) ^ (state >> 3)) & 1
         state = (state >> 1) | (feedback << 16)
+    out.setflags(write=False)
     return out
 
 

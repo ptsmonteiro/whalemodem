@@ -235,9 +235,33 @@ def _magnitude_grid(bank: ToneBank, audio: np.ndarray, step: int
     return magnitudes, rms
 
 
+@dataclass(frozen=True)
+class MagnitudeGrid:
+    """One buffer's sliding-window tone magnitudes, ready to correlate.
+
+    The grid depends only on `(bank, audio, step)` -- never on the pattern --
+    so a caller scoring several patterns against the same audio can build it
+    once and hand it to every `correlate` call.  `hf_lead.candidates` does
+    exactly that for its seven label patterns.
+    """
+
+    magnitudes: np.ndarray
+    rms: np.ndarray
+    step: int
+
+
+def magnitude_grid(bank: ToneBank, audio: np.ndarray, *,
+                   step: int | None = None) -> MagnitudeGrid:
+    """Build the grid `correlate` scores against, for reuse across patterns."""
+    step = bank.symbol_samples // SEARCH_DIVISOR if step is None else step
+    magnitudes, rms = _magnitude_grid(bank, audio, step)
+    return MagnitudeGrid(magnitudes, rms, step)
+
+
 def correlate(bank: ToneBank, audio: np.ndarray, pattern: np.ndarray, *,
               step: int | None = None,
-              rms_floor_fraction: float = RMS_FLOOR_FRACTION
+              rms_floor_fraction: float = RMS_FLOOR_FRACTION,
+              grid: MagnitudeGrid | None = None
               ) -> tuple[np.ndarray, int]:
     """Score every candidate start against a known tone `pattern`.
 
@@ -251,9 +275,20 @@ def correlate(bank: ToneBank, audio: np.ndarray, pattern: np.ndarray, *,
     correlating raw magnitudes scores that common part against itself.
     Pure noise scored 0.73 against a 0.70 threshold. Centred, the channels
     sum to zero at every instant and noise scores near nothing.
+
+    `grid` is an optional `magnitude_grid` for this same audio, for callers
+    scoring several patterns against one buffer; omitting it builds one here,
+    which is what every single-pattern caller wants.  `audio` is then unused,
+    so a `step` that disagrees with the grid's is rejected rather than
+    silently dropped -- it can only mean the two were built for different
+    searches.
     """
-    step = bank.symbol_samples // SEARCH_DIVISOR if step is None else step
-    magnitudes, rms = _magnitude_grid(bank, audio, step)
+    if grid is None:
+        grid = magnitude_grid(bank, audio, step=step)
+    elif step is not None and step != grid.step:
+        raise ValueError(
+            f"step {step} does not match the supplied grid's {grid.step}")
+    magnitudes, rms, step = grid.magnitudes, grid.rms, grid.step
     pattern = np.asarray(pattern, dtype=np.int64)
     per_symbol = bank.symbol_samples // step
     count = len(magnitudes) - (len(pattern) - 1) * per_symbol

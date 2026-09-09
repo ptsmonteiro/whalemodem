@@ -70,18 +70,28 @@ def candidates(audio: np.ndarray, limit: int = MAX_CANDIDATE_BOUNDARIES
         raise ValueError("candidate limit must not be negative")
     if limit == 0:
         return ()
+    # Every label is scored against the same sliding-window tone magnitudes
+    # -- same audio, same bank, same step -- so the grid is built once here
+    # instead of seven times inside `correlate`.  It is the single most
+    # expensive thing this function does and it runs on every decode poll,
+    # including the empty ones, which are most of them.
+    grid = mfsk.magnitude_grid(hc0.RX_BANK, audio)
     scored = []
     score_sets = []
-    step = None
-    for label, block in enumerate(BLOCKS):
-        scores, label_step = mfsk.correlate(
-            hc0.RX_BANK, audio, np.tile(block, 2))
-        step = label_step
+    step = grid.step
+    for block in BLOCKS:
+        scores, _ = mfsk.correlate(
+            hc0.RX_BANK, audio, np.tile(block, 2), grid=grid)
         score_sets.append(scores)
-        scored.extend((float(score), int(at))
-                      for at, score in enumerate(scores)
-                      if score >= MATCH_THRESHOLD)
-    if not scored or step is None:
+        # Threshold in numpy rather than walking every window in Python:
+        # a 10 s buffer is thousands of windows per label, and building the
+        # tuples one at a time was the only part of this loop that touched
+        # them individually.  `.tolist()` yields the same Python floats and
+        # ints in the same ascending order the comprehension did, and the
+        # sort below is stable, so the ranking is unchanged.
+        at = np.flatnonzero(scores >= MATCH_THRESHOLD)
+        scored.extend(zip(scores[at].tolist(), at.tolist()))
+    if not scored:
         return ()
 
     boundaries = []
