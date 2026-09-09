@@ -17,6 +17,9 @@ import numpy as np
 from whale import afsk, rx_audio
 from whale.modes.hc0_mode import HC0
 from whale.modes.hc1w_mode import HC1W
+from whale.modes.hf7_mode import HF7
+from whale.modes.hf8_mode import HF8
+from whale.modes.hf9_mode import HF9
 from whale.modes.vf3_mode import VF3
 
 
@@ -45,7 +48,12 @@ def main():
     print(f"buffer={args.seconds:g}s, repeats={args.repeats}")
     measure("48->12 kHz decimator", lambda: rx_audio.downsample(captured),
             args.repeats)
-    for mode in (*afsk.PROFILES, VF3, HC0, HC1W):
+    # The HF OFDM modes dominate this benchmark's runtime: each attempt
+    # correlates the whole buffer once per CFO hypothesis, which measured
+    # ~2.5-2.7 s per attempt on a 10 s idle buffer, so the default 20 repeats
+    # adds minutes. That figure is a baseline of the current search, not a
+    # property of the modes; use a smaller --repeats while it stands.
+    for mode in (*afsk.PROFILES, VF3, HC0, HC1W, HF9, HF8, HF7):
         measure(f"{mode.name} decoder", lambda mode=mode: mode.decode(received),
                 args.repeats)
 
