@@ -1,4 +1,4 @@
-"""Fused FFT-based sync search for SingleCarrierMode.demodulate().
+"""Fused FFT-based sync search for the single-carrier and OFDM-49 PHYs.
 
 Developed in the retired `experiments/hf5_8psk_4k_profiling/` experiment --
 a read-only investigation that did NOT modify the single-carrier PHY -- and
@@ -15,6 +15,14 @@ Reimplements only the sync-search inner loop (lines ~330-348 of
     padded length chosen once for the whole search
 Everything else (packet framing, matched filter, equalizer, bit mapping) is
 imported unmodified from `whale/phy/sc.py` and reused as-is.
+
+`ofdm49_sync_search` applies the same three ideas to `whale/phy/ofdm49.py`,
+whose 41-hypothesis loop was 93% of an HF7/HF8 decode and 2.7 s of every poll
+on an idle 10 s buffer. The OFDM template is the real preamble wave, so its
+analytic form is built once and only re-modulated per hypothesis rather than
+Hilbert-transformed 41 times. Unlike the single-carrier PHY, `ofdm49.py` is
+not read-only, so `OFDM49Mode.demodulate` calls this kernel directly instead
+of being subclassed the way `sc_fast.py` subclasses `sc.py`.
 """
 from __future__ import annotations
 
@@ -24,6 +32,18 @@ import numpy as np
 from scipy.fft import next_fast_len
 
 from . import sc
+
+
+def _one_sided_mask(n: int) -> np.ndarray:
+    """Hilbert one-sided spectrum mask, matching `sc._hilbert_envelope`."""
+    h = np.zeros(n)
+    if n % 2 == 0:
+        h[0] = h[n // 2] = 1.0
+        h[1:n // 2] = 2.0
+    else:
+        h[0] = 1.0
+        h[1:(n + 1) // 2] = 2.0
+    return h
 
 
 def fast_sync_search(mode: "sc.SingleCarrierMode", x: np.ndarray):
@@ -56,13 +76,7 @@ def fast_sync_search(mode: "sc.SingleCarrierMode", x: np.ndarray):
     # Hilbert one-sided mask at length N (applied to the *full* linear
     # correlation spectrum, so the inverse FFT directly yields the analytic
     # correlation trace -- no second FFT/IFFT round trip needed).
-    h = np.zeros(N)
-    if N % 2 == 0:
-        h[0] = h[N // 2] = 1.0
-        h[1:N // 2] = 2.0
-    else:
-        h[0] = 1.0
-        h[1:(N + 1) // 2] = 2.0
+    h = _one_sided_mask(N)
 
     best = (-1.0, 0, 0.0)
     # np.correlate(x, y, 'valid')[k] = sum_i x[k+i] * y[i]
@@ -103,6 +117,97 @@ def reference_sync_search(mode: "sc.SingleCarrierMode", x: np.ndarray):
         pre_carrier = np.exp(1j * 2 * np.pi * (sc.CARRIER_HZ + hz) * n / sc.DESIGN_RATE)
         pre_passband = np.real(pre_shaped * pre_carrier)
         corr = np.correlate(x, pre_passband, mode="valid")
+        env = np.abs(sc._hilbert_envelope(corr))
+        peak = int(np.argmax(env))
+        conf = float(env[peak] / (norm + 1e-12))
+        if conf > best[0]:
+            best = (conf, peak, float(hz))
+    return best
+
+
+def ofdm49_sync_search(x, preamble_wave, *, search_span=None):
+    """Fused-FFT replacement for the `ofdm49.py` demodulate() sync loop.
+
+    Takes the preamble wave rather than the mode: nothing else about the mode
+    reaches this stage, and the caller already has it cached.
+
+    Returns (confidence, start, freq_hz), the same triple the original loop
+    produced. Equivalence is decode-level, not bitwise, exactly as it is for
+    `fast_sync_search`: the mask below is applied to the full linear-
+    correlation spectrum at the padded length and truncated, where the
+    original Hilbert-transforms the length-M valid trace, so the two envelopes
+    agree closely but not to the last bit. That matters only where the metric
+    has a near-tie -- the clean HF7 capture has two starts scoring within
+    0.006% of each other -- and either of those starts decodes.
+
+    `search_span` bounds the lag search to the first `search_span` samples
+    when the caller already knows where the body begins (the HF lead gives
+    HF7/HF8 a boundary and its own timing tolerance). `None` searches the
+    whole capture, which is what the headless modes and the body-only
+    fallback path need.
+    """
+    from . import ofdm49
+
+    L = len(preamble_wave)
+    if len(x) < L + 10:
+        return -1.0, 0, 0.0
+
+    # Only the lag search is windowed. `norm` stays referenced to the whole
+    # capture because `confidence` is compared against a fixed 0.12 gate that
+    # was tuned on whole-buffer statistics: a window that is nearly all
+    # signal has a larger std, which would push confidence down against a
+    # threshold nobody re-tuned. Windowing must remove candidate peaks, not
+    # rescale the metric.
+    norm = (np.sqrt(np.sum(preamble_wave ** 2)) * (np.std(x) + 1e-12)
+            * np.sqrt(L))
+
+    xs = x if search_span is None else x[:search_span + L]
+    M = len(xs) - L + 1  # 'valid' correlation length, as np.correlate returns
+    if M < 1:
+        return -1.0, 0, 0.0
+    N = next_fast_len(len(xs) + L - 1)  # fast length, no circular wraparound
+
+    # One FFT of the capture, shared across every frequency hypothesis, and
+    # one Hilbert transform of the template -- the frequency shift only
+    # re-modulates the analytic form, so the original's 41 identical
+    # transforms of the same 528-sample preamble collapse to this one.
+    Xf = np.fft.fft(xs, N)
+    h = _one_sided_mask(N)
+    analytic = ofdm49._hilbert_analytic(preamble_wave)
+    k = np.arange(L)
+
+    best = (-1.0, 0, 0.0)
+    for hz in np.arange(-ofdm49.SYNC_SEARCH_HZ, ofdm49.SYNC_SEARCH_HZ + 1e-9,
+                        ofdm49.SYNC_SEARCH_STEP_HZ):
+        # Identical arithmetic to ofdm49._freq_shift_real(preamble_wave, hz).
+        template = (analytic * np.exp(
+            1j * 2 * np.pi * hz * k / ofdm49.DESIGN_RATE)).real
+        Yf = np.fft.fft(template, N)
+        env = np.abs(np.fft.ifft(Xf * np.conj(Yf) * h)[:M])
+        peak = int(np.argmax(env))
+        conf = float(env[peak] / (norm + 1e-12))
+        if conf > best[0]:
+            best = (conf, peak, float(hz))
+    return best
+
+
+def reference_ofdm49_sync_search(x, preamble_wave, *, search_span=None):
+    """Verbatim copy of the ofdm49.py demodulate() sync loop, for comparison."""
+    from . import ofdm49
+
+    L = len(preamble_wave)
+    if len(x) < L + 10:
+        return -1.0, 0, 0.0
+    norm = (np.sqrt(np.sum(preamble_wave ** 2)) * (np.std(x) + 1e-12)
+            * np.sqrt(L))
+    xs = x if search_span is None else x[:search_span + L]
+    if len(xs) < L:
+        return -1.0, 0, 0.0
+    best = (-1.0, 0, 0.0)
+    for hz in np.arange(-ofdm49.SYNC_SEARCH_HZ, ofdm49.SYNC_SEARCH_HZ + 1e-9,
+                        ofdm49.SYNC_SEARCH_STEP_HZ):
+        template = ofdm49._freq_shift_real(preamble_wave, hz, ofdm49.DESIGN_RATE)
+        corr = np.correlate(xs, template, mode="valid")
         env = np.abs(sc._hilbert_envelope(corr))
         peak = int(np.argmax(env))
         conf = float(env[peak] / (norm + 1e-12))

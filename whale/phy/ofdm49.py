@@ -75,6 +75,7 @@ import numpy as np
 
 from whale.dsp import bits as _bits
 from whale.dsp import ldpc as _ldpc
+from whale.phy import fast_sync as _fast_sync
 from whale.phy import sc as _sc
 
 TX_SAMPLE_RATE = _sc.TX_SAMPLE_RATE
@@ -261,6 +262,9 @@ class OFDM49Mode:
             if len(bins) > 2 * g:
                 bins = bins[g:len(bins) - g]
         object.__setattr__(self, "active_bins", bins)
+        # Fancy-index form of the same tuple, so _fft_bins does one gather
+        # instead of a 49-element Python comprehension per OFDM symbol.
+        object.__setattr__(self, "_active_idx", np.asarray(bins, dtype=np.intp))
         n_active = len(bins)
 
         comb_idx = np.zeros(n_active, dtype=bool)
@@ -391,7 +395,7 @@ class OFDM49Mode:
 
     def _fft_bins(self, time_symbol: np.ndarray) -> np.ndarray:
         spec = np.fft.fft(time_symbol) / self.fft_size
-        return np.array([spec[b] for b in self.active_bins])
+        return spec[self._active_idx]
 
     def _add_cp(self, symbol: np.ndarray) -> np.ndarray:
         return np.concatenate([symbol[-self.cp_len:], symbol]) if self.cp_len else symbol
@@ -428,6 +432,24 @@ class OFDM49Mode:
     def _deinterleaver(self) -> np.ndarray:
         self._interleaver()
         return self.__dict__["_interleaver_cache"][1]
+
+    def _preamble_wave(self) -> np.ndarray:
+        """The transmitted preamble, built once per mode.
+
+        Every input to it -- fft_size, cp_len, n_preamble_symbols and the
+        preamble bin symbols -- is fixed at construction, so this is a
+        constant of the mode; demodulate() used to rebuild it on every call.
+        Cached in __dict__ by hand, and returned read-only, because this is a
+        frozen dataclass -- the same pattern as _interleaver_cache above."""
+        cached = self.__dict__.get("_preamble_wave_cache")
+        if cached is not None:
+            return cached
+        one = self._add_cp(self._ifft_symbol(self._preamble_bin_symbols))
+        wave = (np.tile(one, self.n_preamble_symbols)
+                if self.n_preamble_symbols > 1 else one)
+        wave.setflags(write=False)
+        object.__setattr__(self, "_preamble_wave_cache", wave)
+        return wave
 
     def pack_and_encode_bits(self, payload: bytes) -> tuple[np.ndarray, np.ndarray]:
         """Returns (raw_packet_bits, coded_bits) exactly as `modulate()`
@@ -516,13 +538,19 @@ class OFDM49Mode:
 
     def demodulate(self, captured_12k: np.ndarray, *, diagnostics=False,
                    gain_smoothing=1, noise_estimator="legacy",
-                   ldpc_max_iterations=30) -> dict:
+                   ldpc_max_iterations=30, search_span=None) -> dict:
         """Decode; optional HF17 diagnostics and training-only receiver trials.
 
         gain_smoothing is an odd carrier-window width (default 1 disables).
         noise_estimator='repeat' uses repeated-preamble differences for LLR
         weighting and per-bin diagnostics. channel_snr_db retains its legacy
         meaning and must not be interpreted as calibrated RF SNR.
+
+        search_span bounds the preamble search to the first search_span
+        samples, for callers that already know where the body starts -- the
+        HF lead gives HF7/HF8 a boundary and a timing tolerance to size it
+        from. None searches the whole capture, which the headless modes and
+        the mode adapters' body-only fallback path depend on.
         """
         if gain_smoothing < 1 or gain_smoothing % 2 != 1:
             raise ValueError("gain_smoothing must be a positive odd width")
@@ -535,26 +563,18 @@ class OFDM49Mode:
                   "raw_packet_bits": None, "phase_slope_rad_per_bin": None,
                   "pre_fec_bits": None, "ldpc_ok": None, "ldpc_iterations": None}
 
-        one_preamble = self._add_cp(self._ifft_symbol(self._preamble_bin_symbols))
-        preamble_wave = np.tile(one_preamble, self.n_preamble_symbols) \
-            if self.n_preamble_symbols > 1 else one_preamble
+        preamble_wave = self._preamble_wave()
 
         if len(x) < len(preamble_wave) + 10:
             return result
 
-        norm = np.sqrt(np.sum(preamble_wave ** 2)) * (np.std(x) + 1e-12) * np.sqrt(len(preamble_wave))
-
-        best = (-1.0, 0, 0.0)
-        for hz in np.arange(-SYNC_SEARCH_HZ, SYNC_SEARCH_HZ + 1e-9, SYNC_SEARCH_STEP_HZ):
-            template = _freq_shift_real(preamble_wave, hz, DESIGN_RATE)
-            corr = np.correlate(x, template, mode="valid")
-            env = np.abs(_sc._hilbert_envelope(corr))
-            peak = int(np.argmax(env))
-            conf = float(env[peak] / (norm + 1e-12))
-            if conf > best[0]:
-                best = (conf, peak, float(hz))
-
-        confidence, start, freq_offset = best
+        # Fused-FFT search over the same 41 CFO hypotheses: one shared FFT of
+        # the capture, one Hilbert transform of the template, and the
+        # correlation inverse fused with the envelope mask. See
+        # whale/phy/fast_sync.py for why equivalence here is decode-level
+        # rather than bitwise.
+        confidence, start, freq_offset = _fast_sync.ofdm49_sync_search(
+            x, preamble_wave, search_span=search_span)
         result["confidence"] = confidence
         result["freq_offset_hz"] = freq_offset
 
@@ -571,8 +591,19 @@ class OFDM49Mode:
 
         span = x[start:start + total_symbols * symlen + symlen]
 
+        # _freq_shift_real(span, -offset_hz, DESIGN_RATE), with the span's
+        # analytic form -- which does not depend on the offset -- computed
+        # once. The fine-CFO refinement below re-derotates this same span with
+        # the corrected offset, and rebuilding the analytic signal for it cost
+        # a second ~58k-point FFT/IFFT pair for nothing. The operands are in
+        # the order _freq_shift_real applies them, so this is bit-identical.
+        span_analytic = _hilbert_analytic(span)
+        span_n = np.arange(len(span))
+
         def _corrected(offset_hz: float) -> np.ndarray:
-            return _freq_shift_real(span, -offset_hz, DESIGN_RATE)
+            shifted = span_analytic * np.exp(
+                1j * 2 * np.pi * (-offset_hz) * span_n / DESIGN_RATE)
+            return shifted.real
 
         corrected = _corrected(freq_offset)
 
