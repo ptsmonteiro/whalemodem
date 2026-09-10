@@ -22,7 +22,6 @@ import sys
 from dataclasses import dataclass
 from typing import Any, Callable, Generic, Mapping, Protocol, TypeVar
 
-from whale.hw import audio_io, hamlib, ptt
 from whale.hw.radios import Radio, RadioInventory, load_radios, save_radios
 
 DEFAULT_RADIO_CONFIG = "radios.toml"
@@ -100,6 +99,20 @@ def _safe_addnstr(stdscr, y: int, x: int, text: str, attr: int = 0) -> None:
         pass
 
 
+def _scroll_offset(selected: int, count: int, visible: int) -> int:
+    """First index to draw so that ``selected`` stays on screen.
+
+    Recomputed fresh every render from the current selection instead of
+    being tracked as persistent state -- there's no prior-offset to carry
+    between frames, and this "eager scroll" (jump exactly far enough to
+    keep the cursor in view, no further) is simple and always correct.
+    """
+    if visible <= 0 or count <= visible:
+        return 0
+    offset = max(0, selected - visible + 1)
+    return min(offset, count - visible)
+
+
 # --- Radio list view ----------------------------------------------------
 
 @dataclass
@@ -151,10 +164,14 @@ class RadioListView:
         if not names:
             _safe_addnstr(stdscr, 2, 0, "No radios configured.")
         else:
-            row = 2
-            for index, name in enumerate(names):
+            list_top = 2
+            visible = max(0, height - 2 - list_top)
+            offset = _scroll_offset(self.selected, len(names), visible)
+            row = list_top
+            for index in range(offset, len(names)):
                 if row >= height - 2:
                     break
+                name = names[index]
                 radio = self.radios[name]
                 marker = "*" if name == effective_default else " "
                 line = (f"{marker} {name}  {radio.description}  "
@@ -367,9 +384,13 @@ class ListPickerView(Generic[T]):
         row += 1
         if not filtered:
             _safe_addnstr(stdscr, row, 0, "no matches" if self.query else "nothing to pick from")
-        for index, item in enumerate(filtered):
+        list_top = row
+        visible = max(0, height - 2 - list_top)
+        offset = _scroll_offset(self.highlighted, len(filtered), visible)
+        for index in range(offset, len(filtered)):
             if row >= height - 2:
                 break
+            item = filtered[index]
             attr = curses.A_REVERSE if index == self.highlighted else 0
             _safe_addnstr(stdscr, row, 0, self.format_item(item), attr)
             row += 1
@@ -589,8 +610,12 @@ class RadioDetailView:
         _safe_addnstr(stdscr, 0, 0, title, curses.A_BOLD)
 
         rows = self._rows()
-        row_y = 2
-        for index, row in enumerate(rows):
+        list_top = 2
+        visible = max(0, height - 2 - list_top)
+        offset = _scroll_offset(self.selected, len(rows), visible)
+        row_y = list_top
+        for index in range(offset, len(rows)):
+            row = rows[index]
             if row_y >= height - 2:
                 break
             attr = curses.A_REVERSE if index == self.selected else 0
@@ -637,6 +662,8 @@ class RadioDetailView:
         return raw if model is None else f"{model.manufacturer} {model.model_name} (id {model.model})"
 
     def _hamlib_models_by_id_map(self) -> dict[int, hamlib.RigModel]:
+        from whale.hw import hamlib
+
         # Cached per-instance: list_rig_models() is called from _display_value
         # on every render (potentially every keypress) while this form is
         # open, and the rig list never changes during the process's lifetime.
@@ -670,6 +697,8 @@ class RadioDetailView:
         name = str(self._get_value(row.key) or "").strip()
         if not name:
             return ""
+        from whale.hw import audio_io
+
         try:
             current = {d.name for d in audio_io.list_devices(kind=kind)}
         except LookupError:
@@ -749,6 +778,8 @@ class RadioDetailView:
         sitting at). Swallows every exception the same way the picker
         actions below do; a failed probe just means "fall back to typing".
         """
+        from whale.hw import hamlib, ptt
+
         try:
             if row.picker in ("serial", "serial_icom"):
                 return bool(ptt.list_serial_ports())
@@ -824,6 +855,8 @@ class RadioDetailView:
     # -- hardware pickers (each degrades to a status message, never crashes) --
 
     def _push_audio_picker(self, key: str, kind: str) -> KeyResult:
+        from whale.hw import audio_io
+
         try:
             devices = audio_io.list_devices(kind=kind)
         except LookupError as exc:
@@ -842,6 +875,8 @@ class RadioDetailView:
                                     search_key=lambda d: d.name))
 
     def _serial_ports_or_status(self) -> list[ptt.SerialPort] | None:
+        from whale.hw import ptt
+
         try:
             return ptt.list_serial_ports()
         except Exception as exc:
@@ -879,6 +914,8 @@ class RadioDetailView:
                                     search_key=self._format_serial_port))
 
     def _push_hamlib_picker(self, key: str) -> KeyResult:
+        from whale.hw import hamlib
+
         try:
             models = hamlib.list_rig_models()
         except OSError as exc:
