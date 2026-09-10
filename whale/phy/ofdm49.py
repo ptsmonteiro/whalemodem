@@ -517,13 +517,15 @@ class OFDM49Mode:
 
     def demodulate(self, captured_12k: np.ndarray, *, diagnostics=False,
                    gain_smoothing=1, noise_estimator="legacy",
-                   ldpc_max_iterations=30) -> dict:
+                   ldpc_max_iterations=30, refine_iterations=0) -> dict:
         """Decode; optional HF17 diagnostics and training-only receiver trials.
 
         gain_smoothing is an odd carrier-window width (default 1 disables).
         noise_estimator='repeat' uses repeated-preamble differences for LLR
         weighting and per-bin diagnostics. channel_snr_db retains its legacy
         meaning and must not be interpreted as calibrated RF SNR.
+        refine_iterations>0 enables the decision-directed residual-gain passes
+        documented at `_refine_decode`; it is receiver-only and needs FEC.
         """
         if gain_smoothing < 1 or gain_smoothing % 2 != 1:
             raise ValueError("gain_smoothing must be a positive odd width")
@@ -785,23 +787,13 @@ class OFDM49Mode:
             else:
                 data_bin_noise = np.tile(
                     bin_noise_var[self._data_idx], self.n_data_ofdm_symbols)
-            llrs = _soft_bit_llrs(data_syms_flat, self.bits_per_symbol, data_bin_noise)
-            llrs = llrs[: self.coded_bit_count] if len(llrs) > self.coded_bit_count else llrs
-            whitener_llr = _bits.pn_bits(len(llrs), WHITENER_SEED)
-            # whitening is XOR with a known bit; flipping a bit flips the
-            # sign of its LLR (positive LLR == bit zero), so this is
-            # equivalent to de-whitening the soft channel output.
-            llrs = np.where(whitener_llr == 1, -llrs, llrs)
-            if self.interleave and len(llrs) == self.coded_bit_count:
-                llrs = llrs[self._deinterleaver()]
-            k = _ldpc.INFORMATION_BITS[self.fec_rate]
-            n_cw = self.n_codewords
-            pad = n_cw * _ldpc.N - len(llrs)
-            if pad > 0:
-                llrs = np.concatenate([llrs, np.zeros(pad)])
-            blocks = llrs[:n_cw * _ldpc.N].reshape(n_cw, _ldpc.N)
-            info, iterations, oks = _ldpc.decode_batch(
-                blocks, max_iterations=ldpc_max_iterations, rate=self.fec_rate)
+            info, iterations, oks = self._decode_blocks(
+                data_syms_flat, data_bin_noise, ldpc_max_iterations)
+            if refine_iterations:
+                info, iterations, oks, refinement = self._refine_decode(
+                    data_syms_flat, data_bin_noise, info, oks, iterations,
+                    ldpc_max_iterations, refine_iterations)
+                result.update(refinement)
             result["ldpc_ok"] = bool(np.all(oks))
             result["ldpc_codeword_ok"] = np.atleast_1d(oks).astype(bool).tolist()
             result["ldpc_iterations"] = [int(i) for i in np.atleast_1d(iterations)]
@@ -820,6 +812,176 @@ class OFDM49Mode:
         # domain bits for raw (uncoded) BER even when FEC is enabled.
         result["raw_bits"] = raw_bits
         return result
+
+    # -- decision-directed refinement -----------------------------------------
+    #
+    # The block equalizer estimates one complex gain per carrier from the
+    # preamble and interpolates it between time pilots.  Two things it cannot
+    # see are measurable on this bench and cost real margin at 32-QAM:
+    #
+    #   * the receiver AGC moves between pilots.  Measured against known
+    #     payloads over the IC-705/IC-7300 pair, the residual per-symbol
+    #     amplitude wanders 0.82-1.18 with the IC-7300 on AGC-SLOW and
+    #     0.70-1.54 on AGC-FAST -- interpolation over a 20-symbol pilot
+    #     spacing cannot follow it.
+    #   * the preamble's own per-carrier gain estimate has an error floor of
+    #     its own, which sits under every data symbol in the frame.
+    #
+    # Removing both against the known payload was worth 1.5 dB and 2.8 dB of
+    # data EVM respectively on those captures.  Neither needs the payload:
+    # every LDPC codeword that decodes and passes its own parity check is a
+    # block of *certain* transmitted bits, and the interleaver spreads each
+    # codeword across the whole frame, so even a partial first pass hands back
+    # references at every symbol and every carrier.  Re-encoding those
+    # codewords rebuilds their transmitted symbols exactly; fitting the
+    # residual gain against them and decoding again picks up the codewords
+    # that first missed.
+    #
+    # This is receiver-only.  It changes nothing on the air and a frame that
+    # already decoded takes the early exit below, so it can only turn failures
+    # into successes -- the refined pass is kept only when it fixes strictly
+    # more codewords than the pass before it.
+
+    MIN_REFERENCES = 8   # per symbol or carrier, below which the fit is noise
+
+    def _decode_blocks(self, syms_flat, bin_noise, max_iterations):
+        """Symbols -> LLRs -> de-whiten -> de-interleave -> LDPC."""
+        llrs = _soft_bit_llrs(syms_flat, self.bits_per_symbol, bin_noise)
+        llrs = llrs[: self.coded_bit_count] if len(llrs) > self.coded_bit_count else llrs
+        whitener_llr = _bits.pn_bits(len(llrs), WHITENER_SEED)
+        # whitening is XOR with a known bit; flipping a bit flips the
+        # sign of its LLR (positive LLR == bit zero), so this is
+        # equivalent to de-whitening the soft channel output.
+        llrs = np.where(whitener_llr == 1, -llrs, llrs)
+        if self.interleave and len(llrs) == self.coded_bit_count:
+            llrs = llrs[self._deinterleaver()]
+        n_cw = self.n_codewords
+        pad = n_cw * _ldpc.N - len(llrs)
+        if pad > 0:
+            llrs = np.concatenate([llrs, np.zeros(pad)])
+        blocks = llrs[:n_cw * _ldpc.N].reshape(n_cw, _ldpc.N)
+        return _ldpc.decode_batch(blocks, max_iterations=max_iterations,
+                                  rate=self.fec_rate)
+
+    def _reference_symbols(self, info, oks):
+        """Transmitted symbols and a known-mask, rebuilt from the codewords
+        that decoded.  Mirrors modulate()'s encode -> interleave -> whiten ->
+        map chain exactly, so a reference is the symbol that was sent."""
+        n_cw = self.n_codewords
+        coded = np.zeros(n_cw * _ldpc.N, dtype=np.uint8)
+        known = np.zeros(n_cw * _ldpc.N, dtype=bool)
+        info = np.atleast_2d(info)
+        for i, ok in enumerate(np.atleast_1d(oks)):
+            if ok:
+                coded[i * _ldpc.N:(i + 1) * _ldpc.N] = _ldpc.encode(
+                    info[i], rate=self.fec_rate)
+                known[i * _ldpc.N:(i + 1) * _ldpc.N] = True
+        coded = coded[: self.coded_bit_count]
+        known = known[: self.coded_bit_count]
+        if self.interleave:
+            order = self._interleaver()
+            coded, known = coded[order], known[order]
+        whitener = _bits.pn_bits(len(coded), WHITENER_SEED)
+        bits = coded ^ whitener
+
+        needed = self.n_data_ofdm_symbols * self.bits_per_ofdm_symbol
+        if len(bits) < needed:
+            # modulate() pads with zeros, which are as known as any other bit.
+            bits = np.concatenate([bits, np.zeros(needed - len(bits), np.uint8)])
+            known = np.concatenate([known, np.ones(needed - len(known), bool)])
+        bits, known = bits[:needed], known[:needed]
+        syms = bits_to_symbols(bits, self.bits_per_symbol).reshape(
+            self.n_data_ofdm_symbols, self.n_data_bins)
+        # A symbol is usable only when every bit that maps into it is known.
+        sym_known = known.reshape(-1, self.bits_per_symbol).all(axis=1).reshape(
+            self.n_data_ofdm_symbols, self.n_data_bins)
+        return syms, sym_known
+
+    def _residual_gain(self, got, ref, known):
+        """Least-squares per-symbol then per-carrier residual complex gain,
+        each fitted only where enough references exist and held at unity
+        elsewhere."""
+        def fit(axis):
+            weight = np.where(known, np.abs(ref) ** 2, 0.0).sum(axis=axis)
+            product = np.where(known, got * np.conj(ref), 0.0).sum(axis=axis)
+            counts = known.sum(axis=axis)
+            gain = np.divide(product, weight, out=np.ones_like(product),
+                             where=weight > 1e-18)
+            return np.where(counts >= self.MIN_REFERENCES, gain, 1.0)
+
+        per_symbol = fit(1)[:, None]
+        per_carrier = fit(0)[None, :]
+        return per_symbol, per_carrier
+
+    def _residual_noise(self, corrected, ref, known, fallback):
+        """Separable per-symbol x per-carrier noise variance measured from the
+        references themselves.
+
+        The variance the first pass hands the demapper comes from the preamble,
+        and on this bench the data symbols carry roughly 8 dB more error than
+        the preamble does -- guard leakage and AGC movement, neither of which
+        touches a repeated constant preamble symbol.  A uniform scale error
+        would not matter, since the LDPC decoder normalizes it away, but the
+        *shape* does: a symbol the AGC was moving through, or a carrier at the
+        band edge, deserves less weight than the preamble fit gives it.
+        """
+        error = np.where(known, np.abs(corrected - ref) ** 2, 0.0)
+        total = float(error.sum())
+        references = int(known.sum())
+        if references < self.MIN_REFERENCES or total <= 0:
+            return fallback
+        overall = total / references
+
+        def profile(axis):
+            counts = known.sum(axis=axis)
+            usable = counts >= self.MIN_REFERENCES
+            if not np.any(usable):
+                return None
+            mean = np.divide(error.sum(axis=axis), counts,
+                             out=np.full(counts.shape, overall, float),
+                             where=usable)
+            # A row or column with too few references keeps the frame-wide
+            # variance rather than a fit nobody can stand behind.
+            return np.where(usable, mean, overall)
+
+        per_symbol = profile(1)
+        per_carrier = profile(0)
+        if per_symbol is None or per_carrier is None:
+            return fallback
+        return np.maximum(
+            per_symbol[:, None] * per_carrier[None, :] / overall, 1e-18)
+
+    def _refine_decode(self, syms_flat, bin_noise, info, oks, iterations,
+                       max_iterations, passes):
+        """Re-fit the residual gain against the codewords that decoded and
+        decode again, keeping a pass only when it recovers more codewords."""
+        shape = (self.n_data_ofdm_symbols, self.n_data_bins)
+        syms = np.asarray(syms_flat)[: shape[0] * shape[1]].reshape(shape)
+        noise = np.asarray(bin_noise)[: shape[0] * shape[1]].reshape(shape)
+        diagnostics = {"refine_passes_run": 0,
+                       "refine_codewords_ok": [int(np.sum(oks))]}
+        best = (info, iterations, oks)
+        for _ in range(int(passes)):
+            ok_count = int(np.sum(best[2]))
+            if ok_count == self.n_codewords or ok_count == 0:
+                # Nothing left to fix, or nothing trustworthy to fit against.
+                break
+            ref, known = self._reference_symbols(best[0], best[2])
+            per_symbol, per_carrier = self._residual_gain(syms, ref, known)
+            gain = per_symbol * per_carrier
+            corrected = syms / gain
+            # Dividing the symbols by the gain divides their noise by its
+            # squared magnitude; the LLR scaling has to follow.
+            variance = self._residual_noise(
+                corrected, ref, known, noise / np.abs(gain) ** 2)
+            candidate = self._decode_blocks(
+                corrected.reshape(-1), variance.reshape(-1), max_iterations)
+            diagnostics["refine_passes_run"] += 1
+            diagnostics["refine_codewords_ok"].append(int(np.sum(candidate[2])))
+            if int(np.sum(candidate[2])) <= ok_count:
+                break
+            best = candidate
+        return best[0], best[1], best[2], diagnostics
 
     def n_comb(self) -> int:
         return int(np.sum(self._comb_mask))

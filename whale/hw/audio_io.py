@@ -66,6 +66,22 @@ from whale.hw import ptt as ptt_mod
 
 SAMPLE_RATE = 48000
 
+# Requested buffering on the transmit stream.
+#
+# This is a reliability knob, not a taste one. At the PortAudio default (~3 ms
+# on these codecs) any scheduling hiccup starves the callback; at 0.1 s it
+# still did, rarely -- roughly one keying in twelve on this bench, and each
+# one puts a silent gap in the middle of the transmission and delays every
+# sample after it. Measured on an IC-705 -> IC-7300 HF7 frame, one such gap
+# moved the second half of the frame 264 samples late, so the preamble and
+# the first half decoded and the rest was noise: a whole-frame loss whose
+# only visible symptom was a failed CRC.
+#
+# The cost is dead air: the delay between PTT and the first sample on air
+# tracks this value, which is what STREAM_FILL in whale/transport.py records.
+# Raise both together.
+TX_STREAM_LATENCY = 0.3
+
 _log = logging.getLogger(__name__)
 
 _sounddevice = None
@@ -172,7 +188,8 @@ def list_devices(kind=None):
     return sorted(devices, key=lambda dev: dev.index)
 
 
-def transmit(tx_signal, tx_device, ptt, samplerate=SAMPLE_RATE, ptt_lead=0.3, ptt_tail=0.2):
+def transmit(tx_signal, tx_device, ptt, samplerate=SAMPLE_RATE, ptt_lead=0.3,
+             ptt_tail=0.2, stats=None):
     """Keys `ptt`, plays `tx_signal` out `tx_device`, unkeys. Returns the
     key-to-unkey duration in seconds.
 
@@ -242,7 +259,8 @@ def transmit(tx_signal, tx_device, ptt, samplerate=SAMPLE_RATE, ptt_lead=0.3, pt
         ptt.key(True)
         time.sleep(ptt_lead)
         stream = sd.OutputStream(device=tx_device, samplerate=samplerate, channels=1,
-                                 dtype="float32", latency=0.1, callback=out_callback)
+                                 dtype="float32", latency=TX_STREAM_LATENCY,
+                                 callback=out_callback)
         with stream:
             playing_since = time.time()
             # A stream whose device disappears mid-transmission simply stops
@@ -267,8 +285,13 @@ def transmit(tx_signal, tx_device, ptt, samplerate=SAMPLE_RATE, ptt_lead=0.3, pt
     finally:
         ptt_mod.unkey(ptt)
 
+    if stats is not None:
+        stats["output_underflows"] = output_underflows
     if output_underflows:
-        print(f"audio_io: {output_underflows} output underflow(s) during transmit")
+        _log.warning(
+            "%d output underflow(s) during transmit: the signal on air has a gap "
+            "where the card ran dry, and everything after it is late by that much",
+            output_underflows)
     return time.time() - started
 
 

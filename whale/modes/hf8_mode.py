@@ -110,6 +110,12 @@ PILOT_INTERVAL = 10         # HF7 pilots every 20; half that is the fading half
 INTERLEAVE = True
 NOISE_ESTIMATOR = "repeat"
 
+# Decision-directed residual-gain passes (`ofdm49._refine_decode`), as HF7.
+# 8PSK carries no amplitude, so this mode needs it far less than HF7 does --
+# it is here for the partly-decoded frame that would otherwise be retried in
+# full.  A frame whose codewords all decoded never enters the loop.
+REFINE_ITERATIONS = 3
+
 # 300-2700 Hz: 49 carriers, the full HF channel, HF7's plan unchanged.
 BAND_LO_HZ = 300.0
 BAND_HI_HZ = 2700.0
@@ -142,11 +148,13 @@ HF8_PHY = hf8.OFDM49Mode(
     pilot_interval=PILOT_INTERVAL,
     n_preamble_symbols=46,
     equalizer="gain",
-    # HF7's calibration, for HF7's bench and audio gain structure. 8PSK's
+    # HF7's calibration, for HF7's bench and audio gain structure, including
+    # its move from 0.008 to 0.016 for the IC-705's less sensitive audio
+    # input -- see hf7_mode.py for the EVM measurements behind it. 8PSK's
     # crest factor is 0.8 dB above HF7's 8.9 dB, so this is if anything
     # slightly conservative. Like HF7's, it does not generalize to another
     # station's audio path; the right fix is drive from measured EVM.
-    drive_scale=0.008,
+    drive_scale=0.016,
     fec_rate=FEC_RATE,
     interleave=INTERLEAVE,
 )
@@ -176,6 +184,7 @@ class Hf8Codec:
         # gain derived from that same preamble, so its residual is biased low
         # and the LLRs handed to the LDPC decoder are mis-scaled.
         kwargs.setdefault("noise_estimator", NOISE_ESTIMATOR)
+        kwargs.setdefault("refine_iterations", REFINE_ITERATIONS)
         return HF8_PHY.demodulate(np.asarray(audio), **kwargs)
 
     def airtime(self, payload_len: int, mode: "Hf8Mode") -> float:

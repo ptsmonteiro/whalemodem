@@ -286,7 +286,7 @@ MAX_USEFUL_FRAME_SECONDS = 3.0
 # ~20ms past the cap they were supposed to sit under. Corrected here rather
 # than by widening the cap, because the cap is the part with a measurement
 # behind it.
-KEYING_OVERHEAD_SECONDS = 0.16
+KEYING_OVERHEAD_SECONDS = 0.36
 
 
 def frame_bits(payload_len, baud, *, include_head=True):

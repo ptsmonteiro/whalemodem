@@ -15,6 +15,7 @@ whatever it captured immediately before/during/after our own TX instead.
 """
 
 import collections
+import contextlib
 import ctypes
 import logging
 import sys
@@ -76,15 +77,17 @@ def _ensure_com_initialized():
 # actually leaving the card. Not a knob -- it is what the audio stack does,
 # recorded here so the keying-length arithmetic can account for it.
 #
-# MEASURED end to end rather than reasoned from audio_io's latency=0.1: an
-# acceptance run logs `Ns audio, Ms keyed` for every transmission, and
-# M - N was measured after subtracting the then-configured PTT sleeps. Across
-# 44 keyings spanning
-# both radios, all three profiles and every frame type, that came out at
-# 0.15-0.16s -- not the 0.13 previously assumed from the requested stream
-# latency, which left the derived chunk sizes ~20ms over budget. Take the
-# worst; a keying budget wants the pessimistic end.
-STREAM_FILL = 0.16
+# MEASURED end to end rather than reasoned from audio_io's requested latency:
+# a run logs `Ns audio, Ms keyed` for every transmission, and M - N is
+# measured after subtracting the configured PTT sleeps. Take the worst; a
+# keying budget wants the pessimistic end.
+#
+# It tracks audio_io.TX_STREAM_LATENCY, which appears twice in a keying --
+# once filling the buffer before the first sample is on air, once draining it
+# after the last. At the former 0.1 s this was 0.15-0.16 s over 44 keyings
+# spanning both radios, all three profiles and every frame type. At 0.3 s it
+# measured 0.34-0.35 s over 48 HF7/HF8 keyings on the IC-705/IC-7300 pair.
+STREAM_FILL = 0.36
 
 # KEYING_OVERHEAD_SECONDS records the transport contribution to total PTT
 # occupancy. It does not participate in the useful-frame size restriction.
@@ -138,6 +141,9 @@ class RadioTransport:
         self._chunks = collections.deque()
         self._chunks_len = 0
         self._buf_lock = threading.Lock()
+        self._decimator_lock = threading.Lock()
+        self._rx_overflows = 0
+        self._tx_underflows = 0
         self._stream = None
         self._tx_lock = threading.Lock()  # serializes TX attempts
         self._transmitting = threading.Event()
@@ -146,10 +152,31 @@ class RadioTransport:
     # -- receive ------------------------------------------------------
 
     def _in_callback(self, indata, frames, time_info, status):
-        with self._buf_lock:
+        # An input overflow is samples the capture never saw, and the chunks
+        # either side of it are appended as if nothing happened. What that
+        # splice does to a frame in flight is not subtle: a 5 ms drop measured
+        # on this bench moved every OFDM symbol after it by 62 samples, so the
+        # preamble and the first third of the frame decoded perfectly and
+        # everything after it was noise -- a whole-frame loss with no failure
+        # anywhere for the operator to see. Count them and say so; a decode
+        # that fails with a non-zero count here has an explanation that is
+        # nothing to do with the radio, and silence is the wrong default for
+        # data this destructive.
+        if status and status.input_overflow:
+            self._rx_overflows += 1
+            logging.getLogger(__name__).warning(
+                "%s: audio input overflow -- capture samples were dropped and "
+                "any frame in flight is corrupted (%d so far)",
+                self.radio.name, self._rx_overflows)
+        # Decimate under its own lock rather than the buffer's: this runs on
+        # PortAudio's realtime thread, and snapshot_rx() holds the buffer lock
+        # while it concatenates the whole buffer. Waiting on that here is how
+        # the callback runs late and the overflow above happens.
+        with self._decimator_lock:
             if not hasattr(self, "_rx_decimator"):
                 self._rx_decimator = rx_audio.ReceiveDecimator()
             decoded = self._rx_decimator.process(indata[:, 0])
+        with self._buf_lock:
             self._chunks.append(decoded)
             self._chunks_len += len(decoded)
             max_len = int(RX_BUFFER_SECONDS * RX_SAMPLE_RATE)
@@ -177,6 +204,8 @@ class RadioTransport:
         with self._buf_lock:
             self._chunks.clear()
             self._chunks_len = 0
+        lock = getattr(self, "_decimator_lock", None)
+        with lock if lock is not None else contextlib.nullcontext():
             if hasattr(self, "_rx_decimator"):
                 self._rx_decimator.reset()
             else:
@@ -198,6 +227,20 @@ class RadioTransport:
                 self._chunks[0] = flat
                 self._chunks_len = len(flat)
             return flat.copy()
+
+    @property
+    def tx_underflows(self):
+        """Transmit underruns so far. Non-zero means a gap was played into a
+        transmission and everything after it went out late -- see
+        `audio_io.TX_STREAM_LATENCY`."""
+        return self._tx_underflows
+
+    @property
+    def rx_overflows(self):
+        """Capture overflows seen so far. Non-zero means dropped samples, and
+        any frame that was arriving at the time is corrupted -- see
+        `_in_callback`."""
+        return self._rx_overflows
 
     def is_transmitting(self):
         """True for the whole span of a send() call, so callers polling the
@@ -259,9 +302,12 @@ class RadioTransport:
                 log = logging.getLogger(__name__)
                 for attempt in range(1, retries + 1):
                     try:
+                        stats = {}
                         keyed_seconds = audio_io.transmit(
                             tx_audio, self.out_device, self.ptt,
-                            samplerate=TX_SAMPLE_RATE, ptt_lead=ptt_lead, ptt_tail=ptt_tail)
+                            samplerate=TX_SAMPLE_RATE, ptt_lead=ptt_lead,
+                            ptt_tail=ptt_tail, stats=stats)
+                        self._tx_underflows += stats.get("output_underflows", 0)
                         last_exc = None
                         break
                     except _load_sounddevice().PortAudioError as exc:

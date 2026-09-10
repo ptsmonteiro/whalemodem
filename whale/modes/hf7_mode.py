@@ -60,6 +60,13 @@ PILOT_INTERVAL = 20
 INTERLEAVE = True
 NOISE_ESTIMATOR = "repeat"
 
+# Decision-directed residual-gain passes (`ofdm49._refine_decode`).  On the
+# IC-705 -> IC-7300 leg this is the difference between 0 and 13 of 13 captured
+# frames: 32-QAM at rate 3/4 has no margin left for the receiver's AGC
+# movement between pilots, and this mode is the one that feels it.  Receiver
+# side only, and a frame whose codewords all decoded never enters the loop.
+REFINE_ITERATIONS = 3
+
 # 300-2700 Hz: 49 carriers, the full HF channel, 2,444 Hz measured 99%-power
 # occupied bandwidth against a 2,500 Hz gate.
 BAND_LO_HZ = 300.0
@@ -82,7 +89,19 @@ HF7_PHY = hf7.OFDM49Mode(
     # Calibrated against this bench's audio gain structure and this waveform's
     # 8.9 dB crest factor; the harness default of 1.0 runs ~7 dB overdriven
     # and costs two constellation steps of EVM.
-    drive_scale=0.008,
+    #
+    # 0.016 rather than the 0.008 this was first set to, because 0.008 is
+    # calibrated for the IC-7300's audio input and the IC-705's is less
+    # sensitive.  Preamble EVM measured on the IC-705 -> IC-7300 leg: -18 dB
+    # at 0.008, -23.5 dB at 0.016, -28 dB at 0.032.  The leg is receiver-noise
+    # limited below 0.016 and transmitter-compression limited above it -- at
+    # 0.032 the *data* symbols degrade (raw BER 22% in one window) while the
+    # low-crest preamble stays clean, which is what compression on a 9 dB
+    # crest factor looks like.  0.016 was also the best of 0.008/0.016/0.024/
+    # 0.032 on the IC-7300 -> IC-705 leg.  Still a bench calibration and still
+    # does not generalize to another station's audio path; the right fix
+    # remains drive from measured EVM.
+    drive_scale=0.016,
     fec_rate=FEC_RATE,
     interleave=INTERLEAVE,
 )
@@ -114,6 +133,7 @@ class Hf7Codec:
         # preamble, so its residual is biased low and the LLRs handed to the
         # LDPC decoder are mis-scaled. Raw BER is identical either way.
         kwargs.setdefault("noise_estimator", NOISE_ESTIMATOR)
+        kwargs.setdefault("refine_iterations", REFINE_ITERATIONS)
         return HF7_PHY.demodulate(np.asarray(audio), **kwargs)
 
     def airtime(self, payload_len: int, mode: "Hf7Mode") -> float:
