@@ -23,8 +23,11 @@ and 127.0.0.1:18310/18311 respectively.
 import argparse
 import datetime
 import socket
+import subprocess
 import sys
 import threading
+import time
+from pathlib import Path
 
 _lock = threading.Lock()
 _log_file = None
@@ -93,14 +96,66 @@ def _parse_pair(spec: str):
     return label, int(listen_port), target_host, int(target_port)
 
 
+def _wait_for_port(port, processes, timeout=60.0):
+    deadline = time.time() + timeout
+    while time.time() < deadline:
+        if any(proc.poll() is not None for proc in processes):
+            return False
+        try:
+            with socket.create_connection(("127.0.0.1", port), timeout=1.0):
+                return True
+        except OSError:
+            time.sleep(0.2)
+    return False
+
+
 def main():
     ap = argparse.ArgumentParser(description=__doc__,
                                  formatter_class=argparse.RawDescriptionHelpFormatter)
-    ap.add_argument("--pair", action="append", required=True,
+    ap.add_argument("--pair", action="append",
                     metavar="label:listen_port:target_host:target_port",
                     help="a proxied port pair; repeat for each VARA cmd/data port")
     ap.add_argument("--log", help="also append the capture to this file")
+    ap.add_argument("--launch-stations", action="store_true",
+                    help="launch two Whale HF stations and sniff through them")
+    ap.add_argument("--radio-config", help="TOML radio inventory for launched stations")
+    ap.add_argument("--station-a-radio", default="ic705")
+    ap.add_argument("--station-b-radio", default="ic7300")
+    ap.add_argument("--station-a-call", default="STA1")
+    ap.add_argument("--station-b-call", default="STA2")
     args = ap.parse_args()
+
+    station_procs = []
+    if args.launch_stations:
+        if args.pair:
+            ap.error("--pair cannot be combined with --launch-stations")
+        root = Path(__file__).resolve().parent.parent
+        stations = [(args.station_a_radio, args.station_a_call, 8300, 8301),
+                    (args.station_b_radio, args.station_b_call, 8310, 8311)]
+        for radio, call, cmd_port, data_port in stations:
+            cmd = [sys.executable, "-m", "whale.vara_server", "--radio", radio,
+                   "--mycall", call, "--cmd-port", str(cmd_port),
+                   "--data-port", str(data_port), "--channel", "hf-ssb", "--verbose"]
+            if args.radio_config:
+                cmd += ["--radio-config", args.radio_config]
+            print(f"launching station {call}: {' '.join(cmd)}", file=sys.stderr)
+            station_procs.append(subprocess.Popen(cmd, cwd=root))
+        # The data listener is bound at startup but Whale only accepts a data
+        # connection after the radio link reaches CONNECTED.  Waiting for a
+        # successful data-port connect here would therefore time out during
+        # normal idle startup.
+        for _, _, cmd_port, data_port in stations:
+            if not _wait_for_port(cmd_port, station_procs):
+                for proc in station_procs:
+                    if proc.poll() is None:
+                        proc.terminate()
+                ap.error(f"launched station did not open command port {cmd_port}")
+        args.pair = ["sta1-cmd:18300:127.0.0.1:8300",
+                     "sta1-data:18301:127.0.0.1:8301",
+                     "sta2-cmd:18310:127.0.0.1:8310",
+                     "sta2-data:18311:127.0.0.1:8311"]
+    if not args.pair:
+        ap.error("specify --pair or use --launch-stations")
 
     global _log_file
     if args.log:
@@ -119,6 +174,15 @@ def main():
             t.join()
     except KeyboardInterrupt:
         pass
+    finally:
+        for proc in station_procs:
+            if proc.poll() is None:
+                proc.terminate()
+        for proc in station_procs:
+            try:
+                proc.wait(timeout=10)
+            except subprocess.TimeoutExpired:
+                proc.kill()
 
 
 if __name__ == "__main__":

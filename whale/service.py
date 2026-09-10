@@ -55,7 +55,10 @@ class ModemService:
         self._started = threading.Event()
         self._stopping = threading.Event()
         self._worker: threading.Thread | None = None
-        self._listening = False
+        # VARA Chat does not send a LISTEN ON command.  An idle VARA
+        # endpoint accepts incoming CONNECT requests by default; only an
+        # outbound CONNECT or an explicit LISTEN OFF should disable that.
+        self._listening = True
         self._link.on_event = self._on_link_event
 
     @classmethod
