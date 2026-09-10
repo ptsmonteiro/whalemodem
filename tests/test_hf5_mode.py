@@ -14,8 +14,8 @@ def test_hf5_clean_loopback_and_capacity():
     result = HF5.decode(captured)
     assert result["payload"] == payload
     assert result["crc_ok"]
-    assert HF5.airtime(len(payload)) < 6.0
-    assert 8 * HF5.chunk_size / HF5.airtime(len(payload)) > 2_000
+    assert HF5.airtime(len(payload)) < 7.0
+    assert 8 * HF5.chunk_size / HF5.airtime(len(payload)) > 1_700
 
 
 def test_hf5_rejects_oversize_payload():

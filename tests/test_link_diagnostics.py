@@ -16,9 +16,7 @@ from dataclasses import dataclass, field
 
 import numpy as np
 
-from whale import link, rx_audio
-from whale.modes.hc0_mode import HC0
-from whale.modes import hf_lead
+from whale import link
 from whale.waveform import ModeRegistry
 
 import link_harness as harness
@@ -92,11 +90,6 @@ class _StubMode:
 
     def decode(self, audio, **kwargs):
         return self.codec.decode(audio)
-
-
-@dataclass(frozen=True)
-class _LeadStubMode(_StubMode):
-    lead_label: int = 0
 
 
 def _stub_link(*modes):
@@ -220,43 +213,3 @@ def test_candidates_are_attempted_cheapest_first():
     _fill(transport, BUFFER_SECONDS)
     plan = a_link._budgeted_candidates((dear, cheap), transport.snapshot_rx())
     assert [mode.name for mode in plan][:2] == ["cheap", "dear"]
-
-
-def test_hf_lead_candidates_cannot_starve_control_decode(monkeypatch):
-    """A noisy lead may offer dozens of boundaries, but only a few body
-    decodes may run in one poll.  Before the bound, this path sat outside the
-    regular candidate budget and could postpone a DATA_ACK past the sender's
-    timeout, producing the seq-04 late-ACK/duplicate pattern in the radio log.
-    """
-    mode = _LeadStubMode("lead", 1, _StubCodec(), lead_label=0)
-    a_link, transport = _stub_link(mode)
-    offered = [hf_lead.LeadCandidate(1.0, 0, i * 100)
-               for i in range(40)]
-
-    def candidates(_audio, limit=hf_lead.MAX_CANDIDATE_BOUNDARIES):
-        del limit  # Deliberately ignore it: the link owns the safety bound.
-        return tuple(offered)
-
-    monkeypatch.setattr(hf_lead, "candidates", candidates)
-    a_link._decode_one(transport.snapshot_rx())
-
-    # The lead path is bounded to four body attempts.  One fallback attempt is
-    # acceptable and verifies that a missed lead still has a recovery path.
-    assert mode.codec.attempts <= link.HF_LEAD_CANDIDATE_LIMIT + 1
-
-
-def test_hf_head_measurement_uses_the_full_snapshot_after_a_cropped_decode():
-    payload = bytes(range(16))
-    tx = HC0.encode(payload, head_seconds=0.3)
-    captured = rx_audio.downsample(np.concatenate((
-        tx, np.zeros(rx_audio.FILTER_DELAY_CAPTURE_SAMPLES, dtype=np.float32))))
-    decoded = HC0.decode(captured, head_seconds=0.3)
-    assert decoded["payload"] == payload
-
-    # A lead-candidate decoder may have reported a stale/short measurement;
-    # the link must replace it using the absolute body start on the full RX
-    # snapshot before producing DATA feedback.
-    decoded["head_seconds_received"] = 0.0
-    link._refresh_hf_head_measurement(HC0, captured, decoded, 0.3)
-    assert decoded["head_blocks_observed"] >= hf_lead.MIN_BLOCKS
-    assert decoded["head_seconds_received"] > 0.0

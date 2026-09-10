@@ -20,6 +20,7 @@ from dataclasses import dataclass
 import numpy as np
 from scipy.signal import hilbert
 
+from .. import framing
 from ..dsp.bits import pn_bits
 
 
@@ -45,7 +46,7 @@ DATA_SYMBOL_INDICES = np.setdiff1d(
 DATA_SYMBOLS = len(DATA_SYMBOL_INDICES)
 PAYLOAD_BITS = DATA_SYMBOLS * BITS_PER_SYMBOL
 
-LEAD_IN_SAMPLES = 2_160
+LEAD_IN_SAMPLES = int(np.ceil(framing.HEAD_SECONDS * SAMPLE_RATE))
 TAIL_SAMPLES = 912
 FRAME_SAMPLES = LEAD_IN_SAMPLES + TOTAL_SYMBOLS * SYMBOL_SAMPLES + TAIL_SAMPLES
 FRAME_SECONDS = FRAME_SAMPLES / SAMPLE_RATE
@@ -666,7 +667,7 @@ def _check_constants() -> None:
     assert CARRIER_HZ[0] == 468.75 and CARRIER_HZ[-1] == 3140.625
     assert TOTAL_SYMBOLS == 214 and PAYLOAD_BITS == 87_696
     assert PILOT_SYMBOLS == 10 and DATA_SYMBOLS == 189
-    assert FRAME_SAMPLES == 249_600 and FRAME_SECONDS == 5.2
+    assert FRAME_SAMPLES == 295_440 and FRAME_SECONDS == 6.155
     assert PACKET_BYTES == 10_962 and UNUSED_GRID_BYTES == 40
     assert RS_ENCODED_BYTES == 10_922 and RS_PACKET_BYTES == 10_234
     assert MAX_PAYLOAD_BYTES == 10_228

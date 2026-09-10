@@ -60,7 +60,7 @@ class ChannelPolicy:
     # decoded off the air out of each station's log. Three runs, because the
     # silences that matter are not the ones a clean run produces:
     #
-    #   clean acceptance run, 1 KB each way          5.2s  (ht->ic705 leg;
+    #   clean acceptance run, 1 KB each way          6.155s (ht->ic705 leg;
     #                                                       4.0s the other way)
     #   a full max_retries cycle at 300 baud, forced
     #     by suppressing the first five DATA_ACKs
@@ -135,8 +135,7 @@ class ChannelPolicy:
     #
     # Sync-through-CRC audio is capped in duration, and every CPFSK profile's
     # chunk_size is whatever fits inside that cap. The outer head pad and
-    # transport startup do not consume this budget because adaptive timing
-    # varies them by radio pair.
+    # transport startup do not consume this useful-frame budget.
     #
     # See afsk.MAX_USEFUL_FRAME_SECONDS for the full reasoning behind the
     # VHF figure -- retransmit granularity, half-duplex responsiveness, and

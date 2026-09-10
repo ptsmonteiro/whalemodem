@@ -59,11 +59,14 @@ device for either field is not among the currently connected devices (radio
 powered off, USB unplugged, etc), the field shows a `[not found]` marker
 next to it; this is informational only and never blocks `Save`. The
 port, USB ID, and model fields underneath whichever PTT backend is selected
-also support `p` to pick from the real hardware/data instead of typing
-blind, but for those, unlike audio input/output, typing the value by hand
-always works too, including when no serial port or libhamlib is available
-to browse. Select `Save` to validate and write the entry back into the
-in-memory inventory (still not on disk until `s` on the list view), or
+are picker-only too whenever `p` (or `Enter`) can find at least one serial
+port or hamlib model to offer -- no manual typing in that case either.
+Manual typing is only available as a fallback when the picker comes up
+empty or unavailable (no serial port currently connected, or no libhamlib
+on this machine), e.g. when pre-filling an inventory for a station you
+aren't physically sitting at. Select `Save` to validate and write the entry
+back into the in-memory inventory (still not on disk until `s` on the list
+view), or
 `Cancel` to discard the form.
 
 ## Audio backend
@@ -114,7 +117,7 @@ may also call `register_backend()` directly.
 Binds directly to `libhamlib` via ctypes (`whale/hw/hamlib.py`) and keeps one
 `RIG*` handle open for the life of the backend, rather than shelling out to
 `rigctl` per PTT toggle -- a process spawn plus a fresh rig handshake on every
-key() is dead air this project's adaptive-timing goals are meant to remove.
+key() only adds avoidable dead air.
 
 **No separate hamlib install is needed.** Prebuilt libhamlib (+ libusb)
 binaries are vendored under `whale/hw/_vendor/hamlib/` for macOS

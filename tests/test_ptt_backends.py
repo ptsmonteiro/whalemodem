@@ -213,10 +213,12 @@ def _install_fake_devices(monkeypatch, devices):
     """Points audio_io at a fake WASAPI-like host API 0 plus an unrelated
     host API 1, and a fixed device list, so find_device(s)/list_devices can
     be tested without a real sound card."""
+    fake_sd = SimpleNamespace(
+        query_hostapis=lambda: [{"name": "Windows WASAPI"}, {"name": "MME"}],
+        query_devices=lambda: devices,
+    )
     monkeypatch.setenv("WHALE_AUDIO_HOST_API", "wasapi")
-    monkeypatch.setattr(audio_io.sd, "query_hostapis",
-                         lambda: [{"name": "Windows WASAPI"}, {"name": "MME"}])
-    monkeypatch.setattr(audio_io.sd, "query_devices", lambda: devices)
+    monkeypatch.setattr(audio_io, "_load_sounddevice", lambda: fake_sd)
 
 
 # index: name, hostapi, max_input_channels, max_output_channels, default_samplerate

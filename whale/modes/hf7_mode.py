@@ -48,7 +48,6 @@ import numpy as np
 from whale.phy import ofdm49 as hf7
 
 from .. import framing
-from . import hf_lead
 
 
 HF7_MODE_ID = 14
@@ -67,8 +66,7 @@ BAND_LO_HZ = 300.0
 BAND_HI_HZ = 2700.0
 
 # 4,738 B fills 78 rate-3/4 LDPC codewords (k=486 information bits) to within
-# 4 bits, and puts the frame at ~4.84 s -- the size at which the bench's fixed
-# per-keying overhead falls to ~3% of air time.
+# 4 bits. The native 46-symbol preamble brings the full frame to 5.808 s.
 PACKET_BYTES = 4738
 
 ACTIVE_BINS = tuple(hf7.bins_in_band(FFT_SIZE, BAND_LO_HZ, BAND_HI_HZ))
@@ -79,6 +77,7 @@ HF7_PHY = hf7.OFDM49Mode(
     bits_per_symbol=BITS_PER_SYMBOL,
     packet_bytes=PACKET_BYTES,
     pilot_interval=PILOT_INTERVAL,
+    n_preamble_symbols=46,
     equalizer="gain",
     # Calibrated against this bench's audio gain structure and this waveform's
     # 8.9 dB crest factor; the harness default of 1.0 runs ~7 dB overdriven
@@ -96,25 +95,17 @@ class Hf7Codec:
     tx_sample_rate = hf7.TX_SAMPLE_RATE
     rx_sample_rate = hf7.RX_SAMPLE_RATE
 
-    def encode(self, payload: bytes, mode: "Hf7Mode", *, include_head=True,
-               head_seconds=None) -> np.ndarray:
+    def encode(self, payload: bytes, mode: "Hf7Mode") -> np.ndarray:
         if len(payload) > HF7_PHY.max_payload_bytes:
             raise ValueError(
                 f"packet is {len(payload)} bytes; {mode.name} carries at most "
                 f"{HF7_PHY.max_payload_bytes}")
-        # A minimum lead remains present even when the caller disables the
-        # negotiated extension.  Shipped HF modes must never have a headless
-        # default path: the common lead is both the leading-loss guard and
-        # the timing measurement source.
-        if not include_head or head_seconds is None:
-            head_seconds = hf_lead.MIN_SECONDS
-        lead = hf_lead.modulate(hf_lead.HF7_LABEL, head_seconds)
+        del mode
         audio = HF7_PHY.modulate(bytes(payload))
         target = int(round(5.0 * self.tx_sample_rate))
-        body = np.pad(audio, (0, max(0, target - len(audio))))
-        return np.concatenate((lead, body))
+        return np.pad(audio, (0, max(0, target - len(audio))))
 
-    def decode(self, audio, mode: "Hf7Mode", *, head_seconds=None, **kwargs) -> dict:
+    def decode(self, audio, mode: "Hf7Mode", **kwargs) -> dict:
         del mode
         if np.asarray(audio).ndim != 1:
             return {"synced": False, "payload": None}
@@ -123,45 +114,11 @@ class Hf7Codec:
         # preamble, so its residual is biased low and the LLRs handed to the
         # LDPC decoder are mis-scaled. Raw BER is identical either way.
         kwargs.setdefault("noise_estimator", NOISE_ESTIMATOR)
-        # Strip the latest matching lead boundary before OFDM acquisition.
-        # This prevents the MFSK head from looking like a false OFDM
-        # preamble. If the lead is erased or clipped, retain the existing
-        # body-only acquisition fallback.
-        captured = np.asarray(audio)
-        lead_candidates = hf_lead.measured_candidates(
-            captured, hf_lead.HF7_LABEL, head_seconds)
-        result = None
-        body_start = None
-        # Correlation ranking is advisory; the checked OFDM payload chooses
-        # the winning boundary. Keep attempts bounded because each OFDM
-        # acquisition scans the retained audio at multiple CFO hypotheses.
-        for candidate, body_offset in lead_candidates:
-            attempt = HF7_PHY.demodulate(captured[body_offset:], **kwargs)
-            local_start = attempt.get("start_sample")
-            if local_start is not None:
-                body_start = body_offset + local_start
-                attempt["start_sample"] = body_start
-            result = attempt
-            if result.get("payload") is not None and body_start is not None:
-                break
-        if result is None or result.get("payload") is None:
-            # A damaged/erased lead must not prevent the existing body-only
-            # OFDM acquisition fallback.
-            result = HF7_PHY.demodulate(captured, **kwargs)
-            body_start = result.get("start_sample")
-        if result.get("payload") is not None and body_start is not None:
-            result["start_index"] = body_start
-            observed, score = hf_lead.measure(
-                captured, body_start, hf_lead.HF7_LABEL, head_seconds)
-            result.update(
-                head_blocks_observed=observed,
-                head_seconds_received=hf_lead.seconds_received(observed),
-                head_match=score)
-        return result
+        return HF7_PHY.demodulate(np.asarray(audio), **kwargs)
 
     def airtime(self, payload_len: int, mode: "Hf7Mode") -> float:
         del payload_len, mode
-        return hf_lead.MIN_SECONDS + 5.0
+        return max(5.0, HF7_PHY.frame_seconds())
 
 
 HF7_CODEC = Hf7Codec()
@@ -173,7 +130,6 @@ class Hf7Mode:
     mode_id: int = HF7_MODE_ID
     chunk_size: int = CHUNK_SIZE
     confidence_threshold: float = CONFIDENCE_THRESHOLD
-    lead_label: int = hf_lead.HF7_LABEL
     fec_rate: str | None = FEC_RATE
     codec: Hf7Codec = field(default=HF7_CODEC, compare=False, repr=False)
 
@@ -189,14 +145,8 @@ class Hf7Mode:
     def baud(self) -> float:
         return hf7.DESIGN_RATE / HF7_PHY.symbol_len
 
-    @property
-    def head_match_allowance_seconds(self) -> float:
-        """One common HF lead block, the measurement resolution."""
-        return hf_lead.BLOCK_SAMPLES / self.tx_sample_rate
-
-    def encode(self, payload: bytes, *, include_head=True, head_seconds=None):
-        return self.codec.encode(payload, self, include_head=include_head,
-                                 head_seconds=head_seconds)
+    def encode(self, payload: bytes):
+        return self.codec.encode(payload, self)
 
     def decode(self, audio, **kwargs):
         return self.codec.decode(audio, self, **kwargs)

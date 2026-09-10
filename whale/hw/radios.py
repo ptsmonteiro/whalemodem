@@ -9,7 +9,7 @@ try:
 except ModuleNotFoundError:  # pragma: no cover - compatibility for dev Python 3.10
     import tomli as tomllib
 from typing import Any, Mapping
-from . import audio_io, ptt
+from . import ptt
 from .ptt_backends import PttCapabilities, available_backends, open_backend
 
 @dataclass(frozen=True)
@@ -26,6 +26,8 @@ class Radio:
         return available_backends()[self.ptt_backend].capabilities
 
     def devices(self):
+        from . import audio_io
+
         return (audio_io.find_device(self.audio_output_name, "output"), audio_io.find_device(self.audio_input_name, "input"))
 
     def ptt(self):

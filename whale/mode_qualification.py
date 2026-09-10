@@ -65,7 +65,7 @@ MANIFEST = (
     # availability, not qualification.
     QualificationEntry("hf-ssb", 14, QualificationLevel.DEFAULT),
     # HF8 is HF7's carrier plan and guard at 8PSK with rate-2/3 LDPC, double
-    # the pilot density and a 0.616 s frame: 3,299 bit/s against HF7's 7,805,
+    # the pilot density and a 5.940 s frame: 3,292 bit/s against HF7's 6,504,
     # bought for an 8 dB lower simulated AWGN floor (12 dB vs 20) and the only
     # measured fading envelope on this PHY family -- 90% delivery on quiet
     # Watterson from 16 dB, where HF7 manages 7/40 at 24 dB.

@@ -98,7 +98,7 @@ WRITE_TIMEOUT = 0.25
 # recovery time would set it is the one that stopped answering, and
 # reproducing the failure means deliberately transmitting high power into a
 # desensed USB bus. Three attempts bound the recovery effort without tying it
-# to the separately defined useful-frame or adaptive timing durations.
+# to the separately defined useful-frame duration.
 UNKEY_ATTEMPTS = 3
 
 # Blind transmit-off frames written once the acked attempts are exhausted:

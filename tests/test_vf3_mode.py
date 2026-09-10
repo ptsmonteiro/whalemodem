@@ -4,9 +4,8 @@ The DSP itself is covered by `tests/test_vf3_kernels.py` and
 `tests/test_vf3_stages.py`, and was validated
 on air (`experiments/vf3/RESULTS.md`).  What is tested here is the adapter:
 that VF3 presents the surface the link drives, that its decode results say
-the three things the link's receive loop reads them for, and that the
-adaptive head the link negotiates does not disturb the waveform the bench
-signed off on.
+the three things the link's receive loop reads them for, and that the mode's
+fixed native preamble is part of the waveform the bench validated.
 
 Software only -- no radios, no sound cards.
 """
@@ -54,7 +53,7 @@ def test_vf3_is_the_top_rung_of_the_ladder_and_steps_both_ways():
 
 
 def test_a_vf3_keying_is_fixed_length_whatever_it_carries():
-    assert VF3.airtime(1) == VF3.airtime(VF3.chunk_size) == pytest.approx(5.2)
+    assert VF3.airtime(1) == VF3.airtime(VF3.chunk_size) == pytest.approx(6.155)
 
 
 def test_a_full_chunk_is_worth_more_than_four_1200_baud_keyings():
@@ -119,57 +118,10 @@ def test_noise_and_a_bare_tone_decode_to_nothing():
         assert VF3.decode(rx_audio.downsample(audio))["payload"] is None
 
 
-# -- the adaptive head ----------------------------------------------------
-
-def test_the_default_head_reproduces_the_waveform_the_bench_validated():
+def test_the_native_preamble_is_part_of_the_waveform():
     packet = _packet()
     assert np.array_equal(VF3.encode(packet), vf3.modulate(packet))
-    assert np.array_equal(VF3.encode(packet, include_head=False),
-                          vf3.modulate(packet))
-
-
-@pytest.mark.parametrize("head_seconds", [0.045, 0.3, 1.0])
-def test_a_negotiated_head_only_lengthens_the_lead_in(head_seconds):
-    packet = _packet()
-    audio = VF3.encode(packet, head_seconds=head_seconds)
-    lead = vf3.lead_in_samples(head_seconds)
-
-    assert len(audio) == vf3.frame_samples(head_seconds)
-    # Everything after the head is the frame the bench validated, untouched.
-    assert np.array_equal(audio[lead:], vf3.modulate(packet)[vf3.LEAD_IN_SAMPLES:])
-    assert VF3.decode(_snapshot(audio), head_seconds=head_seconds)["payload"] == packet
-
-
-def test_the_head_absorbs_leading_audio_that_a_squelch_blackout_would_eat():
-    """The point of the head: clipping costs padding, not the header."""
-    packet = _packet()
-    audio = VF3.encode(packet, head_seconds=0.5)
-    blackout = int(0.4 * vf3.SAMPLE_RATE)
-    clipped = np.concatenate((np.zeros(blackout, np.float32), audio[blackout:]))
-
-    assert VF3.decode(_snapshot(clipped))["payload"] == packet
-
-
-def test_the_surviving_head_is_reported_in_cores_and_in_seconds():
-    audio = VF3.encode(_packet(), head_seconds=0.5)
-    result = VF3.decode(_snapshot(audio))
-
-    # 0.5 s of head holds 23 whole 1024-sample cores.
-    cores = int(0.5 * vf3.SAMPLE_RATE) // vf3.CORE_SAMPLES
-    assert result["head_cores_observed"] == cores
-    # The seconds are what link._head_feedback_request consumes; the core
-    # count stays as the diagnostic.  See vf3_mode's docstring.
-    assert result["head_seconds_received"] == cores * vf3.CORE_SAMPLES / vf3.SAMPLE_RATE
-    assert "head_symbols_received" not in result
-
-
-def test_a_clipped_head_measures_short():
-    audio = VF3.encode(_packet(), head_seconds=0.5)
-    blackout = int(0.3 * vf3.SAMPLE_RATE)
-    clipped = np.concatenate((np.zeros(blackout, np.float32), audio[blackout:]))
-    full = VF3.decode(_snapshot(audio))["head_cores_observed"]
-
-    assert 0 < VF3.decode(_snapshot(clipped))["head_cores_observed"] < full
+    assert len(VF3.encode(packet)) == vf3.FRAME_SAMPLES
 
 
 if __name__ == "__main__":

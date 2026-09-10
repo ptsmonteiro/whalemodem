@@ -13,9 +13,9 @@ def test_hc1w_geometry_and_capacity():
     assert hc1w.CARRIER_HZ[[0, -1]].tolist() == [468.75, 2531.25]
     assert hc1w.CODEC.code is hc1w.dsp.K9
     assert HC1W.chunk_size == 995
-    assert HC1W.airtime(HC1W.chunk_size) == pytest.approx(5.0146667)
+    assert HC1W.airtime(HC1W.chunk_size) == pytest.approx(5.8946667)
     assert HC1W.chunk_size * 8 / HC1W.airtime(HC1W.chunk_size) == pytest.approx(
-        1587.3438
+        1350.3732
     )
 
 

@@ -1,7 +1,7 @@
 """HC1W: 23-carrier differential-QPSK OFDM for HF SSB.
 
 The 468.75-2531.25 Hz carrier plan uses 93.75 Hz spacing, a 2.67 ms cyclic
-prefix, a 5.015 s frame, and terminated rate-1/2 K=9 coding.
+prefix, a 5.895 s frame, and terminated rate-1/2 K=9 coding.
 """
 
 from __future__ import annotations
@@ -11,9 +11,9 @@ from dataclasses import dataclass
 import numpy as np
 from scipy.signal import hilbert
 
-from .. import dsp, rx_audio
+from .. import dsp, framing, rx_audio
 from ..dsp import (acquire as _acquire_kernel, differential as _diff,
-                   equalize as _eq, freq as _freq, head as _head,
+                   equalize as _eq, freq as _freq,
                    ofdm as _ofdm, timing as _timing)
 
 # -- geometry -------------------------------------------------------------
@@ -59,35 +59,9 @@ RX_GEOMETRY = _ofdm.Geometry(
     guard_samples=RX_GUARD_SAMPLES, carrier_bins=CARRIER_BINS,
 )
 
-#: 48 ms -- four whole sync cores plus HEAD_PHASE_SAMPLES.  SSB has no
-#: squelch to blank the start of a transmission, so unlike the FM profiles'
-#: 1 s head pad this floor is only what ramps the transmitter and the sound
-#: card up.  The link negotiates it longer if the far end reports losing
-#: more than that; see `lead_in_samples`.
-LEAD_IN_SAMPLES = 2_304
-
-#: Where in the sync core the head must stop, and the reason `lead_in_samples`
-#: quantizes rather than rounding.
-#:
-#: A sync symbol is `core[-128:] + core`, so a head that ends exactly on a
-#: core boundary has *already transmitted* a sync symbol in its own last 640
-#: samples -- the tail of one core followed by a whole one is precisely that
-#: shape.  Acquisition then finds its lag-640 self-correlation holding at
-#: 1.0 for the 640 samples before the header, collapses that into one
-#: proposal group, and returns whichever sample inside the plateau numerical
-#: noise favours.  Measured before this was fixed: a clean frame acquired
-#: 329 samples early and decoded to nothing.
-#:
-#: Stopping half a core short instead makes that alignment impossible for
-#: any head length: the match needs the head to end at core phase 0 and this
-#: guarantees phase 256.  The head stays core-periodic, so `_head.measure`
-#: is unaffected -- it recovers the phase circularly and counts whole cores
-#: back from wherever the header starts.
 HEAD_PHASE_SAMPLES = CORE_SAMPLES // 2
 LEAD_IN_FADE_SAMPLES = 240
 TAIL_SAMPLES = 960
-FRAME_SAMPLES = LEAD_IN_SAMPLES + TOTAL_SYMBOLS * SYMBOL_SAMPLES + TAIL_SAMPLES
-FRAME_SECONDS = FRAME_SAMPLES / SAMPLE_RATE
 
 FFT_OFFSET = GUARD_SAMPLES
 RX_FFT_OFFSET = RX_GUARD_SAMPLES
@@ -96,11 +70,7 @@ ACQUISITION_THRESHOLD = 0.70
 MIN_PRESENT_CARRIERS = 19
 CARRIER_FLOOR_DB = 35.0
 
-HEAD_MATCH_THRESHOLD = _head.MATCH_THRESHOLD
-HEAD_MIN_ENERGY_FRACTION = _head.MIN_ENERGY_FRACTION
-#: One sample of block-to-block alignment drift, allowed because the head is
-#: measured on frequency-corrected audio.  See `_measure_head`.
-HEAD_PHASE_TOLERANCE = 1
+HEAD_SECONDS = framing.HEAD_SECONDS
 
 #: Unambiguous range of the two frequency estimators, as a fact about the
 #: geometry rather than a tunable: the cyclic-prefix angle wraps at half a
@@ -125,35 +95,24 @@ FINE_OFFSET_LIMIT_HZ = SAMPLE_RATE / (2.0 * SYMBOL_SAMPLES)
 # second pass over the whole capture.  See `_remove_residual_offset`.
 
 
-def lead_in_samples(head_seconds: float = None) -> int:
-    """Leading sync-core samples for a requested head duration.
-
-    Rounded *up* to the next whole core plus HEAD_PHASE_SAMPLES, so no
-    requested duration can land the head on a core boundary and blunt
-    acquisition.  LEAD_IN_SAMPLES is the floor, for the same reason it is in
-    VF3: it is what ramps the transmitter and the sound card up, and nothing
-    shorter has ever been transmitted.
-    """
-    if head_seconds is None:
-        wanted = LEAD_IN_SAMPLES
-    elif head_seconds < 0:
-        raise ValueError("head duration must not be negative")
-    else:
-        wanted = max(LEAD_IN_SAMPLES, int(round(head_seconds * SAMPLE_RATE)))
-    cores = -(-(wanted - HEAD_PHASE_SAMPLES) // CORE_SAMPLES)
+def lead_in_samples() -> int:
+    """HC1W's fixed native preamble length, aligned for acquisition."""
+    wanted = int(np.ceil(HEAD_SECONDS * SAMPLE_RATE))
+    cores = -((-(wanted - HEAD_PHASE_SAMPLES)) // CORE_SAMPLES)
     return cores * CORE_SAMPLES + HEAD_PHASE_SAMPLES
 
 
-DEFAULT_HEAD_SECONDS = LEAD_IN_SAMPLES / SAMPLE_RATE
+LEAD_IN_SAMPLES = lead_in_samples()
+FRAME_SAMPLES = LEAD_IN_SAMPLES + TOTAL_SYMBOLS * SYMBOL_SAMPLES + TAIL_SAMPLES
+FRAME_SECONDS = FRAME_SAMPLES / SAMPLE_RATE
 
 
-def frame_samples(head_seconds: float = DEFAULT_HEAD_SECONDS) -> int:
-    return (lead_in_samples(head_seconds)
-            + TOTAL_SYMBOLS * SYMBOL_SAMPLES + TAIL_SAMPLES)
+def frame_samples() -> int:
+    return FRAME_SAMPLES
 
 
-def frame_seconds(head_seconds: float = DEFAULT_HEAD_SECONDS) -> float:
-    return frame_samples(head_seconds) / SAMPLE_RATE
+def frame_seconds() -> float:
+    return FRAME_SECONDS
 
 
 # -- reference constellations and the payload codec -----------------------
@@ -228,15 +187,14 @@ def frame_constellation(payload: bytes) -> np.ndarray:
     return np.vstack((HEADER_VALUES, payload_values))
 
 
-def modulate(payload: bytes, *,
-             head_seconds: float = DEFAULT_HEAD_SECONDS) -> np.ndarray:
+def modulate(payload: bytes) -> np.ndarray:
     values = frame_constellation(payload)
     symbols = np.concatenate([build_symbol(row) for row in values])
-    lead = np.resize(sync_core(), lead_in_samples(head_seconds)).copy()
+    lead = np.resize(sync_core(), LEAD_IN_SAMPLES).copy()
     fade = LEAD_IN_FADE_SAMPLES
     lead[:fade] *= np.linspace(0.0, 1.0, fade, endpoint=True)
     audio = np.concatenate((lead, symbols, np.zeros(TAIL_SAMPLES)))
-    if len(audio) != frame_samples(head_seconds):
+    if len(audio) != frame_samples():
         raise AssertionError(f"internal frame length error: {len(audio)}")
     peak = float(np.max(np.abs(audio)))
     if peak > MAX_SAMPLE:
@@ -308,26 +266,6 @@ def _acquire(analytic: np.ndarray) -> tuple[int | None, float]:
         rank=lambda start: _header_candidate_snr(analytic, start))
 
 
-def _measure_head(samples: np.ndarray, start: int) -> tuple[int, float]:
-    """How much of the transmitted head survived, in whole 512-sample cores.
-
-    Takes the *frequency-corrected* audio.  The head is matched against a
-    reference waveform, and even an 8 Hz offset -- less than this bench
-    measured between its two radios -- cuts a 47-core head to 1, which the
-    link would answer by lengthening a head that was arriving perfectly.
-    Correcting first is what keeps the head feedback meaningful on an
-    offset channel.
-
-    Correcting is also why the phase tolerance is one sample rather than
-    zero: the correction is a slow phase ramp across the whole capture, and
-    a ramp of a few degrees walks the correlation peak over a sample
-    boundary partway down a long head.  See `_head.measure`'s
-    `phase_tolerance`.
-    """
-    return _head.measure(samples, start, rx_sync_core(),
-                         phase_tolerance=HEAD_PHASE_TOLERANCE)
-
-
 def _base_result() -> dict:
     return {
         "synced": False, "payload": None, "confidence": 0.0,
@@ -338,10 +276,8 @@ def _base_result() -> dict:
     }
 
 
-def demodulate(audio: np.ndarray, *,
-               head_seconds: float = DEFAULT_HEAD_SECONDS) -> dict:
+def demodulate(audio: np.ndarray) -> dict:
     """Decode one HC1W frame from receive-rate audio."""
-    del head_seconds  # acquisition finds the header wherever the head ended
     result = _base_result()
     samples = np.asarray(audio, dtype=np.float64).reshape(-1)
     if len(samples) < HEADER_SYMBOLS * RX_SYMBOL_SAMPLES:
@@ -360,10 +296,6 @@ def demodulate(audio: np.ndarray, *,
     coarse_hz = _coarse_offset(analytic, start)
     corrected = _freq.derotate(analytic, coarse_hz, RX_SAMPLE_RATE)
     result["coarse_cfo_hz"] = coarse_hz
-
-    head_cores, head_score = _measure_head(np.real(corrected), start)
-    result["head_cores_received"] = head_cores
-    result["head_match"] = head_score
 
     fit = _timing.estimate(RX_GEOMETRY, corrected, start, _TIMING_SYMBOLS)
     result["timing_drift_samples"] = fit.drift_samples(TOTAL_SYMBOLS)
@@ -420,9 +352,8 @@ def demodulate(audio: np.ndarray, *,
     return result
 
 
-def demodulate_debug(audio: np.ndarray, reference_payload: bytes | None = None,
-                     *, head_seconds: float = DEFAULT_HEAD_SECONDS) -> dict:
-    result = demodulate(audio, head_seconds=head_seconds)
+def demodulate_debug(audio: np.ndarray, reference_payload: bytes | None = None) -> dict:
+    result = demodulate(audio)
     if reference_payload is None or result.get("raw_payload_bits") is None:
         return result
     expected = encode_payload_bits(reference_payload)
@@ -470,7 +401,7 @@ def _check_constants() -> None:
     assert TOTAL_SYMBOLS == 365 and PAYLOAD_BITS == 16_192
     assert FEC_INPUT_BITS == 8_096
     assert LEAD_IN_SAMPLES % CORE_SAMPLES == HEAD_PHASE_SAMPLES
-    assert FRAME_SAMPLES == 236_864
+    assert FRAME_SAMPLES == 282_944
     assert PACKET_BYTES == 1_011 and UNUSED_INFO_BITS == 0
     assert MAX_PAYLOAD_BYTES == 1_005
     assert COARSE_OFFSET_LIMIT_HZ == 46.875

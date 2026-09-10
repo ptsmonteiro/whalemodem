@@ -1,7 +1,7 @@
 """VF4: mid-rung 58-carrier OFDM with square 16-QAM and RS protection.
 
 VF4 fills VHF FM speed-ladder Level 3 ("Fast data").  It reuses VF6's
-qualified 48 kHz / 5.2 s / 214-symbol OFDM frame geometry, header, and
+qualified 48 kHz / 6.155 s / 214-symbol OFDM frame geometry, header, and
 pilot-tracking approach verbatim -- the same 58 carriers at 46.875 Hz
 spacing, the same 15-symbol coherent header, and the same ten interspersed
 full-band pilot symbols -- but spends only 4 bits per carrier per symbol
@@ -30,6 +30,7 @@ from dataclasses import dataclass
 import numpy as np
 from scipy.signal import hilbert
 
+from .. import framing
 from ..dsp.bits import pn_bits
 
 
@@ -55,7 +56,7 @@ DATA_SYMBOL_INDICES = np.setdiff1d(
 DATA_SYMBOLS = len(DATA_SYMBOL_INDICES)
 PAYLOAD_BITS = DATA_SYMBOLS * BITS_PER_SYMBOL
 
-LEAD_IN_SAMPLES = 2_160
+LEAD_IN_SAMPLES = int(np.ceil(framing.HEAD_SECONDS * SAMPLE_RATE))
 TAIL_SAMPLES = 912
 FRAME_SAMPLES = LEAD_IN_SAMPLES + TOTAL_SYMBOLS * SYMBOL_SAMPLES + TAIL_SAMPLES
 FRAME_SECONDS = FRAME_SAMPLES / SAMPLE_RATE
@@ -685,7 +686,7 @@ def _check_constants() -> None:
     assert CARRIER_HZ[0] == 468.75 and CARRIER_HZ[-1] == 3140.625
     assert TOTAL_SYMBOLS == 214 and PAYLOAD_BITS == 43_848
     assert PILOT_SYMBOLS == 10 and DATA_SYMBOLS == 189
-    assert FRAME_SAMPLES == 249_600 and FRAME_SECONDS == 5.2
+    assert FRAME_SAMPLES == 295_440 and FRAME_SECONDS == 6.155
     assert PACKET_BYTES == 5_481 and UNUSED_GRID_BYTES == 147
     assert RS_BLOCKS == 21
     assert RS_ENCODED_BYTES == 5_334 and RS_PACKET_BYTES == 4_998

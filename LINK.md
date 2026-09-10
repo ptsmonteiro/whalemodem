@@ -59,14 +59,12 @@ bytes are inline; any remainder follows in the same waveform.
 | `0x02` | CONNECT_ACK | Connection acceptance | control |
 | `0x03` | DISC | Empty | control |
 | `0x04` | DISC_ACK | Empty | control |
-| `0x05` | DATA | Flags/sequence and sent-head duration inline, then chunk body | negotiated body |
-| `0x06` | DATA_ACK | Answered sequence, next expected sequence, received mode, requested head | control |
+| `0x05` | DATA | Flags/sequence inline, then chunk body | negotiated body |
+| `0x06` | DATA_ACK | Answered sequence, next expected sequence, received mode | control |
 | `0x07` | reserved | Must be ignored | control |
 | `0x08` | reserved | Must be ignored | control |
 | `0x09` | FLOOR_REQ | Empty | control |
 | `0x0a` | FLOOR_GRANT | Empty | control |
-| `0x0b` | TIMING_ACK | Reverse-direction timing measurement | control |
-| `0x0c` | TIMING_CONFIRM | Timing-handshake confirmation | control |
 
 ### Connection bodies
 
@@ -80,7 +78,7 @@ Both packet types begin with this envelope:
 | Field | Size | Value or meaning |
 | --- | ---: | --- |
 | Magic | 4 bytes | `ff 57 48 4c` (`0xff` followed by ASCII `WHL`) |
-| Format version | 1 byte | `0x04` |
+| Format version | 1 byte | `0x05` |
 | Content length | 2 bytes | Bytes after this field |
 | Content | `content_length` bytes | The version-specific fields below |
 
@@ -89,7 +87,7 @@ body with the wrong magic, an unsupported format version, a content length
 that does not equal the remaining body size, a truncated field, or extra
 bytes.
 
-CONNECT v4 Content is:
+CONNECT v5 Content is:
 
 | Field | Size | Meaning |
 | --- | ---: | --- |
@@ -102,7 +100,7 @@ CONNECT v4 Content is:
 | Supported mode IDs | `mode_count` bytes | Unique one-byte IDs in preference order |
 | Proposed transmit mode | 1 byte | One of the advertised IDs |
 
-CONNECT_ACK v4 Content is:
+CONNECT_ACK v5 Content is:
 
 | Field | Size | Meaning |
 | --- | ---: | --- |
@@ -122,26 +120,15 @@ FM ladder, mode 5 on the HF SSB one. Callsigns are compared according to the
 existing link addressing policy after their encoding has been validated.
 The limits above bound all variable fields before allocation.
 
-The format version defines the complete handshake feature set. Version 4
-includes calibration, ordinary-frame head feedback, and ACK-embedded mode confirmation, and therefore
-requires the calibration handshake
-described in `ADAPTIVE_TIMING.md`. Its CONNECT carries the protocol-fixed
-calibration head before the frame. The decoder retains enough leading audio to
-measure it. CONNECT_ACK begins the two-probe exchange. An endpoint that does
-not implement every required version-4 behavior rejects version 4 rather than
-accepting a reduced feature set. Version 3 included tail sequences and
-three-byte timing reports; version 2 lacks the DATA/DATA_ACK feedback bytes.
-Version 1 used the
-removed MODE_REQ/MODE_ACK exchange.
+The format version defines the complete handshake feature set. Version 5 uses
+each mode's fixed native preamble and has no calibration handshake or adaptive
+head feedback. Older versions are rejected rather than being accepted with a
+reduced feature set.
 
 The session ID and the complete encoded CONNECT body identify an attempt. A
 listener answers an identical duplicate CONNECT using the same format version
-and mode choices. While awaiting TIMING_ACK, the listener starts a fresh
-control-response timeout after a duplicate CONNECT_ACK finishes transmitting;
-the half-duplex caller cannot begin TIMING_ACK before then. Adaptive-timing measurements may change only according to
-the conservative aggregation rule in `ADAPTIVE_TIMING.md`. A CONNECT with the
-same session ID but different bytes is invalid. This prevents the handshake
-feature set from changing across retries.
+and mode choices. A CONNECT with the same session ID but different bytes is
+invalid. This prevents the handshake feature set from changing across retries.
 
 The caller randomly chooses one session identifier in the range `1..255` for
 the complete retry sequence. The caller ignores acknowledgements with a
@@ -152,26 +139,24 @@ state.
 
 ### DATA and DATA_ACK
 
-The first two DATA body bytes are:
+The first DATA body byte is:
 
 ```text
 bit 7       EOF: this is the final chunk of the current message
 bits 6..0   sequence number, modulo 128
-byte 1      transmitted head duration in unsigned 10 ms units
 ```
 
-The duration is rounded upward and ranges from 10 ms through the documented
-1.00 s maximum. The remainder is the chunk, including possibly zero bytes. Sequence numbers
+The remainder is the chunk, including possibly zero bytes. Sequence numbers
 run across message boundaries for the entire connection. They do not reset at
 each message. This makes a retransmitted final chunk distinguishable from the
 first chunk of the following message.
 
 Only the ISS may originate DATA. Each DATA frame is sent using stop-and-wait
 ARQ and must be acknowledged before the next sequence is sent. DATA_ACK has
-exactly four significant body bytes:
+exactly three significant body bytes:
 
 ```text
-answered_sequence next_expected_sequence received_mode_id requested_head_duration
+answered_sequence next_expected_sequence received_mode_id
 ```
 
 The sequence values use their low seven bits. An ACK accepts the outstanding frame
@@ -179,12 +164,6 @@ only when `answered_sequence` equals that frame's sequence and
 `next_expected_sequence` is one step ahead modulo 128, and the mode ID equals
 the mode in which the sender transmitted it. An ACK for an older frame or a
 different mode is ignored while the sender continues waiting.
-
-The requested duration uses the same 10 ms units as DATA. It is absolute, not
-a delta, and is applied only from an otherwise acceptable ACK and only when it
-exceeds the current connection value. Retries, duplicates, stale sequence
-numbers, floor transfers, and delayed smaller requests therefore cannot
-repeatedly inflate or decrease padding.
 
 The receiver appends a chunk only when its sequence equals the expected
 sequence, then advances the expectation. A duplicate is discarded. Every
@@ -228,11 +207,9 @@ is authoritative: the receiver adopts that mode and returns it as
 silence at one speed by retransmitting the same sequence at a lower speed; the
 first successful ACK confirms both delivery and the new mode. DATA_ACK remains
 in the robust control mode and does not describe the reverse-direction mode.
-Head fields encode duration rather than symbols, so a mode change preserves
-the protection and rounds it upward at the new mode's own head granularity.
-The connection-time calibration in `ADAPTIVE_TIMING.md` encodes duration for
-the same reason: it is what lets a mode without symbols -- HC1W measures its
-head in whole OFDM sync cores -- be the control mode at all.
+Each mode owns its fixed native preamble, so a mode change also changes the
+preamble waveform while preserving the common settling allowance. The
+receiver tries every mutually advertised mode when looking for DATA.
 
 ### Disconnect
 

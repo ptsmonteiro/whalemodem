@@ -78,5 +78,5 @@ def test_oversize_packet_is_rejected():
 
 
 def test_vf6_fixed_airtime_and_top_rate():
-    assert VF6.airtime(framing.AIR_HEADER_BYTES) == pytest.approx(5.2)
-    assert VF6.chunk_size * 8 / VF6.airtime(VF6.chunk_size) > 15_000
+    assert VF6.airtime(framing.AIR_HEADER_BYTES) == pytest.approx(6.155)
+    assert VF6.chunk_size * 8 / VF6.airtime(VF6.chunk_size) > 13_000

@@ -28,13 +28,12 @@ class Hf5Codec:
     tx_sample_rate = hf5.TX_SAMPLE_RATE
     rx_sample_rate = hf5.RX_SAMPLE_RATE
 
-    def encode(self, payload: bytes, mode: "Hf5Mode", *, include_head=True,
-               head_seconds=None) -> np.ndarray:
-        del mode, include_head, head_seconds
+    def encode(self, payload: bytes, mode: "Hf5Mode") -> np.ndarray:
+        del mode
         return hf5.modulate(bytes(payload))
 
-    def decode(self, audio, mode: "Hf5Mode", *, head_seconds=None, **kwargs) -> dict:
-        del mode, head_seconds, kwargs
+    def decode(self, audio, mode: "Hf5Mode", **kwargs) -> dict:
+        del mode, kwargs
         return hf5.demodulate(audio)
 
     def airtime(self, payload_len: int, mode: "Hf5Mode") -> float:
@@ -66,19 +65,8 @@ class Hf5Mode:
     def baud(self) -> float:
         return hf5.BAUD
 
-    @property
-    def head_match_allowance_seconds(self) -> float:
-        """This PHY carries no outer head, so it never reports an observation
-        and `_head_feedback_request` returns before consulting the allowance.
-        The value is still dereferenced eagerly at that call site, so it has
-        to exist: without it the first frame this mode ever receives raises
-        an AttributeError that escapes ModemService's LinkError handler and
-        tears the link down mid-transfer."""
-        return 0.0
-
-    def encode(self, payload: bytes, *, include_head=True, head_seconds=None):
-        return self.codec.encode(payload, self, include_head=include_head,
-                                 head_seconds=head_seconds)
+    def encode(self, payload: bytes):
+        return self.codec.encode(payload, self)
 
     def decode(self, audio, **kwargs):
         return self.codec.decode(audio, self, **kwargs)

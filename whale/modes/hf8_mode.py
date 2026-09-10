@@ -17,7 +17,7 @@ change:
     AWGN boundary, and none of those other axes moved it by a grid step.
   * **Rate-2/3 LDPC instead of rate-3/4**,
   * **a full pilot symbol every 10 data symbols instead of every 20**, and
-  * **a 0.616 s frame instead of 4.84 s** -- see `PACKET_BYTES` below, where
+  * **a 5.940 s frame instead of 5.808 s** -- see `PACKET_BYTES` below, where
     the reasoning is the opposite of HF7's and matters more than the other
     three put together on a fading channel.
 
@@ -98,7 +98,6 @@ import numpy as np
 from whale.phy import ofdm49 as hf8
 
 from .. import framing
-from . import hf_lead
 
 
 HF8_MODE_ID = 15
@@ -116,13 +115,13 @@ BAND_LO_HZ = 300.0
 BAND_HI_HZ = 2700.0
 
 # 270 B is 5 whole rate-2/3 LDPC codewords (k=432 information bits) with no
-# padding at all, and puts the frame at 0.616 s.
+# padding at all, and puts the frame at 5.940 s.
 #
 # The frame length is not an overhead decision here, the way HF7's 4,738 B is.
 # It is the single largest lever on this mode's fading envelope, measured:
 # holding the waveform fixed and varying only the frame, quiet-Watterson 90%
 # delivery moves 24 dB -> 20 -> 16 as the frame shortens 2.090 s -> 1.144 ->
-# 0.616, and at 4.862 s it is never reached at all.  Long frames straddle deep
+# 5.940, and at 4.862 s it is never reached at all.  Long frames straddle deep
 # fades; no amount of coding inside one recovers a frame that spent a whole
 # codeword in a null.  HF7's reasoning -- lengthen the frame until the fixed
 # ~155 ms per-keying cost amortizes to ~3% -- is right for a mode whose job is
@@ -141,6 +140,7 @@ HF8_PHY = hf8.OFDM49Mode(
     bits_per_symbol=BITS_PER_SYMBOL,
     packet_bytes=PACKET_BYTES,
     pilot_interval=PILOT_INTERVAL,
+    n_preamble_symbols=46,
     equalizer="gain",
     # HF7's calibration, for HF7's bench and audio gain structure. 8PSK's
     # crest factor is 0.8 dB above HF7's 8.9 dB, so this is if anything
@@ -159,20 +159,15 @@ class Hf8Codec:
     tx_sample_rate = hf8.TX_SAMPLE_RATE
     rx_sample_rate = hf8.RX_SAMPLE_RATE
 
-    def encode(self, payload: bytes, mode: "Hf8Mode", *, include_head=True,
-               head_seconds=None) -> np.ndarray:
+    def encode(self, payload: bytes, mode: "Hf8Mode") -> np.ndarray:
         if len(payload) > HF8_PHY.max_payload_bytes:
             raise ValueError(
                 f"packet is {len(payload)} bytes; {mode.name} carries at most "
                 f"{HF8_PHY.max_payload_bytes}")
-        # Keep the minimum common lead when include_head=False; disabling the
-        # negotiated extension must not create a headless shipped waveform.
-        if not include_head or head_seconds is None:
-            head_seconds = hf_lead.MIN_SECONDS
-        lead = hf_lead.modulate(hf_lead.HF8_LABEL, head_seconds)
-        return np.concatenate((lead, HF8_PHY.modulate(bytes(payload))))
+        del mode
+        return HF8_PHY.modulate(bytes(payload))
 
-    def decode(self, audio, mode: "Hf8Mode", *, head_seconds=None, **kwargs) -> dict:
+    def decode(self, audio, mode: "Hf8Mode", **kwargs) -> dict:
         del mode
         if np.asarray(audio).ndim != 1:
             return {"synced": False, "payload": None}
@@ -181,39 +176,11 @@ class Hf8Codec:
         # gain derived from that same preamble, so its residual is biased low
         # and the LLRs handed to the LDPC decoder are mis-scaled.
         kwargs.setdefault("noise_estimator", NOISE_ESTIMATOR)
-        # Strip the latest matching lead boundary before OFDM acquisition so
-        # the MFSK head cannot win the OFDM preamble search. Erased or clipped
-        # leads still use the body-only acquisition fallback.
-        captured = np.asarray(audio)
-        lead_candidates = hf_lead.measured_candidates(
-            captured, hf_lead.HF8_LABEL, head_seconds)
-        result = None
-        body_start = None
-        for candidate, body_offset in lead_candidates:
-            attempt = HF8_PHY.demodulate(captured[body_offset:], **kwargs)
-            local_start = attempt.get("start_sample")
-            if local_start is not None:
-                body_start = body_offset + local_start
-                attempt["start_sample"] = body_start
-            result = attempt
-            if result.get("payload") is not None and body_start is not None:
-                break
-        if result is None or result.get("payload") is None:
-            result = HF8_PHY.demodulate(captured, **kwargs)
-            body_start = result.get("start_sample")
-        if result.get("payload") is not None and body_start is not None:
-            result["start_index"] = body_start
-            observed, score = hf_lead.measure(
-                captured, body_start, hf_lead.HF8_LABEL, head_seconds)
-            result.update(
-                head_blocks_observed=observed,
-                head_seconds_received=hf_lead.seconds_received(observed),
-                head_match=score)
-        return result
+        return HF8_PHY.demodulate(np.asarray(audio), **kwargs)
 
     def airtime(self, payload_len: int, mode: "Hf8Mode") -> float:
         del payload_len, mode
-        return hf_lead.MIN_SECONDS + HF8_PHY.frame_seconds()
+        return HF8_PHY.frame_seconds()
 
 
 HF8_CODEC = Hf8Codec()
@@ -225,7 +192,6 @@ class Hf8Mode:
     mode_id: int = HF8_MODE_ID
     chunk_size: int = CHUNK_SIZE
     confidence_threshold: float = CONFIDENCE_THRESHOLD
-    lead_label: int = hf_lead.HF8_LABEL
     fec_rate: str | None = FEC_RATE
     codec: Hf8Codec = field(default=HF8_CODEC, compare=False, repr=False)
 
@@ -241,14 +207,8 @@ class Hf8Mode:
     def baud(self) -> float:
         return hf8.DESIGN_RATE / HF8_PHY.symbol_len
 
-    @property
-    def head_match_allowance_seconds(self) -> float:
-        """One common HF lead block, the measurement resolution."""
-        return hf_lead.BLOCK_SAMPLES / self.tx_sample_rate
-
-    def encode(self, payload: bytes, *, include_head=True, head_seconds=None):
-        return self.codec.encode(payload, self, include_head=include_head,
-                                 head_seconds=head_seconds)
+    def encode(self, payload: bytes):
+        return self.codec.encode(payload, self)
 
     def decode(self, audio, **kwargs):
         return self.codec.decode(audio, self, **kwargs)

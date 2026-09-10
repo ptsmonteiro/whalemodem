@@ -78,6 +78,32 @@ def estimate(geometry: Geometry, analytic: np.ndarray, start: int,
             np.sqrt(energy * tail_energy), 1e-30)
         # argmax keeps the first shift on an exact tie, as the scalar `>` did.
         best = np.argmax(candidates, axis=1)
+        # The batched reductions above can differ from the scalar np.vdot by
+        # a few float32 ulps.  Near a flat cyclic-prefix correlation that can
+        # move argmax by one sample, even though the scalar implementation
+        # would keep the first equal winner.  Re-evaluate only that narrow
+        # tie band with the scalar reduction and strict comparison; ordinary
+        # peaks retain the vectorized path.
+        for row in range(len(indices)):
+            if not usable[row].any():
+                continue
+            vector_best = candidates[row, best[row]]
+            near = np.flatnonzero(
+                usable[row] & (vector_best - candidates[row] <= 1e-6))
+            if len(near) < 2:
+                continue
+            best_score, best_column = -1.0, int(near[0])
+            for column in near:
+                at = int(starts[row, column])
+                window = analytic[at:at + guard]
+                trailing = analytic[at + core:at + symbol]
+                denominator = np.sqrt(np.vdot(window, window).real
+                                      * np.vdot(trailing, trailing).real)
+                score = float(abs(np.vdot(window, trailing))
+                              / max(denominator, 1e-30))
+                if score > best_score:
+                    best_score, best_column = score, int(column)
+            best[row] = best_column
         found = usable[np.arange(len(indices)), best]
         shifts = np.where(found, offsets[best], 0).astype(float)
         # The winner's score is re-derived with the same np.vdot reduction

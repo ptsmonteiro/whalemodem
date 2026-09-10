@@ -203,8 +203,13 @@ def _goto_backend(view, backend):
 
 
 def _fill_text(view, key, text):
+    """Forces manual-edit mode directly via _start_edit rather than routing
+    through Enter: for a picker-backed row (port/usb_id), Enter now opens
+    the picker instead whenever real candidates are available (see
+    _has_pickable_items), which on a machine with real serial ports or a
+    working libhamlib made this helper's assumption machine-dependent."""
     _select_row(view, key)
-    _enter(view)
+    view._start_edit(key)
     _clear_edit_buffer(view)
     _type(view, text)
     _enter(view)
@@ -268,19 +273,38 @@ def test_save_fails_on_missing_icom_civ_usb_id():
     assert "usb_id" in view.status.lower()
 
 
-def test_save_fails_on_bad_baud():
+def test_baud_selector_cycles_through_fixed_list_and_wraps():
     view = _new_view()
+    _goto_backend(view, "serial-line")
+    _select_row(view, "baud")
+    assert view.backend_config["serial-line"]["baud"] == ""
+    for expected in ("300", "1200", "2400", "4800", "9600", "19200", "38400", "57600",
+                     "115200", ""):
+        _enter(view)
+        assert view.backend_config["serial-line"]["baud"] == expected
+
+
+def test_full_valid_save_serial_line_with_selected_baud():
+    captured = {}
+
+    def on_done(old_name, new_name, radio):
+        captured["result"] = (old_name, new_name, radio)
+
+    view = _new_view(on_done=on_done)
     _fill_text(view, "name", "ht")
-    _fill_text(view, "description", "desc")
-    _fill_audio(view, "Card")
+    _fill_text(view, "description", "HT via Digirig")
+    _fill_audio(view, "USB Audio")
     _goto_backend(view, "serial-line")
     _fill_text(view, "port", "COM5")
-    _fill_text(view, "baud", "not-a-number")
+    _select_row(view, "baud")
+    for _ in range(6):  # "" -> 300 -> 1200 -> 2400 -> 4800 -> 9600 -> 19200
+        _enter(view)
     _select_row(view, "save")
     result = _enter(view)
-    assert result is NOTHING
-    assert "baud" in view.status.lower()
-    assert "whole number" in view.status.lower()
+
+    assert result is POP
+    _, _, radio = captured["result"]
+    assert radio.ptt_config["baud"] == 19200
 
 
 def test_save_fails_on_bad_icom_address():
@@ -800,6 +824,93 @@ def test_hamlib_picker_selects_model_and_autofills_blank_description(monkeypatch
     picker.handle_key(curses.KEY_ENTER)
     assert view.backend_config["hamlib"]["model"] == "3081"
     assert view.description == "Icom IC-7300"
+
+
+# -- hamlib "Model" row display: shows "<manufacturer> <model_name> (id <id>)"
+# instead of the bare stored id, whenever that id resolves --
+
+def test_display_value_shows_manufacturer_and_model_name_for_known_model(monkeypatch):
+    RigModel = hamlib.RigModel
+    models = [RigModel(model=3070, manufacturer="Icom", model_name="IC-705",
+                        version="1.0", status="Stable")]
+    monkeypatch.setattr(hamlib, "list_rig_models", lambda: models)
+
+    view = _new_view()
+    _goto_backend(view, "hamlib")
+    view.backend_config["hamlib"]["model"] = "3070"
+    row = _select_row(view, "model")
+    assert view._display_value(row) == "Icom IC-705 (id 3070)"
+
+
+def test_display_value_falls_back_to_raw_id_when_model_not_found(monkeypatch):
+    monkeypatch.setattr(hamlib, "list_rig_models", lambda: [])
+
+    view = _new_view()
+    _goto_backend(view, "hamlib")
+    view.backend_config["hamlib"]["model"] = "3070"
+    row = _select_row(view, "model")
+    assert view._display_value(row) == "3070"
+
+
+def test_display_value_falls_back_to_raw_value_when_not_numeric(monkeypatch):
+    def boom():
+        raise AssertionError("list_rig_models should not be called for a non-numeric value")
+    monkeypatch.setattr(hamlib, "list_rig_models", boom)
+
+    view = _new_view()
+    _goto_backend(view, "hamlib")
+    view.backend_config["hamlib"]["model"] = ""
+    row = _select_row(view, "model")
+    assert view._display_value(row) == ""
+
+
+def test_display_value_falls_back_to_raw_id_when_hamlib_unavailable(monkeypatch):
+    def boom():
+        raise OSError("could not load libhamlib")
+    monkeypatch.setattr(hamlib, "list_rig_models", boom)
+
+    view = _new_view()
+    _goto_backend(view, "hamlib")
+    view.backend_config["hamlib"]["model"] = "3070"
+    row = _select_row(view, "model")
+    assert view._display_value(row) == "3070"
+
+
+def test_display_value_shows_raw_edit_buffer_while_editing_model(monkeypatch):
+    RigModel = hamlib.RigModel
+    models = [RigModel(model=3070, manufacturer="Icom", model_name="IC-705",
+                        version="1.0", status="Stable")]
+    monkeypatch.setattr(hamlib, "list_rig_models", lambda: models)
+
+    view = _new_view()
+    _goto_backend(view, "hamlib")
+    view.backend_config["hamlib"]["model"] = "3070"
+    row = _select_row(view, "model")
+    # Enter would open the picker here since models is non-empty (see
+    # _has_pickable_items) -- start editing directly, same as _handle_enter
+    # does once the picker has nothing to offer.
+    view._start_edit("model")
+    _clear_edit_buffer(view)
+    _type(view, "30")
+    assert view._display_value(row) == "30_"
+
+
+def test_display_value_caches_hamlib_model_lookup_across_renders(monkeypatch):
+    calls = []
+
+    def list_rig_models():
+        calls.append(1)
+        return [hamlib.RigModel(model=3070, manufacturer="Icom", model_name="IC-705",
+                                 version="1.0", status="Stable")]
+    monkeypatch.setattr(hamlib, "list_rig_models", list_rig_models)
+
+    view = _new_view()
+    _goto_backend(view, "hamlib")
+    view.backend_config["hamlib"]["model"] = "3070"
+    row = _select_row(view, "model")
+    for _ in range(5):
+        view._display_value(row)
+    assert len(calls) == 1
 
 
 # -- render() regression: every row of every backend must actually draw --

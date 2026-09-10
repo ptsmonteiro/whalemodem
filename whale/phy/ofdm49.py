@@ -72,6 +72,7 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 
 import numpy as np
+from scipy.signal import fftconvolve
 
 from whale.dsp import bits as _bits
 from whale.dsp import ldpc as _ldpc
@@ -547,7 +548,7 @@ class OFDM49Mode:
         best = (-1.0, 0, 0.0)
         for hz in np.arange(-SYNC_SEARCH_HZ, SYNC_SEARCH_HZ + 1e-9, SYNC_SEARCH_STEP_HZ):
             template = _freq_shift_real(preamble_wave, hz, DESIGN_RATE)
-            corr = np.correlate(x, template, mode="valid")
+            corr = fftconvolve(x, template[::-1], mode="valid")
             env = np.abs(_sc._hilbert_envelope(corr))
             peak = int(np.argmax(env))
             conf = float(env[peak] / (norm + 1e-12))
@@ -564,9 +565,8 @@ class OFDM49Mode:
         if confidence < 0.12 or needed > len(x):
             return result
         result["synced"] = True
-        # The mode adapter uses the checked OFDM start to measure the common
-        # outer HF lead.  Keep this scalar diagnostic available on the normal
-        # decode path; the large diagnostics arrays remain opt-in below.
+        # Keep the checked OFDM start available on the normal decode path; the
+        # large diagnostics arrays remain opt-in below.
         result["start_sample"] = int(start)
 
         span = x[start:start + total_symbols * symlen + symlen]

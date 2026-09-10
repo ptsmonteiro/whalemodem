@@ -22,12 +22,23 @@ import threading
 import time
 
 import numpy as np
-import sounddevice as sd
 
 from whale import afsk
 from whale.hw import audio_io
 from whale.hw import radios as radios_mod
 from whale import rx_audio
+
+_sounddevice = None
+
+
+def _load_sounddevice():
+    """Load PortAudio bindings only when a live transport opens audio."""
+    global _sounddevice
+    if _sounddevice is None:
+        import sounddevice
+
+        _sounddevice = sounddevice
+    return _sounddevice
 
 TX_SAMPLE_RATE = audio_io.SAMPLE_RATE
 CAPTURE_SAMPLE_RATE = audio_io.SAMPLE_RATE
@@ -149,6 +160,7 @@ class RadioTransport:
         if self._stream is not None:
             return
         _ensure_com_initialized()
+        sd = _load_sounddevice()
         self._stream = sd.InputStream(
             device=self.in_device, samplerate=CAPTURE_SAMPLE_RATE, channels=1,
             dtype="float32", latency=0.1, callback=self._in_callback,
@@ -252,7 +264,7 @@ class RadioTransport:
                             samplerate=TX_SAMPLE_RATE, ptt_lead=ptt_lead, ptt_tail=ptt_tail)
                         last_exc = None
                         break
-                    except sd.PortAudioError as exc:
+                    except _load_sounddevice().PortAudioError as exc:
                         last_exc = exc
                         log.warning(
                             "OutputStream start failed (attempt %d/%d): %s", attempt, retries, exc)

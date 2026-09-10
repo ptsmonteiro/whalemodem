@@ -1,7 +1,7 @@
 """HR0 short/full 32-FSK control waveform, promoted from MARGIN32.
 
 The 2026-09-06 revision trades the previous 128-FSK margin for short ACK
-latency: 1.812 s for 12 bytes and 3.860 s for 42 bytes with the common lead.
+latency. The fixed native preamble is one second for consistent AGC settling.
 This is wire-incompatible with the previous mode-10 body. Both peers must
 upgrade; the frozen old waveform lives only in the comparison experiment.
 """
@@ -11,6 +11,7 @@ from __future__ import annotations
 import numpy as np
 from scipy.signal import hilbert
 
+from .. import framing
 from .. import dsp, rx_audio
 from ..dsp import mfsk
 
@@ -32,10 +33,14 @@ TAIL_SAMPLES = 960
 RX_TAIL_SAMPLES = TAIL_SAMPLES // rx_audio.DECIMATION
 TX_AMPLITUDE = 0.13 * np.sqrt(2.0)
 ACQUISITION_THRESHOLD = 0.10
+HEAD_SECONDS = framing.HEAD_SECONDS
 
 SYNC_PATTERN = np.repeat(
     BANK.symbols_from_bits(dsp.bits.pn_bits((SYNC_SYMBOLS // 2) *
                                            BITS_PER_SYMBOL, 0x1D35B)), 2)
+HEAD_SYMBOLS = int(np.ceil(HEAD_SECONDS * SAMPLE_RATE / SYMBOL_SAMPLES))
+HEAD_PATTERN = BANK.symbols_from_bits(
+    dsp.bits.pn_bits(HEAD_SYMBOLS * BITS_PER_SYMBOL, 0x0B4A7))
 CODEC = dsp.PacketCodec(
     payload_bits=PAYLOAD_BITS,
     interleaver=dsp.interleave.multiplicative(PAYLOAD_BITS, 301),
@@ -66,11 +71,20 @@ def payload_symbols(payload_len: int) -> int:
             else PAYLOAD_SYMBOLS)
 
 
+def head_in_samples() -> int:
+    symbols = int(np.ceil(HEAD_SECONDS * SAMPLE_RATE / SYMBOL_SAMPLES))
+    return symbols * SYMBOL_SAMPLES
+
+
 def modulate(payload: bytes) -> np.ndarray:
     symbols = payload_symbols(len(payload))
     codec = SHORT_CODEC if symbols == SHORT_PAYLOAD_SYMBOLS else CODEC
     tones = np.concatenate((SYNC_PATTERN, BANK.symbols_from_bits(codec.encode(payload))))
     body = mfsk.modulate(BANK, tones, TX_AMPLITUDE)
+    if HEAD_SECONDS:
+        head = np.resize(mfsk.modulate(BANK, HEAD_PATTERN, TX_AMPLITUDE),
+                         head_in_samples())
+        body = np.concatenate((head, body))
     return np.concatenate((body, np.zeros(TAIL_SAMPLES))).astype(np.float32)
 
 
@@ -144,9 +158,9 @@ def demodulate(audio: np.ndarray) -> dict:
         return result
 
 
-def frame_seconds(lead_samples: int, payload_len: int = MAX_PAYLOAD_BYTES) -> float:
+def frame_seconds(payload_len: int = MAX_PAYLOAD_BYTES) -> float:
     symbols = SYNC_SYMBOLS + payload_symbols(payload_len)
-    return (lead_samples + symbols * SYMBOL_SAMPLES + TAIL_SAMPLES) / SAMPLE_RATE
+    return (head_in_samples() + symbols * SYMBOL_SAMPLES + TAIL_SAMPLES) / SAMPLE_RATE
 
 
 assert BANK.bandwidth_hz <= 2_300.0

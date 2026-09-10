@@ -58,9 +58,8 @@ tried. A rate-1/2 K=7 grid with 11 data carriers (44 raw bits/symbol) needs
 point, and is used here.  See its "Implementation note" and stage-4
 dated note for the record of this and the pilot-count deviations.
 
-The shared HF lead-in (`whale.modes.hf_lead`, label `HF2_LABEL`) is
-prepended by `modulate` and measured by `demodulate`, the same calling
-convention `whale/modes/hc1w_mode.py` uses around `whale/modes/hc1w.py`.
+The waveform's own repeated QPSK sync symbols provide its acquisition
+preamble; `modulate` emits that waveform directly.
 """
 
 from __future__ import annotations
@@ -73,7 +72,6 @@ from scipy.signal import hilbert
 from whale import dsp, rx_audio
 from whale.dsp import (acquire as _acquire_kernel, equalize as _eq,
                        freq as _freq, ofdm as _ofdm, timing as _timing)
-from whale.modes import hf_lead
 
 # -- geometry ---------------------------------------------------------------
 
@@ -152,7 +150,9 @@ assert sorted(GROUP_OF_DATA_LOCAL) == sorted(DATA_LOCAL_INDEX.tolist())
 
 RAW_BITS_PER_SYMBOL = N_LOGICAL_CARRIERS * BITS_PER_DATA_CARRIER
 
-SYNC_SYMBOLS = 4
+# The repeated native sync waveform is also HF2's fixed preamble.  Keep it at
+# least the shared settling allowance before the training symbols begin.
+SYNC_SYMBOLS = 78
 TRAINING_SYMBOLS = 6
 HEADER_SYMBOLS = SYNC_SYMBOLS + TRAINING_SYMBOLS
 #: 1980 coded bits (990 information bits, same packet size as the stage-4a
@@ -187,21 +187,12 @@ COARSE_OFFSET_LIMIT_HZ = SAMPLE_RATE / (2.0 * CORE_SAMPLES)
 FINE_OFFSET_LIMIT_HZ = SAMPLE_RATE / (2.0 * SYMBOL_SAMPLES)
 
 
-def lead_in_samples(head_seconds: float | None = None) -> int:
-    """Leading `hf_lead` samples for a requested head duration."""
-    return hf_lead.lead_samples(head_seconds)
+def frame_samples() -> int:
+    return TOTAL_SYMBOLS * SYMBOL_SAMPLES + TAIL_SAMPLES
 
 
-DEFAULT_HEAD_SECONDS = hf_lead.MIN_SECONDS
-
-
-def frame_samples(head_seconds: float = DEFAULT_HEAD_SECONDS) -> int:
-    return (lead_in_samples(head_seconds)
-            + TOTAL_SYMBOLS * SYMBOL_SAMPLES + TAIL_SAMPLES)
-
-
-def frame_seconds(head_seconds: float = DEFAULT_HEAD_SECONDS) -> float:
-    return frame_samples(head_seconds) / SAMPLE_RATE
+def frame_seconds() -> float:
+    return frame_samples() / SAMPLE_RATE
 
 
 # -- reference constellations and the payload codec --------------------------
@@ -313,17 +304,15 @@ def frame_constellation(payload: bytes) -> np.ndarray:
     return np.vstack((HEADER_VALUES, payload_grid))
 
 
-def modulate(payload: bytes, *,
-            head_seconds: float = DEFAULT_HEAD_SECONDS) -> np.ndarray:
+def modulate(payload: bytes) -> np.ndarray:
     if len(payload) > MAX_PAYLOAD_BYTES:
         raise ValueError(
             f"payload is {len(payload)} bytes; the maximum is "
             f"{MAX_PAYLOAD_BYTES}")
     values = frame_constellation(payload)
     symbols = np.concatenate([build_symbol(row) for row in values])
-    lead = hf_lead.modulate(hf_lead.HF2_LABEL, head_seconds)
-    audio = np.concatenate((lead, symbols, np.zeros(TAIL_SAMPLES)))
-    if len(audio) != frame_samples(head_seconds):
+    audio = np.concatenate((symbols, np.zeros(TAIL_SAMPLES)))
+    if len(audio) != frame_samples():
         raise AssertionError(f"internal frame length error: {len(audio)}")
     peak = float(np.max(np.abs(audio)))
     if peak > MAX_SAMPLE:
@@ -452,8 +441,7 @@ def _base_result() -> dict:
     }
 
 
-def demodulate(audio: np.ndarray, *,
-              head_seconds: float = DEFAULT_HEAD_SECONDS, **kwargs) -> dict:
+def demodulate(audio: np.ndarray, **kwargs) -> dict:
     """Decode one HF2 frame out of `audio` (at `RX_SAMPLE_RATE`).
 
     Returns at least `{"synced", "payload", "start_index"}` plus diagnostics
@@ -591,7 +579,7 @@ def _check_constants() -> None:
     assert CARRIER_HZ[0] == 656.25 and CARRIER_HZ[-1] == 2343.75
     assert list(PILOT_BINS) == [7, 10, 12, 15, 17, 20, 22, 25]
     assert N_LOGICAL_CARRIERS == 5
-    assert TOTAL_SYMBOLS == 109 and PAYLOAD_SYMBOLS == 99
+    assert TOTAL_SYMBOLS == 183 and PAYLOAD_SYMBOLS == 99
     assert RAW_BITS_PER_SYMBOL == 20 and PAYLOAD_BITS == 1_980
     assert FEC_INPUT_BITS == 990
     # No stranded bits: the coded grid divides exactly into whole packet

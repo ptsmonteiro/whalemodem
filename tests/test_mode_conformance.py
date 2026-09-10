@@ -88,15 +88,7 @@ def test_hostile_input_is_rejected_without_raising(mode, case):
     assert result.get("payload") is None, (mode.name, case)
 
 
-# Attributes whale/link.py dereferences on an rx/tx profile. A mode missing
-# one of these does not fail a decode -- it raises an AttributeError deep in
-# Link._handle_data, which escapes ModemService's LinkError handler and
-# disconnects the link mid-transfer. That is how hf7/hf8/hf9 shipped without
-# `head_match_allowance_seconds`: nothing decodes those modes until a session
-# is healthy enough to climb to them, so the first on-air session that ever
-# reached hf8 tore itself down on the frame it had just decoded correctly.
-# `lead_label` is deliberately absent from this list: it is genuinely optional
-# and every call site hasattr-guards it.
+# Attributes whale/link.py dereferences on a waveform mode.
 REQUIRED_PROFILE_ATTRS = (
     "name",
     "mode_id",
@@ -104,7 +96,6 @@ REQUIRED_PROFILE_ATTRS = (
     "tx_sample_rate",
     "chunk_size",
     "confidence_threshold",
-    "head_match_allowance_seconds",
     "encode",
     "decode",
 )

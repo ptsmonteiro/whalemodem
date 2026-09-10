@@ -34,6 +34,7 @@ HF6_PHY = hf6.OFDM49Mode(
     bits_per_symbol=BITS_PER_SYMBOL,
     packet_bytes=PACKET_BYTES,
     pilot_interval=PILOT_INTERVAL,
+    n_preamble_symbols=40,
     equalizer="gain",
     drive_scale=1.0,
     fec_rate=FEC_RATE,
@@ -47,17 +48,15 @@ class Hf6Codec:
     tx_sample_rate = hf6.TX_SAMPLE_RATE
     rx_sample_rate = hf6.RX_SAMPLE_RATE
 
-    def encode(self, payload: bytes, mode: "Hf6Mode", *, include_head=True,
-               head_seconds=None) -> np.ndarray:
-        del include_head, head_seconds
+    def encode(self, payload: bytes, mode: "Hf6Mode") -> np.ndarray:
         if len(payload) > HF6_PHY.max_payload_bytes:
             raise ValueError(
                 f"packet is {len(payload)} bytes; {mode.name} carries at most "
                 f"{HF6_PHY.max_payload_bytes}")
         return HF6_PHY.modulate(bytes(payload))
 
-    def decode(self, audio, mode: "Hf6Mode", *, head_seconds=None, **kwargs) -> dict:
-        del mode, head_seconds
+    def decode(self, audio, mode: "Hf6Mode", **kwargs) -> dict:
+        del mode
         if np.asarray(audio).ndim != 1:
             return {"synced": False, "payload": None}
         return HF6_PHY.demodulate(audio, **kwargs)
@@ -91,19 +90,8 @@ class Hf6Mode:
     def baud(self) -> float:
         return hf6.DESIGN_RATE / HF6_PHY.symbol_len
 
-    @property
-    def head_match_allowance_seconds(self) -> float:
-        """This PHY carries no outer head, so it never reports an observation
-        and `_head_feedback_request` returns before consulting the allowance.
-        The value is still dereferenced eagerly at that call site, so it has
-        to exist: without it the first frame this mode ever receives raises
-        an AttributeError that escapes ModemService's LinkError handler and
-        tears the link down mid-transfer."""
-        return 0.0
-
-    def encode(self, payload: bytes, *, include_head=True, head_seconds=None):
-        return self.codec.encode(payload, self, include_head=include_head,
-                                 head_seconds=head_seconds)
+    def encode(self, payload: bytes):
+        return self.codec.encode(payload, self)
 
     def decode(self, audio, **kwargs):
         return self.codec.decode(audio, self, **kwargs)

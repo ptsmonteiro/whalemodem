@@ -26,8 +26,8 @@ Measured channel: the hardware test bench is one IC-705 (STA1) and one HT via
 a Digirig-style interface (STA2), both squelched, on the bench per
 whale/hw/radios.py. The HT is a Wouxun KG-UV9D Plus, which is also what the
 SNR figures below were taken with, so they stand. (A Baofeng UV-B5 stood in
-for a few hours on 2026-08-18 and is what framing.HEAD_PAD_SECONDS is sized
-against; these numbers were never re-taken on it.) scripts/measure_snr.py measures in-band SNR (signal RMS
+for a few hours on 2026-08-18; these numbers were never re-taken on it.)
+scripts/measure_snr.py measures in-band SNR (signal RMS
 across the profile's tone pair vs. a PSD-scaled noise estimate from the side
 bands just outside it, taken from a live squelch-open reception --
 squelch-closed audio is just the receiver muted, not a usable noise
@@ -180,10 +180,9 @@ class CpfskCodec:
     tx_sample_rate = SAMPLE_RATE
     rx_sample_rate = RX_SAMPLE_RATE
 
-    def encode(self, payload: bytes, profile: "Profile", *, include_head=True,
-               head_seconds=framing.HEAD_PAD_SECONDS):
+    def encode(self, payload: bytes, profile: "Profile", *, include_head=True):
         return modulate(payload, profile=profile, sample_rate=self.tx_sample_rate,
-                        include_head=include_head, head_seconds=head_seconds)
+                        include_head=include_head)
 
     def decode(self, audio, profile: "Profile", **kwargs):
         return demodulate(audio, profile=profile, sample_rate=self.rx_sample_rate, **kwargs)
@@ -231,20 +230,8 @@ class Profile:
     def rx_sample_rate(self):
         return self.codec.rx_sample_rate
 
-    @property
-    def head_match_allowance_seconds(self):
-        """How short a head observation may fall before the link believes it.
-
-        The backward pad matcher gives up a whole PAD_MATCH_WINDOW_SYMBOLS
-        window when it trips, so an observation is systematically short by up
-        to that much even on a perfectly received head.
-        """
-        return PAD_MATCH_WINDOW_SYMBOLS / self.baud
-
-    def encode(self, payload: bytes, *, include_head=True,
-               head_seconds=framing.HEAD_PAD_SECONDS):
-        return self.codec.encode(payload, self, include_head=include_head,
-                                 head_seconds=head_seconds)
+    def encode(self, payload: bytes, *, include_head=True):
+        return self.codec.encode(payload, self, include_head=include_head)
 
     def decode(self, audio, **kwargs):
         return self.codec.decode(audio, self, **kwargs)
@@ -257,7 +244,7 @@ class Profile:
 #
 # Sync-through-CRC audio is capped in duration, and every profile's chunk_size
 # is whatever fits inside that cap. The outer head pad and transport startup do
-# not consume this budget because adaptive timing will vary them by radio pair.
+# are deliberately excluded from this useful-frame budget.
 #
 # This is a design choice, not a measurement -- worth saying plainly, because
 # the number looks like the kind that gets measured. Nothing on this bench
@@ -312,8 +299,7 @@ def frame_bits(payload_len, baud, *, include_head=True):
 def max_payload_for_useful_frame(baud, budget=MAX_USEFUL_FRAME_SECONDS):
     """Largest AFSK payload whose sync-through-CRC audio fits in `budget`.
 
-    The outer head pad and transport startup are deliberately excluded:
-    adaptive timing will vary them per radio pair.
+    The fixed preamble and transport startup are deliberately excluded.
     """
     spare_bits = budget * baud - frame_bits(0, baud, include_head=False)
     return max(0, min(int(spare_bits // 8), framing.MAX_PAYLOAD_BYTES))
@@ -468,15 +454,6 @@ PROFILES_BY_ID = {p.mode_id: p for p in PROFILES}
 # ever use the negotiated profile.
 CONTROL_PROFILE = PROFILE_300
 
-# Outer-pad measurement policy. Sparse hard-decision errors are tolerated,
-# but a window that exceeds this budget is treated wholly as suspect. Dropping
-# the complete failing window is intentional: it prevents the look-ahead
-# needed to distinguish clipping from an isolated error from inflating the
-# received-symbol count and selecting unsafe timing.
-PAD_MATCH_WINDOW_SYMBOLS = 16
-PAD_MATCH_MAX_ERRORS = 2
-
-
 def profiles_for_budget(budget=MAX_USEFUL_FRAME_SECONDS):
     """The three CPFSK profiles, sized for a `budget`-second useful frame.
 
@@ -522,8 +499,7 @@ def _apply_ramp(signal, sample_rate, ramp_ms=5):
 
 
 def modulate(payload: bytes, profile: Profile = PROFILE_300, sample_rate=SAMPLE_RATE,
-             amplitude=0.6, *, include_head=True,
-             head_seconds=framing.HEAD_PAD_SECONDS):
+             amplitude=0.6, *, include_head=True):
     """One keying's worth of audio: `payload` framed (sync word, length,
     CRC and head pad) and modulated as one continuous signal.
 
@@ -539,7 +515,7 @@ def modulate(payload: bytes, profile: Profile = PROFILE_300, sample_rate=SAMPLE_
     """
     sps = round(sample_rate / profile.baud)
     bits = framing.build_frame_bits(payload, baud=profile.baud,
-                                    include_head=include_head, head_seconds=head_seconds)
+                                    include_head=include_head)
     tone = _cpfsk_tone(bits, sps, sample_rate, profile.freq0, profile.freq1)
     audio = amplitude * tone
     ramped = _apply_ramp(audio, sample_rate)
@@ -708,8 +684,7 @@ def _sync_peaks(score, threshold_value, min_separation):
     return peaks
 
 
-def _try_sync(diff, i_star, sps, confidence, max_credible_bits, n_sync, baud,
-              head_seconds):
+def _try_sync(diff, i_star, sps, confidence, max_credible_bits, n_sync):
     """Attempts to read a frame at one correlation peak. Same return shape
     as demodulate(). `n_sync` is the sync word's length in bits at this
     profile's baud -- it sets where the length field starts, so it has to
@@ -766,34 +741,6 @@ def _try_sync(diff, i_star, sps, confidence, max_credible_bits, n_sync, baud,
         # measure a skip with.
         result["end_index"] = result["sync_end_index"]
     elif payload is not None:
-        head_bits = framing.head_pad_bits(baud, head_seconds)
-
-        def adjacent_matches(expected, indices):
-            mismatches = []
-            count = 0
-            for count, (bit, index) in enumerate(zip(expected, indices), 1):
-                # Running outside retained audio is a known hard boundary,
-                # not a noisy symbol, so no decision window is needed.
-                if index < 0 or index >= len(diff):
-                    return count - 1
-                mismatches.append((diff[index] > 0) != bool(bit))
-                if len(mismatches) > PAD_MATCH_WINDOW_SYMBOLS:
-                    mismatches.pop(0)
-                if (len(mismatches) == PAD_MATCH_WINDOW_SYMBOLS
-                        and sum(mismatches) > PAD_MATCH_MAX_ERRORS):
-                    return count - PAD_MATCH_WINDOW_SYMBOLS
-            return count
-
-        # Walk backward from sync through the head sequence. A rolling window
-        # tolerates isolated hard-decision errors;
-        # the whole first failing window is excluded from the count.
-        result["head_symbols_received"] = adjacent_matches(
-            reversed(head_bits),
-            (first_index - sps * offset for offset in range(1, len(head_bits) + 1)),
-        )
-        # The mode-independent form the link's head feedback works in; the
-        # symbol count above stays for the logs and the CPFSK tests.
-        result["head_seconds_received"] = result["head_symbols_received"] / baud
         result["end_index"] = i_star + sps * total_bits_needed
     elif max_symbols >= total_bits_needed:
         # Either it decoded, or we had every bit the claimed length says it
@@ -811,7 +758,7 @@ def _try_sync(diff, i_star, sps, confidence, max_credible_bits, n_sync, baud,
 
 
 def demodulate(audio, profile: Profile = PROFILE_300, sample_rate=SAMPLE_RATE, *,
-               head_seconds=framing.HEAD_PAD_SECONDS, diagnostics=False):
+               diagnostics=False):
     """Finds and decodes the *earliest* frame in `audio`. Returns a dict
     with at least 'synced' and 'payload' (None if nothing usable was found).
 
@@ -852,7 +799,7 @@ def demodulate(audio, profile: Profile = PROFILE_300, sample_rate=SAMPLE_RATE, *
     n_sync = len(framing.sync_bits(profile.baud))
     for i_star in peaks:
         result = _try_sync(diff, i_star, sps, float(ncc[i_star]), credible_bits,
-                           n_sync, profile.baud, head_seconds)
+                           n_sync)
         if result.get("payload") is not None:
             result["snr_db"] = _sync_snr_db(audio, i_star, profile, sample_rate)
             if not diagnostics:

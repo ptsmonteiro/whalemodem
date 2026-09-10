@@ -11,7 +11,6 @@ import pytest
 
 from whale import framing, rx_audio
 from whale.mode_qualification import registry
-from whale.modes import hf_lead
 from whale.modes.hf7_mode import HF7
 from whale.modes.hf8_mode import HF8, HF8_PHY, BAND_LO_HZ, BAND_HI_HZ
 from whale.phy import ofdm49 as ofdm49
@@ -50,10 +49,6 @@ def test_hf8_clean_loopback_and_throughput():
     result = HF8.decode(captured)
     assert result["payload"] == payload
     assert result["crc_ok"]
-    assert result["head_blocks_observed"] >= hf_lead.MIN_BLOCKS
-    assert result["head_seconds_received"] == pytest.approx(
-        hf_lead.MIN_SECONDS)
-    assert result["head_match"] >= hf_lead.MATCH_THRESHOLD
     # SPEED_LADDERS.md: net application bits per full DATA frame over that
     # frame's complete airtime.
     assert 8 * HF8.chunk_size / HF8.airtime(len(payload)) > LEVEL3_MIN_NET_BPS
@@ -105,20 +100,11 @@ def test_hf8_trades_constellation_and_coding_for_margin_against_hf7():
     assert hf8_rate < hf7_rate
 
 
-def test_hf8_frame_is_codeword_aligned_and_includes_the_common_lead():
-    """270 B is 5 whole rate-2/3 codewords with no padding, in a 0.616 s
-    frame.
-
-    The shortness is the design, not an accident, and it is the opposite of
-    HF7's choice: frame length was the largest single lever on this mode's
-    fading envelope (quiet-Watterson 90% delivery at 24/20/16 dB for 2.090 s
-    / 1.144 s / 0.616 s frames, and never reached at 4.862 s). A future
-    change that lengthens this frame to chase throughput gives the envelope
-    back, so it should fail here and be argued on new evidence.
-    """
+def test_hf8_frame_is_codeword_aligned_and_includes_its_native_preamble():
+    """The frame is codeword-aligned and includes the fixed native preamble."""
     assert HF8_PHY.n_codewords == 46
-    assert HF8.airtime(HF8.chunk_size) == pytest.approx(
-        hf_lead.MIN_SECONDS + HF8_PHY.frame_seconds())
+    assert HF8_PHY.n_preamble_symbols == 46
+    assert HF8.airtime(HF8.chunk_size) == pytest.approx(HF8_PHY.frame_seconds())
 
 
 def test_hf8_rejects_oversize_payload():
@@ -130,26 +116,14 @@ def test_hf8_rejects_oversize_payload():
         raise AssertionError("oversize HF8 payload was accepted")
 
 
-@pytest.mark.parametrize("head_seconds", [0.0, 0.31, 0.75, 1.0])
-def test_hf8_common_lead_round_trip_measures_minimum_or_requested_duration(
-        head_seconds):
+def test_hf8_native_preamble_round_trips_at_a_fixed_length():
     payload = bytes((i * 19 + 3) & 0xFF
                     for i in range(HF8.chunk_size + framing.AIR_HEADER_BYTES))
-    tx = HF8.encode(payload, head_seconds=head_seconds)
+    tx = HF8.encode(payload)
     captured = rx_audio.downsample(np.concatenate((
         tx, np.zeros(rx_audio.FILTER_DELAY_CAPTURE_SAMPLES, dtype=np.float32))))
-    result = HF8.decode(captured, head_seconds=head_seconds)
-
-    expected_blocks = hf_lead.lead_samples(head_seconds) // hf_lead.BLOCK_SAMPLES
+    result = HF8.decode(captured)
     assert result["payload"] == payload
-    assert result["head_blocks_observed"] == expected_blocks
-    assert result["head_seconds_received"] == pytest.approx(
-        hf_lead.seconds_received(expected_blocks))
-
-
-def test_hf8_include_head_false_keeps_the_minimum_common_lead():
-    payload = bytes(range(16))
-    tx = HF8.encode(payload, include_head=False)
     assert len(tx) == round(HF8.airtime(len(payload)) * HF8.tx_sample_rate)
 
 
@@ -162,7 +136,6 @@ def test_hf8_sits_between_hc1w_and_hf7_on_the_default_ladder():
     assert "hf8" in names
     assert names.index("hc1w") < names.index("hf8") < names.index("hf7")
 
-
 def test_default_hf_ladder_is_ordered_by_rate():
     """The whole ladder, not just HF8: adaptation climbs it one rung at a
     time, so an out-of-order rung would make a step down to a *faster* mode."""
@@ -170,10 +143,3 @@ def test_default_hf_ladder_is_ordered_by_rate():
     rates = [8 * m.chunk_size / m.airtime(m.chunk_size) for m in modes]
     assert rates == sorted(rates), [
         (m.name, round(r)) for m, r in zip(modes, rates)]
-
-
-def test_every_default_hf_mode_has_a_measurable_outer_head():
-    modes = registry("hf-ssb", "default").modes
-    assert all(hasattr(mode, "lead_label") for mode in modes)
-    assert all(mode.head_match_allowance_seconds > 0 for mode in modes)
-    assert len({mode.lead_label for mode in modes}) == len(modes)

@@ -171,8 +171,7 @@ def test_a_lock_survives_losing_the_opening_of_the_sync_word():
             (profile.name, "should survive losing the first 40% of the sync word")
 
     # And the cliff is in the same place for every profile -- that sameness
-    # is the property, more than the exact figure. If a decoder change moves
-    # it, move the 0.4 in framing.HEAD_PAD_SECONDS' sizing rule with it.
+    # is the property, more than the exact figure.
     for profile in afsk.PROFILES:
         assert decode_rate(profile, 0.6) == 0.0, \
             (profile.name, "60% of the sync word destroyed should not decode")
@@ -221,7 +220,6 @@ def test_afsk_clean_loopback():
     result = afsk.demodulate(tx)
     assert result["synced"], result
     assert result["payload"] == payload, (result["payload"], payload)
-    assert result["head_symbols_received"] == len(framing.head_pad_bits(300))
     assert "tail_symbols_received" not in result
     print("test_afsk_clean_loopback OK")
 
@@ -254,76 +252,6 @@ def test_head_pad_is_a_full_period_pn_sequence():
         h = framing.head_pad_bits(profile.baud)
         assert abs(sum(h) / len(h) - 0.5) < 0.1
     print("test_head_pad_is_a_full_period_pn_sequence OK")
-
-
-def test_head_pad_durations_share_the_symbols_adjacent_to_sync():
-    for profile in afsk.PROFILES:
-        calibration = framing.head_pad_bits(profile.baud)
-        for seconds in (0.01, 0.11, 0.36, 0.73):
-            head = framing.head_pad_bits(profile.baud, seconds)
-            assert head == calibration[-len(head):]
-    print("test_head_pad_durations_share_the_symbols_adjacent_to_sync OK")
-
-
-def test_head_measurement_survives_a_one_symbol_duration_increase():
-    """Regression for the 2026-08-28 radio acceptance run.
-
-    The calibrated 355.1 ms head occupied 107 symbols at 300 baud. Rounding
-    feedback to 360 ms grew the next head to 108 symbols; prefix-anchored PN
-    generation changed the phase beside sync and falsely measured zero.
-    """
-    payload = b"sync-anchored adaptive head"
-    profile = afsk.PROFILE_300
-    expected_seconds = 0.3551
-    sent_seconds = 0.36
-    expected_symbols = len(framing.head_pad_bits(profile.baud, expected_seconds))
-    assert expected_symbols == 107
-    assert len(framing.head_pad_bits(profile.baud, sent_seconds)) == 108
-
-    audio = afsk.modulate(payload, profile=profile, head_seconds=sent_seconds)
-    result = afsk.demodulate(
-        audio, profile=profile, head_seconds=expected_seconds)
-
-    assert result["payload"] == payload, result
-    assert result["head_symbols_received"] == expected_symbols
-    print("test_head_measurement_survives_a_one_symbol_duration_increase OK")
-
-
-def test_head_symbol_measurement_reports_clipping():
-    payload = b"outer timing probe"
-    profile = afsk.PROFILE_300
-    sps = round(afsk.SAMPLE_RATE / profile.baud)
-    head_clipped = 17
-    audio = afsk.modulate(payload, profile=profile)
-    clipped = audio[head_clipped * sps:]
-    result = afsk.demodulate(clipped, profile=profile)
-    assert result["payload"] == payload, result
-    expected_head = len(framing.head_pad_bits(profile.baud)) - head_clipped
-    # Window look-ahead may discard up to one full suspect window, but must
-    # never credit clipped symbols as received.
-    assert expected_head - afsk.PAD_MATCH_WINDOW_SYMBOLS < result["head_symbols_received"] <= expected_head
-    print("test_head_symbol_measurement_reports_clipping OK")
-
-
-def test_head_symbol_measurement_tolerates_isolated_errors():
-    payload = b"outer timing probe"
-    profile = afsk.PROFILE_300
-    sps = round(afsk.SAMPLE_RATE / profile.baud)
-    bits = framing.build_frame_bits(payload, baud=profile.baud)
-    head_len = len(framing.head_pad_bits(profile.baud))
-
-    # Two errors in the 16-symbol boundary window are within the policy.
-    for offset in (3, 12):
-        bits[head_len - offset] ^= 1
-
-    audio = afsk._apply_ramp(
-        0.6 * afsk._cpfsk_tone(bits, sps, afsk.SAMPLE_RATE,
-                               profile.freq0, profile.freq1),
-        afsk.SAMPLE_RATE).astype(np.float32)
-    result = afsk.demodulate(audio, profile=profile)
-    assert result["payload"] == payload, result
-    assert result["head_symbols_received"] == head_len
-    print("test_head_symbol_measurement_tolerates_isolated_errors OK")
 
 
 def test_afsk_noisy_delayed_loopback():
@@ -724,32 +652,6 @@ def test_connect_ack_body_roundtrip():
     assert decoded == ("STA2", "STA1", [0, 1, 2], 1, 0, 0x5A), decoded
 
 
-def test_timing_measurement_derives_guarded_session_head():
-    # 0.9 s of a 1 s calibration head arrived: 270 of PROFILE_300's symbols,
-    # but the measurement crosses the air in seconds so that a control mode
-    # without symbols can make it too. See link._encode_timing.
-    body = link._encode_timing(0x5A, 270 / afsk.CONTROL_PROFILE.baud)
-    assert link._decode_timing(body) == (0x5A, 230)
-    head = link._derive_timing(230)
-    assert abs(head - (25 / 255 + link.HEAD_MIN_GUARD_SECONDS)) < 1e-9, head
-    print("test_timing_measurement_derives_guarded_session_head OK")
-
-
-def test_a_head_measured_slightly_long_is_clamped_not_rejected():
-    """A mode that quantizes its head can measure a hair over what it asked
-    for. That is quantization, not a corrupt measurement -- rejecting it
-    would fail the handshake every time (whale/modes/hc1w.py rounds its head
-    up to whole sync cores)."""
-    assert link._encode_timing(0x5A, link.CALIBRATION_SECONDS * 1.01)[1] == 255
-    for bad in (None, -0.1):
-        try:
-            link._encode_timing(0x5A, bad)
-        except ValueError:
-            continue
-        raise AssertionError(f"{bad!r} should not encode as a measurement")
-    print("test_a_head_measured_slightly_long_is_clamped_not_rejected OK")
-
-
 def test_negotiate_mode():
     assert link._negotiate_mode([0, 1], 1) == 1
     assert link._negotiate_mode([0], 1) == afsk.CONTROL_PROFILE.mode_id
@@ -767,11 +669,10 @@ def test_link_uses_waveform_mode_contract():
             self.encoded = 0
             self.decoded = 0
 
-        def encode(self, payload, profile, *, include_head=True,
-                   head_seconds=framing.HEAD_PAD_SECONDS):
+        def encode(self, payload, profile, *, include_head=True):
             self.encoded += 1
-            return afsk.modulate(payload, profile=profile, include_head=include_head,
-                                 head_seconds=head_seconds)
+            return afsk.modulate(payload, profile=profile,
+                                 include_head=include_head)
 
         def decode(self, audio, profile, **kwargs):
             self.decoded += 1
@@ -808,11 +709,11 @@ def test_data_ack_carries_received_mode():
     """The ACK identifies both the sequence result and DATA mode decoded."""
     header, remainder = link._encode_air_header(
         link.PT_DATA_ACK, afsk.CONTROL_PROFILE.mode_id,
-        bytes([7, 8, afsk.PROFILE_600.mode_id, 100]))
-    assert len(remainder) == 2
+        bytes([7, 8, afsk.PROFILE_600.mode_id]))
+    assert len(remainder) == 1
     decoded = link._decode_air_header(header)
     assert decoded[-1] == bytes([7, 8])
-    assert remainder == bytes([afsk.PROFILE_600.mode_id, 100])
+    assert remainder == bytes([afsk.PROFILE_600.mode_id])
     print("test_data_ack_carries_received_mode OK")
 
 
@@ -995,10 +896,9 @@ def test_spare_ack_for_an_earlier_chunk_does_not_provoke_a_retransmit():
     # what the peer wants next, exactly the value the frame in flight would
     # be acked with -- then the real answer.
     mode = afsk.CONTROL_PROFILE.mode_id
-    a, keyings = _arq_sender([bytes([0x06, 0x07, mode, 150]),
-                              bytes([0x07, 0x08, mode, 100])])
+    a, keyings = _arq_sender([bytes([0x06, 0x07, mode]),
+                              bytes([0x07, 0x08, mode])])
     assert a._send_chunk_with_arq(0x07, b"aaaa", False) == 1
-    assert a._tx_head_seconds == 1.0, "stale feedback must not be applied"
     assert len(keyings) == 1, f"{len(keyings)} keyings for one chunk -- retransmitted on a stale ACK"
     print("test_spare_ack_for_an_earlier_chunk_does_not_provoke_a_retransmit OK")
 
@@ -1007,7 +907,7 @@ def test_ack_for_a_duplicate_still_advances_the_sender():
     """The other half of the same format: when the sender retransmits after
     a lost ACK, the peer's answer is about a frame it has already taken and
     moved past. That must still count as acked, or the transfer stalls."""
-    a, keyings = _arq_sender([bytes([0x07, 0x08, afsk.CONTROL_PROFILE.mode_id, 100])])
+    a, keyings = _arq_sender([bytes([0x07, 0x08, afsk.CONTROL_PROFILE.mode_id])])
     assert a._send_chunk_with_arq(0x07, b"aaaa", True) == 1
     print("test_ack_for_a_duplicate_still_advances_the_sender OK")
 
@@ -1191,10 +1091,6 @@ if __name__ == "__main__":
     test_every_keying_fits_the_budget_and_uses_it()
     test_afsk_clean_loopback()
     test_head_pad_is_a_full_period_pn_sequence()
-    test_head_pad_durations_share_the_symbols_adjacent_to_sync()
-    test_head_measurement_survives_a_one_symbol_duration_increase()
-    test_head_symbol_measurement_reports_clipping()
-    test_head_symbol_measurement_tolerates_isolated_errors()
     test_afsk_noisy_delayed_loopback()
     test_clock_offset_simulation_is_faithful()
     test_decodes_through_a_small_clock_offset()
@@ -1207,7 +1103,6 @@ if __name__ == "__main__":
     test_link_packet_roundtrip()
     test_connect_body_roundtrip()
     test_connect_ack_body_roundtrip()
-    test_timing_measurement_derives_guarded_session_head()
     test_negotiate_mode()
     test_link_uses_waveform_mode_contract()
     test_data_ack_carries_received_mode()

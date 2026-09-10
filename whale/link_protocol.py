@@ -17,22 +17,20 @@ PT_DATA = 0x05
 PT_DATA_ACK = 0x06
 PT_FLOOR_REQ = 0x09
 PT_FLOOR_GRANT = 0x0A
-PT_TIMING_ACK = 0x0B
-PT_TIMING_CONFIRM = 0x0C
 
 CONTROL_PLANE_TYPES = frozenset({
     PT_CONNECT, PT_CONNECT_ACK, PT_DISC, PT_DISC_ACK, PT_DATA_ACK,
-    PT_FLOOR_REQ, PT_FLOOR_GRANT, PT_TIMING_ACK, PT_TIMING_CONFIRM,
+    PT_FLOOR_REQ, PT_FLOOR_GRANT,
 })
 DATA_PLANE_TYPES = frozenset({PT_DATA})
 
 AIR_HEADER_MAGIC = b"WH"
-AIR_HEADER_VERSION = 2
+AIR_HEADER_VERSION = 3
 AIR_HEADER_INLINE_BYTES = 2
 AIR_HEADER_LEN = framing.BOOTSTRAP_HEADER_BYTES
 
 CONNECT_FORMAT_MAGIC = b"\xffWHL"
-CONNECT_FORMAT_VERSION = 4
+CONNECT_FORMAT_VERSION = 5
 SESSION_ID_NONE = 0
 
 EOF_BIT = 0x80
@@ -44,14 +42,14 @@ PTYPE_NAMES = {
     PT_DISC: "DISC", PT_DISC_ACK: "DISC_ACK",
     PT_DATA: "DATA", PT_DATA_ACK: "DATA_ACK",
     PT_FLOOR_REQ: "FLOOR_REQ", PT_FLOOR_GRANT: "FLOOR_GRANT",
-    PT_TIMING_ACK: "TIMING_ACK", PT_TIMING_CONFIRM: "TIMING_CONFIRM",
 }
 
 
 def air_inline_length(ptype):
-    if ptype in (PT_DATA, PT_CONNECT, PT_CONNECT_ACK, PT_DATA_ACK,
-                 PT_TIMING_ACK, PT_TIMING_CONFIRM):
+    if ptype in (PT_CONNECT, PT_CONNECT_ACK, PT_DATA_ACK):
         return 2
+    if ptype == PT_DATA:
+        return 1
     return 0
 
 
@@ -85,15 +83,13 @@ def decode_air_header(raw: bytes):
 def valid_air_shape(ptype, profile, body_len, inline, control_mode_id):
     """Apply semantic checks after the header CRC has passed."""
     if ptype == PT_DATA:
-        return len(inline) == 2 and body_len <= profile.chunk_size
+        return len(inline) == 1 and body_len <= profile.chunk_size
     if profile.mode_id != control_mode_id:
         return False
     if ptype in (PT_CONNECT, PT_CONNECT_ACK):
         return len(inline) == 2 and 0 < body_len <= 128
     if ptype == PT_DATA_ACK:
-        return len(inline) == 2 and body_len == 2
-    if ptype in (PT_TIMING_ACK, PT_TIMING_CONFIRM):
-        return len(inline) == 2 and body_len == 0
+        return len(inline) == 2 and body_len == 1
     if ptype in (PT_DISC, PT_DISC_ACK, PT_FLOOR_REQ, PT_FLOOR_GRANT):
         return len(inline) == 0 and body_len == 0
     return False

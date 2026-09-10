@@ -19,9 +19,7 @@ class Vf6Codec:
     tx_sample_rate = vf6.SAMPLE_RATE
     rx_sample_rate = rx_audio.DECODE_SAMPLE_RATE
 
-    def encode(self, payload: bytes, mode: "Vf6Mode", *, include_head=True,
-               head_seconds=0.045) -> np.ndarray:
-        del include_head, head_seconds
+    def encode(self, payload: bytes, mode: "Vf6Mode") -> np.ndarray:
         if len(payload) > vf6.MAX_PAYLOAD_BYTES:
             raise ValueError(f"packet is {len(payload)} bytes; {mode.name} carries at most {vf6.MAX_PAYLOAD_BYTES}")
         return vf6.modulate(bytes(payload))
@@ -68,10 +66,7 @@ class Vf6Mode:
     @property
     def baud(self): return vf6.SAMPLE_RATE / vf6.SYMBOL_SAMPLES
 
-    @property
-    def head_match_allowance_seconds(self): return vf6.CORE_SAMPLES / vf6.SAMPLE_RATE
-
-    def encode(self, payload: bytes, **kwargs): return self.codec.encode(payload, self, **kwargs)
+    def encode(self, payload: bytes): return self.codec.encode(payload, self)
 
     def decode(self, audio, **kwargs): return self.codec.decode(audio, self, **kwargs)
 
