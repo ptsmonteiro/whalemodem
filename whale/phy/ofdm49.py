@@ -92,6 +92,7 @@ INTERLEAVER_SEED = 0x5EED1A
 
 SYNC_SEARCH_HZ = 20.0
 SYNC_SEARCH_STEP_HZ = 1.0
+SYNC_HINT_RADIUS_HZ = 2.0
 
 # 32-QAM (bits_per_symbol=5) is not in hf5's shared mapper, which jumps
 # straight from 16-QAM to 64-QAM, and hf5 is not modified by this
@@ -517,7 +518,8 @@ class OFDM49Mode:
 
     def demodulate(self, captured_12k: np.ndarray, *, diagnostics=False,
                    gain_smoothing=1, noise_estimator="legacy",
-                   ldpc_max_iterations=30, refine_iterations=0) -> dict:
+                   ldpc_max_iterations=30, refine_iterations=0,
+                   freq_hint_hz=None) -> dict:
         """Decode; optional HF17 diagnostics and training-only receiver trials.
 
         gain_smoothing is an odd carrier-window width (default 1 disables).
@@ -548,7 +550,19 @@ class OFDM49Mode:
         norm = np.sqrt(np.sum(preamble_wave ** 2)) * (np.std(x) + 1e-12) * np.sqrt(len(preamble_wave))
 
         best = (-1.0, 0, 0.0)
-        for hz in np.arange(-SYNC_SEARCH_HZ, SYNC_SEARCH_HZ + 1e-9, SYNC_SEARCH_STEP_HZ):
+        if freq_hint_hz is None:
+            search_hz = np.arange(-SYNC_SEARCH_HZ, SYNC_SEARCH_HZ + 1e-9,
+                                  SYNC_SEARCH_STEP_HZ)
+        else:
+            if not np.isfinite(freq_hint_hz):
+                raise ValueError("frequency hint must be finite")
+            hint = float(np.clip(freq_hint_hz, -SYNC_SEARCH_HZ, SYNC_SEARCH_HZ))
+            search_hz = hint + np.arange(-SYNC_HINT_RADIUS_HZ,
+                                         SYNC_HINT_RADIUS_HZ + 1e-9,
+                                         SYNC_SEARCH_STEP_HZ)
+            search_hz = np.clip(search_hz, -SYNC_SEARCH_HZ, SYNC_SEARCH_HZ)
+            search_hz = np.unique(search_hz)
+        for hz in search_hz:
             template = _freq_shift_real(preamble_wave, hz, DESIGN_RATE)
             corr = fftconvolve(x, template[::-1], mode="valid")
             env = np.abs(_sc._hilbert_envelope(corr))

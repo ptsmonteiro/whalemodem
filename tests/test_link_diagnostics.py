@@ -17,6 +17,7 @@ from dataclasses import dataclass, field
 import numpy as np
 
 from whale import link
+from whale.policy import HF_SSB, VHF_FM
 from whale.waveform import ModeRegistry
 
 import link_harness as harness
@@ -64,9 +65,11 @@ class _StubCodec:
         self.rate = seconds_per_audio_second
         self.result = {} if result is None else result
         self.attempts = 0
+        self.kwargs = []
 
-    def decode(self, audio):
+    def decode(self, audio, **kwargs):
         self.attempts += 1
+        self.kwargs.append(kwargs)
         if self.rate:
             deadline = (time.perf_counter()
                         + len(audio) / RX_RATE * self.rate)
@@ -84,12 +87,13 @@ class _StubMode:
     confidence_threshold: float = 0.5
     tx_sample_rate: int = 48_000
     rx_sample_rate: int = RX_RATE
+    supports_frequency_hint: bool = False
 
     def airtime(self, payload_len):
         return FRAME_SECONDS
 
     def decode(self, audio, **kwargs):
-        return self.codec.decode(audio)
+        return self.codec.decode(audio, **kwargs)
 
 
 def _stub_link(*modes):
@@ -103,6 +107,38 @@ def _stub_link(*modes):
 
 def _fill(transport, seconds):
     transport._buf = np.zeros(int(seconds * RX_RATE), dtype=np.float32)
+
+
+def test_hf_frequency_hint_is_shared_across_modes_and_session_scoped():
+    first = _StubMode("first", 1, _StubCodec())
+    second = _StubMode("second", 2, _StubCodec(result={"payload": b"ok"}),
+                       supports_frequency_hint=True)
+    transport = harness.FakeTransport()
+    transport.peer = harness.FakeTransport()
+    a_link = link.Link(transport, "STA1", policy=HF_SSB,
+                       mode_registry=ModeRegistry((first, second), first))
+    a_link._rx_frequency_hint_hz = 7.25
+
+    a_link._decode_attempt(second, np.zeros(RX_RATE, dtype=np.float32))
+    assert second.codec.kwargs == [{"freq_hint_hz": 7.25}]
+
+    # Transitioning from the measured handshake into CONNECTED preserves it;
+    # ending the session does not.
+    a_link._reset_sequence_state()
+    assert a_link._rx_frequency_hint_hz == 7.25
+    a_link._forget_session()
+    assert a_link._rx_frequency_hint_hz is None
+
+
+def test_vhf_policy_does_not_offer_a_frequency_hint_to_modes():
+    mode = _StubMode("mode", 1, _StubCodec(result={"payload": b"ok"}),
+                     supports_frequency_hint=True)
+    a_link, _ = _stub_link(mode)
+    assert a_link.policy is VHF_FM
+    a_link._rx_frequency_hint_hz = 7.25
+
+    a_link._decode_attempt(mode, np.zeros(RX_RATE, dtype=np.float32))
+    assert mode.codec.kwargs == [{}]
 
 
 def test_a_perpetual_speculative_lock_cannot_pin_the_rx_buffer():

@@ -576,6 +576,10 @@ class Link:
         self._tx_seq = 0
         self._rx_expect_seq = 0
         self._acked_chunks = 0
+        # Last validated carrier offset for this HF receive session. All HF
+        # modes hear the same peer oscillator/BFO error, so a control frame
+        # can seed a later OFDM mode. VHF policy leaves this unused.
+        self._rx_frequency_hint_hz = None
         # Qualification counters are observational and do not affect protocol state.
         self.qualification_metrics = {
             "data_attempts": 0, "retransmissions": 0,
@@ -742,7 +746,22 @@ class Link:
 
     def _decode_attempt(self, profile, audio, offset=0):
         cpu0, wall0 = time.thread_time(), time.perf_counter()
-        result = profile.decode(audio)
+        hint = (self._rx_frequency_hint_hz
+                if self.policy.track_frequency_offset else None)
+        if hint is None or not getattr(profile, "supports_frequency_hint", False):
+            result = profile.decode(audio)
+        else:
+            result = profile.decode(audio, freq_hint_hz=hint)
+            # A promising acquisition is commonly just a frame still arriving.
+            # Wait for its full advertised airtime before paying for the broad
+            # search. Once complete, failure of the hinted decode immediately
+            # falls back to the normal full-range acquisition.
+            start = result.get("start_sample")
+            complete = (start is not None and
+                        start + int(np.ceil(profile.airtime(profile.chunk_size)
+                                            * profile.rx_sample_rate)) <= len(audio))
+            if (start is None or complete) and result.get("payload") is None:
+                result = profile.decode(audio)
         cpu = time.thread_time() - cpu0
         self._decode_cost.setdefault(profile.name, _DecodeCost()).add(
             cpu, time.perf_counter() - wall0,
@@ -823,6 +842,10 @@ class Link:
                     or not _valid_air_shape(ptype, body_profile, body_len, inline,
                                             self.modes.control.mode_id)):
                 return False
+            freq_offset = result.get("freq_offset_hz", result.get("cfo_hz"))
+            if (self.policy.track_frequency_offset and freq_offset is not None
+                    and np.isfinite(freq_offset)):
+                self._rx_frequency_hint_hz = float(freq_offset)
             end = result.get("end_index", len(snap))
             self.transport.consume_rx(end)
             self._finish_air_packet(ptype, inline + remainder, profile, snap, end,
@@ -1200,6 +1223,7 @@ class Link:
         timeout_per_try = self.control_ack_timeout if timeout_per_try is None else timeout_per_try
         retries = self._channel("max_retries") if retries is None else retries
         self._drain_packets()
+        self._rx_frequency_hint_hz = None
         self.state = "CONNECTING"
         own_supported = list(self.modes.supported_ids)
         # Not `forced or history`: mode_id 0 is a real profile (300 baud)
@@ -1275,6 +1299,7 @@ class Link:
         and transitions to CONNECTED. Returns the peer callsign, or None on
         timeout."""
         self._drain_packets()
+        self._rx_frequency_hint_hz = None
         self.state = "LISTENING"
         got = self._wait_packet({PT_CONNECT}, timeout or 1e9)
         if got is None:
@@ -1648,6 +1673,7 @@ class Link:
         PT_CONNECT arriving afterwards is treated as a new call rather than
         re-answered as a retry of a session that no longer exists."""
         self._session_id = SESSION_ID_NONE
+        self._rx_frequency_hint_hz = None
         self._connect_ack_body = None
         self._last_peer_frame_at = None
 

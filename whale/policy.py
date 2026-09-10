@@ -163,6 +163,10 @@ class ChannelPolicy:
     # rediscovered when the detector lands.
     require_clear_channel: bool = False
 
+    #: Whether validated receive frames may seed a session-wide audio carrier
+    #: offset. HF waveforms share that useful SSB/BFO error; VHF FM does not.
+    track_frequency_offset: bool = False
+
     # -- which waveforms suit this channel -------------------------------
     #
     # Called as `mode_ladder(max_useful_frame_seconds)` by Link.__init__ when
@@ -201,6 +205,7 @@ VHF_FM = ChannelPolicy(
     step_up_after_clean_streak_max=8,
     max_useful_frame_seconds=afsk.MAX_USEFUL_FRAME_SECONDS,
     require_clear_channel=False,
+    track_frequency_offset=False,
     mode_ladder=modes.default_registry,
 )
 
@@ -250,6 +255,7 @@ HF_SSB = ChannelPolicy(
     step_up_after_clean_streak_max=32,
     max_useful_frame_seconds=8.0,
     require_clear_channel=True,
+    track_frequency_offset=True,
     mode_ladder=modes.hf_registry,
 )
 

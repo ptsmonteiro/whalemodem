@@ -151,6 +151,7 @@ class Hf7Mode:
     chunk_size: int = CHUNK_SIZE
     confidence_threshold: float = CONFIDENCE_THRESHOLD
     fec_rate: str | None = FEC_RATE
+    supports_frequency_hint: bool = field(default=True, init=False, repr=False)
     codec: Hf7Codec = field(default=HF7_CODEC, compare=False, repr=False)
 
     @property

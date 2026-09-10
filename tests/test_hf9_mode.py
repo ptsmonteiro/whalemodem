@@ -55,6 +55,26 @@ def test_hf9_clean_full_frame_round_trip():
     assert result["noise_estimator"] == "repeat"
 
 
+def test_hf9_frequency_hint_uses_the_local_search_window(monkeypatch):
+    payload = _full_payload(23)
+    tx = HF9.encode(payload)
+    captured = rx_audio.downsample(np.concatenate((
+        tx, np.zeros(rx_audio.FILTER_DELAY_CAPTURE_SAMPLES, dtype=np.float32))))
+    calls = 0
+    original = ofdm49.fftconvolve
+
+    def counted(*args, **kwargs):
+        nonlocal calls
+        calls += 1
+        return original(*args, **kwargs)
+
+    monkeypatch.setattr(ofdm49, "fftconvolve", counted)
+    result = HF9.decode(captured, freq_hint_hz=0.0)
+
+    assert result["payload"] == payload
+    assert calls == 5
+
+
 def test_hf9_is_experimental_and_rate_ordered_below_hc1w():
     assert (qualification_level("hf-ssb", HF9.mode_id)
             is QualificationLevel.EXPERIMENTAL)
