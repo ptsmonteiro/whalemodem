@@ -92,8 +92,8 @@ def hf_registry(fast=True):
     """The mode ladder a station on an HF SSB channel runs.
 
     HC0 is the control mode and the bottom rung; HC1W is appended above it
-    for a channel that can carry it, and `_maybe_adapt` climbs to it after
-    a clean streak and falls back after silence, exactly as the VHF ladder
+    for a channel that can carry it, and `_maybe_adapt` probes it then uses
+    delivery statistics to climb or fall back, exactly as the VHF ladder
     climbs to VF3.
 
     `fast=False` drops HC1W, leaving the robust rung alone.  That is for

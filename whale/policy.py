@@ -116,20 +116,13 @@ class ChannelPolicy:
 
     # -- mid-session speed adaptation ------------------------------------
     #
-    # Deliberately just ARQ-outcome based (no SNR estimate, no throughput
-    # math). React fast to trouble, be conservative about speeding up.
+    # ARQ outcomes are accumulated per mode with exponential decay, then
+    # converted to expected application goodput.  The prior is deliberately
+    # optimistic so an unmeasured faster rung gets tried, while the decay
+    # lets a recovered channel shed old failures.
 
-    #: A chunk needing this many tries triggers an immediate step down.
+    #: This many consecutive DATA_ACK timeouts trigger an emergency step down.
     step_down_after_attempts: int
-
-    # The clean-streak length needed to step up is not fixed: it starts at
-    # `step_up_after_clean_streak_initial` (on VHF, one clean chunk earns a
-    # step up) and grows by 1 every time a step down happens, so a session
-    # that has been burned needs more evidence before it is trusted to speed
-    # up again. Capped at `step_up_after_clean_streak_max` so a persistently
-    # bad link doesn't make the threshold unbounded.
-    step_up_after_clean_streak_initial: int
-    step_up_after_clean_streak_max: int
 
     # -- keying length ---------------------------------------------------
     #
@@ -188,6 +181,21 @@ class ChannelPolicy:
     mode_ladder: Callable[[float], object] = dataclasses.field(
         default=modes.default_registry, compare=False, repr=False)
 
+    #: Half-life of per-mode success/failure observations.
+    adaptation_half_life_seconds: float = 60.0
+
+    #: Weak optimistic Beta prior for a mode with no session evidence.
+    adaptation_prior_successes: float = 1.8
+    adaptation_prior_failures: float = 0.2
+
+    #: A known faster mode must beat the current expected goodput by this
+    #: fraction before it is selected. Untested modes are allowed one probe.
+    adaptation_step_up_margin: float = 0.15
+
+    #: Minimum settling time after a statistics-driven change. Emergency
+    #: fallback after consecutive timeouts is never held up by this.
+    adaptation_cooldown_seconds: float = 20.0
+
 
 #: The channel this modem was built, measured and accepted against: two FM
 #: handhelds on 2 m simplex, a few metres apart, no other occupants. Every
@@ -201,8 +209,7 @@ VHF_FM = ChannelPolicy(
     max_retries=6,
     ack_timeout_slack=3.0,
     step_down_after_attempts=3,
-    step_up_after_clean_streak_initial=1,
-    step_up_after_clean_streak_max=8,
+    adaptation_cooldown_seconds=5.0,
     max_useful_frame_seconds=afsk.MAX_USEFUL_FRAME_SECONDS,
     require_clear_channel=False,
     track_frequency_offset=False,
@@ -251,8 +258,6 @@ HF_SSB = ChannelPolicy(
     max_retries=10,
     ack_timeout_slack=5.0,
     step_down_after_attempts=2,
-    step_up_after_clean_streak_initial=4,
-    step_up_after_clean_streak_max=32,
     max_useful_frame_seconds=8.0,
     require_clear_channel=True,
     track_frequency_offset=True,

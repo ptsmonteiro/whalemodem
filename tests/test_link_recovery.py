@@ -160,11 +160,6 @@ def _mode_step_survives_a_lost_ack(start_id, direction):
         # sent and lost.
         harness.drop_next(b, "MODE_ACK")
 
-        # This test is about mode-step/ack behavior, not speed adaptation,
-        # so pin the clean-streak threshold well above the two chunks sent
-        # below -- otherwise the first clean ACK would itself trigger a
-        # second mode step in the middle of the assertions.
-        a._data_ack_to_speed_up = 10
         payload = bytes((i * 7 + 11) % 256 for i in range(2 * a.tx_profile.chunk_size))
         got = {}
         receiver = threading.Thread(

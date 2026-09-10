@@ -17,9 +17,9 @@ def default_registry(budget=None):
     keeps the CPFSK module unaware of the waveforms stacked on top of it.
 
     VF3 sits at the top because it is the fastest and least robust rung: the
-    ladder is ordered by rate, and `_maybe_adapt` climbs it only after a
-    clean streak and steps down after silence, so a link that cannot hold
-    VF3 falls back to 1200 baud on its own.  Negotiation is per-station --
+    ladder is ordered by rate, and `_maybe_adapt` compares decayed delivery
+    statistics and expected goodput, so a link that cannot hold VF3 falls
+    back to 1200 baud on its own. Negotiation is per-station --
     a peer that does not advertise mode 3 simply never has it selected.
 
     `budget` is the useful-frame budget in seconds (see
@@ -52,8 +52,8 @@ def hf_registry(budget=None):
     and HF7: it is the robust rung, measured on radios to keep delivering on
     a path where HF7 delivers nothing. HF7 is the maximum-speed rung:
     49-carrier OFDM, 32-QAM, rate-3/4 LDPC. The ladder is ordered by rate and
-    the link climbs it only after a clean streak, so a path that cannot hold
-    HF7 falls back on its own.
+    the link probes unmeasured rungs and then selects from decayed delivery
+    statistics, so a path that cannot hold HF7 falls back on its own.
 
     Separate from `default_registry` rather than an extension of it: the
     CPFSK profiles have no carrier-frequency estimate anywhere in them, so
