@@ -255,12 +255,14 @@ application data already accepted by the service: `DISCONNECT` sends that
 queued data before starting the normal DISC handshake, while `ABORT` discards
 it and starts the same handshake immediately. The captures only exercise
 `ABORT` and do not establish real VARA's distinction, so the `DISCONNECT`
-drain behavior is a conservative, provisional choice. Both paths clear
-session stream queues so bytes cannot leak into a later connection. Unknown
+drain behavior is a conservative, provisional choice. Neither path touches
+bytes already received over the air: they stay readable after teardown so the
+tail of a transfer that landed just before the session ended still reaches the
+data-port client. Those leftovers are dropped when the next session starts,
+which is what keeps one session's bytes out of the next connection. Unknown
 or malformed commands are logged and receive no error response. `LISTEN ON`
 starts an incoming session worker if one is not
-already running. After the radio connection is established, that worker
-accepts one data-port TCP connection. Exactly `CHAT ON` or `CHAT OFF` is
+already running. Exactly `CHAT ON` or `CHAT OFF` is
 accepted and acknowledged; other values or extra arguments remain on the
 unknown-command path. The accepted forms currently have no effect beyond
 recording the last-set mode on the server (`chat_mode`); `BW<n>` (no space before the number, e.g.
@@ -292,16 +294,15 @@ client never sent one -- see "Current limitations" below.
 An outbound `CONNECT` is acknowledged with `OK` when its asynchronous attempt
 is accepted for processing. If the link exhausts its retry budget, it returns
 to `IDLE` and its internal service emits `CONNECT_FAILED`. At the VARA API
-boundary that event is translated to `DISCONNECTED`, and no data-port
-connection is accepted. This matches `capture-conn-fail.log`: VARA HF 4.3.0
+boundary that event is translated to `DISCONNECTED`. This matches
+`capture-conn-fail.log`: VARA HF 4.3.0
 acknowledged the call immediately, made 15 keyed attempts over about 47.2s,
 then emitted `DISCONNECTED` about 49.1s after the command without ever
 emitting `CONNECTED` or `CONNECT FAILED`. Whether some other rejection or
 failure class uses `CONNECT FAILED` remains unknown.
 
 For an incoming connection armed by `LISTEN ON`, Whale emits
-`CONNECTED <local_call> <caller_call> <bandwidth>` and then accepts the data
-connection exactly as it does for an outbound connection. This local/peer
+`CONNECTED <local_call> <caller_call> <bandwidth>`. This local/peer
 ordering is the symmetric extension of the captured outbound form, not a
 claim about observed LISTEN-side VARA behavior: neither successful capture
 is accepting-side.
@@ -321,10 +322,21 @@ matching real VARA's behavior.
 
 ### Data port
 
-Once the radio link is connected, the server accepts a TCP client on the data
-port. Bytes read from TCP are coalesced from currently queued reads and passed
+The server accepts a TCP client on the data port from the moment it starts
+serving, independent of session state, and keeps that connection for the life
+of the client's TCP connection: it is not closed on `DISCONNECTED` or on a
+failed connect, and radio sessions come and go underneath it. This matches
+real VARA, whose clients send their setup sequence exactly once per capture
+and would re-run it if the data socket were reset. One data connection is
+attached at a time; a new one replaces its predecessor, and after the client
+closes its socket the server is already accepting the next.
+
+Bytes read from TCP are coalesced from currently queued reads and passed
 to one link message; the link splits them into profile-sized DATA chunks.
-Completed inbound link messages are written to TCP as raw bytes.
+Completed inbound link messages are written to TCP as raw bytes. Bytes
+written to the data port while no radio session is up cannot be transmitted
+and are dropped; the captures establish no buffering behavior there, so Whale
+invents none.
 
 TCP itself is a byte stream, so message boundaries are not exposed to the
 local client. The mapping between TCP read batches and over-the-air messages

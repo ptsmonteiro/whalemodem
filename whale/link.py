@@ -133,8 +133,8 @@ _negotiate_mode = protocol.negotiate_mode
 logger = logging.getLogger(__name__)
 
 
-def _decode_snr_summary(result):
-    """Return the mode's receive-SNR diagnostic in a common log format.
+def _decode_snr(result):
+    """Return this decode's receive SNR as ``(dB, kind)``, or ``(None, None)``.
 
     HC0 measures the winning tone against the other tones. VF3 and HC1W
     estimate every carrier separately, for which the median is the stable
@@ -143,20 +143,43 @@ def _decode_snr_summary(result):
     """
     tone_snr = result.get("tone_snr_db")
     if tone_snr is not None and np.isfinite(tone_snr):
-        return f"SNR {float(tone_snr):.1f} dB (tone)"
+        return float(tone_snr), "tone"
 
     carrier_snr = result.get("carrier_snr_db")
     if carrier_snr is not None:
         finite = np.asarray(carrier_snr, dtype=float)
         finite = finite[np.isfinite(finite)]
         if finite.size:
-            return f"SNR {float(np.median(finite)):.1f} dB (median carrier)"
+            return float(np.median(finite)), "median carrier"
 
     snr = result.get("snr_db")
     if snr is not None and np.isfinite(snr):
-        return f"SNR {float(snr):.1f} dB (effective sync)"
+        return float(snr), "effective sync"
 
-    return "SNR unavailable"
+    return None, None
+
+
+def _decode_snr_summary(result):
+    """Return the mode's receive-SNR diagnostic in a common log format."""
+    snr_db, kind = _decode_snr(result)
+    if snr_db is None:
+        return "SNR unavailable"
+    return f"SNR {snr_db:.1f} dB ({kind})"
+
+
+def net_bits_per_second(mode):
+    """Net application bit/s this mode carries in a full-capacity DATA frame.
+
+    ``chunk_size`` is what one DATA frame delivers to the application after
+    the air header, and ``airtime`` is that frame's keyed duration, so their
+    ratio is the same net figure ``docs/MODES.md`` tabulates per mode. It is
+    a property of the mode, not a measurement of the current channel: whale
+    has no throughput estimator to report instead.
+    """
+    airtime = mode.airtime(mode.chunk_size)
+    if not airtime:
+        return 0.0
+    return mode.chunk_size * 8.0 / airtime
 
 
 # Which end may originate PT_DATA right now. Real half-duplex ARQ modems
@@ -981,6 +1004,17 @@ class Link:
                     "decode cpu unmeasured" if cpu is None
                     else f"decode cpu {cpu * 1000.0:.1f} ms",
                     _decode_snr_summary(decode_result))
+        if ptype == PT_DATA:
+            # Report the burst before handling it, so a listener sees the
+            # SNR and mode of a data frame ahead of the delivery and the
+            # ACK keying that follow. Data-plane only: an ACK is a control
+            # frame in the control waveform and says nothing about the
+            # negotiated data rate.
+            snr_db, _ = _decode_snr(decode_result)
+            if snr_db is not None:
+                self.on_event("SNR", snr_db=snr_db)
+            self.on_event("BITRATE", direction="RX", mode_id=profile.mode_id,
+                          bits_per_second=net_bits_per_second(profile))
         self._handle_raw(bytes([ptype]) + body, profile)
 
     def _capture_near_miss(self, snap, confidence):
@@ -1503,6 +1537,9 @@ class Link:
             if attempt > 1:
                 self.qualification_metrics["retransmissions"] += 1
             body = bytes([seq | (EOF_BIT if is_eof else 0)]) + chunk
+            self.on_event("BITRATE", direction="TX",
+                          mode_id=self.tx_profile.mode_id,
+                          bits_per_second=net_bits_per_second(self.tx_profile))
             self.on_event("PTT", on=True)
             self._tx_packet(PT_DATA, body)
             self.on_event("PTT", off=True)
@@ -1768,6 +1805,13 @@ class Link:
         # answered frame and the sequence wanted next so a stale duplicate
         # cannot be mistaken for an answer to a later frame.
         self.on_event("PTT", on=True)
+        if message is not None:
+            # Hand the reassembled message up now rather than after the ACK
+            # keying finishes: it is already decoded and the peer is already
+            # owed it, so holding it for the length of a transmission only
+            # adds latency. Callers that consume the return value still get
+            # it -- see recv_message.
+            self.on_event("RX_MESSAGE", data=message)
         self._tx_packet(PT_DATA_ACK,
                         bytes([seq, self._rx_expect_seq, self.rx_profile.mode_id]))
         self.on_event("PTT", off=True)

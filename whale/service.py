@@ -50,6 +50,11 @@ class ModemService:
         self._outbound: queue.Queue[bytes] = queue.Queue(maxsize=queue_size)
         self._inbound: queue.Queue[bytes] = queue.Queue(maxsize=queue_size)
         self._commands: queue.Queue[tuple[str, object]] = queue.Queue()
+        # Messages already placed on _inbound by the link's RX_MESSAGE event,
+        # which recv_message() is still going to return. Only the service
+        # worker thread touches it -- the event fires synchronously inside
+        # recv_message() on that same thread -- so a plain int is enough.
+        self._delivered_early = 0
         self._subscribers: list[EventHandler] = []
         self._subscriber_lock = threading.Lock()
         self._started = threading.Event()
@@ -102,6 +107,13 @@ class ModemService:
                 logger.exception("modem event subscriber failed")
 
     def _on_link_event(self, name: str, **details) -> None:
+        if name == "RX_MESSAGE":
+            # Stream bytes, not a status event: deliver them to the reader
+            # immediately, while the link is still keying the ACK, and
+            # remember that recv_message() will hand back the same message.
+            self._inbound.put(details["data"])
+            self._delivered_early += 1
+            return
         self._emit(name, **details)
 
     def start(self) -> None:
@@ -165,17 +177,18 @@ class ModemService:
                 if mycall:
                     self._link.mycall = mycall
                 self._listening = False
+                self._begin_session()
                 self._link.connect(destination)
             elif command == "disconnect":
                 self._listening = False
                 self._flush_outbound()
                 self._link.disconnect()
-                self._discard_stream_queues()
+                self._end_session()
             elif command == "abort":
                 self._listening = False
                 self._discard_queue(self._outbound)
                 self._link.disconnect()
-                self._discard_stream_queues()
+                self._end_session()
         return True
 
     @staticmethod
@@ -186,11 +199,29 @@ class ModemService:
             except queue.Empty:
                 return
 
-    def _discard_stream_queues(self) -> None:
-        # Stream bytes belong to one radio session and must never cross into
-        # the next connection, regardless of how this session ended.
+    def _end_session(self) -> None:
+        """Drop untransmitted bytes once the link is down.
+
+        Only ``_outbound`` is cleared: those bytes can no longer be keyed,
+        and a write racing the teardown can still have landed here while the
+        link was closing. Received bytes are left for the consumer -- see
+        :meth:`_begin_session`.
+        """
         self._discard_queue(self._outbound)
+
+    def _begin_session(self) -> None:
+        """Drop whatever the previous session left unread in ``_inbound``.
+
+        Received bytes survive teardown -- ``disconnect`` and ``abort`` leave
+        ``_inbound`` alone -- so a reader that polls has time to collect the
+        tail of a transfer that landed just before the session ended.
+        Session isolation is enforced here instead, at the moment the next
+        session starts: this is the service worker thread, the only producer
+        of ``_inbound``, so once this drain returns no byte from an earlier
+        session can be handed to a reader as part of this one.
+        """
         self._discard_queue(self._inbound)
+        self._delivered_early = 0
 
     def _flush_outbound(self) -> None:
         chunks = []
@@ -229,7 +260,10 @@ class ModemService:
             return
         message = self._link.recv_message(timeout=self._poll_interval)
         if message is not None:
-            self._inbound.put(message)
+            if self._delivered_early:
+                self._delivered_early -= 1
+            else:
+                self._inbound.put(message)
 
     def _run(self) -> None:
         self._link.start()
@@ -244,6 +278,7 @@ class ModemService:
                     elif self._listening:
                         if self._link.listen_once(timeout=self._poll_interval) is not None:
                             self._listening = False
+                            self._begin_session()
                     else:
                         try:
                             command = self._commands.get(timeout=self._poll_interval)

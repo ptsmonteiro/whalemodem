@@ -163,6 +163,39 @@ merely transports an end-to-end framing convention implemented by the chat
 applications. Implementations should not strip or synthesize this prefix in
 the generic byte-stream adapter without further evidence.
 
+### File-transfer records (`capture-file-transfer-official-vara.log`)
+
+A file offered through VARA Chat's file transfer used a second record form on
+the same data port:
+
+```text
+<decimal payload byte count>#<raw-DEFLATE payload bytes>
+```
+
+The separator is the only thing distinguishing it from the text form above: a
+`#` rather than a space. The count is read the same way in both -- it is the
+number of bytes that follow the separator, so here it counts the *compressed*
+bytes, not what they expand to.
+
+The one observed record was 38 bytes, `35#` followed by 35 bytes:
+
+```text
+35#<35 bytes>  ->  inflate  ->  "riseup.txt#Oportunidade RiseUP\r\n\r\n"
+```
+
+Those 35 bytes are a complete, self-terminating raw-DEFLATE stream (no zlib or
+gzip wrapper, no trailing bytes). The inflated 34 bytes are the file name, a
+`#`, and then the file's contents. The same 38 bytes appear byte-identically in
+`vara-chat-file-transfer-via-whale.log`, so this framing is the chat
+application's, not something the modem adds.
+
+One transfer of one small file is the whole of the evidence. It does not
+establish how a file too large for a single record is split, whether the count
+field has a maximum, what happens to a name containing `#`, whether the
+receiver acknowledges the file in-band, or whether an uncompressed variant
+exists. As with the text form, whale neither strips nor synthesises this
+prefix: the data port stays byte-transparent.
+
 ### Binary/mixed-session observations (`capture1.log`)
 
 - Payload sizes clustered at fixed values per observed transfer (38 bytes
@@ -175,6 +208,12 @@ the generic byte-stream adapter without further evidence.
   Inbound, it's the reverse: the `SN`/`BITRATE ... RX`/`PTT ON` status
   appears first, and the decoded payload lands on the data port ~0.1-0.2s
   later.
+- Data-port lifetime: the client's setup sequence (`MYCALL`/`CHAT ON`/`BW<n>`)
+  appears exactly once, at the start of every capture, including the one that
+  ends the session with `ABORT` and `DISCONNECTED`. Nothing in the captures
+  shows VARA dropping the data connection at teardown, and a client that saw
+  one would re-run that setup. Whale therefore keeps the data connection for
+  the life of the client's TCP connection.
 
 ## Known gaps in this document
 

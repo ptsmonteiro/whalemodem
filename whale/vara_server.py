@@ -2,8 +2,16 @@
 
 Two TCP ports, same shape as VARA HF/FM's API:
   - command port: line-oriented ASCII commands in, status lines out
-  - data port: once connected, raw bytes written are sent over the air,
-    raw bytes received over the air are written back out
+  - data port: raw bytes written are sent over the air, raw bytes received
+    over the air are written back out. A decoded message is handed over
+    while the link is still keying its ACK, so it reaches the client
+    between that burst's PTT ON and PTT OFF, as real VARA's does. The connection is accepted for the
+    life of the server rather than per radio session: real VARA keeps it
+    attached across connect/disconnect cycles (its clients send their init
+    sequence exactly once per capture). Bytes written while no session is up
+    cannot be transmitted and are dropped; no capture establishes buffering
+    here. Bytes already received over the air outlive their session's
+    teardown and are written out on this same connection.
 
 Commands (each line, '\r' or '\n' terminated):
     MYCALL <call>              set our callsign (also settable via --mycall)
@@ -11,7 +19,9 @@ Commands (each line, '\r' or '\n' terminated):
     LISTEN OFF                 stop accepting incoming CONNECTs
     CONNECT <mycall> <dstcall> initiate a connection
     DISCONNECT                 send queued data, then tear down the connection
-    ABORT                      discard queued data, then tear down immediately
+    ABORT                      discard queued outbound data, then tear down
+                               immediately (bytes already received over the
+                               air are still delivered)
     CHAT ON / CHAT OFF         set chat mode (accepted; no behavior change yet)
     BW<n>                      set bandwidth in Hz, e.g. BW2300 (no space)
 
@@ -26,6 +36,14 @@ Status lines pushed back on the command port:
                                 fall back on -- see _on_modem_event)
     DISCONNECTED                 sent after established teardown or an
                                  exhausted outbound connection attempt
+    SN <x.x>                   receive SNR of a decoded DATA burst, sent
+                                just before its BITRATE ... RX line
+    BITRATE (<id>)  <n> bps <TX|RX>
+                                the mode a DATA burst is keyed or decoded at:
+                                whale's own mode_id, and that mode's net
+                                application bit/s (docs/MODES.md), not a
+                                measured channel throughput. Control frames
+                                (ACKs and the handshake) report nothing.
     BUFFER 0                   sent after queued application data finishes a
                                 link send; nonzero semantics are unconfirmed
     IAMALIVE                   unsolicited keepalive, sent roughly every 60s
@@ -53,14 +71,22 @@ logger = logging.getLogger(__name__)
 
 PUMP_RECV_TIMEOUT = 0.5
 
-# How often a pending local data-port accept checks whether its modem
-# session is still active.
+# How often a pending local data-port accept wakes to check for shutdown.
 DATA_ACCEPT_POLL = 0.5
 
 # Real VARA emits an unsolicited IAMALIVE roughly every 60s for the life of
 # the session, whether or not it is connected. Module-level so tests can
 # monkeypatch it to a short interval instead of waiting on the real cadence.
 IAMALIVE_INTERVAL = 60.0
+
+
+def _close_socket(conn):
+    if conn is None:
+        return
+    try:
+        conn.close()
+    except OSError:
+        pass
 
 
 class StationServer:
@@ -113,20 +139,31 @@ class StationServer:
             # command port (capture-conn-fail.log), with no CONNECT FAILED
             # line, even though no CONNECTED status preceded it.
             self._send_status("DISCONNECTED")
-            self._close_data_connection()
         elif name == "DISCONNECTED":
             self._send_status("DISCONNECTED")
-            self._close_data_connection()
+        elif name == "SNR":
+            # Real VARA reports the receive SNR of a decoded data burst as
+            # "SN <x.x>" just before the mode line (capture-file-transfer-
+            # official-vara.log). The unit is not stated in any capture;
+            # whale sends its own decode's dB figure.
+            self._send_status(f"SN {kw['snr_db']:.1f}")
+        elif name == "BITRATE":
+            # Captured shape: "BITRATE (4)  175 bps TX" and
+            # "BITRATE (3)  82 bps TX" -- two literal spaces after the
+            # parenthesised index in both, so the gap is fixed, not a
+            # right-aligned field. The index is VARA's own mode numbering,
+            # which whale has no mapping for, so it carries whale's mode_id;
+            # the rate is the mode's net application bit/s (see
+            # link.net_bits_per_second and docs/MODES.md), not a measured
+            # channel throughput.
+            self._send_status(f"BITRATE ({kw['mode_id']})  "
+                              f"{round(kw['bits_per_second'])} bps "
+                              f"{kw['direction']}")
         elif name == "OUTBOUND_DRAINED":
             # All five captured BUFFER reports were zero and followed the
             # data-bearing TX burst.  Do not invent uncaptured units or a
             # nonzero range; translate only the service's empty boundary.
             self._send_status("BUFFER 0")
-        if name == "CONNECTED":
-            with self._data_lock:
-                if not self._data_accepting:
-                    self._data_accepting = True
-                    threading.Thread(target=self._accept_data_connection, daemon=True).start()
 
     def _iamalive_loop(self):
         """Send IAMALIVE roughly every IAMALIVE_INTERVAL seconds.
@@ -152,58 +189,94 @@ class StationServer:
     # -- data port ----------------------------------------------------------
 
     def _data_reader_loop(self, conn):
-        while True:
+        """Feed data-port bytes to the service for the life of ``conn``.
+
+        The connection outlives radio sessions, so a write that lands while
+        no session is up must not end this loop. ModemService.write() raises
+        ConnectionError in that case; those bytes cannot be transmitted and
+        are dropped. No capture establishes what real VARA does with
+        data-port bytes written between sessions, so nothing is buffered on
+        their behalf.
+        """
+        while not self._stopping.is_set():
             try:
                 chunk = conn.recv(4096)
             except OSError:
-                return
+                break
             if not chunk:
-                return
+                break
             try:
                 self.service.write(chunk)
             except ConnectionError:
-                return
+                logger.debug("dropped %d data-port bytes: no active session",
+                             len(chunk))
+        self._detach_data_connection(conn)
 
     def _data_writer_loop(self, conn):
-        while True:
+        """Write inbound stream bytes to ``conn`` for the life of ``conn``.
+
+        Like the reader, this survives session teardown: it ends only when
+        the connection is closed or replaced, or the server stops.
+        """
+        while not self._stopping.is_set():
+            with self._data_lock:
+                if self._data_conn is not conn:
+                    return
             data = self.service.read(timeout=PUMP_RECV_TIMEOUT)
             if data is None:
-                if self.service.state != "CONNECTED":
-                    return
                 continue
             try:
                 conn.sendall(data)
             except OSError:
-                return
+                break
+        self._detach_data_connection(conn)
 
     def _accept_data_connection(self):
-        """Attach the next local VARA data connection to the active stream."""
+        """Accept local VARA data connections for the life of the server.
+
+        Real VARA's data port is not tied to a radio session: in every
+        capture the client sends its cold-start init sequence exactly once,
+        and connect/disconnect cycles happen underneath a data socket that is
+        never dropped (in capture1.log the client ends the session with ABORT
+        and re-inits nothing afterwards). So this loop starts when the server
+        starts serving and keeps an accept pending at all times, leaving no
+        window between sessions where the listener is unattended.
+
+        One data connection is attached at a time; a new one replaces and
+        closes its predecessor.
+        """
         self._data_listener.settimeout(DATA_ACCEPT_POLL)
-        while True:
-            try:
-                conn, addr = self._data_listener.accept()
-            except socket.timeout:
-                if self.service.state != "CONNECTED":
-                    with self._data_lock:
-                        self._data_accepting = False
-                    return
-                continue
-            logger.info("data connection from %s", addr)
+        try:
+            while not self._stopping.is_set():
+                try:
+                    conn, addr = self._data_listener.accept()
+                except socket.timeout:
+                    continue
+                except OSError:
+                    break
+                logger.info("data connection from %s", addr)
+                with self._data_lock:
+                    previous, self._data_conn = self._data_conn, conn
+                _close_socket(previous)
+                threading.Thread(target=self._data_reader_loop, args=(conn,),
+                                 daemon=True).start()
+                threading.Thread(target=self._data_writer_loop, args=(conn,),
+                                 daemon=True).start()
+        finally:
             with self._data_lock:
-                self._data_conn = conn
                 self._data_accepting = False
-            threading.Thread(target=self._data_reader_loop, args=(conn,), daemon=True).start()
-            threading.Thread(target=self._data_writer_loop, args=(conn,), daemon=True).start()
-            return
+
+    def _detach_data_connection(self, conn):
+        """Close ``conn``, clearing it if it is still the attached one."""
+        with self._data_lock:
+            if self._data_conn is conn:
+                self._data_conn = None
+        _close_socket(conn)
 
     def _close_data_connection(self):
         with self._data_lock:
             conn, self._data_conn = self._data_conn, None
-        if conn is not None:
-            try:
-                conn.close()
-            except OSError:
-                pass
+        _close_socket(conn)
 
     # -- command handling -------------------------------------------------
 
@@ -327,6 +400,10 @@ class StationServer:
         self._data_listener.bind((self.host, self.data_port))
         self._data_listener.listen(1)
         self.data_port = self._data_listener.getsockname()[1]
+
+        with self._data_lock:
+            self._data_accepting = True
+        threading.Thread(target=self._accept_data_connection, daemon=True).start()
 
         logger.info("whale VARA-API server: mycall=%s cmd=%d data=%d",
                     self.mycall, self.cmd_port, self.data_port)
