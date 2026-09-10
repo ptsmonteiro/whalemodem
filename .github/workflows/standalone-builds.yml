@@ -88,17 +88,18 @@ jobs:
           pyinstaller packaging/pyinstaller/whale.spec
       - name: Smoke test
         run: |
-          dist/whale-server/whale-server --help
+          dist/whale/whale-server --help
+          dist/whale/whale-configure --help
           . .venv/bin/activate
           python3 -c "import whale.hw.hamlib, whale.hw.audio_io"
       - name: Archive bundle
         run: |
           cd dist
-          tar czf "whale-server-${{ needs.compute-version.outputs.version }}-linux-x86_64.tar.gz" whale-server
+          tar czf "whale-${{ needs.compute-version.outputs.version }}-linux-x86_64.tar.gz" whale
       - uses: actions/upload-artifact@v4
         with:
-          name: whale-server-linux-x86_64
-          path: dist/whale-server-*-linux-x86_64.tar.gz
+          name: whale-linux-x86_64
+          path: dist/whale-*-linux-x86_64.tar.gz
 
   # linux-aarch64 / linux-armv7: also amd64 GitHub runners, cross-arch via
   # QEMU user-mode emulation registered by setup-qemu-action, the same
@@ -149,17 +150,18 @@ jobs:
               pip install -e ".[test]"
               pip install pyinstaller
               pyinstaller packaging/pyinstaller/whale.spec
-              dist/whale-server/whale-server --help
+              dist/whale/whale-server --help
+              dist/whale/whale-configure --help
               python3 -c "import whale.hw.hamlib, whale.hw.audio_io"
             '
       - name: Archive bundle
         run: |
           cd dist
-          tar czf "whale-server-${{ needs.compute-version.outputs.version }}-${{ matrix.tag }}.tar.gz" whale-server
+          tar czf "whale-${{ needs.compute-version.outputs.version }}-${{ matrix.tag }}.tar.gz" whale
       - uses: actions/upload-artifact@v4
         with:
-          name: whale-server-${{ matrix.tag }}
-          path: dist/whale-server-*-${{ matrix.tag }}.tar.gz
+          name: whale-${{ matrix.tag }}
+          path: dist/whale-*-${{ matrix.tag }}.tar.gz
 
   # macos-arm64 / macos-x86_64: real, native Apple Silicon / Intel runners.
   # No QEMU/Rosetta needed -- macos-13 is the last macOS runner generation
@@ -192,16 +194,17 @@ jobs:
         run: pyinstaller packaging/pyinstaller/whale.spec
       - name: Smoke test
         run: |
-          dist/whale-server/whale-server --help
+          dist/whale/whale-server --help
+          dist/whale/whale-configure --help
           python3 -c "import whale.hw.hamlib, whale.hw.audio_io"
       - name: Archive bundle
         run: |
           cd dist
-          zip -r "whale-server-${{ needs.compute-version.outputs.version }}-${{ matrix.tag }}.zip" whale-server
+          zip -r "whale-${{ needs.compute-version.outputs.version }}-${{ matrix.tag }}.zip" whale
       - uses: actions/upload-artifact@v4
         with:
-          name: whale-server-${{ matrix.tag }}
-          path: dist/whale-server-*-${{ matrix.tag }}.zip
+          name: whale-${{ matrix.tag }}
+          path: dist/whale-*-${{ matrix.tag }}.zip
 
   # windows-x86_64: native runner, sounddevice's wheel already bundles
   # PortAudio on Windows so there's no vendored-PortAudio preload step to
@@ -225,12 +228,13 @@ jobs:
         run: pyinstaller packaging/pyinstaller/whale.spec
       - name: Smoke test
         run: |
-          dist\whale-server\whale-server.exe --help
+          dist\whale\whale-server.exe --help
+          dist\whale\whale-configure.exe --help
           python -c "import whale.hw.hamlib, whale.hw.audio_io"
       - name: Archive bundle
         run: |
-          Compress-Archive -Path dist\whale-server -DestinationPath "dist\whale-server-${{ needs.compute-version.outputs.version }}-windows-x86_64.zip"
+          Compress-Archive -Path dist\whale -DestinationPath "dist\whale-${{ needs.compute-version.outputs.version }}-windows-x86_64.zip"
       - uses: actions/upload-artifact@v4
         with:
-          name: whale-server-windows-x86_64
-          path: dist/whale-server-*-windows-x86_64.zip
+          name: whale-windows-x86_64
+          path: dist/whale-*-windows-x86_64.zip

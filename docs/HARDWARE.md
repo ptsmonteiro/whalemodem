@@ -156,19 +156,21 @@ instead of CAT, etc).
 For an end user who doesn't want to set up Python, a venv, or `pip install`
 at all, Whale can be frozen into a standalone, no-Python-required
 onedir bundle with PyInstaller -- a folder containing the
-`whale-server` executable plus its own Python runtime, numpy/scipy,
-and (vendored the same way `hamlib` is vendored above) hamlib and, on
-Linux, PortAudio. It is a folder you download and run directly, not yet an
-installer, system package, or service -- nothing registers it to start on
-boot, and there is no upgrade mechanism beyond replacing the folder. The
-same command-line flags shown under
+`whale-server` and `whale-configure` executables plus their shared Python
+runtime, numpy/scipy, and (vendored the same way `hamlib` is vendored
+above) hamlib and, on Linux, PortAudio. It is a folder you download and
+run directly, not yet an installer, system package, or service -- nothing
+registers it to start on boot, and there is no upgrade mechanism beyond
+replacing the folder. The same command-line flags shown under
 [Starting a station](#starting-a-station) apply, just against the frozen
 executable instead of `python -m whale.vara_server`:
 
 ```console
-whale-server/whale-server --radio-config radios.toml --radio station-a \
+whale/whale-server --radio-config radios.toml --radio station-a \
   --mycall STA1 --cmd-port 8300 --data-port 8301
 ```
+
+`whale/whale-configure` is the frozen radio-config TUI, in the same folder.
 
 Building one is covered in `packaging/pyinstaller/README.md`; that
 procedure, not this section, is the source of truth for the actual build
@@ -194,21 +196,23 @@ should be checked for on a bare or minimal target rather than assumed.
 macOS and Windows builds have no equivalent gap: the `sounddevice` wheel
 already bundles PortAudio itself on those platforms.
 
-**Validation status.** Only linux-x86_64 has actually been built and
-exercised so far, inside Docker, without real audio or rig hardware
-attached: `whale-server --help` running to completion plus native
-import/load checks for `whale.hw.hamlib` and `whale.hw.audio_io`, not a
-full radio session. The other five platforms (linux-aarch64, linux-armv7,
-macos-arm64, macos-x86_64, windows-x86_64) are built by the
+**Validation status.** linux-x86_64 (inside Docker) and windows-x86_64
+(native, on a real Windows host) have actually been built and exercised so
+far, without real audio or rig hardware attached: `whale-server --help` and
+`whale-configure --help` (`.exe` on Windows) both running to completion,
+plus native import/load checks for `whale.hw.hamlib` and
+`whale.hw.audio_io`, not a full radio session. The other four platforms
+(linux-aarch64, linux-armv7,
+macos-arm64, macos-x86_64) are built by the
 `.github/workflows/standalone-builds.yml` CI matrix but have not yet run
 on real GitHub Actions or on real hardware. As with every mode covered by
 this project's [current status](../README.md#current-status),
 "builds and imports cleanly" is not the same claim as "verified" --
-standalone builds for any platform other than the one smoke-tested here
+standalone builds for any platform other than the two smoke-tested here
 should be treated as unvalidated until they have actually run on that
-target OS/architecture, and the Linux/Raspberry-Pi-class path specifically
-still needs a real audio-plus-rig hardware pass before it is used for
-anything beyond a bench trial.
+target OS/architecture, and every platform (Windows included) still needs
+a real audio-plus-rig hardware pass before it is used for anything beyond
+a bench trial.
 
 ## Starting a station
 

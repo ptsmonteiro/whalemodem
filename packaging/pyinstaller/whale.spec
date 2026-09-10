@@ -1,14 +1,25 @@
-# PyInstaller spec for a standalone whale-server bundle.
+# PyInstaller spec for the standalone whale-server and whale-configure
+# bundles.
 #
-# Built onedir (not onefile): this runs as a long-lived server, often on
-# low-end hardware like a Raspberry Pi, so avoiding onefile's self-extraction
-# cost on every process start matters more than shipping a single file.
-# Only the *current build host's* vendored hamlib copy is bundled (trimming
-# ~68MB of six-platform vendor data down to ~11-13MB for one), placed at the
-# same relative path hamlib.py already looks it up from. On Linux hosts only,
+# Built onedir (not onefile): whale-server runs as a long-lived server,
+# often on low-end hardware like a Raspberry Pi, so avoiding onefile's
+# self-extraction cost on every process start matters more than shipping a
+# single file; whale-configure matches it for consistency. Only the
+# *current build host's* vendored hamlib copy is bundled (trimming ~68MB of
+# six-platform vendor data down to ~11-13MB for one), placed at the same
+# relative path hamlib.py already looks it up from. On Linux hosts only,
 # the vendored PortAudio .so is additionally bundled at the fixed
 # `_vendor_portaudio/libportaudio.so.2` path that whale/hw/audio_io.py's
 # frozen-mode preload hook expects.
+#
+# whale-configure (whale.radio_config_tui) never imports whale.dsp, so it
+# pulls in neither numpy nor scipy -- its own Analysis is far smaller than
+# whale-server's. The two do share the Python runtime and the vendored
+# hamlib blob (whale-configure drives PTT through whale.hw.ptt_backends'
+# HamlibController same as whale-server does), so MERGE() plus a single
+# combined COLLECT call below writes both executables into one dist/whale/
+# folder sharing one _internal/, instead of duplicating that shared data
+# into two separate onedir folders.
 
 import os
 import sys
@@ -63,7 +74,7 @@ if TAG.startswith("linux-"):
 # numpy/scipy hooks, so this list is expected to stay short).
 hiddenimports = []
 
-a = Analysis(
+a_server = Analysis(
     [os.path.join(REPO_ROOT, "packaging", "pyinstaller", "entrypoint.py")],
     pathex=[REPO_ROOT],
     binaries=[],
@@ -76,11 +87,34 @@ a = Analysis(
     noarchive=False,
 )
 
-pyz = PYZ(a.pure)
+a_configure = Analysis(
+    [os.path.join(REPO_ROOT, "packaging", "pyinstaller", "entrypoint_configure.py")],
+    pathex=[REPO_ROOT],
+    binaries=[],
+    datas=datas,
+    hiddenimports=hiddenimports,
+    hookspath=[],
+    hooksconfig={},
+    runtime_hooks=[],
+    excludes=[],
+    noarchive=False,
+)
 
-exe = EXE(
-    pyz,
-    a.scripts,
+# Dedupes binaries/datas shared between the two Analyses (the Python
+# runtime, the vendored hamlib blob) so they're written once and shared
+# between dist/whale-server/ and dist/whale-configure/ rather than copied
+# into each independently.
+MERGE(
+    (a_server, "whale-server", "whale-server"),
+    (a_configure, "whale-configure", "whale-configure"),
+)
+
+pyz_server = PYZ(a_server.pure)
+pyz_configure = PYZ(a_configure.pure)
+
+exe_server = EXE(
+    pyz_server,
+    a_server.scripts,
     [],
     exclude_binaries=True,
     name="whale-server",
@@ -96,12 +130,38 @@ exe = EXE(
     entitlements_file=None,
 )
 
+exe_configure = EXE(
+    pyz_configure,
+    a_configure.scripts,
+    [],
+    exclude_binaries=True,
+    name="whale-configure",
+    debug=False,
+    bootloader_ignore_signals=False,
+    strip=False,
+    upx=True,
+    console=True,
+    disable_windowed_traceback=False,
+    argv_emulation=False,
+    target_arch=None,
+    codesign_identity=None,
+    entitlements_file=None,
+)
+
+# A single COLLECT call across both EXEs is what actually realizes the
+# MERGE() dedupe: it writes one shared `dist/whale/_internal/` (Python
+# runtime, hamlib vendor blob) instead of duplicating it into two separate
+# onedir folders. whale-server.exe and whale-configure.exe both land next
+# to that shared _internal/, inside dist/whale/.
 coll = COLLECT(
-    exe,
-    a.binaries,
-    a.datas,
+    exe_server,
+    a_server.binaries,
+    a_server.datas,
+    exe_configure,
+    a_configure.binaries,
+    a_configure.datas,
     strip=False,
     upx=True,
     upx_exclude=[],
-    name="whale-server",
+    name="whale",
 )
