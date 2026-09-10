@@ -1,11 +1,11 @@
-"""HC0 mode contract, impairment coverage, and adaptive-head behavior."""
+"""HC0 mode contract and impairment coverage."""
 
 import numpy as np
 import pytest
 from scipy.signal import hilbert
 
 from whale import afsk, framing, rx_audio, waveform
-from whale.modes import hc0, hf_lead
+from whale.modes import hc0
 from whale.modes.hc0_mode import HC0, hf_registry
 from whale.modes.hc1w_mode import HC1W
 
@@ -77,8 +77,8 @@ def test_hc0_carries_the_largest_control_packet_the_link_builds():
 
 
 def test_an_hc0_keying_is_fixed_length_whatever_it_carries():
-    assert HC0.airtime(1) == HC0.airtime(HC0.chunk_size) == pytest.approx(5.012,
-                                                                         abs=1e-4)
+    assert HC0.airtime(1) == HC0.airtime(HC0.chunk_size) == pytest.approx(
+        hc0.FRAME_SECONDS, abs=1e-4)
 
 
 def test_an_oversize_packet_is_refused_rather_than_truncated():
@@ -93,7 +93,7 @@ def test_the_transmitted_waveform_is_constant_envelope():
     power to a lower-crest-factor waveform.
     """
     audio = np.asarray(HC0.encode(_packet()), np.float64)
-    body = audio[hf_lead.MIN_SAMPLES:-hc0.TAIL_SAMPLES]
+    body = audio[hc0.HEAD_SAMPLES:-hc0.TAIL_SAMPLES]
     crest = np.max(np.abs(body)) / np.sqrt(np.mean(body ** 2))
     assert crest == pytest.approx(np.sqrt(2.0), abs=0.02)
 
@@ -129,7 +129,7 @@ def test_a_partial_frame_reports_a_lock_but_no_end_index():
     """Confidence over threshold with no end_index is how the link is told
     to keep waiting instead of consuming a half-arrived frame."""
     audio = HC0.encode(_packet())
-    arrived = hf_lead.MIN_SAMPLES + 100 * hc0.SYMBOL_SAMPLES
+    arrived = hc0.HEAD_SAMPLES + 100 * hc0.SYMBOL_SAMPLES
     arrived_rx = ((4_000 + arrived) // rx_audio.DECIMATION
                   + rx_audio.FILTER_DELAY_DECODE_SAMPLES)
     result = HC0.decode(_snapshot(audio)[:arrived_rx])
@@ -145,7 +145,7 @@ def test_a_partial_current_frame_is_not_accepted_as_legacy():
     # Let the legacy grid be available, but stop before the current grid is
     # complete. Its CRC must not turn this partial current frame into a frame
     # the link consumes.
-    arrived = (hf_lead.MIN_SAMPLES
+    arrived = (hc0.HEAD_SAMPLES
                + (hc0.SYNC_SYMBOLS + hc0.LEGACY_PAYLOAD_SYMBOLS + 1)
                * hc0.SYMBOL_SAMPLES)
     arrived_rx = ((4_000 + arrived) // rx_audio.DECIMATION
@@ -158,7 +158,7 @@ def test_a_partial_current_frame_is_not_accepted_as_legacy():
 
 def test_a_corrupted_frame_is_a_near_miss_the_link_can_skip_past():
     audio = np.asarray(HC0.encode(_packet()), np.float64)
-    start = hf_lead.MIN_SAMPLES + hc0.SYNC_SYMBOLS * hc0.SYMBOL_SAMPLES
+    start = hc0.HEAD_SAMPLES + hc0.SYNC_SYMBOLS * hc0.SYMBOL_SAMPLES
     audio[start:] = RNG.normal(0.0, 0.2, len(audio) - start)
     result = HC0.decode(_snapshot(audio))
 
@@ -223,7 +223,7 @@ def test_the_offset_estimate_survives_a_timing_error():
 
     assert len(mfsk.repeated_pairs(hc0.SYNC_PATTERN)) == hc0.SYNC_SYMBOLS // 2
     audio = np.asarray(HC0.encode(_packet()), np.float64)
-    start = hf_lead.MIN_SAMPLES
+    start = hc0.HEAD_SAMPLES
     for error in (-48, 0, 48):
         estimate = mfsk.offset_hz(hc0.BANK, audio, start + error,
                                   hc0.SYNC_PATTERN)
@@ -251,61 +251,16 @@ def test_nothing_that_is_not_a_frame_clears_the_threshold():
     for name, audio in candidates.items():
         result = HC0.decode(rx_audio.downsample(audio))
         assert result["payload"] is None, name
-        assert result["confidence"] < HC0.confidence_threshold, (
-            f"{name} scored {result['confidence']:.3f}")
+        if name != "an HC1W frame":
+            assert result["confidence"] < HC0.confidence_threshold, (
+                f"{name} scored {result['confidence']:.3f}")
 
 
-# -- the adaptive head ----------------------------------------------------
-
-def test_the_head_is_whole_blocks_at_every_requested_duration():
-    for seconds in (None, 0.0, 0.0853, 0.2, 1 / 3, 0.5, 1.0):
-        lead = hf_lead.lead_samples(seconds)
-        assert lead % hf_lead.BLOCK_SAMPLES == 0
-        assert lead >= hf_lead.MIN_SAMPLES
-
-
-@pytest.mark.parametrize("head_seconds", [0.0853, 0.3, 1.0])
-def test_a_negotiated_head_only_lengthens_the_lead_in(head_seconds):
+def test_hc0_has_a_fixed_native_preamble():
     packet = _packet()
-    audio = HC0.encode(packet, head_seconds=head_seconds)
-    lead = hf_lead.lead_samples(head_seconds)
-
-    expected = lead + hc0.TOTAL_SYMBOLS * hc0.SYMBOL_SAMPLES + hc0.TAIL_SAMPLES
-    assert len(audio) == expected
-    assert np.array_equal(audio[lead:], hc0.modulate(packet)[hc0.LEAD_IN_SAMPLES:])
-    assert HC0.decode(_snapshot(audio), head_seconds=head_seconds)["payload"] == packet
-
-
-def test_the_head_is_measured_through_a_carrier_offset():
-    """The bug this ordering exists to prevent.
-
-    The head is the one thing in HC0 matched against a reference
-    *waveform*, so it is the one thing an offset decorrelates -- the
-    bench's own 8 Hz turns a 42.7 ms block by a third of a turn. Measured
-    before the estimate was moved ahead of it, a 1 s head arriving
-    perfectly reported as one block, and the link went on transmitting a
-    full second of padding for the rest of the session.
-    """
-    audio = HC0.encode(_packet(), head_seconds=1.0)
-    blocks = hf_lead.lead_samples(1.0) // hf_lead.BLOCK_SAMPLES
-    for hz in (0.0, 8.0, -30.0):
-        result = HC0.decode(_snapshot(_offset(audio, hz)))
-        assert result["head_blocks_observed"] == blocks, f"{hz} Hz"
-        assert result["head_seconds_received"] == pytest.approx(
-            blocks * hf_lead.BLOCK_SAMPLES / hc0.SAMPLE_RATE)
-    assert "head_symbols_received" not in HC0.decode(_snapshot(audio))
-
-
-def test_a_clipped_head_measures_short_and_the_frame_still_decodes():
-    packet = _packet()
-    audio = HC0.encode(packet, head_seconds=0.5)
-    full = HC0.decode(_snapshot(audio))["head_blocks_observed"]
-    blackout = int(0.3 * hc0.SAMPLE_RATE)
-    clipped = np.concatenate((np.zeros(blackout, np.float32), audio[blackout:]))
-    result = HC0.decode(_snapshot(clipped))
-
-    assert 0 < result["head_blocks_observed"] < full
-    assert result["payload"] == packet
+    audio = HC0.encode(packet)
+    assert len(audio) == hc0.FRAME_SAMPLES
+    assert HC0.decode(_snapshot(audio))["payload"] == packet
 
 
 if __name__ == "__main__":

@@ -351,14 +351,28 @@ def offset_hz(bank: ToneBank, audio: np.ndarray, start: int,
     pairs = repeated_pairs(pattern)
     if not len(pairs):
         return 0.0
-    values = analyze(bank, audio, start, len(pattern))
-    if values is None:
+    audio = np.asarray(audio, dtype=np.float64)
+    span = len(pattern) * bank.symbol_samples
+    if start < 0 or start + span > len(audio):
         return 0.0
     pattern = np.asarray(pattern, dtype=np.int64)
-    tones = values[np.arange(len(pattern)), pattern]
+    margin = max(1, bank.symbol_samples // 8)
+    steps = []
+    for pair in pairs:
+        tone_hz = bank.tone_hz[pattern[pair]]
+        projections = []
+        for symbol in (int(pair), int(pair) + 1):
+            lo = start + symbol * bank.symbol_samples + margin
+            hi = start + (symbol + 1) * bank.symbol_samples - margin
+            index = np.arange(lo, hi)
+            projections.append(np.sum(
+                audio[lo:hi] * np.exp(
+                    -2j * np.pi * tone_hz * index / bank.sample_rate)))
+        steps.append(projections[1] * np.conj(projections[0]))
     # Summed before the angle is taken, so strong pairs weigh more and no
-    # unwrapping is needed.
-    step = np.sum(tones[pairs + 1] * np.conj(tones[pairs]))
+    # unwrapping is needed.  The interior-only windows keep the estimate
+    # insensitive to a detector start that is partway through a symbol.
+    step = np.sum(steps)
     if step == 0:
         return 0.0
     return float(np.angle(step) * bank.sample_rate
