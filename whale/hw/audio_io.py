@@ -61,13 +61,24 @@ def _preload_bundled_portaudio() -> None:
 _preload_bundled_portaudio()
 
 import numpy as np
-import sounddevice as sd
 
 from whale.hw import ptt as ptt_mod
 
 SAMPLE_RATE = 48000
 
 _log = logging.getLogger(__name__)
+
+_sounddevice = None
+
+
+def _load_sounddevice():
+    """Load PortAudio bindings only when an audio operation needs them."""
+    global _sounddevice
+    if _sounddevice is None:
+        import sounddevice
+
+        _sounddevice = sounddevice
+    return _sounddevice
 
 # Per-platform default host API, matched by substring against
 # sd.query_hostapis()'s "name" field. Overridable with WHALE_AUDIO_HOST_API
@@ -79,6 +90,7 @@ _DEFAULT_HOST_API = {"win32": "wasapi", "darwin": "core audio"}.get(sys.platform
 
 def _host_api_index():
     wanted = os.environ.get("WHALE_AUDIO_HOST_API", _DEFAULT_HOST_API).lower()
+    sd = _load_sounddevice()
     hostapis = sd.query_hostapis()
     for i, api in enumerate(hostapis):
         if wanted in api["name"].lower():
@@ -93,6 +105,7 @@ def find_devices(name_substr, kind):
     """Lists device indices on the selected host API by partial name and
     direction ('input'/'output'). Unlike find_device(), never raises: 0, 1,
     or many matches all come back as a plain (possibly empty) list."""
+    sd = _load_sounddevice()
     hostapi = _host_api_index()
     channel_key = "max_input_channels" if kind == "input" else "max_output_channels"
     return [
@@ -108,6 +121,7 @@ def find_device(name_substr, kind):
     """Finds a device index on the selected host API by partial name and
     direction ('input'/'output'). See _host_api_index() for which host API
     that is on this platform."""
+    sd = _load_sounddevice()
     matches = find_devices(name_substr, kind)
     api_name = sd.query_hostapis()[_host_api_index()]["name"]
     if not matches:
@@ -136,6 +150,7 @@ def list_devices(kind=None):
     that direction; kind=None (the default) returns every device on the host
     API regardless of channel counts, for a wizard's unified picker table.
     """
+    sd = _load_sounddevice()
     hostapi = _host_api_index()
     api_name = sd.query_hostapis()[hostapi]["name"]
     devices = []
@@ -199,6 +214,7 @@ def transmit(tx_signal, tx_device, ptt, samplerate=SAMPLE_RATE, ptt_lead=0.3, pt
         turn it off. Both halves of that failed together, which is why both
         halves are fixed here.
     """
+    sd = _load_sounddevice()
     tx_signal = np.asarray(tx_signal, dtype=np.float32).reshape(-1, 1)
     tx_duration = len(tx_signal) / samplerate
 
@@ -289,6 +305,7 @@ def capture_while_transmitting(
     # streams to give PortAudio enough buffer headroom.
     stream_latency = 0.1
 
+    sd = _load_sounddevice()
     tx_signal = np.asarray(tx_signal, dtype=np.float32).reshape(-1, 1)
     tx_duration = len(tx_signal) / samplerate
     total_duration = pre_roll + ptt_lead + stream_latency + tx_duration + ptt_tail + post_roll

@@ -28,11 +28,20 @@ import types
 
 import numpy as np
 import serial
-import sounddevice as sd
 
 from whale import transport
 from whale.hw import audio_io
 from whale.hw import ptt
+
+
+class _FakeSoundDevice:
+    class PortAudioError(Exception):
+        pass
+
+    OutputStream = None
+
+
+sd = _FakeSoundDevice()
 
 
 # -- fakes -------------------------------------------------------------
@@ -392,7 +401,8 @@ def _transmit(pttobj, fail_stream=False, device=3):
     FakeOutputStream.fail = fail_stream
     FakeOutputStream.opened_devices = []
     signal = np.zeros(480, dtype=np.float32)
-    with _Patch(sd, "OutputStream", FakeOutputStream):
+    with _Patch(sd, "OutputStream", FakeOutputStream), \
+            _Patch(audio_io, "_load_sounddevice", lambda: sd):
         try:
             return audio_io.transmit(signal, device, pttobj, ptt_lead=0.0, ptt_tail=0.0), None
         except Exception as exc:
@@ -466,6 +476,7 @@ def test_send_does_not_rekey_on_an_unconfirmed_key_state():
     t = _fake_transport(pttobj)
     raised = None
     with _Patch(transport, "_ensure_com_initialized", lambda: None), \
+            _Patch(transport, "_load_sounddevice", lambda: sd), \
             _Patch(audio_io, "transmit", failing_transmit):
         try:
             t.send(np.zeros(480, dtype=np.float32), retries=5)
@@ -492,6 +503,7 @@ def test_send_still_retries_when_the_key_state_is_known():
     pttobj = FakePtt()
     t = _fake_transport(pttobj)
     with _Patch(transport, "_ensure_com_initialized", lambda: None), \
+            _Patch(transport, "_load_sounddevice", lambda: sd), \
             _Patch(audio_io, "transmit", flaky_transmit), \
             _Patch(audio_io, "find_device", lambda *a: t.out_device):
         assert t.send(np.zeros(480, dtype=np.float32), retries=5) == 1.23
@@ -519,6 +531,7 @@ def test_send_reresolves_a_moved_output_device_between_attempts():
     pttobj = FakePtt()
     t = _fake_transport(pttobj, out_device=7)
     with _Patch(transport, "_ensure_com_initialized", lambda: None), \
+            _Patch(transport, "_load_sounddevice", lambda: sd), \
             _Patch(audio_io, "transmit", flaky_transmit), \
             _Patch(audio_io, "find_device", lambda name, kind: 11):
         t.send(np.zeros(480, dtype=np.float32), retries=5)
