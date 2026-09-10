@@ -73,7 +73,7 @@ BAND_LO_HZ = 300.0
 BAND_HI_HZ = 2700.0
 
 # 4,738 B fills 78 rate-3/4 LDPC codewords (k=486 information bits) to within
-# 4 bits. The native 46-symbol preamble brings the full frame to 5.808 s.
+# 4 bits. The native 14-symbol preamble brings the full frame to about 5.104 s.
 PACKET_BYTES = 4738
 
 ACTIVE_BINS = tuple(hf7.bins_in_band(FFT_SIZE, BAND_LO_HZ, BAND_HI_HZ))
@@ -84,7 +84,8 @@ HF7_PHY = hf7.OFDM49Mode(
     bits_per_symbol=BITS_PER_SYMBOL,
     packet_bytes=PACKET_BYTES,
     pilot_interval=PILOT_INTERVAL,
-    n_preamble_symbols=46,
+    # Approximately 300 ms at HF7's 12 kHz design rate.
+    n_preamble_symbols=14,
     equalizer="gain",
     # Calibrated against this bench's audio gain structure and this waveform's
     # 8.9 dB crest factor; the harness default of 1.0 runs ~7 dB overdriven

@@ -103,7 +103,7 @@ def test_hf8_trades_constellation_and_coding_for_margin_against_hf7():
 def test_hf8_frame_is_codeword_aligned_and_includes_its_native_preamble():
     """The frame is codeword-aligned and includes the fixed native preamble."""
     assert HF8_PHY.n_codewords == 46
-    assert HF8_PHY.n_preamble_symbols == 46
+    assert HF8_PHY.n_preamble_symbols == 14
     assert HF8.airtime(HF8.chunk_size) == pytest.approx(HF8_PHY.frame_seconds())
 
 

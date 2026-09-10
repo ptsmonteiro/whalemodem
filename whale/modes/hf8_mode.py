@@ -146,7 +146,8 @@ HF8_PHY = hf8.OFDM49Mode(
     bits_per_symbol=BITS_PER_SYMBOL,
     packet_bytes=PACKET_BYTES,
     pilot_interval=PILOT_INTERVAL,
-    n_preamble_symbols=46,
+    # Approximately 300 ms at HF8's 12 kHz design rate.
+    n_preamble_symbols=14,
     equalizer="gain",
     # HF7's calibration, for HF7's bench and audio gain structure, including
     # its move from 0.008 to 0.016 for the IC-705's less sensitive audio

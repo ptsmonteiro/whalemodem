@@ -30,10 +30,10 @@ in the table. Drive multipliers and decoder estimates are not SNR.
 | --- | --- | --- | ---: | ---: | --- | ---: | ---: | ---: | --- | --- | --- |
 | hr0 | 562.5-2,015.625 Hz | 32-tone noncoherent FSK | 32 (32-FSK) | 1/2 | terminated K=9 convolutional, interleaved, soft-decision Viterbi | 32 B | 4.735 s | 54 bit/s | -10 dB and above | quiet, moderate, disturbed: 0 dB and above | 2026-09-08, 10/10 at 34.0 dB SNR |
 | hc0 | 750-2,156.25 Hz | 16-tone noncoherent FSK | 16 (16-FSK) | 1/2 | terminated K=7 convolutional, interleaved, soft-decision Viterbi | 91 B | 5.908 s | 123 bit/s | -7 dB and above | quiet, moderate, disturbed: -5 dB and above | 2026-09-08, 10/10 at 34.0 dB SNR |
-| hf9 | 300-2,700 Hz | 49-carrier QPSK OFDM | 4 (QPSK) | 1/2 | IEEE 802.11n QC-LDPC, interleaved | 105 B | 1.540 s | 545 bit/s | 6 dB (97/100) | moderate: 8 dB (96/100); not passed at 6 dB (77/100) | not measured |
+| hf9 | 300-2,700 Hz | 49-carrier QPSK OFDM | 4 (QPSK) | 1/2 | IEEE 802.11n QC-LDPC, interleaved | 105 B | 0.836 s | 1,005 bit/s | 6 dB (97/100) | moderate: 8 dB (96/100); not passed at 6 dB (77/100) | not measured |
 | hc1w | 468.75-2,531.25 Hz | 23-carrier differential-QPSK OFDM | 4 (QPSK) | 1/2 | terminated K=9 convolutional, interleaved, soft-decision Viterbi | 995 B | 5.895 s | 1,350 bit/s | 6 dB (90/100) | quiet: 15 dB (95/100); moderate: not passed at 20 dB (75/100); disturbed: not measured | 2026-09-08, 10/10 at 30.8 dB SNR |
-| hf8 | 300-2,700 Hz | 49-carrier 8PSK OFDM | 8 (8PSK) | 2/3 | IEEE 802.11n QC-LDPC, interleaved | 2,444 B | 5.940 s | 3,292 bit/s | 12 dB and above | quiet: 18 dB and above | 2026-09-10, IC-7300->IC-705 29/30, IC-705->IC-7300 28/30 (SNR not calibrated this session) |
-| hf7 | 300-2,700 Hz | 49-carrier 32-QAM OFDM | 32 (32-QAM) | 3/4 | IEEE 802.11n QC-LDPC, interleaved | 4,722 B | 5.808 s | 6,504 bit/s | 20 dB and above | not passed | 2026-09-10, IC-7300->IC-705 30/30, IC-705->IC-7300 55/55 (SNR not calibrated this session) |
+| hf8 | 300-2,700 Hz | 49-carrier 8PSK OFDM | 8 (8PSK) | 2/3 | IEEE 802.11n QC-LDPC, interleaved | 2,444 B | 5.236 s | 3,734 bit/s | 12 dB and above | quiet: 18 dB and above | 2026-09-10, IC-7300->IC-705 29/30, IC-705->IC-7300 28/30 (SNR not calibrated this session) |
+| hf7 | 300-2,700 Hz | 49-carrier 32-QAM OFDM | 32 (32-QAM) | 3/4 | IEEE 802.11n QC-LDPC, interleaved | 4,722 B | 5.104 s | 7,402 bit/s | 20 dB and above | not passed | 2026-09-10, IC-7300->IC-705 30/30, IC-705->IC-7300 55/55 (SNR not calibrated this session) |
 
 These are snapshots of checked-in shipped code and retained results, not
 promises for every radio, path, or direction. When a mode or measurement

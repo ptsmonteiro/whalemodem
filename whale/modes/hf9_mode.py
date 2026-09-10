@@ -34,7 +34,8 @@ HF9_PHY = ofdm49.OFDM49Mode(
     bits_per_symbol=BITS_PER_SYMBOL,
     packet_bytes=PACKET_BYTES,
     pilot_interval=PILOT_INTERVAL,
-    n_preamble_symbols=46,
+    # Approximately 300 ms at HF9's 12 kHz design rate.
+    n_preamble_symbols=14,
     equalizer="gain",
     drive_scale=0.008,
     fec_rate=FEC_RATE,

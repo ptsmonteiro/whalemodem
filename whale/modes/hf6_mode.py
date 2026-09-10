@@ -34,7 +34,8 @@ HF6_PHY = hf6.OFDM49Mode(
     bits_per_symbol=BITS_PER_SYMBOL,
     packet_bytes=PACKET_BYTES,
     pilot_interval=PILOT_INTERVAL,
-    n_preamble_symbols=40,
+    # Approximately 300 ms at HF6's 12 kHz design rate.
+    n_preamble_symbols=12,
     equalizer="gain",
     drive_scale=1.0,
     fec_rate=FEC_RATE,

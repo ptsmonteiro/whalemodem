@@ -103,7 +103,7 @@ def test_hf7_native_preamble_is_fixed_and_part_of_the_waveform():
         tx, np.zeros(rx_audio.FILTER_DELAY_CAPTURE_SAMPLES, dtype=np.float32))))
     result = HF7.decode(captured)
     assert result["payload"] == payload
-    assert HF7_PHY.n_preamble_symbols == 46
+    assert HF7_PHY.n_preamble_symbols == 14
     assert len(tx) == round(HF7.airtime(len(payload)) * HF7.tx_sample_rate)
 
 
