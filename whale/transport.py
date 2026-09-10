@@ -132,14 +132,13 @@ class RadioTransport:
         self.receive_only = bool(receive_only)
         self.ptt = None if self.receive_only else self.radio.ptt()
 
-        # A deque of 12 kHz receive chunks rather than one growing array: the audio
-        # callback runs on PortAudio's realtime thread, and re-concatenating
-        # an array that can be RX_BUFFER_SECONDS long on every
-        # callback -- ~10x/sec -- is real work on that thread. Appending a
-        # chunk is O(1); the expensive concatenate+trim happens lazily in
-        # snapshot_rx(), called from the (non-realtime) decode thread.
+        # The realtime callback appends chunks. The decode thread reads only
+        # new samples into its ring; snapshots remain available to batch callers.
         self._chunks = collections.deque()
         self._chunks_len = 0
+        self._rx_end = 0
+        self._rx_generation = 0
+        self._snapshot_position = (0, 0)
         self._buf_lock = threading.Lock()
         self._decimator_lock = threading.Lock()
         self._rx_overflows = 0
@@ -152,17 +151,10 @@ class RadioTransport:
     # -- receive ------------------------------------------------------
 
     def _in_callback(self, indata, frames, time_info, status):
-        # An input overflow is samples the capture never saw, and the chunks
-        # either side of it are appended as if nothing happened. What that
-        # splice does to a frame in flight is not subtle: a 5 ms drop measured
-        # on this bench moved every OFDM symbol after it by 62 samples, so the
-        # preamble and the first third of the frame decoded perfectly and
-        # everything after it was noise -- a whole-frame loss with no failure
-        # anywhere for the operator to see. Count them and say so; a decode
-        # that fails with a non-zero count here has an explanation that is
-        # nothing to do with the radio, and silence is the wrong default for
-        # data this destructive.
+        # Dropped samples break timing and filter continuity. Start a new
+        # capture generation so receivers abandon any in-flight acquisition.
         if status and status.input_overflow:
+            self._clear_buffer()
             self._rx_overflows += 1
             logging.getLogger(__name__).warning(
                 "%s: audio input overflow -- capture samples were dropped and "
@@ -179,6 +171,7 @@ class RadioTransport:
         with self._buf_lock:
             self._chunks.append(decoded)
             self._chunks_len += len(decoded)
+            self._rx_end = getattr(self, "_rx_end", 0) + len(decoded)
             max_len = int(RX_BUFFER_SECONDS * RX_SAMPLE_RATE)
             while self._chunks_len - len(self._chunks[0]) > max_len:
                 self._chunks_len -= len(self._chunks.popleft())
@@ -204,6 +197,7 @@ class RadioTransport:
         with self._buf_lock:
             self._chunks.clear()
             self._chunks_len = 0
+            self._rx_generation = getattr(self, "_rx_generation", 0) + 1
         lock = getattr(self, "_decimator_lock", None)
         with lock if lock is not None else contextlib.nullcontext():
             if hasattr(self, "_rx_decimator"):
@@ -216,6 +210,8 @@ class RadioTransport:
     def snapshot_rx(self):
         """Everything captured so far, flattened into one array."""
         with self._buf_lock:
+            self._snapshot_position = (getattr(self, "_rx_generation", 0),
+                                       getattr(self, "_rx_end", 0) - self._chunks_len)
             if not self._chunks:
                 return np.zeros(0, dtype=np.float32)
             flat = np.concatenate(self._chunks)
@@ -226,7 +222,51 @@ class RadioTransport:
                 flat = flat[-max_len:]
                 self._chunks[0] = flat
                 self._chunks_len = len(flat)
+                self._snapshot_position = (getattr(self, "_rx_generation", 0),
+                                           getattr(self, "_rx_end", 0) - len(flat))
             return flat.copy()
+
+    def read_rx(self, cursor=None):
+        """Return (generation, absolute start, new audio) since a cursor.
+
+        A different generation denotes a capture gap or TX clear. A start
+        beyond the requested cursor denotes history lost to the buffer cap.
+        """
+        with self._buf_lock:
+            generation = getattr(self, "_rx_generation", 0)
+            end = getattr(self, "_rx_end", 0)
+            start = end - self._chunks_len
+            if cursor is not None and cursor[0] == generation:
+                start = min(end, max(start, cursor[1]))
+            skip = start - (end - self._chunks_len)
+            pieces = []
+            for chunk in self._chunks:
+                if skip >= len(chunk):
+                    skip -= len(chunk)
+                else:
+                    pieces.append(chunk[skip:])
+                    skip = 0
+            samples = (np.concatenate(pieces) if pieces
+                       else np.zeros(0, dtype=np.float32))
+            return generation, start, samples
+
+    def consume_rx_through(self, generation, end):
+        """Discard an absolute interval, only if its capture is still current."""
+        with self._buf_lock:
+            if generation != getattr(self, "_rx_generation", 0):
+                return
+            count = min(self._chunks_len, max(0, end -
+                        (getattr(self, "_rx_end", 0) - self._chunks_len)))
+            self._chunks_len -= count
+            while self._chunks and count >= len(self._chunks[0]):
+                count -= len(self._chunks.popleft())
+            if count and self._chunks:
+                self._chunks[0] = self._chunks[0][count:]
+
+    @property
+    def rx_generation(self):
+        with self._buf_lock:
+            return getattr(self, "_rx_generation", 0)
 
     @property
     def tx_underflows(self):
@@ -249,18 +289,9 @@ class RadioTransport:
         return self._transmitting.is_set()
 
     def consume_rx(self, upto_sample: int):
-        """Drops everything up to `upto_sample` (index into the array
-        `snapshot_rx()` returned) from the buffer. Must be called shortly
-        after snapshot_rx() -- it assumes the buffer's front chunk is still
-        the array snapshot_rx() flattened, so it can just slice it."""
-        with self._buf_lock:
-            if not self._chunks:
-                return
-            front = self._chunks[0]
-            n = min(upto_sample, len(front))
-            if n > 0:
-                self._chunks[0] = front[n:]
-                self._chunks_len -= n
+        """Discard through an index in the last snapshot, tolerating TX clears."""
+        generation, start = self._snapshot_position
+        self.consume_rx_through(generation, start + upto_sample)
 
     # -- transmit -------------------------------------------------------
 

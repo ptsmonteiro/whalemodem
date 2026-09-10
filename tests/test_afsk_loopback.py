@@ -782,27 +782,32 @@ def test_seq_ahead_wraps():
     print("test_seq_ahead_wraps OK")
 
 
-def test_await_turnaround_does_not_add_dead_air():
-    """Effective clipping is absorbed by the calibrated head sequence."""
+def test_await_turnaround_applies_the_channel_policy(monkeypatch):
+    """HF waits after a decoded frame; VHF's zero-delay policy does not."""
+    from whale.policy import HF_SSB
+
     a = link.Link(_FakeTransport(), "STA1")
-    saved = link.TX_TURNAROUND_DELAY
-    link.TX_TURNAROUND_DELAY = 0.4
-    try:
-        a._peer_unkeyed_at = time.monotonic() - 5.0
-        start = time.monotonic()
-        a._await_turnaround()
-        assert time.monotonic() - start < 0.05
-        assert a._peer_unkeyed_at is None
-        start = time.monotonic()
-        a._await_turnaround()
-        assert time.monotonic() - start < 0.05
-        a._peer_unkeyed_at = time.monotonic() - 0.3
-        start = time.monotonic()
-        a._await_turnaround()
-        assert time.monotonic() - start < 0.05
-    finally:
-        link.TX_TURNAROUND_DELAY = saved
-    print("test_await_turnaround_does_not_add_dead_air OK")
+    sleeps = []
+    monkeypatch.setattr(link.time, "sleep", sleeps.append)
+    monkeypatch.setattr(link.time, "monotonic", lambda: 100.0)
+
+    a._peer_unkeyed_at = 99.9
+    a._await_turnaround()
+    assert sleeps == []
+    assert a._peer_unkeyed_at is None
+
+    a.policy = HF_SSB
+    a._peer_unkeyed_at = 99.9
+    a._await_turnaround()
+    assert abs(sleeps.pop() - 0.2) < 1e-9
+
+    a._peer_unkeyed_at = None
+    a._await_turnaround()
+    assert abs(sleeps.pop() - 0.3) < 1e-9
+
+    a._peer_unkeyed_at = 90.0
+    a._await_turnaround()
+    assert abs(sleeps.pop() - 0.3) < 1e-9
 
 
 def test_link_multi_chunk_message_roundtrip():

@@ -87,6 +87,7 @@ import math
 import numpy as np
 
 from whale import afsk, mode_history
+from whale.streaming import ReceiveStream
 from whale import link_protocol as protocol
 from whale.policy import VHF_FM
 
@@ -601,6 +602,7 @@ class Link:
         # profile name -> _DecodeCost, written and read only by the decode
         # thread (and by stop(), after it has been asked to finish).
         self._decode_cost = {}
+        self._receive_stream = None
         self._decode_cost_reported_at = None
         self._decode_thread = threading.Thread(target=self._decode_loop, daemon=True)
 
@@ -750,7 +752,11 @@ class Link:
         cpu0, wall0 = time.thread_time(), time.perf_counter()
         hint = (self._rx_frequency_hint_hz
                 if self.policy.track_frequency_offset else None)
-        if hint is None or not getattr(profile, "supports_frequency_hint", False):
+        stream_result = (self._receive_stream.decode(profile)
+                         if self._receive_stream is not None else None)
+        if stream_result is not None:
+            result = stream_result
+        elif hint is None or not getattr(profile, "supports_frequency_hint", False):
             result = profile.decode(audio)
         else:
             result = profile.decode(audio, freq_hint_hz=hint)
@@ -774,6 +780,10 @@ class Link:
     # -- decode loop (background) ---------------------------------------
 
     def _decode_loop(self):
+        retry = False
+        if hasattr(self.transport, "read_rx"):
+            from whale.transport import RX_BUFFER_SECONDS, RX_SAMPLE_RATE
+            self._receive_stream = ReceiveStream(int(RX_BUFFER_SECONDS * RX_SAMPLE_RATE))
         while not self._stop.is_set():
             if self.transport.is_transmitting():
                 # Don't touch the RX buffer mid-TX: transport.send() clears
@@ -784,13 +794,35 @@ class Link:
                 # frame before send()'s post-TX clear ever runs.
                 time.sleep(DECODE_POLL_INTERVAL)
                 continue
-            snap = self.transport.snapshot_rx()
+            if self._receive_stream is not None:
+                stream = self._receive_stream
+                generation, start, samples = self.transport.read_rx(stream.cursor)
+                changed = generation != stream.generation or start != stream.audio.end
+                stream.append(generation, start, samples)
+                if not len(samples) and not changed and not retry:
+                    self._report_decode_cost()
+                    time.sleep(DECODE_POLL_INTERVAL)
+                    continue
+                snap = stream.audio.read()
+            else:
+                snap = self.transport.snapshot_rx()
             if len(snap) > 0:
                 if self._decode_one(snap):
+                    retry = True
                     self._report_decode_cost()
                     continue  # try again immediately in case another frame follows
+            retry = False
             self._report_decode_cost()
             time.sleep(DECODE_POLL_INTERVAL)
+
+    def _consume_rx(self, end):
+        if self._receive_stream is None:
+            self.transport.consume_rx(end)
+        else:
+            stream = self._receive_stream
+            end += stream.audio.start
+            self.transport.consume_rx_through(stream.generation, end)
+            stream.audio.discard(end)
 
     def _report_decode_cost(self, final=False):
         """Logs per-profile decode cost every DECODE_COST_REPORT_INTERVAL.
@@ -834,6 +866,9 @@ class Link:
             payload = result.get("payload")
             if payload is None:
                 return False
+            if (self._receive_stream is not None and
+                    self.transport.rx_generation != self._receive_stream.generation):
+                return False
             decoded = _decode_air_header(payload[:_AIR_HEADER_LEN])
             if decoded is None:
                 return False
@@ -849,7 +884,7 @@ class Link:
                     and np.isfinite(freq_offset)):
                 self._rx_frequency_hint_hz = float(freq_offset)
             end = result.get("end_index", len(snap))
-            self.transport.consume_rx(end)
+            self._consume_rx(end)
             self._finish_air_packet(ptype, inline + remainder, profile, snap, end,
                                     result)
             return True
@@ -865,13 +900,9 @@ class Link:
         if accept_checked(control, control_result):
             return True
 
-        # Each mode owns its complete preamble and acquisition. The decoder
-        # tries every mutually supported mode, then accepts only a checked air
-        # header and body from one of them. One whole-buffer attempt per
-        # profile bounds fallback work -- but
-        # "one attempt each" is not on its own a bound the receiver can live
-        # with: a single attempt by an OFDM candidate on a full buffer costs
-        # seconds. _budgeted_candidates is what bounds the poll.
+        # Streaming modes retain acquisition and body-attempt state, sharing
+        # searches when their preambles match. Budgeting still bounds the
+        # remaining batch decoders and costly complete-frame FEC attempts.
         data_profiles = tuple(profile for profile in profiles if profile is not control)
         for profile in (self._budgeted_candidates(data_profiles, snap)
                         if data_profiles else ()):
@@ -890,7 +921,7 @@ class Link:
                                                        item["end_index"]))
                 skip = result.get("sync_end_index", result["end_index"])
                 self._capture_near_miss(snap, result.get("confidence", 0))
-                self.transport.consume_rx(skip)
+                self._consume_rx(skip)
                 return True
         # Unconditional, `pending` included. A candidate that reports a sync
         # it can never resolve -- a false lock on noise, or a real frame whose
@@ -904,26 +935,11 @@ class Link:
         return False
 
     def _budgeted_candidates(self, profiles, snap):
-        """Which candidates to actually run this poll, cheapest first.
+        """Run cheapest candidates first, within a fraction of retained airtime.
 
-        A poll re-searches the entire retained buffer at every candidate
-        profile, so its cost is the sum of the candidates' costs -- and those
-        differ by three orders of magnitude (a 10 s buffer is about 11 ms at
-        hc0 and seconds at hf7/hf8, whose acquisition correlates a preamble
-        over the whole buffer at 41 frequency hypotheses). Unbounded, that is
-        a receiver that spends longer examining the buffer than the buffer
-        holds: audio ages out unexamined between polls and the peer's frames
-        land in the gap. Not hypothetical -- it is what took an on-air session
-        down on a 33 dB path.
-
-        So: cheapest first, since an expensive candidate must never cost a
-        cheap one its attempt; everything that fits
-        DECODE_POLL_BUDGET_FRACTION of the recency window; and at most one
-        over-budget candidate per poll, the one most overdue against its own
-        DECODE_EXPENSIVE_DUTY share of wall time. Over-budget is a duty cycle,
-        not a ban: a mode nobody ever tries is a mode nobody can ever receive.
-        A profile that decoded a frame within DECODE_RECENT_SUCCESS_SECONDS is
-        exempt from all of it -- it is carrying the session.
+        At most one overdue, over-budget candidate runs per poll. Recently
+        successful modes are exempt. Streaming reduces repeated acquisition
+        work, but complete-frame FEC and batch fallback still need a budget.
         """
         now = time.monotonic()
         seconds = len(snap) / max(p.rx_sample_rate for p in profiles)
@@ -1021,7 +1037,7 @@ class Link:
         keep = int(self._rx_keep_seconds * max(
             p.rx_sample_rate for p in self._candidate_decode_profiles()))
         if snap_len > keep:
-            self.transport.consume_rx(snap_len - keep)
+            self._consume_rx(snap_len - keep)
 
     def _handle_raw(self, raw: bytes, profile):
         if len(raw) < 1:
@@ -1066,7 +1082,18 @@ class Link:
         finished long ago", it means we stopped being able to follow what
         the peer was saying, which is the worst moment to assume the
         channel is free. See ANCHOR_AGE_SLACK."""
+        delay = self._channel("tx_turnaround_delay")
+        anchor = self._peer_unkeyed_at
         self._peer_unkeyed_at = None
+        if delay <= 0:
+            return
+        now = time.monotonic()
+        if anchor is None or now - anchor > delay + ANCHOR_AGE_SLACK:
+            time.sleep(delay)
+            return
+        remaining = anchor + delay - now
+        if remaining > 0:
+            time.sleep(remaining)
 
     def _tx_packet(self, ptype: int, body: bytes):
         """Keys one complete packet in its control or negotiated waveform."""

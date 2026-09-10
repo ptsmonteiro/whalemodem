@@ -70,6 +70,7 @@ codec with no qpsk29-specific state.
 from __future__ import annotations
 
 from dataclasses import dataclass, field
+from functools import cached_property
 
 import numpy as np
 from scipy.signal import fftconvolve
@@ -519,7 +520,7 @@ class OFDM49Mode:
     def demodulate(self, captured_12k: np.ndarray, *, diagnostics=False,
                    gain_smoothing=1, noise_estimator="legacy",
                    ldpc_max_iterations=30, refine_iterations=0,
-                   freq_hint_hz=None) -> dict:
+                   freq_hint_hz=None, acquisition=None) -> dict:
         """Decode; optional HF17 diagnostics and training-only receiver trials.
 
         gain_smoothing is an odd carrier-window width (default 1 disables).
@@ -540,12 +541,41 @@ class OFDM49Mode:
                   "raw_packet_bits": None, "phase_slope_rad_per_bin": None,
                   "pre_fec_bits": None, "ldpc_ok": None, "ldpc_iterations": None}
 
+        confidence, start, freq_offset = (self.acquire(x, freq_hint_hz=freq_hint_hz)
+                                          if acquisition is None else acquisition)
+        result["confidence"] = confidence
+        result["freq_offset_hz"] = freq_offset
+
+        total_symbols = self.total_ofdm_symbols()
+        symlen = self.symbol_len
+        needed = start + total_symbols * symlen
+        if confidence < 0.12 or start < 0 or needed > len(x):
+            return result
+        result["synced"] = True
+        result["start_sample"] = int(start)
+
+        return self._decode_acquired(x, result, start, freq_offset, diagnostics,
+                                     gain_smoothing, noise_estimator,
+                                     ldpc_max_iterations, refine_iterations)
+
+    @cached_property
+    def _sync_preamble(self):
         one_preamble = self._add_cp(self._ifft_symbol(self._preamble_bin_symbols))
-        preamble_wave = np.tile(one_preamble, self.n_preamble_symbols) \
+        return np.tile(one_preamble, self.n_preamble_symbols) \
             if self.n_preamble_symbols > 1 else one_preamble
 
+    @cached_property
+    def _sync_templates(self):
+        return {float(hz): _freq_shift_real(self._sync_preamble, hz, DESIGN_RATE)
+                for hz in np.arange(-SYNC_SEARCH_HZ, SYNC_SEARCH_HZ + 1e-9,
+                                    SYNC_SEARCH_STEP_HZ)}
+
+    def acquire(self, x, *, freq_hint_hz=None, search_slice=None):
+        """Return (confidence, start, frequency) without decoding the body."""
+        x = np.asarray(x, dtype=np.float64)
+        preamble_wave = self._sync_preamble
         if len(x) < len(preamble_wave) + 10:
-            return result
+            return (0.0, 0, 0.0)
 
         norm = np.sqrt(np.sum(preamble_wave ** 2)) * (np.std(x) + 1e-12) * np.sqrt(len(preamble_wave))
 
@@ -563,28 +593,26 @@ class OFDM49Mode:
             search_hz = np.clip(search_hz, -SYNC_SEARCH_HZ, SYNC_SEARCH_HZ)
             search_hz = np.unique(search_hz)
         for hz in search_hz:
-            template = _freq_shift_real(preamble_wave, hz, DESIGN_RATE)
+            template = self._sync_templates.get(float(hz))
+            if template is None:
+                template = _freq_shift_real(preamble_wave, hz, DESIGN_RATE)
             corr = fftconvolve(x, template[::-1], mode="valid")
             env = np.abs(_sc._hilbert_envelope(corr))
-            peak = int(np.argmax(env))
+            low, high, _ = (search_slice or slice(None)).indices(len(env))
+            if high <= low:
+                continue
+            peak = low + int(np.argmax(env[low:high]))
             conf = float(env[peak] / (norm + 1e-12))
             if conf > best[0]:
                 best = (conf, peak, float(hz))
 
-        confidence, start, freq_offset = best
-        result["confidence"] = confidence
-        result["freq_offset_hz"] = freq_offset
+        return best
 
+    def _decode_acquired(self, x, result, start, freq_offset, diagnostics,
+                         gain_smoothing, noise_estimator, ldpc_max_iterations,
+                         refine_iterations):
         total_symbols = self.total_ofdm_symbols()
         symlen = self.symbol_len
-        needed = start + total_symbols * symlen
-        if confidence < 0.12 or needed > len(x):
-            return result
-        result["synced"] = True
-        # Keep the checked OFDM start available on the normal decode path; the
-        # large diagnostics arrays remain opt-in below.
-        result["start_sample"] = int(start)
-
         span = x[start:start + total_symbols * symlen + symlen]
 
         def _corrected(offset_hz: float) -> np.ndarray:

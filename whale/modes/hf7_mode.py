@@ -111,6 +111,7 @@ CONFIDENCE_THRESHOLD = 0.12
 
 
 class Hf7Codec:
+    streaming_phy = HF7_PHY
     tx_sample_rate = hf7.TX_SAMPLE_RATE
     rx_sample_rate = hf7.RX_SAMPLE_RATE
 

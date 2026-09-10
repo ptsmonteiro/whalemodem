@@ -164,6 +164,7 @@ CONFIDENCE_THRESHOLD = 0.12
 
 
 class Hf8Codec:
+    streaming_phy = HF8_PHY
     tx_sample_rate = hf8.TX_SAMPLE_RATE
     rx_sample_rate = hf8.RX_SAMPLE_RATE
 

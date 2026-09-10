@@ -46,6 +46,7 @@ CONFIDENCE_THRESHOLD = 0.12
 
 
 class Hf9Codec:
+    streaming_phy = HF9_PHY
     tx_sample_rate = ofdm49.TX_SAMPLE_RATE
     rx_sample_rate = ofdm49.RX_SAMPLE_RATE
 
