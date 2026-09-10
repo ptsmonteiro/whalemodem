@@ -193,7 +193,7 @@ def test_vf3_carries_a_session_through_the_same_stack():
     # Measured at 4,000 bytes each way: 66.6 s against 93.9 s, a 1.41x
     # saving.  The ratio is this modest only because the session is short --
     # climbing the ladder costs the same three slow chunks either way, and a
-    # 5.2 s VF3 chunk is still answered by a 0.70 s ACK on the 300-baud
+    # 6.155 s VF3 chunk is still answered by a 0.70 s ACK on the 300-baud
     # control plane.  At 16,000 bytes each way the same measurement gives
     # 161.0 s against 315.7 s, or 1.96x.  The floor here is deliberately well
     # under 1.41 so this catches a regression rather than ordinary variation.

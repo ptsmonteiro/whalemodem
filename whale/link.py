@@ -15,16 +15,9 @@ exchange at 1200 baud at 3.91s, of which:
     0.20s  the ACK frame, carrying 8 bits of information
     0.19s  the DATA frame's own sync word, length, CRC and pads
 
-So 17% of the link was moving user data. Two things are done about it here,
-neither of which changes how many frames are in flight:
-
-  - The fixed turnaround sleep is removed. The calibration handshake measures
-    effective clipping on replies after a real direction change, and the
-    resulting per-session head pad absorbs that loss.
-  - The decode loop prunes audio it has already searched, so a poll costs
-    a bounded amount of time rather than growing with the idle stretch
-    before it. See _prune_stale. This matters to turnaround specifically:
-    the reply cannot go out until the poll that decoded the frame returns.
+So 17% of the link was moving user data. The decode loop prunes audio it has
+already searched, so a poll costs a bounded amount of time rather than growing
+with the idle stretch before it. See _prune_stale.
 
 The third and largest item -- several DATA frames per keying under one
 cumulative ACK, go-back-N -- was built and then rolled back. It never
@@ -77,12 +70,10 @@ have chunks in flight. One byte of airtime buys an unambiguous answer.
 Stations running builds from either side of this change will not
 interoperate.
 
-ON-AIR FORMAT CHANGE for connection version 4: DATA adds one inline byte
-declaring its transmitted head duration and DATA_ACK adds one byte carrying
-the receiver's absolute requested duration. Version 2 is rejected explicitly;
-silently accepting version 2 would reinterpret the first application byte as
-timing. Version 4 additionally removes tail timing fields and tail symbols and
-uses checked air-header version 2.
+ON-AIR FORMAT CHANGE for connection version 5: DATA no longer carries a
+head-duration byte and DATA_ACK no longer carries a head request.
+Every waveform supplies its own fixed-duration native preamble. The checked air
+header version also advances so older peers are rejected explicitly.
 """
 
 import logging
@@ -109,8 +100,6 @@ PT_DATA = protocol.PT_DATA
 PT_DATA_ACK = protocol.PT_DATA_ACK
 PT_FLOOR_REQ = protocol.PT_FLOOR_REQ
 PT_FLOOR_GRANT = protocol.PT_FLOOR_GRANT
-PT_TIMING_ACK = protocol.PT_TIMING_ACK
-PT_TIMING_CONFIRM = protocol.PT_TIMING_CONFIRM
 EOF_BIT = protocol.EOF_BIT
 SEQ_MASK = protocol.SEQ_MASK
 SEQ_MODULO = protocol.SEQ_MODULO
@@ -167,12 +156,6 @@ def _decode_snr_summary(result):
 
     return "SNR unavailable"
 
-CALIBRATION_SECONDS = 1.0
-HEAD_MIN_GUARD_SECONDS = 0.01
-TIMING_MARGIN = 0.0
-HEAD_FEEDBACK_UNIT_SECONDS = 0.01
-HEAD_MAX_SECONDS = 1.0
-HEAD_ZERO_INCREASE_SECONDS = 0.1
 
 # Which end may originate PT_DATA right now. Real half-duplex ARQ modems
 # (PACTOR, VARA, WINMOR/Ardop) call these roles ISS (Information Sending
@@ -249,14 +232,6 @@ MAX_RETRIES = VHF_FM.max_retries
 #: chunk_size and retries under the same sequence number.
 _RESIZE = object()
 DECODE_POLL_INTERVAL = 0.15
-
-#: The lead detector can return many plausible boundaries in a noisy HF
-#: buffer.  Decoding every boundary defeats the decode-poll budget: a single
-#: HC1W candidate costs little, but 32 of them can delay a control ACK long
-#: enough for the sender's DATA timeout to expire.  Four boundaries per poll
-#: preserves the strongest hypotheses while bounding the work; the ordinary
-#: whole-buffer decoder remains the fallback for a missed lead.
-HF_LEAD_CANDIDATE_LIMIT = 4
 
 #: Wall-clock share of the RX buffer's own recency window (_rx_keep_seconds)
 #: that one decode poll may spend. A poll re-searches the whole retained
@@ -464,116 +439,6 @@ def _mode_step_script(env=None):
     return script
 
 
-def _encode_timing(session_id, head_seconds):
-    """The connect-time calibration byte: how much of a CALIBRATION_SECONDS
-    head the far end actually heard, as a fraction of it scaled to 255.
-
-    Takes seconds, not symbols.  The quantity on air has always been that
-    fraction -- the old form divided a CPFSK symbol count by
-    `CALIBRATION_SECONDS * CONTROL_PROFILE.baud`, which is the same number
-    by a longer route -- but taking the measurement in the control mode's
-    own symbols meant only a mode with symbols could be the control mode.
-    An OFDM control mode (whale/modes/hc1w.py) measures its head in cores,
-    an MFSK one would measure it in something else again, and seconds is
-    the unit they all already report.  This is the connect-time half of the
-    same move `_head_feedback_request` made for the DATA plane.
-
-    An observation slightly *over* CALIBRATION_SECONDS is clamped rather
-    than rejected: a mode whose head is quantized (HC1W's is, to whole sync
-    cores) can legitimately measure a hair more than was asked for, and
-    that is quantization, not corruption.
-    """
-    if head_seconds is None or head_seconds < 0:
-        raise ValueError("invalid calibration measurement")
-    fraction = min(1.0, head_seconds / CALIBRATION_SECONDS)
-    return bytes([session_id, min(255, int(np.ceil(fraction * 255)))])
-
-
-def _decode_timing(body):
-    if len(body) != 2:
-        raise ValueError("invalid TIMING_ACK")
-    return body[0], body[1]
-
-
-def _derive_timing(head_duration_byte):
-    if not 0 <= head_duration_byte <= 255:
-        raise ValueError("invalid calibration measurement")
-    head_loss = CALIBRATION_SECONDS * (255 - head_duration_byte) / 255
-    return min(CALIBRATION_SECONDS,
-               head_loss + max(HEAD_MIN_GUARD_SECONDS, head_loss * TIMING_MARGIN))
-
-
-def _encode_head_duration(seconds):
-    """Encode a duration upward in protocol-v3 10 ms units."""
-    if not 0 < seconds <= HEAD_MAX_SECONDS:
-        raise ValueError("invalid head duration")
-    return min(255, int(np.ceil(seconds / HEAD_FEEDBACK_UNIT_SECONDS)))
-
-
-def _decode_head_duration(value):
-    if not 0 < value <= int(HEAD_MAX_SECONDS / HEAD_FEEDBACK_UNIT_SECONDS):
-        raise ValueError("invalid head duration")
-    return value * HEAD_FEEDBACK_UNIT_SECONDS
-
-
-def _head_feedback_request(advertised_head, observed_seconds, match_allowance_seconds):
-    """Return (absolute request byte, reason) for one valid DATA frame.
-
-    Both the observation and the allowance arrive in seconds, from whichever
-    mode carried the frame, so nothing here is in symbols, cores or any other
-    mode-specific unit.
-    """
-    sent = _decode_head_duration(advertised_head)
-    if observed_seconds is None:
-        # HF7/HF8 and the other no-outer-head modes deliberately provide no
-        # measurement.  That is different from a malformed measurement and
-        # must not leak a NaN-looking diagnostic into an otherwise good run.
-        return advertised_head, "measurement unavailable"
-    try:
-        finite = bool(np.isfinite(observed_seconds))
-    except (TypeError, ValueError):
-        finite = False
-    if not finite or observed_seconds < 0:
-        return advertised_head, "invalid observation"
-    if observed_seconds == 0:
-        requested = min(HEAD_MAX_SECONDS, sent + HEAD_ZERO_INCREASE_SECONDS)
-        return _encode_head_duration(requested), "zero observation is a lower bound"
-    deficit = HEAD_MIN_GUARD_SECONDS - observed_seconds
-    if deficit <= 0:
-        return advertised_head, "target residual guard met"
-    if deficit <= match_allowance_seconds:
-        return advertised_head, "deficit is within matcher-window allowance"
-    requested = min(HEAD_MAX_SECONDS, sent + deficit)
-    return _encode_head_duration(requested), "residual guard below target"
-
-
-def _refresh_hf_head_measurement(profile, audio, decode_result,
-                                  expected_seconds):
-    """Measure a common HF lead against the un-sliced receive snapshot.
-
-    Lead-candidate acquisition may give a mode decoder a cropped view of the
-    buffer.  That is sufficient to decode the body, but it can remove most of
-    the preceding lead and make the mode-local measurement report zero.  The
-    link has the absolute body start after applying the crop offset, so repeat
-    the cheap measurement here against the original snapshot before storing
-    feedback state.
-    """
-    label = getattr(profile, "lead_label", None)
-    body_start = decode_result.get("start_index")
-    if label is None or body_start is None:
-        return
-    try:
-        from .modes import hf_lead
-        observed, score = hf_lead.measure(
-            audio, body_start, label, expected_seconds)
-    except (TypeError, ValueError, IndexError):
-        return
-    decode_result.update(
-        head_blocks_observed=observed,
-        head_seconds_received=hf_lead.seconds_received(observed),
-        head_match=score)
-
-
 class LinkError(Exception):
     pass
 
@@ -702,9 +567,6 @@ class Link:
         self._mode_step_script = _mode_step_script()
 
         self._rx_packets = queue.Queue()
-        self._rx_measurements = {}
-        self._tx_head_seconds = CALIBRATION_SECONDS
-        self._rx_head_seconds = CALIBRATION_SECONDS
         # A station asking for the floor may receive the current ISS's
         # message before its request can be granted.  send_message() has to
         # service and ACK those frames to let the ISS finish; retain any
@@ -723,7 +585,6 @@ class Link:
         # returned -- see _answer_duplicate_connect.
         self._session_id = SESSION_ID_NONE
         self._connect_ack_body = None
-        self._timing_confirm_body = None
         # When we last decoded anything from the peer, in time.monotonic()
         # terms. Written by the decode thread, read by _peer_is_stale.
         self._last_peer_frame_at = None
@@ -834,9 +695,9 @@ class Link:
         # frame out at tx_profile, then the peer's (tiny) ACK back at
         # rx_profile, with a turnaround at each end.
         tx_airtime = self.tx_profile.airtime(_AIR_HEADER_LEN + self.tx_profile.chunk_size)
-        # The two sequence bytes are inline; mode and absolute head request
-        # are the ACK's two-byte control-mode body.
-        ack_airtime = self.modes.control.airtime(_AIR_HEADER_LEN + 2)
+        # The two sequence bytes are inline; the decoded mode is the ACK's
+        # one-byte control-mode body.
+        ack_airtime = self.modes.control.airtime(_AIR_HEADER_LEN + 1)
         self.data_ack_timeout = (tx_airtime + ack_airtime
                                  + 2 * self._channel("tx_turnaround_delay")
                                  + self.policy.ack_timeout_slack)
@@ -858,9 +719,9 @@ class Link:
         Therefore every mutually advertised data mode remains a candidate;
         the DATA frame itself is authoritative notification of a change."""
         # Before the connection handshake completes, every legal inbound
-        # packet is on the robust control waveform.  Do not spend seconds
-        # probing newly advertised OFDM data modes against CONNECT/TIMING
-        # frames; the negotiated DATA profile is not active yet.
+        # packet is on the robust control waveform. Do not spend seconds
+        # probing newly advertised data modes against connection frames; the
+        # negotiated DATA profile is not active yet.
         if self.state in {"CONNECTING", "LISTENING"}:
             return (self.modes.control,)
         candidates = [self.modes.control]
@@ -881,7 +742,7 @@ class Link:
 
     def _decode_attempt(self, profile, audio, offset=0):
         cpu0, wall0 = time.thread_time(), time.perf_counter()
-        result = profile.decode(audio, head_seconds=self._rx_head_seconds)
+        result = profile.decode(audio)
         cpu = time.thread_time() - cpu0
         self._decode_cost.setdefault(profile.name, _DecodeCost()).add(
             cpu, time.perf_counter() - wall0,
@@ -979,46 +840,10 @@ class Link:
         if accept_checked(control, control_result):
             return True
 
-        # A common HF lead proposes ranked body boundaries. Decode both mode
-        # interpretations at each boundary, but accept none until the mode's
-        # payload CRC and the checked air header below agree. Cropping keeps a
-        # false early boundary from changing which later acquisition wins.
-        # The control mode and the peer's currently expected DATA mode are
-        # the only lead-labelled decoders worth trying on the fast path.
-        # Every mutually supported mode remains in the bounded fallback below
-        # for an unannounced mode step, but probing every expensive OFDM lead
-        # against every control frame lets unrelated lead patterns consume the
-        # whole receive budget before the cheap control decoder runs.
-        expected_profiles = {self.rx_profile}
-        by_label = {p.lead_label: p for p in profiles
-                    if hasattr(p, "lead_label") and p in expected_profiles
-                    and p is not control}
-        if by_label:
-            from .modes import hf_lead
-            tolerance = hf_lead.RX_BLOCK_SAMPLES // hf_lead.BLOCK_SYMBOLS
-            lead_candidates = hf_lead.candidates(
-                snap, limit=HF_LEAD_CANDIDATE_LIMIT)
-            # Keep the bound local as well as passing it to the detector.  It
-            # is a cheap defensive guard against a future detector returning
-            # more entries than requested, and makes the decode cost contract
-            # explicit at the call site.
-            labelled_count = len({p.lead_label for p in profiles
-                                  if hasattr(p, "lead_label")})
-            for candidate in lead_candidates[:HF_LEAD_CANDIDATE_LIMIT * labelled_count]:
-                profile = by_label.get(candidate.label)
-                if profile is None:
-                    continue
-                offset = max(0, candidate.body_start - tolerance)
-                result = self._decode_attempt(profile, snap[offset:], offset)
-                start = result.get("start_index")
-                if start is not None and abs(start - candidate.body_start) <= tolerance:
-                    results.append((profile, result))
-                    if accept_checked(profile, result):
-                        return True
-
-        # Mandatory body-acquisition fallback: erased, wrong, or low-scoring
-        # lead audio cannot suppress either eligible checked decoder. One
-        # whole-buffer attempt per profile also bounds fallback work -- but
+        # Each mode owns its complete preamble and acquisition. The decoder
+        # tries every mutually supported mode, then accepts only a checked air
+        # header and body from one of them. One whole-buffer attempt per
+        # profile bounds fallback work -- but
         # "one attempt each" is not on its own a bound the receiver can live
         # with: a single attempt by an OFDM candidate on a full buffer costs
         # seconds. _budgeted_candidates is what bounds the poll.
@@ -1103,8 +928,6 @@ class Link:
         return plan
 
     def _finish_air_packet(self, ptype, body, profile, snap, end, decode_result):
-        _refresh_hf_head_measurement(profile, snap, decode_result,
-                                     self._rx_head_seconds)
         trailing = max(0, len(snap) - end)
         self._peer_unkeyed_at = time.monotonic() - trailing / profile.rx_sample_rate
         cost = self._decode_cost.get(profile.name)
@@ -1117,24 +940,6 @@ class Link:
                     "decode cpu unmeasured" if cpu is None
                     else f"decode cpu {cpu * 1000.0:.1f} ms",
                     _decode_snr_summary(decode_result))
-        head_seconds = decode_result.get("head_seconds_received")
-        if head_seconds is not None:
-            # Seconds is the only unit every mode reports; whatever it
-            # counted to get there (CPFSK symbols, OFDM cores) rides along
-            # as a diagnostic where the mode chose to put one.
-            logger.info("[%s] RX outer head: observed %.1f ms%s", self.mycall,
-                        head_seconds * 1000.0,
-                        "".join(f" ({key}={decode_result[key]})"
-                                for key in ("head_symbols_received",
-                                            "head_cores_observed",
-                                            "head_blocks_observed")
-                                if key in decode_result))
-        # Seconds, whatever the mode measured in: both the connect-time
-        # calibration (_encode_timing) and the per-frame head feedback
-        # (_head_feedback_request) read this and nothing else.
-        self._rx_measurements[(ptype, body)] = {
-            "head_seconds": decode_result.get("head_seconds_received"),
-        }
         self._handle_raw(bytes([ptype]) + body, profile)
 
     def _capture_near_miss(self, snap, confidence):
@@ -1255,7 +1060,7 @@ class Link:
                                 body[:_air_inline_length(ptype)],
                                 self.modes.control.mode_id):
             raise ValueError(f"invalid {_ptype_name(ptype)} body/mode for air header")
-        audio = profile.encode(header + remainder, head_seconds=self._tx_head_seconds)
+        audio = profile.encode(header + remainder)
         keyed = self.transport.send(audio)
         # Both numbers, because the gap between them is the PTT/settling
         # overhead this frame actually paid -- the thing to watch if air
@@ -1264,30 +1069,7 @@ class Link:
                     self.mycall, _ptype_name(ptype), profile.name, len(body),
                     len(audio) / profile.tx_sample_rate, keyed)
 
-    def _apply_head_feedback(self, requested_byte, *, seq):
-        """Apply an absolute peer request monotonically and idempotently."""
-        old = self._tx_head_seconds
-        try:
-            requested = _decode_head_duration(requested_byte)
-        except ValueError:
-            logger.warning("[%s] ignoring head feedback for seq=0x%02x: invalid request 0x%02x",
-                           self.mycall, seq, requested_byte)
-            return False
-        if requested <= old + 1e-12:
-            reason = ("duplicate/no increase" if requested >= old - HEAD_FEEDBACK_UNIT_SECONDS
-                      else "would decrease padding")
-            logger.info("[%s] ignoring head feedback for seq=0x%02x: requested %.1f ms, "
-                        "TX head %.1f ms (%s)", self.mycall, seq, requested * 1000,
-                        old * 1000, reason)
-            return False
-        new = min(HEAD_MAX_SECONDS, requested)
-        self._tx_head_seconds = new
-        logger.info("[%s] applied head feedback for seq=0x%02x: requested %.1f ms, "
-                    "TX head %.1f -> %.1f ms", self.mycall, seq, requested * 1000,
-                    old * 1000, new * 1000)
-        return True
-
-    def _wait_packet(self, want_types, timeout, *, restart_after_duplicate_connect=False):
+    def _wait_packet(self, want_types, timeout):
         deadline = time.time() + timeout
         while True:
             remaining = deadline - time.time()
@@ -1300,14 +1082,6 @@ class Link:
             if ptype in want_types:
                 return ptype, body
             if ptype == PT_CONNECT and self._answer_duplicate_connect(body):
-                # Re-answering can itself consume most or all of a control
-                # timeout on a slow control waveform (HC0 takes several
-                # seconds).  During connection establishment the caller
-                # cannot send TIMING_ACK until this retransmitted ACK has
-                # finished, so give it a fresh response window measured
-                # from the end of our transmission.
-                if restart_after_duplicate_connect:
-                    deadline = time.time() + timeout
                 continue
             # Not what we're waiting for right now (e.g. a stray DISC from a
             # previous session) -- drop it and keep waiting.
@@ -1358,20 +1132,6 @@ class Link:
         self.on_event("PTT", off=True)
         return True
 
-    def _answer_duplicate_timing(self, body):
-        if self.state != "CONNECTED" or self._timing_confirm_body is None:
-            return False
-        try:
-            session_id, _ = _decode_timing(body)
-        except ValueError:
-            return False
-        if session_id != self._session_id:
-            return False
-        self.on_event("PTT", on=True)
-        self._tx_packet(PT_TIMING_CONFIRM, self._timing_confirm_body)
-        self.on_event("PTT", off=True)
-        return True
-
     def _peer_is_stale(self):
         """True when this station has been CONNECTED for longer than
         INACTIVITY_TIMEOUT with nothing decoded from its peer at all."""
@@ -1414,8 +1174,6 @@ class Link:
                 break
             if ptype == PT_CONNECT:
                 self._answer_duplicate_connect(body)
-            elif ptype == PT_TIMING_ACK:
-                self._answer_duplicate_timing(body)
             elif ptype == PT_DISC:
                 self._handle_peer_disc()
                 return False
@@ -1443,8 +1201,6 @@ class Link:
         retries = self._channel("max_retries") if retries is None else retries
         self._drain_packets()
         self.state = "CONNECTING"
-        self._tx_head_seconds = CALIBRATION_SECONDS
-        self._rx_head_seconds = CALIBRATION_SECONDS
         own_supported = list(self.modes.supported_ids)
         # Not `forced or history`: mode_id 0 is a real profile (300 baud)
         # and a perfectly reasonable thing to pin a bench run to.
@@ -1479,15 +1235,6 @@ class Link:
                     logger.info("[%s] ignoring CONNECT_ACK for session 0x%02x (calling as 0x%02x)",
                                 self.mycall, ack_session, self._session_id)
                     continue
-                measurement = self._rx_measurements.get((PT_CONNECT_ACK, ack_body), {})
-                head = measurement.get("head_seconds")
-                try:
-                    timing_body = _encode_timing(self._session_id, head)
-                    _, head_duration = _decode_timing(timing_body)
-                    self._rx_head_seconds = _derive_timing(head_duration)
-                except (TypeError, ValueError):
-                    logger.warning("[%s] invalid CONNECT_ACK timing measurement", self.mycall)
-                    continue
                 self.peer_call = src
                 self.peer_supported_modes = set(peer_supported)
                 # accepted_id: what the listener accepted of our proposal --
@@ -1497,24 +1244,6 @@ class Link:
                 # what we should expect its frames at.
                 self._apply_tx_profile(self.modes.resolve(accepted_id))
                 self._apply_rx_profile(self.modes.resolve(peer_tx_id))
-                confirmed = None
-                for _ in range(retries):
-                    self.on_event("PTT", on=True)
-                    self._tx_packet(PT_TIMING_ACK, timing_body)
-                    self.on_event("PTT", off=True)
-                    confirmed = self._wait_packet({PT_TIMING_CONFIRM}, timeout_per_try)
-                    if confirmed is not None:
-                        break
-                if confirmed is None:
-                    continue
-                _, confirm_body = confirmed
-                try:
-                    confirm_session, own_head = _decode_timing(confirm_body)
-                    if confirm_session != self._session_id:
-                        continue
-                    self._tx_head_seconds = _derive_timing(own_head)
-                except ValueError:
-                    continue
                 self._clean_streak = 0
                 self._data_ack_to_speed_up = self._channel("step_up_after_clean_streak_initial")
                 self.state = "CONNECTED"
@@ -1547,8 +1276,6 @@ class Link:
         timeout."""
         self._drain_packets()
         self.state = "LISTENING"
-        self._tx_head_seconds = CALIBRATION_SECONDS
-        self._rx_head_seconds = CALIBRATION_SECONDS
         got = self._wait_packet({PT_CONNECT}, timeout or 1e9)
         if got is None:
             return None
@@ -1585,34 +1312,6 @@ class Link:
         self._connect_ack_body = ack_body
         self.on_event("PTT", on=True)
         self._tx_packet(PT_CONNECT_ACK, ack_body)
-        self.on_event("PTT", off=True)
-        # Once CONNECT has been accepted this is no longer an idle-listen
-        # poll. Give the rest of the handshake its full control-frame
-        # timeout even when the service called listen_once with a short
-        # polling timeout.
-        got_timing = self._wait_packet(
-            {PT_TIMING_ACK}, self.control_ack_timeout,
-            restart_after_duplicate_connect=True)
-        if got_timing is None:
-            self.state = "IDLE"
-            return None
-        _, timing_body = got_timing
-        try:
-            timing_session, own_head = _decode_timing(timing_body)
-            if timing_session != session_id:
-                raise ValueError("wrong timing session")
-            self._tx_head_seconds = _derive_timing(own_head)
-            measurement = self._rx_measurements[(PT_TIMING_ACK, timing_body)]
-            peer_head = measurement["head_seconds"]
-            confirm_body = _encode_timing(session_id, peer_head)
-            _, peer_head_duration = _decode_timing(confirm_body)
-            self._rx_head_seconds = _derive_timing(peer_head_duration)
-        except (KeyError, TypeError, ValueError):
-            self.state = "IDLE"
-            return None
-        self._timing_confirm_body = confirm_body
-        self.on_event("PTT", on=True)
-        self._tx_packet(PT_TIMING_CONFIRM, confirm_body)
         self.on_event("PTT", off=True)
         self._apply_rx_profile(self.modes.resolve(negotiated_id))
         self._apply_tx_profile(self.modes.resolve(own_tx_id))
@@ -1755,8 +1454,7 @@ class Link:
             self.qualification_metrics["data_attempts"] += 1
             if attempt > 1:
                 self.qualification_metrics["retransmissions"] += 1
-            advertised_head = _encode_head_duration(self._tx_head_seconds)
-            body = bytes([seq | (EOF_BIT if is_eof else 0), advertised_head]) + chunk
+            body = bytes([seq | (EOF_BIT if is_eof else 0)]) + chunk
             self.on_event("PTT", on=True)
             self._tx_packet(PT_DATA, body)
             self.on_event("PTT", off=True)
@@ -1772,13 +1470,12 @@ class Link:
                 if ptype == PT_DISC:
                     self._handle_peer_disc()
                     raise LinkError("peer disconnected mid-transfer")
-                if len(body_in) != 4:
+                if len(body_in) != 3:
                     logger.info("[%s] ignoring malformed DATA_ACK for seq=0x%02x (%d bytes)",
                                 self.mycall, seq, len(body_in))
                     continue
                 answered, expects = body_in[0] & SEQ_MASK, body_in[1] & SEQ_MASK
                 received_mode_id = body_in[2]
-                requested_head = body_in[3]
                 if answered != seq:
                     # An answer to a frame we have already moved past --
                     # most often the receiver's second ack of a chunk we
@@ -1796,7 +1493,6 @@ class Link:
                         logger.warning("[%s] ignoring ACK reporting mode %d; transmitting at %s",
                                        self.mycall, received_mode_id, self.tx_profile.name)
                         continue
-                    self._apply_head_feedback(requested_head, seq=seq)
                     logger.info("[%s] DATA seq=0x%02x acked after %d attempt(s) at %s",
                                 self.mycall, seq, attempt, self.tx_profile.name)
                     return attempt
@@ -1916,41 +1612,11 @@ class Link:
         """Consumes and acknowledges one DATA body, returning a completed
         message or None.  Shared by recv_message() and floor acquisition so
         an IRS can continue receiving while its application wants to send."""
-        if len(body) < 2:
-            logger.info("[%s] ignoring DATA without v3 head-duration field", self.mycall)
+        if len(body) < 1:
+            logger.info("[%s] ignoring empty DATA body", self.mycall)
             return None
-        flags, advertised_head, chunk = body[0], body[1], body[2:]
+        flags, chunk = body[0], body[1:]
         seq = flags & SEQ_MASK
-        measurement = self._rx_measurements.get((PT_DATA, body), {})
-        observed_seconds = measurement.get("head_seconds")
-        try:
-            requested_head, feedback_reason = _head_feedback_request(
-                advertised_head, observed_seconds,
-                self.rx_profile.head_match_allowance_seconds)
-            if observed_seconds is None:
-                logger.info("[%s] DATA seq=0x%02x head observation unavailable: "
-                            "reported unchanged %.1f ms (%s)", self.mycall, seq,
-                            _decode_head_duration(requested_head) * 1000,
-                            feedback_reason)
-            elif not bool(np.isfinite(observed_seconds)):
-                logger.info("[%s] DATA seq=0x%02x head observation invalid: "
-                            "reported unchanged %.1f ms (%s)", self.mycall, seq,
-                            _decode_head_duration(requested_head) * 1000,
-                            feedback_reason)
-            elif requested_head == advertised_head:
-                observed_ms = observed_seconds * 1000.0
-                logger.info("[%s] DATA seq=0x%02x head observation ignored: observed %.1f ms, "
-                            "reported unchanged %.1f ms (%s)", self.mycall, seq, observed_ms,
-                            _decode_head_duration(requested_head) * 1000, feedback_reason)
-            else:
-                observed_ms = observed_seconds * 1000.0
-                logger.info("[%s] DATA seq=0x%02x head feedback: observed %.1f ms, "
-                            "reported request %.1f ms (%s)", self.mycall, seq, observed_ms,
-                            _decode_head_duration(requested_head) * 1000, feedback_reason)
-        except ValueError:
-            logger.info("[%s] ignoring head observation for DATA seq=0x%02x: "
-                        "invalid advertised duration 0x%02x", self.mycall, seq, advertised_head)
-            return None
         message = None
         if self._partial_rx_buf is None:
             self._partial_rx_buf = bytearray()
@@ -1971,8 +1637,7 @@ class Link:
         # cannot be mistaken for an answer to a later frame.
         self.on_event("PTT", on=True)
         self._tx_packet(PT_DATA_ACK,
-                        bytes([seq, self._rx_expect_seq, self.rx_profile.mode_id,
-                               requested_head]))
+                        bytes([seq, self._rx_expect_seq, self.rx_profile.mode_id]))
         self.on_event("PTT", off=True)
         return message
 
@@ -1984,9 +1649,6 @@ class Link:
         re-answered as a retry of a session that no longer exists."""
         self._session_id = SESSION_ID_NONE
         self._connect_ack_body = None
-        self._timing_confirm_body = None
-        self._tx_head_seconds = CALIBRATION_SECONDS
-        self._rx_head_seconds = CALIBRATION_SECONDS
         self._last_peer_frame_at = None
 
     def _handle_peer_disc(self):

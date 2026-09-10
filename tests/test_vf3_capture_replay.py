@@ -45,7 +45,7 @@ def capture_ids():
 
 @pytest.fixture(scope="module")
 def decoded():
-    """Every pinned capture decoded once; the frames are 5.2 s each."""
+    """Every pinned capture decoded once; the native frame has a fixed head."""
     results = {}
     for name in capture_ids():
         audio = np.load(CAPTURES / name)

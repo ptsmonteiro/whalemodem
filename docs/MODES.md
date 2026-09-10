@@ -19,21 +19,21 @@ in the table. Drive multipliers and decoder estimates are not SNR.
 
 | Mode | Frequency span | Modulation geometry | Modulation order | FEC rate | FEC technique | DATA payload/frame | Frame duration | Net/frame | Pure SNR passed | Radio tested |
 | --- | --- | --- | ---: | ---: | --- | ---: | ---: | ---: | --- | --- |
-| 300baud | 1,200-1,800 Hz | 2-tone CPFSK | 2 (2-FSK) | none | none | 88 B | 3.983 s | 177 bit/s | not retained as pure SNR | not measured |
-| 600baud | 1,200-1,800 Hz | 2-tone CPFSK | 2 (2-FSK) | none | none | 193 B | 3.998 s | 386 bit/s | not retained as pure SNR | not measured |
-| 1200baud | 1,200-2,200 Hz | 2-tone CPFSK | 2 (2-FSK) | none | none | 402 B | 3.999 s | 804 bit/s | not retained as pure SNR | not measured |
-| vf3 | 468.75-3,140.625 Hz | 58-carrier differential-QPSK OFDM | 4 (QPSK) | 1/2 | terminated K=7 convolutional, interleaved, soft-decision Viterbi | 1,426 B | 5.200 s | 2,194 bit/s | — | not measured |
+| 300baud | 1,200-1,800 Hz | 2-tone CPFSK | 2 (2-FSK) | none | none | 88 B | 3.717 s | 189 bit/s | not retained as pure SNR | not measured |
+| 600baud | 1,200-1,800 Hz | 2-tone CPFSK | 2 (2-FSK) | none | none | 193 B | 3.865 s | 399 bit/s | not retained as pure SNR | not measured |
+| 1200baud | 1,200-2,200 Hz | 2-tone CPFSK | 2 (2-FSK) | none | none | 402 B | 3.933 s | 818 bit/s | not retained as pure SNR | not measured |
+| vf3 | 468.75-3,140.625 Hz | 58-carrier differential-QPSK OFDM | 4 (QPSK) | 1/2 | terminated K=7 convolutional, interleaved, soft-decision Viterbi | 1,426 B | 6.155 s | 1,853 bit/s | — | not measured |
 
 ## HF SSB
 
 | Mode | Frequency span | Modulation geometry | Modulation order | FEC rate | FEC technique | DATA payload/frame | Frame duration | Net/frame | Pure SNR passed | Watterson passed | Radio tested |
 | --- | --- | --- | ---: | ---: | --- | ---: | ---: | ---: | --- | --- | --- |
-| hr0 | 562.5-2,015.625 Hz | 32-tone noncoherent FSK | 32 (32-FSK) | 1/2 | terminated K=9 convolutional, interleaved, soft-decision Viterbi | 32 B | 3.860 s | 66 bit/s | -10 dB and above | quiet, moderate, disturbed: 0 dB and above | 2026-09-08, 10/10 at 34.0 dB SNR |
-| hc0 | 750-2,156.25 Hz | 16-tone noncoherent FSK | 16 (16-FSK) | 1/2 | terminated K=7 convolutional, interleaved, soft-decision Viterbi | 91 B | 5.012 s | 145 bit/s | -7 dB and above | quiet, moderate, disturbed: -5 dB and above | 2026-09-08, 10/10 at 34.0 dB SNR |
-| hf9 | 300-2,700 Hz | 49-carrier QPSK OFDM | 4 (QPSK) | 1/2 | IEEE 802.11n QC-LDPC, interleaved | 105 B | 0.572 s | 1,469 bit/s | 6 dB (97/100) | moderate: 8 dB (96/100); not passed at 6 dB (77/100) | not measured |
-| hc1w | 468.75-2,531.25 Hz | 23-carrier differential-QPSK OFDM | 4 (QPSK) | 1/2 | terminated K=9 convolutional, interleaved, soft-decision Viterbi | 995 B | 5.015 s | 1,587 bit/s | 6 dB (90/100) | quiet: 15 dB (95/100); moderate: not passed at 20 dB (75/100); disturbed: not measured | 2026-09-08, 10/10 at 30.8 dB SNR |
-| hf8 | 300-2,700 Hz | 49-carrier 8PSK OFDM | 8 (8PSK) | 2/3 | IEEE 802.11n QC-LDPC, interleaved | 2,444 B | 5.100 s | 3,834 bit/s | 12 dB and above | quiet: 18 dB and above | 2026-09-08, 10/10 at 34.0 dB SNR |
-| hf7 | 300-2,700 Hz | 49-carrier 32-QAM OFDM | 32 (32-QAM) | 3/4 | IEEE 802.11n QC-LDPC, interleaved | 4,722 B | 5.128 s | 7,367 bit/s | 20 dB and above | not passed | 2026-09-08, 10/10 at 34.0 dB SNR |
+| hr0 | 562.5-2,015.625 Hz | 32-tone noncoherent FSK | 32 (32-FSK) | 1/2 | terminated K=9 convolutional, interleaved, soft-decision Viterbi | 32 B | 4.735 s | 54 bit/s | -10 dB and above | quiet, moderate, disturbed: 0 dB and above | 2026-09-08, 10/10 at 34.0 dB SNR |
+| hc0 | 750-2,156.25 Hz | 16-tone noncoherent FSK | 16 (16-FSK) | 1/2 | terminated K=7 convolutional, interleaved, soft-decision Viterbi | 91 B | 5.908 s | 123 bit/s | -7 dB and above | quiet, moderate, disturbed: -5 dB and above | 2026-09-08, 10/10 at 34.0 dB SNR |
+| hf9 | 300-2,700 Hz | 49-carrier QPSK OFDM | 4 (QPSK) | 1/2 | IEEE 802.11n QC-LDPC, interleaved | 105 B | 1.540 s | 545 bit/s | 6 dB (97/100) | moderate: 8 dB (96/100); not passed at 6 dB (77/100) | not measured |
+| hc1w | 468.75-2,531.25 Hz | 23-carrier differential-QPSK OFDM | 4 (QPSK) | 1/2 | terminated K=9 convolutional, interleaved, soft-decision Viterbi | 995 B | 5.895 s | 1,350 bit/s | 6 dB (90/100) | quiet: 15 dB (95/100); moderate: not passed at 20 dB (75/100); disturbed: not measured | 2026-09-08, 10/10 at 30.8 dB SNR |
+| hf8 | 300-2,700 Hz | 49-carrier 8PSK OFDM | 8 (8PSK) | 2/3 | IEEE 802.11n QC-LDPC, interleaved | 2,444 B | 5.940 s | 3,292 bit/s | 12 dB and above | quiet: 18 dB and above | 2026-09-08, 10/10 at 34.0 dB SNR |
+| hf7 | 300-2,700 Hz | 49-carrier 32-QAM OFDM | 32 (32-QAM) | 3/4 | IEEE 802.11n QC-LDPC, interleaved | 4,722 B | 5.808 s | 6,504 bit/s | 20 dB and above | not passed | 2026-09-08, 10/10 at 34.0 dB SNR |
 
 These are snapshots of checked-in shipped code and retained results, not
 promises for every radio, path, or direction. When a mode or measurement

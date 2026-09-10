@@ -19,20 +19,15 @@ around CPFSK and VF3 does not fit all of it:
     the link puts in is a packet, and the air header it prepends is just the
     first ten bytes of the VF3 payload.
 
-  - **The frame is fixed-length.** A VF3 keying is 5.2 s whatever the
+  - **The frame is fixed-length.** A VF3 keying is 6.155 s whatever the
     payload, so `airtime` ignores `payload_len`.  Short packets waste the
     difference, which is why this mode is for DATA only: the control plane
     stays on `afsk.CONTROL_PROFILE`, where a 12-byte ACK costs 12 bytes of
     air.  The link already routes it that way (see `_tx_packet`).
 
-  - **Head feedback is in seconds, not symbols.** VF3 measures its received
-    head in whole cores (see `vf3._measure_head`); this adapter reports that
-    count as `head_cores_observed` for the logs and converts it to
-    `head_seconds_received`, which is what the link's
-    `_head_feedback_request` consumes.  The tolerance that goes with it is
-    `head_match_allowance_seconds` below -- one core, the granularity of the
-    measurement -- rather than the CPFSK pad-matcher window, so a VF3
-    transfer adapts its own head without borrowing a CPFSK constant.
+  - **The preamble is native.** VF3 repeats its own sync core for the fixed
+    universal head time, so acquisition and AGC see the same waveform power
+    on every frame.
 """
 
 from __future__ import annotations
@@ -64,32 +59,16 @@ class Vf3Codec:
     tx_sample_rate = vf3.SAMPLE_RATE
     rx_sample_rate = vf3.RX_SAMPLE_RATE
 
-    def encode(self, payload: bytes, mode: "Vf3Mode", *, include_head=True,
-               head_seconds=vf3.DEFAULT_HEAD_SECONDS) -> np.ndarray:
+    def encode(self, payload: bytes, mode: "Vf3Mode") -> np.ndarray:
         if len(payload) > vf3.MAX_PAYLOAD_BYTES:
             raise ValueError(
                 f"packet is {len(payload)} bytes; {mode.name} carries at most "
                 f"{vf3.MAX_PAYLOAD_BYTES}")
-        # include_head=False means "no adaptive guard", not "no lead-in":
-        # vf3.lead_in_samples floors at the 45 ms that ramps the transmitter
-        # and the sound card up, and a VF3 frame has never been sent without
-        # it.  There is nothing to gain by trying -- the floor is 45 ms of a
-        # 5.2 s keying.
-        if not include_head:
-            head_seconds = vf3.DEFAULT_HEAD_SECONDS
-        return vf3.modulate(bytes(payload), head_seconds=head_seconds)
+        return vf3.modulate(bytes(payload))
 
-    def decode(self, audio, mode: "Vf3Mode", *,
-               head_seconds=vf3.DEFAULT_HEAD_SECONDS, **kwargs) -> dict:
-        result = vf3.demodulate(audio, head_seconds=head_seconds, **kwargs)
-        observed = result.pop("head_cores_received", None)
-        if observed is not None:
-            # The core count is the diagnostic; the seconds are what the
-            # link's head feedback reads.
-            result["head_cores_observed"] = observed
-            result["head_seconds_received"] = (
-                observed * vf3.CORE_SAMPLES / vf3.SAMPLE_RATE)
-        return result
+    def decode(self, audio, mode: "Vf3Mode", **kwargs) -> dict:
+        del mode
+        return vf3.demodulate(audio, **kwargs)
 
     def airtime(self, payload_len: int, mode: "Vf3Mode") -> float:
         del payload_len  # a VF3 frame is the same length whatever it carries
@@ -130,20 +109,8 @@ class Vf3Mode:
         """VF3's OFDM symbol rate, 41.667 symbol/s."""
         return vf3.SAMPLE_RATE / vf3.SYMBOL_SAMPLES
 
-    @property
-    def head_match_allowance_seconds(self) -> float:
-        """One core (~21.3 ms) -- the resolution of `vf3._measure_head`.
-
-        The head measurement counts whole cores, so any observation is short
-        by up to one of them; a deficit inside that is measurement noise,
-        not a head that needs lengthening.
-        """
-        return vf3.CORE_SAMPLES / vf3.SAMPLE_RATE
-
-    def encode(self, payload: bytes, *, include_head=True,
-               head_seconds=vf3.DEFAULT_HEAD_SECONDS):
-        return self.codec.encode(payload, self, include_head=include_head,
-                                 head_seconds=head_seconds)
+    def encode(self, payload: bytes):
+        return self.codec.encode(payload, self)
 
     def decode(self, audio, **kwargs):
         return self.codec.decode(audio, self, **kwargs)

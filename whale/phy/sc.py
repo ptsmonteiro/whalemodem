@@ -33,6 +33,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 
 import numpy as np
+from scipy.signal import fftconvolve
 
 from whale.dsp import bits as _bits
 
@@ -50,8 +51,10 @@ LENGTH_BYTES = 2
 CRC_BYTES = 4
 WHITENER_SEED = 0xACE1
 
-# Preamble: 63-chip PN sequence (order-6 LFSR), one BPSK symbol/chip.
-PREAMBLE_CHIPS = 63
+# Preamble: one second of the mode's known BPSK symbols.  At the shipped
+# 1500-baud rate this is 1500 chips and is long enough for PTT lead clipping
+# and AGC settling.
+PREAMBLE_CHIPS = 1500
 PREAMBLE_SEED = 0x2E
 
 
@@ -365,7 +368,7 @@ class SingleCarrierMode:
         for hz in np.arange(-SYNC_SEARCH_HZ, SYNC_SEARCH_HZ + 1e-9, SYNC_SEARCH_STEP_HZ):
             pre_carrier = np.exp(1j * 2 * np.pi * (CARRIER_HZ + hz) * n / DESIGN_RATE)
             pre_passband = np.real(pre_shaped * pre_carrier)
-            corr = np.correlate(x, pre_passband, mode="valid")
+            corr = fftconvolve(x, pre_passband[::-1], mode="valid")
             env = np.abs(_hilbert_envelope(corr))
             peak = int(np.argmax(env))
             conf = float(env[peak] / (norm + 1e-12))

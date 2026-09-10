@@ -54,8 +54,7 @@ TOLERANCE_ARRAY_KEYS = ("carrier_snr_db", "symbol_evm_db", "soft_payload_bits",
 # ...and the scalars, which are cheap to read in a diff when a digest moves.
 SCALAR_KEYS = ("confidence", "start_index", "sync_end_index", "end_index",
                "present_carriers", "timing_drift_samples",
-               "timing_confidence", "clock_offset_ppm",
-               "head_cores_received", "head_match", "decoded_length",
+               "timing_confidence", "clock_offset_ppm", "decoded_length",
                "crc_ok", "fec_tail_ok")
 
 

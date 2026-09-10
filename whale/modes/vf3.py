@@ -26,9 +26,9 @@ from dataclasses import dataclass
 import numpy as np
 from scipy.signal import hilbert
 
-from .. import dsp, rx_audio
+from .. import dsp, framing, rx_audio
 from ..dsp import (acquire as _acquire_kernel, differential as _diff,
-                   equalize as _eq, freq as _freq, head as _head,
+                   equalize as _eq, freq as _freq,
                    ofdm as _ofdm, timing as _timing)
 
 # -- geometry -------------------------------------------------------------
@@ -66,7 +66,7 @@ RX_GEOMETRY = _ofdm.Geometry(
     guard_samples=RX_GUARD_SAMPLES, carrier_bins=CARRIER_BINS,
 )
 
-LEAD_IN_SAMPLES = 2_160
+LEAD_IN_SAMPLES = int(np.ceil(framing.HEAD_SECONDS * SAMPLE_RATE))
 LEAD_IN_FADE_SAMPLES = 240
 TAIL_SAMPLES = 912
 FRAME_SAMPLES = LEAD_IN_SAMPLES + TOTAL_SYMBOLS * SYMBOL_SAMPLES + TAIL_SAMPLES
@@ -79,47 +79,17 @@ ACQUISITION_THRESHOLD = 0.70
 MIN_PRESENT_CARRIERS = 40
 CARRIER_FLOOR_DB = 35.0
 
-HEAD_MATCH_THRESHOLD = _head.MATCH_THRESHOLD
-HEAD_MIN_ENERGY_FRACTION = _head.MIN_ENERGY_FRACTION
-
-# -- the adaptive head ----------------------------------------------------
-#
-# The shipped link asks each mode for a leading guard of `head_seconds`,
-# negotiated per direction at connect time and adjusted during transfer, to
-# cover the receiver's squelch blackout (see whale/framing.py's
-# HEAD_PAD_SECONDS).  VF3 already had exactly that in miniature: a 45 ms
-# lead-in of the sync symbol's *core*, ramped up over 5 ms.  Lengthening
-# that lead-in is the whole implementation.
-#
-# It is deliberately core-periodic (1024 samples) rather than
-# symbol-periodic (1152).  Acquisition locks by correlating the signal
-# against itself one whole symbol apart, so a head built from repeated
-# *symbols* would extend that correlation's plateau across the entire head,
-# collapse it into one contiguous proposal group, and leave the candidate
-# ranking a single arbitrary offset inside the plateau to rank.  A
-# core-periodic head is not autocorrelated at lag 1152 at all, so the
-# acquisition peak stays where the real header is.
-DEFAULT_HEAD_SECONDS = LEAD_IN_SAMPLES / SAMPLE_RATE
+def lead_in_samples() -> int:
+    """VF3's fixed native preamble length."""
+    return LEAD_IN_SAMPLES
 
 
-def lead_in_samples(head_seconds: float = DEFAULT_HEAD_SECONDS) -> int:
-    """Leading sync-core samples for a requested head duration.
-
-    The original 45 ms is the floor: it is what ramps the transmitter and
-    the sound card up, and a head shorter than that has never been sent.
-    """
-    if head_seconds < 0:
-        raise ValueError("head duration must not be negative")
-    return max(LEAD_IN_SAMPLES, int(round(head_seconds * SAMPLE_RATE)))
+def frame_samples() -> int:
+    return FRAME_SAMPLES
 
 
-def frame_samples(head_seconds: float = DEFAULT_HEAD_SECONDS) -> int:
-    return (lead_in_samples(head_seconds)
-            + TOTAL_SYMBOLS * SYMBOL_SAMPLES + TAIL_SAMPLES)
-
-
-def frame_seconds(head_seconds: float = DEFAULT_HEAD_SECONDS) -> float:
-    return frame_samples(head_seconds) / SAMPLE_RATE
+def frame_seconds() -> float:
+    return FRAME_SAMPLES / SAMPLE_RATE
 
 
 # -- reference constellations and the payload codec -----------------------
@@ -201,15 +171,14 @@ def frame_constellation(payload: bytes) -> np.ndarray:
     return np.vstack((HEADER_VALUES, payload_values))
 
 
-def modulate(payload: bytes, *,
-             head_seconds: float = DEFAULT_HEAD_SECONDS) -> np.ndarray:
+def modulate(payload: bytes) -> np.ndarray:
     values = frame_constellation(payload)
     symbols = np.concatenate([build_symbol(row) for row in values])
-    lead = np.resize(sync_core(), lead_in_samples(head_seconds)).copy()
+    lead = np.resize(sync_core(), LEAD_IN_SAMPLES).copy()
     fade = LEAD_IN_FADE_SAMPLES
     lead[:fade] *= np.linspace(0.0, 1.0, fade, endpoint=True)
     audio = np.concatenate((lead, symbols, np.zeros(TAIL_SAMPLES)))
-    if len(audio) != frame_samples(head_seconds):
+    if len(audio) != frame_samples():
         raise AssertionError(f"internal frame length error: {len(audio)}")
     peak = float(np.max(np.abs(audio)))
     if peak > MAX_SAMPLE:
@@ -247,15 +216,6 @@ def _estimate_timing(analytic: np.ndarray,
     return fit.intercept, fit.slope, fit.confidence
 
 
-def _measure_head(samples: np.ndarray, start: int) -> tuple[int, float]:
-    """How much of the transmitted head survived, in whole 1024-sample cores.
-
-    Nothing in the decode path uses this; see `vf3_mode` for how the link
-    turns it into head feedback.
-    """
-    return _head.measure(samples, start, rx_sync_core())
-
-
 def _base_result() -> dict:
     return {
         "synced": False, "payload": None, "confidence": 0.0,
@@ -266,13 +226,8 @@ def _base_result() -> dict:
     }
 
 
-def demodulate(audio: np.ndarray, *,
-               head_seconds: float = DEFAULT_HEAD_SECONDS) -> dict:
+def demodulate(audio: np.ndarray) -> dict:
     """Decode one VF3 frame out of `audio`.
-
-    `head_seconds` is accepted for symmetry with `modulate` and with the
-    `WaveformMode` contract; acquisition does not need to be told how long
-    the head was, since it locks on the header rather than on the head.
 
     Alongside VF3's own diagnostics the result carries the three keys the
     link's receive loop reads: `confidence`, `sync_end_index` and
@@ -281,7 +236,6 @@ def demodulate(audio: np.ndarray, *,
     how the caller is told to wait for more audio rather than consume what
     it has.  See whale/link.py's _decode_one.
     """
-    del head_seconds  # acquisition finds the header wherever the head ended
     result = _base_result()
     samples = np.asarray(audio, dtype=np.float64).reshape(-1)
     if len(samples) < HEADER_SYMBOLS * RX_SYMBOL_SAMPLES:
@@ -295,10 +249,6 @@ def demodulate(audio: np.ndarray, *,
         result["failure"] = "header not found"
         return result
     result["sync_end_index"] = start + HEADER_SYMBOLS * RX_SYMBOL_SAMPLES
-
-    head_cores, head_score = _measure_head(samples, start)
-    result["head_cores_received"] = head_cores
-    result["head_match"] = head_score
 
     fit = _timing.estimate(RX_GEOMETRY, analytic, start, _TIMING_SYMBOLS)
     result["timing_drift_samples"] = fit.drift_samples(TOTAL_SYMBOLS)
@@ -355,9 +305,8 @@ def demodulate(audio: np.ndarray, *,
     return result
 
 
-def demodulate_debug(audio: np.ndarray, reference_payload: bytes | None = None,
-                     *, head_seconds: float = DEFAULT_HEAD_SECONDS) -> dict:
-    result = demodulate(audio, head_seconds=head_seconds)
+def demodulate_debug(audio: np.ndarray, reference_payload: bytes | None = None) -> dict:
+    result = demodulate(audio)
     if reference_payload is None or result.get("raw_payload_bits") is None:
         return result
     expected = encode_payload_bits(reference_payload)
@@ -403,7 +352,7 @@ def _check_constants() -> None:
     assert CARRIER_HZ[0] == 468.75 and CARRIER_HZ[-1] == 3140.625
     assert TOTAL_SYMBOLS == 214 and PAYLOAD_BITS == 23_084
     assert FEC_INPUT_BITS == 11_542
-    assert FRAME_SAMPLES == 249_600 and FRAME_SECONDS == 5.2
+    assert FRAME_SAMPLES == 295_440 and FRAME_SECONDS == 6.155
     assert PACKET_BYTES == 1_442 and UNUSED_INFO_BITS == 0
     assert MAX_PAYLOAD_BYTES == 1_436
     assert CODEC.interleaver.is_valid()

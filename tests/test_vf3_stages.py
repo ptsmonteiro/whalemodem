@@ -15,7 +15,7 @@ import numpy as np
 import pytest
 from scipy.signal import hilbert
 
-from whale import rx_audio
+from whale import framing, rx_audio
 from whale.modes import vf3
 from whale.modes.vf3 import (CARRIER_BINS, CORE_SAMPLES, GUARD_SAMPLES,
                              HEADER_SYMBOLS, HEADER_VALUES, MAX_PAYLOAD_BYTES,
@@ -227,46 +227,12 @@ def test_carrier_weights_scale_the_reliabilities_they_belong_to():
     assert np.all(soft[:, 8, :] != 0.0)
 
 
-# -- head measurement ----------------------------------------------------
-
-def test_head_measurement_counts_the_cores_that_were_sent():
-    head_seconds = 0.5
-    audio = vf3.modulate(_payload(64), head_seconds=head_seconds)
-    start = vf3.lead_in_samples(head_seconds)
-    received = rx_audio.downsample(audio)
-    rx_start = (start // rx_audio.DECIMATION
-                + rx_audio.FILTER_DELAY_DECODE_SAMPLES)
-    count, score = vf3._measure_head(received, rx_start)
-    assert score > vf3.HEAD_MATCH_THRESHOLD
-    # The ramped-up first core and the partial core left by the resize are
-    # not required to count; everything between them is.
-    assert count >= start // CORE_SAMPLES - 2
-
-
-def test_head_measurement_stops_at_a_blackout():
-    head_seconds = 0.5
-    audio = vf3.modulate(_payload(64), head_seconds=head_seconds).astype(
-        np.float64)
-    start = vf3.lead_in_samples(head_seconds)
-    audio[:start - 3 * CORE_SAMPLES] = 0.0
-    received = rx_audio.downsample(audio)
-    rx_start = (start // rx_audio.DECIMATION
-                + rx_audio.FILTER_DELAY_DECODE_SAMPLES)
-    count, _ = vf3._measure_head(received, rx_start)
-    assert count == 3
-
-
 # -- frame geometry ------------------------------------------------------
 
-def test_frame_length_tracks_the_requested_head():
-    assert vf3.frame_samples(0.0) == vf3.FRAME_SAMPLES
-    assert len(vf3.modulate(b"x", head_seconds=1.0)) == vf3.frame_samples(1.0)
-    assert vf3.frame_samples(1.0) > vf3.frame_samples(0.045)
-
-
-def test_a_negative_head_is_refused():
-    with pytest.raises(ValueError):
-        vf3.lead_in_samples(-0.1)
+def test_frame_length_includes_vf3s_fixed_native_preamble():
+    assert vf3.frame_samples() == vf3.FRAME_SAMPLES
+    assert len(vf3.modulate(b"x")) == vf3.FRAME_SAMPLES
+    assert vf3.LEAD_IN_SAMPLES == round(framing.HEAD_SECONDS * vf3.SAMPLE_RATE)
 
 
 def test_the_constellation_is_the_header_then_the_payload():

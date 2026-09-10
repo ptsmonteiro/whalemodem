@@ -43,8 +43,7 @@ def main():
     args = ap.parse_args()
 
     print(f"opening radios... (TX_TURNAROUND_DELAY={link_mod.TX_TURNAROUND_DELAY}s; "
-          "radio settling is carried by waveform timing symbols and calibrated "
-          "per session -- see ADAPTIVE_TIMING.md)")
+          "radio settling is carried by each mode's native preamble)")
     t1 = RadioTransport("ic705")
     t2 = RadioTransport("ht")
 

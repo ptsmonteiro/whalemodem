@@ -112,8 +112,6 @@ def run_direction(mode, tx, rx, label, trials, size, rng, capture_dir=None):
             "carrier_snr_db": (None if result.get("carrier_snr_db") is None
                                or not np.all(np.isfinite(result["carrier_snr_db"]))
                                else [round(float(v), 2) for v in result["carrier_snr_db"]]),
-            "head": result.get("head_cores_received",
-                               result.get("head_blocks_received")),
             "failure": result.get("failure"),
         })
         if capture_dir is not None:

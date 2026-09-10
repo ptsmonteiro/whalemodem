@@ -2,7 +2,7 @@
 
 The receiver correlates a known tone pattern, estimates carrier offset, and
 decodes an interleaved terminated rate-1/2 K=7 packet with length and CRC32.
-Frames use the shared adaptive HF lead.
+Frames use HC0's native fixed preamble.
 """
 
 from __future__ import annotations
@@ -11,11 +11,8 @@ from dataclasses import dataclass
 
 import numpy as np
 
-import numpy as _np
-from scipy.signal import hilbert as _hilbert
-
-from .. import dsp, rx_audio
-from ..dsp import freq as _freq, head as _head, mfsk as _mfsk
+from .. import dsp, framing, rx_audio
+from ..dsp import mfsk as _mfsk
 
 # -- geometry -------------------------------------------------------------
 
@@ -79,71 +76,22 @@ MAX_SAMPLE = 0.95
 #: payload stops.
 ACQUISITION_THRESHOLD = 0.12
 
-# -- the adaptive head ----------------------------------------------------
-#
-# The link negotiates a leading guard per direction and adjusts it during a
-# transfer (see whale/framing.py's HEAD_PAD_SECONDS and ADAPTIVE_TIMING.md).
-# HC0's is a repeat of a fixed four-symbol tone block, which `_head.measure`
-# counts backwards from the preamble.
-#
-# It does *not* have to avoid resembling the preamble the way VF3's and
-# HC1W's heads have to avoid resembling their sync symbols. Those modes
-# acquire by correlating the capture against itself, so any repeat anywhere
-# near the header widens the peak into a plateau; HC0 correlates against a
-# known pattern instead, and a head built from a different pattern simply
-# does not score. One more thing that stops being a problem when detection
-# stops being blind.
-
 HEAD_BLOCK_SYMBOLS = 4
 HEAD_BLOCK_SAMPLES = HEAD_BLOCK_SYMBOLS * SYMBOL_SAMPLES
-RX_HEAD_BLOCK_SAMPLES = HEAD_BLOCK_SYMBOLS * RX_SYMBOL_SAMPLES
-
-#: Two blocks, 85.3 ms.  SSB has no squelch to blank the start of a
-#: transmission, so this floor is only what ramps the transmitter and the
-#: sound card up.
-LEAD_IN_BLOCKS = 2
-LEAD_IN_SAMPLES = LEAD_IN_BLOCKS * HEAD_BLOCK_SAMPLES
 LEAD_IN_FADE_SAMPLES = 240
 TAIL_SAMPLES = 960
 RX_TAIL_SAMPLES = TAIL_SAMPLES // rx_audio.DECIMATION
 
-DEFAULT_HEAD_SECONDS = LEAD_IN_SAMPLES / SAMPLE_RATE
-
-#: The longest head the link will ever ask for (whale/link.py's
-#: HEAD_MAX_SECONDS), plus a block, which is as far back as there is any
-#: point looking.
-MAX_HEAD_SAMPLES = SAMPLE_RATE + HEAD_BLOCK_SAMPLES
-MAX_RX_HEAD_SAMPLES = RX_SAMPLE_RATE + RX_HEAD_BLOCK_SAMPLES
-
-#: Two receive samples of block-to-block alignment drift, because the head is
-#: measured on frequency-corrected audio; see `_measure_head`.
-HEAD_PHASE_TOLERANCE = 2
+HEAD_SAMPLES = int(np.ceil(framing.HEAD_SECONDS * SAMPLE_RATE
+                           / HEAD_BLOCK_SAMPLES)) * HEAD_BLOCK_SAMPLES
 
 
-def lead_in_samples(head_seconds: float | None = None) -> int:
-    """Leading head samples for a requested duration, whole blocks.
-
-    Rounded up to a whole block because `_head.measure` counts blocks, and
-    a partial one at the transmitter would be reported short by the
-    receiver for the life of the session.
-    """
-    if head_seconds is None:
-        wanted = LEAD_IN_SAMPLES
-    elif head_seconds < 0:
-        raise ValueError("head duration must not be negative")
-    else:
-        wanted = max(LEAD_IN_SAMPLES, int(round(head_seconds * SAMPLE_RATE)))
-    blocks = -(-wanted // HEAD_BLOCK_SAMPLES)
-    return blocks * HEAD_BLOCK_SAMPLES
+def frame_samples() -> int:
+    return HEAD_SAMPLES + TOTAL_SYMBOLS * SYMBOL_SAMPLES + TAIL_SAMPLES
 
 
-def frame_samples(head_seconds: float = DEFAULT_HEAD_SECONDS) -> int:
-    return (lead_in_samples(head_seconds)
-            + TOTAL_SYMBOLS * SYMBOL_SAMPLES + TAIL_SAMPLES)
-
-
-def frame_seconds(head_seconds: float = DEFAULT_HEAD_SECONDS) -> float:
-    return frame_samples(head_seconds) / SAMPLE_RATE
+def frame_seconds() -> float:
+    return frame_samples() / SAMPLE_RATE
 
 
 FRAME_SAMPLES = frame_samples()
@@ -205,23 +153,17 @@ def head_block() -> np.ndarray:
     return _mfsk.modulate(BANK, HEAD_PATTERN, TX_AMPLITUDE)
 
 
-def rx_head_block() -> np.ndarray:
-    """The receive-rate representation of one repeated head block."""
-    return _mfsk.modulate(RX_BANK, HEAD_PATTERN, TX_AMPLITUDE)
-
-
-def modulate(payload: bytes, *,
-             head_seconds: float = DEFAULT_HEAD_SECONDS) -> np.ndarray:
+def modulate(payload: bytes) -> np.ndarray:
     tones = np.concatenate((
         SYNC_PATTERN,
         BANK.symbols_from_bits(encode_payload_bits(payload)),
     ))
     body = _mfsk.modulate(BANK, tones, TX_AMPLITUDE)
-    lead = np.resize(head_block(), lead_in_samples(head_seconds)).copy()
+    lead = np.resize(head_block(), HEAD_SAMPLES).copy()
     fade = LEAD_IN_FADE_SAMPLES
     lead[:fade] *= np.linspace(0.0, 1.0, fade, endpoint=True)
     audio = np.concatenate((lead, body, np.zeros(TAIL_SAMPLES)))
-    if len(audio) != frame_samples(head_seconds):
+    if len(audio) != frame_samples():
         raise AssertionError(f"internal frame length error: {len(audio)}")
     peak = float(np.max(np.abs(audio)))
     if peak > MAX_SAMPLE:
@@ -230,34 +172,6 @@ def modulate(payload: bytes, *,
 
 
 # -- demodulation ---------------------------------------------------------
-
-def _measure_head(samples: np.ndarray, start: int,
-                  offset_hz: float) -> tuple[int, float]:
-    """How much of the transmitted head survived, in whole 4-symbol blocks.
-
-    Takes the *frequency-corrected* audio, and the correction is why this
-    runs after `_mfsk.offset_hz` rather than before it.  Everything else in
-    this mode detects energy and does not care about phase; the head is the
-    one exception, because it is matched against a reference *waveform*,
-    and the bench's own 8 Hz turns a 42.7 ms block by a third of a turn.
-    Measured before this was ordered correctly: a 1 s head, arriving
-    perfectly, reported as one block -- so the link kept transmitting a
-    full second of it for the whole session, a quarter of every keying
-    spent on padding that was already known to be arriving.
-
-    Only the last second is examined, which is all the link will ever ask
-    for, so the analytic signal is computed over a slice rather than the
-    whole receive buffer.
-    """
-    span = min(start, MAX_RX_HEAD_SAMPLES)
-    if span < RX_HEAD_BLOCK_SAMPLES:
-        return 0, 0.0
-    window = _np.asarray(samples[start - span:start], dtype=_np.float64)
-    corrected = _np.real(
-        _freq.derotate(_hilbert(window), offset_hz, RX_SAMPLE_RATE))
-    return _head.measure(corrected, len(corrected), rx_head_block(),
-                         phase_tolerance=HEAD_PHASE_TOLERANCE)
-
 
 def _base_result() -> dict:
     return {
@@ -279,13 +193,8 @@ def _acquire(audio: np.ndarray) -> tuple[int | None, float]:
     return start, float(max(score, scores[coarse]))
 
 
-def demodulate(audio: np.ndarray, *,
-               head_seconds: float = DEFAULT_HEAD_SECONDS) -> dict:
+def demodulate(audio: np.ndarray) -> dict:
     """Decode one HC0 frame out of `audio`.
-
-    `head_seconds` is accepted for symmetry with `modulate` and with the
-    `WaveformMode` contract; acquisition locks on the preamble wherever the
-    head happened to end.
 
     Alongside HC0's own diagnostics the result carries the three keys the
     link's receive loop reads: `confidence`, `sync_end_index` and
@@ -294,7 +203,6 @@ def demodulate(audio: np.ndarray, *,
     how the caller is told to wait for more audio rather than consume what
     it has.  See whale/link.py's _decode_one.
     """
-    del head_seconds  # acquisition finds the preamble, not the head
     result = _base_result()
     samples = np.asarray(audio, dtype=np.float64).reshape(-1)
     if len(samples) < SYNC_SYMBOLS * RX_SYMBOL_SAMPLES:
@@ -312,10 +220,6 @@ def demodulate(audio: np.ndarray, *,
     # frame, because nothing in the detector needed the phase it came from.
     offset = _mfsk.offset_hz(RX_BANK, samples, start, SYNC_PATTERN)
     result["cfo_hz"] = offset
-
-    head_blocks, head_score = _measure_head(samples, start, offset)
-    result["head_blocks_received"] = head_blocks
-    result["head_match"] = head_score
 
     payload_start = result["sync_end_index"]
 
@@ -391,9 +295,8 @@ def _tone_snr_db(magnitudes: np.ndarray) -> float:
     return float(10.0 * np.log10(np.mean(best) / max(np.mean(rest), 1e-30)))
 
 
-def demodulate_debug(audio: np.ndarray, reference_payload: bytes | None = None,
-                     *, head_seconds: float = DEFAULT_HEAD_SECONDS) -> dict:
-    result = demodulate(audio, head_seconds=head_seconds)
+def demodulate_debug(audio: np.ndarray, reference_payload: bytes | None = None) -> dict:
+    result = demodulate(audio)
     if reference_payload is None or result.get("raw_payload_bits") is None:
         return result
     codec = LEGACY_CODEC if result.get("legacy_frame") else CODEC
@@ -423,7 +326,7 @@ def _check_constants() -> None:
     # bytes plus the trellis tail.  This is what picked 283 payload symbols.
     assert PACKET_BYTES == 107 and UNUSED_INFO_BITS == 2
     assert MAX_PAYLOAD_BYTES == 101
-    assert FRAME_SAMPLES == 238_528 and FRAME_SECONDS == 4.969333333333333
+    assert FRAME_SAMPLES == 283_584 and FRAME_SECONDS == 5.908
     # Every deliberate pair; a draw that happens to repeat a tone across
     # neighbouring pairs would give more, which is only more of the same
     # measurement.

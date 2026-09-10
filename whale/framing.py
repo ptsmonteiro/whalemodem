@@ -1,7 +1,7 @@
 """Bit-level framing for the AFSK link: sync, checked header/body, bit packing.
 
 Frame layout (bits, MSB first):
-    head pad  (sync-anchored PN suffix -- leading-loss protection and measurement)
+    preamble (mode-specific fixed-time leading-loss protection)
     sync word (PN sequence -- good autocorrelation for sync search; its
               length depends on baud, see sync_bits)
     length    (16 bits, big endian, complete payload length)
@@ -57,7 +57,7 @@ def _lfsr_bits(num_bits, order, taps, seed=1):
 # that sync word. That is not a hypothetical: swapping the bench HT for one
 # that blacks out for ~110ms after its squelch opens killed PROFILE_1200
 # outright while 300 and 600 baud kept working, because at 1200 the whole
-# sync word fitted inside the blackout. See HEAD_PAD_SECONDS.
+# sync word fitted inside the blackout. See HEAD_SECONDS.
 #
 # Every profile now gets SYNC_SECONDS of sync word, so a blackout costs each
 # one the same *fraction* of its sync word rather than a fraction that
@@ -130,9 +130,9 @@ AIR_HEADER_BYTES = 10
 # separately modulated bootstrap frame.
 BOOTSTRAP_HEADER_BYTES = AIR_HEADER_BYTES
 
-# The outer head timing pad is both measurement and protection, so it needs
-# deterministic, alignment-safe content. Its order-15 maximal-length sequence
-# has a period comfortably longer than every supported pad.
+# The AFSK preamble is deterministic and alignment-safe. Its order-15
+# maximal-length sequence has a period comfortably longer than every mode's
+# fixed head.
 _PAD_LFSR_ORDER = 15
 _PAD_LFSR_SEED = 0x5A5A
 _HEAD_PAD_TAPS = (1, 15)
@@ -218,7 +218,7 @@ _HEAD_PAD_TAPS = (1, 15)
 #     profiles, and holding to 40% while breaking at 50%; see
 #     test_a_lock_survives_losing_the_opening_of_the_sync_word).
 #
-# Total blackout tolerance is therefore about HEAD_PAD_SECONDS + 0.4 *
+# Total blackout tolerance is therefore about HEAD_SECONDS + 0.4 *
 # SYNC_SECONDS, or pad + ~85ms. Sizing this is picking how much margin to
 # hold over the worst receiver you expect; the sync word covers the rest and
 # costs the same at every profile.
@@ -242,7 +242,7 @@ _HEAD_PAD_TAPS = (1, 15)
 # Note this pad is also the cheaper allowance to grow later: it is the one
 # that does not have to be paid at every profile equally, since a slow
 # receiver is a fixed number of ms regardless of what baud is running.
-HEAD_PAD_SECONDS = 1.0
+HEAD_SECONDS = 1.0
 
 
 @functools.lru_cache(maxsize=16)
@@ -252,19 +252,9 @@ def _head_pad_anchor_bits(num_bits):
                             seed=_PAD_LFSR_SEED))
 
 
-def head_pad_bits(baud, seconds=HEAD_PAD_SECONDS):
-    n = math.ceil(seconds * baud)
-    anchor_n = math.ceil(HEAD_PAD_SECONDS * baud)
-    if n < 0 or n > anchor_n:
-        raise ValueError(
-            f"head duration must be between 0 and {HEAD_PAD_SECONDS:g} seconds")
-    if n == 0:
-        return []
-    # Every operational duration is a suffix of the protocol-fixed
-    # calibration head. The symbol touching sync therefore stays at the same
-    # PN phase when feedback changes the duration, so a receiver measuring
-    # with its earlier expectation still compares the correct symbols.
-    return list(_head_pad_anchor_bits(anchor_n)[-n:])
+def head_pad_bits(baud):
+    """Return the AFSK mode's fixed-duration native preamble."""
+    return list(_head_pad_anchor_bits(math.ceil(HEAD_SECONDS * baud)))
 
 
 def bytes_to_bits(data: bytes):
@@ -286,8 +276,7 @@ def bits_to_bytes(bits) -> bytes:
     return bytes(out)
 
 
-def build_frame_bits(payload: bytes, baud=300, *, include_head=True,
-                     head_seconds=HEAD_PAD_SECONDS):
+def build_frame_bits(payload: bytes, baud=300, *, include_head=True):
     if len(payload) > MAX_PAYLOAD_BYTES:
         raise ValueError(f"payload too long ({len(payload)} > {MAX_PAYLOAD_BYTES})")
     length = len(payload).to_bytes(LENGTH_FIELD_BITS // 8, "big")
@@ -296,14 +285,14 @@ def build_frame_bits(payload: bytes, baud=300, *, include_head=True,
     if len(payload) < AIR_HEADER_BYTES:
         checked = length + payload
         checked += crc16_ccitt_false(checked).to_bytes(2, "big")
-        return ((head_pad_bits(baud, head_seconds) if include_head else []) + sync_bits(baud)
+        return ((head_pad_bits(baud) if include_head else []) + sync_bits(baud)
                 + bytes_to_bits(checked))
     header, body = payload[:AIR_HEADER_BYTES], payload[AIR_HEADER_BYTES:]
     header_crc = crc16_ccitt_false(length + header).to_bytes(2, "big")
     checked = length + header + header_crc
     if body:
         checked += body + crc16_ccitt_false(body).to_bytes(2, "big")
-    return ((head_pad_bits(baud, head_seconds) if include_head else []) + sync_bits(baud)
+    return ((head_pad_bits(baud) if include_head else []) + sync_bits(baud)
             + bytes_to_bits(checked))
 
 

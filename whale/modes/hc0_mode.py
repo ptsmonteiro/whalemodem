@@ -1,7 +1,7 @@
 """HC0 adapter and its position below HC1W in the HF SSB ladder.
 
 HC0 carries the control plane and provides the robust data fallback. Its
-fixed-length frames use the common HF lead, length and CRC framing, and
+fixed-length frames use HC0's native fixed preamble, length and CRC framing, and
 terminated rate-1/2 convolutional coding.
 """
 
@@ -12,7 +12,7 @@ from dataclasses import dataclass, field
 import numpy as np
 
 from .. import framing
-from . import hc0, hf_lead
+from . import hc0
 
 #: On-air identifier; mode IDs identify one immutable waveform globally.
 HC0_MODE_ID = 5
@@ -31,37 +31,21 @@ class Hc0Codec:
     tx_sample_rate = hc0.SAMPLE_RATE
     rx_sample_rate = hc0.RX_SAMPLE_RATE
 
-    def encode(self, payload: bytes, mode: "Hc0Mode", *, include_head=True,
-               head_seconds=hc0.DEFAULT_HEAD_SECONDS) -> np.ndarray:
+    def encode(self, payload: bytes, mode: "Hc0Mode") -> np.ndarray:
         if len(payload) > hc0.MAX_PAYLOAD_BYTES:
             raise ValueError(
                 f"packet is {len(payload)} bytes; {mode.name} carries at most "
                 f"{hc0.MAX_PAYLOAD_BYTES}")
-        if not include_head:
-            head_seconds = hc0.DEFAULT_HEAD_SECONDS
-        body = hc0.modulate(bytes(payload))[hc0.lead_in_samples():]
-        return np.concatenate((hf_lead.modulate(hf_lead.HC0_LABEL,
-                                                head_seconds), body))
+        return hc0.modulate(bytes(payload))
 
-    def decode(self, audio, mode: "Hc0Mode", *,
-               head_seconds=hc0.DEFAULT_HEAD_SECONDS, **kwargs) -> dict:
-        result = hc0.demodulate(audio, head_seconds=head_seconds, **kwargs)
-        result.pop("head_blocks_received", None)
-        if (result.get("payload") is not None
-                and result.get("start_index") is not None):
-            observed, score = hf_lead.measure(
-                audio, result["start_index"], hf_lead.HC0_LABEL, head_seconds)
-            # The block count is the diagnostic; the seconds are what the
-            # link's head feedback and connect-time calibration read.
-            result["head_blocks_observed"] = observed
-            result["head_seconds_received"] = (
-                hf_lead.seconds_received(observed))
-            result["head_match"] = score
-        return result
+    def decode(self, audio, mode: "Hc0Mode", **kwargs) -> dict:
+        del mode, kwargs
+        return hc0.demodulate(audio)
 
     def airtime(self, payload_len: int, mode: "Hc0Mode") -> float:
         del payload_len  # an HC0 frame is the same length whatever it carries
-        return ((hf_lead.MIN_SAMPLES + hc0.TOTAL_SYMBOLS * hc0.SYMBOL_SAMPLES
+        return ((hc0.HEAD_SAMPLES
+                 + hc0.TOTAL_SYMBOLS * hc0.SYMBOL_SAMPLES
                  + hc0.TAIL_SAMPLES) / hc0.SAMPLE_RATE)
 
 
@@ -76,7 +60,6 @@ class Hc0Mode:
     mode_id: int = HC0_MODE_ID
     chunk_size: int = CHUNK_SIZE
     confidence_threshold: float = CONFIDENCE_THRESHOLD
-    lead_label: int = hf_lead.HC0_LABEL
     codec: Hc0Codec = field(default=HC0_CODEC, compare=False, repr=False)
 
     @property
@@ -92,15 +75,8 @@ class Hc0Mode:
         """HC0's symbol rate, 93.75 baud -- also its tone spacing."""
         return hc0.BANK.symbol_rate
 
-    @property
-    def head_match_allowance_seconds(self) -> float:
-        """One common HF lead block (64 ms), the measurement resolution."""
-        return hf_lead.BLOCK_SAMPLES / hc0.SAMPLE_RATE
-
-    def encode(self, payload: bytes, *, include_head=True,
-               head_seconds=hc0.DEFAULT_HEAD_SECONDS):
-        return self.codec.encode(payload, self, include_head=include_head,
-                                 head_seconds=head_seconds)
+    def encode(self, payload: bytes):
+        return self.codec.encode(payload, self)
 
     def decode(self, audio, **kwargs):
         return self.codec.decode(audio, self, **kwargs)

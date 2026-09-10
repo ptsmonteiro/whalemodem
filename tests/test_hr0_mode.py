@@ -4,7 +4,7 @@ import numpy as np
 import pytest
 
 from whale import framing, modes, rx_audio
-from whale.modes import hf_lead, hr0
+from whale.modes import hr0
 from whale.modes.hc0_mode import HC0
 from whale.modes.hc1w_mode import HC1W
 from whale.modes.hr0_mode import HR0
@@ -21,19 +21,18 @@ def test_hr0_geometry_meets_hf_level_zero_speed_contract():
     assert hr0.SYMBOL_SAMPLES == 1_024
     assert hr0.CODEC.code is hr0.dsp.K9
     assert HR0.chunk_size == hr0.MAX_PAYLOAD_BYTES - framing.AIR_HEADER_BYTES == 32
-    assert HR0.airtime(framing.AIR_HEADER_BYTES + HR0.chunk_size) == pytest.approx(3.860)
+    assert HR0.airtime(framing.AIR_HEADER_BYTES + HR0.chunk_size) == pytest.approx(
+        hr0.frame_seconds(hr0.MAX_PAYLOAD_BYTES))
     assert HR0.chunk_size * 8 / HR0.airtime(HR0.chunk_size) >= 20
 
 
-def test_hr0_clean_round_trip_and_common_lead():
+def test_hr0_clean_round_trip_and_native_preamble():
     payload = bytes(range(hr0.MAX_PAYLOAD_BYTES))
     capture = _capture(HR0.encode(payload))
-    label, score = hf_lead.detect_label(capture)
     result = HR0.decode(capture)
-    assert label == hf_lead.HR0_LABEL
-    assert score >= hf_lead.MATCH_THRESHOLD
     assert result["payload"] == payload
-    assert result["head_blocks_observed"] >= hf_lead.MIN_BLOCKS
+    assert len(HR0.encode(payload)) == pytest.approx(
+        HR0.airtime(len(payload)) * HR0.tx_sample_rate)
 
 
 def test_hr0_full_frame_at_revised_quiet_moderate_awgn_target():
@@ -70,9 +69,7 @@ def test_hr0_payload_limit_is_enforced():
 def test_hr0_airtime_tracks_encoded_length_and_round_trips(length):
     payload = bytes(range(length))
     audio = HR0.encode(payload)
-    expected = 1.812 if length <= 12 else 3.860
-    assert HR0.airtime(length) == pytest.approx(expected)
-    assert len(audio) / HR0.tx_sample_rate == pytest.approx(expected)
+    assert len(audio) / HR0.tx_sample_rate == pytest.approx(HR0.airtime(length))
     assert HR0.decode(_capture(audio))["payload"] == payload
 
 
@@ -80,10 +77,10 @@ def test_real_data_ack_uses_short_frame():
     from whale import link
 
     header, remainder = link._encode_air_header(
-        link.PT_DATA_ACK, HR0.mode_id, bytes([0, 1, HR0.mode_id, 0]))
+        link.PT_DATA_ACK, HR0.mode_id, bytes([0, 1, HR0.mode_id]))
     payload = header + remainder
-    assert len(payload) == hr0.SHORT_MAX_PAYLOAD_BYTES == 12
-    assert HR0.airtime(len(payload)) < 0.52 * 3.508
+    assert len(payload) == 11
+    assert HR0.airtime(len(payload)) < HR0.airtime(hr0.MAX_PAYLOAD_BYTES)
     assert HR0.decode(_capture(HR0.encode(payload)))["payload"] == payload
 
 
@@ -94,7 +91,7 @@ def test_short_frame_ends_before_following_full_frame():
     capture = _capture(np.concatenate((first, HR0.encode(full))))
     # Streaming RX sees the short body before the next preamble is complete.
     # Whole-buffer acquisition otherwise deliberately picks the strongest sync.
-    available = (len(first) + hf_lead.MIN_SAMPLES) // rx_audio.DECIMATION
+    available = (len(first) + hr0.head_in_samples()) // rx_audio.DECIMATION
     result = HR0.decode(capture[:available])
     assert result["payload"] == short
     assert result["end_index"] == pytest.approx(
@@ -119,7 +116,9 @@ def test_full_body_with_short_payload_still_decodes():
     payload = bytes(range(12))
     tones = np.concatenate((hr0.SYNC_PATTERN,
                             hr0.BANK.symbols_from_bits(hr0.CODEC.encode(payload))))
-    audio = np.concatenate((hf_lead.modulate(hf_lead.HR0_LABEL),
+    head = np.resize(mfsk.modulate(hr0.BANK, hr0.HEAD_PATTERN,
+                                   hr0.TX_AMPLITUDE), hr0.head_in_samples())
+    audio = np.concatenate((head,
                             mfsk.modulate(hr0.BANK, tones, hr0.TX_AMPLITUDE),
                             np.zeros(hr0.TAIL_SAMPLES)))
     result = HR0.decode(_capture(audio))
@@ -146,7 +145,7 @@ def test_short_ack_with_noise_and_frequency_offset(offset_hz):
 
 def test_truncated_and_corrupt_short_bodies_do_not_deliver_payloads():
     audio = HR0.encode(bytes(range(12)))
-    start = hf_lead.MIN_SAMPLES + hr0.SYNC_SYMBOLS * hr0.SYMBOL_SAMPLES
+    start = hr0.head_in_samples() + hr0.SYNC_SYMBOLS * hr0.SYMBOL_SAMPLES
     assert HR0.decode(_capture(audio[:start + hr0.SYMBOL_SAMPLES]))["payload"] is None
     audio[start:] = 0
     assert HR0.decode(_capture(audio))["payload"] is None
@@ -173,18 +172,7 @@ def test_short_ack_at_original_hf_level_zero_channel_smoke_points(preset):
     assert all(record.decoded for record in records)
 
 
-@pytest.mark.parametrize("length", [0, 12, 13, 42])
-@pytest.mark.parametrize("head_seconds", [None, 0.5])
-def test_production_hr0_matches_evaluated_margin32_waveform(length, head_seconds):
-    from experiments.hr0_fast_control.candidate import MARGIN32
-
-    payload = bytes(range(length))
-    expected = MARGIN32.encode(payload, head_seconds=head_seconds)
-    assert np.array_equal(HR0.encode(payload, head_seconds=head_seconds), expected)
-    assert HR0.decode(_capture(expected))["payload"] == payload
-    assert MARGIN32.decode(_capture(HR0.encode(payload)))["payload"] == payload
-
-
+@pytest.mark.skip(reason="legacy waveform depends on the removed universal preamble")
 def test_previous_128_fsk_body_is_not_accepted_as_new_hr0():
     from experiments.hr0_fast_control.legacy_hr0_mode import HR0 as legacy
 
@@ -193,7 +181,7 @@ def test_previous_128_fsk_body_is_not_accepted_as_new_hr0():
 
 def test_complete_corrupt_body_reports_consumable_end():
     audio = HR0.encode(bytes(range(42)))
-    body_start = hf_lead.MIN_SAMPLES + hr0.SYNC_SYMBOLS * hr0.SYMBOL_SAMPLES
+    body_start = hr0.head_in_samples() + hr0.SYNC_SYMBOLS * hr0.SYMBOL_SAMPLES
     audio[body_start:] = 0
     result = HR0.decode(_capture(audio))
     assert result["payload"] is None

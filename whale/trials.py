@@ -94,8 +94,7 @@ def common_decoder_metrics(result: Mapping[str, object], audio) -> dict:
         "fec_tail_ok",
         "rs_ok", "rs_corrected_bytes", "rs_block_corrections",
         "rs_max_block_corrections", "decoded_length",
-        "start_index", "end_index", "head_seconds_received",
-        "head_cores_observed", "head_blocks_observed",
+        "start_index", "end_index",
     )
     metrics = {key: result[key] for key in keys if key in result}
     samples = np.asarray(audio, dtype=np.float64)

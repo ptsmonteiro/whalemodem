@@ -80,7 +80,7 @@ def test_oversize_packet_is_rejected():
 def test_vf4_fixed_airtime_and_useful_rate_beats_vf3():
     from whale.modes.vf3_mode import VF3
 
-    assert VF4.airtime(framing.AIR_HEADER_BYTES) == pytest.approx(5.2)
+    assert VF4.airtime(framing.AIR_HEADER_BYTES) == pytest.approx(6.155)
     vf4_rate = VF4.chunk_size * 8 / VF4.airtime(VF4.chunk_size)
     vf3_rate = VF3.chunk_size * 8 / VF3.airtime(VF3.chunk_size)
     assert vf4_rate > 6_000

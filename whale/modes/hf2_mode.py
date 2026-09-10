@@ -31,7 +31,6 @@ import numpy as np
 from whale.phy import hf2
 
 from .. import framing
-from . import hf_lead
 
 #: On-air identifier; mode IDs identify one immutable waveform globally.
 HF2_MODE_ID = 7
@@ -50,41 +49,20 @@ class Hf2Codec:
     tx_sample_rate = hf2.SAMPLE_RATE
     rx_sample_rate = hf2.RX_SAMPLE_RATE
 
-    def encode(self, payload: bytes, mode: "Hf2Mode", *, include_head=True,
-               head_seconds=hf2.DEFAULT_HEAD_SECONDS) -> np.ndarray:
+    def encode(self, payload: bytes, mode: "Hf2Mode") -> np.ndarray:
         if len(payload) > hf2.MAX_PAYLOAD_BYTES:
             raise ValueError(
                 f"packet is {len(payload)} bytes; {mode.name} carries at most "
                 f"{hf2.MAX_PAYLOAD_BYTES}")
-        # include_head=False means "no adaptive guard", not "no lead-in":
-        # hf2.lead_in_samples floors at the minimum lead that ramps the
-        # transmitter and the sound card up, and there is nothing to gain by
-        # trying to go below it.
-        if not include_head:
-            head_seconds = hf2.DEFAULT_HEAD_SECONDS
-        body = hf2.modulate(bytes(payload))[hf2.lead_in_samples():]
-        return np.concatenate((hf_lead.modulate(hf_lead.HF2_LABEL,
-                                                head_seconds), body))
+        del mode
+        return hf2.modulate(bytes(payload))
 
-    def decode(self, audio, mode: "Hf2Mode", *,
-               head_seconds=hf2.DEFAULT_HEAD_SECONDS, **kwargs) -> dict:
-        result = hf2.demodulate(audio, head_seconds=head_seconds, **kwargs)
-        if (result.get("payload") is not None
-                and result.get("start_index") is not None):
-            observed, score = hf_lead.measure(
-                audio, result["start_index"], hf_lead.HF2_LABEL, head_seconds)
-            # The block count is the diagnostic; the seconds are what the
-            # link's head feedback reads.
-            result["head_blocks_observed"] = observed
-            result["head_seconds_received"] = (
-                hf_lead.seconds_received(observed))
-            result["head_match"] = score
-        return result
+    def decode(self, audio, mode: "Hf2Mode", **kwargs) -> dict:
+        return hf2.demodulate(audio, **kwargs)
 
     def airtime(self, payload_len: int, mode: "Hf2Mode") -> float:
         del payload_len  # an HF2 frame is the same length whatever it carries
-        return ((hf_lead.MIN_SAMPLES + hf2.TOTAL_SYMBOLS * hf2.SYMBOL_SAMPLES
-                 + hf2.TAIL_SAMPLES) / hf2.SAMPLE_RATE)
+        return hf2.frame_seconds()
 
 
 HF2_CODEC = Hf2Codec()
@@ -98,7 +76,6 @@ class Hf2Mode:
     mode_id: int = HF2_MODE_ID
     chunk_size: int = CHUNK_SIZE
     confidence_threshold: float = CONFIDENCE_THRESHOLD
-    lead_label: int = hf_lead.HF2_LABEL
     codec: Hf2Codec = field(default=HF2_CODEC, compare=False, repr=False)
 
     @property
@@ -114,15 +91,8 @@ class Hf2Mode:
         """HF2's OFDM symbol rate."""
         return hf2.SAMPLE_RATE / hf2.SYMBOL_SAMPLES
 
-    @property
-    def head_match_allowance_seconds(self) -> float:
-        """One common HF lead block, the measurement resolution."""
-        return hf_lead.BLOCK_SAMPLES / hf2.SAMPLE_RATE
-
-    def encode(self, payload: bytes, *, include_head=True,
-               head_seconds=hf2.DEFAULT_HEAD_SECONDS):
-        return self.codec.encode(payload, self, include_head=include_head,
-                                 head_seconds=head_seconds)
+    def encode(self, payload: bytes):
+        return self.codec.encode(payload, self)
 
     def decode(self, audio, **kwargs):
         return self.codec.decode(audio, self, **kwargs)

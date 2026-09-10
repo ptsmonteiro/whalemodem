@@ -117,7 +117,7 @@ may also call `register_backend()` directly.
 Binds directly to `libhamlib` via ctypes (`whale/hw/hamlib.py`) and keeps one
 `RIG*` handle open for the life of the backend, rather than shelling out to
 `rigctl` per PTT toggle -- a process spawn plus a fresh rig handshake on every
-key() is dead air this project's adaptive-timing goals are meant to remove.
+key() only adds avoidable dead air.
 
 **No separate hamlib install is needed.** Prebuilt libhamlib (+ libusb)
 binaries are vendored under `whale/hw/_vendor/hamlib/` for macOS
