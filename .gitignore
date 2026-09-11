@@ -1,4 +1,5 @@
 __pycache__/
+/radios.toml
 .pytest_cache/
 .tmp_pytest*/
 *.pyc

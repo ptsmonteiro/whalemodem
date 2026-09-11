@@ -9,7 +9,6 @@ try:
 except ModuleNotFoundError:  # pragma: no cover - compatibility for dev Python 3.10
     import tomli as tomllib
 from typing import Any, Mapping
-from . import ptt
 from .ptt_backends import PttCapabilities, available_backends, open_backend
 
 @dataclass(frozen=True)
@@ -74,17 +73,14 @@ def load_radios(path: str | os.PathLike[str]) -> RadioInventory:
         default = next(iter(radios))
     return RadioInventory(radios, default)
 
-# Compatibility inventory for the original bench. Installations should use
-# an external file selected by --radio-config or WHALE_RADIO_CONFIG.
-RADIOS = {
-    "ic705": Radio("ic705", "IC-705 (VHF), CI-V PTT", "IC-705", "IC-705", "icom-civ", {"usb_id": "0C26:0036", "radio_name": "IC-705", "address": ptt.IC705_DEFAULT_ADDR}),
-    "ic7300": Radio("ic7300", "IC-7300 (HF), CI-V PTT", "IC-7300", "IC-7300", "icom-civ", {"usb_id": "10C4:EA60", "radio_name": "IC-7300", "address": ptt.IC7300_DEFAULT_ADDR}),
-    "ht": Radio("ht", "HT via serial-interface RTS", "USB Audio Device", "USB Audio Device", "serial-line", {"port": "COM5", "line": "rts"}),
-}
+# Default inventory file, used when neither --radio-config nor
+# WHALE_RADIO_CONFIG names one -- same default as whale-configure, so
+# pointing both at a bare `radios.toml` in the current directory agrees.
+DEFAULT_RADIO_CONFIG = "radios.toml"
 
 def radio_inventory(path: str | os.PathLike[str] | None = None) -> RadioInventory:
-    configured = path or os.environ.get("WHALE_RADIO_CONFIG")
-    return load_radios(configured) if configured else RadioInventory(dict(RADIOS), default=None)
+    configured = path or os.environ.get("WHALE_RADIO_CONFIG") or DEFAULT_RADIO_CONFIG
+    return load_radios(configured)
 
 def get_radio(name: str | None, path: str | os.PathLike[str] | None = None) -> Radio:
     """Look up ``name`` in the selected inventory; ``None`` resolves to its default radio."""

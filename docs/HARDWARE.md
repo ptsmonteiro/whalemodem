@@ -22,8 +22,10 @@ ptt.address = 0xA4
 ```
 
 The server's `--radio` value is the inventory key (`station-a` above), not an
-audio-device name. When no inventory is selected, the legacy `ic705`,
-`ic7300`, and `ht` definitions remain available for the original bench.
+audio-device name. When no inventory is selected, `--radio-config` and
+`WHALE_RADIO_CONFIG` both default to `radios.toml` in the current directory;
+the repo root's `radios.toml` holds the original bench's `ic705`, `ic7300`,
+and `ht` definitions.
 
 An optional top-level `default_radio = "station-a"` key, placed before any
 `[radios.*]` table, names the radio to use when none is given explicitly. A

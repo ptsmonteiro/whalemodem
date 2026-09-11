@@ -1,5 +1,7 @@
-# Copy this file anywhere, edit it, and pass --radio-config PATH. The legacy
-# ic705/ic7300/ht names remain available when no inventory is selected.
+# Copy this file anywhere, edit it, and pass --radio-config PATH (or set
+# WHALE_RADIO_CONFIG). With neither, radios.toml in the current directory is
+# used -- see the repo root's radios.toml for the original bench's
+# ic705/ic7300/ht inventory.
 
 # Optional: the radio used when --radio is omitted. Must name one of the
 # [radios.*] tables below, and must come before any table header. A file
