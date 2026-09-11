@@ -31,7 +31,7 @@ from whale.modes.hf7_mode import HF7
 from whale.modes.hf8_mode import HF8
 from whale.modes.hr0_mode import HR0
 from whale.modes.vf3_mode import VF3
-from whale.policy import HF_SSB, VHF_FM
+from whale.policy import HF, FM
 
 
 def _run_session(*args, **kwargs):
@@ -205,10 +205,10 @@ def test_vf3_carries_a_session_through_the_same_stack():
 
 
 def test_the_hf_channel_carries_a_session_with_hr0_in_control():
-    """The HF station, whole: HF_SSB's policy, HF_SSB's ladder, live on air.
+    """The HF station, whole: HF's policy, HF's ladder, live on air.
 
     This is the software half of the HF acceptance test -- everything
-    `scripts/run_acceptance_test.py --channel hf-ssb` does except the
+    `scripts/run_acceptance_test.py --channel hf` does except the
     radios.  It matters more than the VF3 session does, because HR0 is the
     *control* mode: the connect handshake, the timing calibration, every
     ACK, the floor handover and the disconnect all ride a waveform that
@@ -217,17 +217,17 @@ def test_the_hf_channel_carries_a_session_with_hr0_in_control():
     fallback, maximum coverage" role in SPEED_LADDERS.md.
 
     Nothing is passed but the policy.  The ladder comes from
-    `HF_SSB.mode_ladder`, which is the pairing whale/policy.py exists to
+    `HF.mode_ladder`, which is the pairing whale/policy.py exists to
     keep from drifting apart. The exact set of registered modes below
     tracks `whale.mode_qualification.MANIFEST`'s current Default entries
-    for the hf-ssb policy and is expected to grow as more modes are
+    for the hf policy and is expected to grow as more modes are
     promoted; the fixed invariant this test protects is that HR0 remains
     control and the ladder actually climbs off it, not the specific
     membership of the faster rungs.
     """
     payload_ab = _payload(600, 7, 11)
     payload_ba = _payload(600, 13, 5)
-    link_a, link_b, ta, tb = _run_session(payload_ab, payload_ba, policy=HF_SSB)
+    link_a, link_b, ta, tb = _run_session(payload_ab, payload_ba, policy=HF)
 
     # HR0 is the control mode, so the handshake, the calibration exchange,
     # every ACK and the disconnect all rode the 32-FSK control waveform.

@@ -65,6 +65,7 @@ import socket
 import threading
 
 from whale import policy
+from whale.hw.radios import get_radio
 from whale.service import ModemService
 
 logger = logging.getLogger(__name__)
@@ -434,7 +435,7 @@ def main():
     ap.add_argument("--cmd-port", type=int, default=8300)
     ap.add_argument("--data-port", type=int, default=8301)
     ap.add_argument("--host", default="127.0.0.1")
-    ap.add_argument("--channel", default="vhf-fm", choices=sorted(policy.CHANNELS),
+    ap.add_argument("--channel", default="fm", choices=sorted(policy.CHANNELS),
                     help="which channel this station is on: its timeouts, its "
                          "retry budget and the waveforms it offers "
                          "(see whale/policy.py)")
@@ -448,6 +449,10 @@ def main():
                          format="%(asctime)s %(levelname)s %(name)s: %(message)s")
 
     channel = policy.by_name(args.channel)
+    radio = get_radio(args.radio, args.radio_config)
+    if args.channel not in radio.channels:
+        ap.error(f"radio {args.radio!r} is not configured for channel {args.channel!r} "
+                 f"(radio channels: {sorted(radio.channels)})")
     from whale.mode_qualification import registry
     mode_registry = registry(args.channel, args.mode_level,
                              channel.max_useful_frame_seconds)

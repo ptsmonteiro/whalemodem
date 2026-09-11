@@ -784,7 +784,7 @@ def test_seq_ahead_wraps():
 
 def test_await_turnaround_applies_the_channel_policy(monkeypatch):
     """HF waits after a decoded frame; VHF's zero-delay policy does not."""
-    from whale.policy import HF_SSB
+    from whale.policy import HF
 
     a = link.Link(_FakeTransport(), "STA1")
     sleeps = []
@@ -796,7 +796,7 @@ def test_await_turnaround_applies_the_channel_policy(monkeypatch):
     assert sleeps == []
     assert a._peer_unkeyed_at is None
 
-    a.policy = HF_SSB
+    a.policy = HF
     a._peer_unkeyed_at = 99.9
     a._await_turnaround()
     assert abs(sleeps.pop() - 0.2) < 1e-9

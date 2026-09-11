@@ -71,10 +71,10 @@ def main(argv=None):
         ap.error("--trials must be positive and --bytes non-negative")
     if args.reverse_points and len(args.reverse_points) != len(args.points):
         ap.error("--reverse-points must have the same length as --points")
-    if args.model == "watterson" and args.policy != "hf-ssb":
-        ap.error("the Watterson benchmark requires --policy hf-ssb")
-    if args.model == "fm" and args.policy != "vhf-fm":
-        ap.error("the FM benchmark requires --policy vhf-fm")
+    if args.model == "watterson" and args.policy != "hf":
+        ap.error("the Watterson benchmark requires --policy hf")
+    if args.model == "fm" and args.policy != "fm":
+        ap.error("the FM benchmark requires --policy fm")
 
     selected_policy = policy.by_name(args.policy)
     records = []

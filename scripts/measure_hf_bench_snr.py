@@ -104,7 +104,7 @@ def main(argv=None) -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--out", type=Path,
                         default=ROOT / "logs" / "mode_qualification" /
-                        "hf-ssb" / "bench-snr-20260908.json")
+                        "hf" / "bench-snr-20260908.json")
     args = parser.parse_args(argv)
 
     signal = calibration_signal()

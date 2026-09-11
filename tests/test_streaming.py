@@ -121,14 +121,15 @@ def test_ring_wrap_discard_and_discontinuity():
     assert np.array_equal(ring.read(), np.arange(20, 30))
 
 
-@pytest.mark.parametrize("generation,start", [(1, 14000), (0, 15000)])
-def test_reset_or_missing_samples_abandons_pending_frame(generation, start):
+@pytest.mark.parametrize("generation,gap", [(1, 0), (0, 1000)])
+def test_reset_or_missing_samples_abandons_pending_frame(generation, gap):
     payload, audio = capture(HF9)
     stream = ReceiveStream(120000)
-    stream.append(0, 0, audio[:14000])
+    cut = len(audio) // 2
+    stream.append(0, 0, audio[:cut])
     assert stream.decode(HF9).get("payload") is None
     old = stream.receivers[HF9.name]
-    stream.append(generation, start, audio[14000:])
+    stream.append(generation, cut + gap, audio[cut:])
     assert stream.decode(HF9).get("payload") is None
     assert stream.receivers[HF9.name] is not old
     end = stream.audio.end
@@ -144,7 +145,7 @@ def transport():
     radio._decimator_lock = threading.Lock()
     radio._rx_decimator = rx_audio.ReceiveDecimator()
     radio._rx_overflows = 0
-    radio.radio = SimpleNamespace(name="test")
+    radio.radio = SimpleNamespace(id="test")
     return radio
 
 

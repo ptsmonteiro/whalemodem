@@ -98,11 +98,63 @@ def test_toml_radio_inventory(tmp_path: Path):
 [radios.field]
 audio.input = "Codec"
 audio.output = "Codec"
+channels = ["fm"]
 ptt.backend = "vox"
 ''')
     radio = radios.get_radio("field", path)
     assert radio.ptt_backend == "vox"
+    assert radio.channels == frozenset({"fm"})
     assert radio.ptt().key(True)
+
+
+def test_radio_channels_may_be_both_fm_and_hf(tmp_path: Path):
+    path = tmp_path / "radios.toml"
+    path.write_text('''
+[radios.field]
+audio.input = "Codec"
+audio.output = "Codec"
+channels = ["fm", "hf"]
+ptt.backend = "vox"
+''')
+    assert radios.get_radio("field", path).channels == frozenset({"fm", "hf"})
+
+
+def test_radio_missing_channels_raises(tmp_path: Path):
+    path = tmp_path / "radios.toml"
+    path.write_text('''
+[radios.field]
+audio.input = "Codec"
+audio.output = "Codec"
+ptt.backend = "vox"
+''')
+    with pytest.raises(ValueError, match="channels"):
+        radios.load_radios(path)
+
+
+def test_radio_empty_channels_raises(tmp_path: Path):
+    path = tmp_path / "radios.toml"
+    path.write_text('''
+[radios.field]
+audio.input = "Codec"
+audio.output = "Codec"
+channels = []
+ptt.backend = "vox"
+''')
+    with pytest.raises(ValueError, match="channels"):
+        radios.load_radios(path)
+
+
+def test_radio_invalid_channel_raises(tmp_path: Path):
+    path = tmp_path / "radios.toml"
+    path.write_text('''
+[radios.field]
+audio.input = "Codec"
+audio.output = "Codec"
+channels = ["uhf"]
+ptt.backend = "vox"
+''')
+    with pytest.raises(ValueError, match="channels"):
+        radios.load_radios(path)
 
 
 def test_single_radio_file_defaults_implicitly(tmp_path: Path):
@@ -112,11 +164,12 @@ def test_single_radio_file_defaults_implicitly(tmp_path: Path):
 [radios.field]
 audio.input = "Codec"
 audio.output = "Codec"
+channels = ["fm"]
 ptt.backend = "vox"
 ''')
     inventory = radios.load_radios(path)
     assert inventory.default == "field"
-    assert radios.get_radio(None, path).name == "field"
+    assert radios.get_radio(None, path).id == "field"
 
 
 def test_default_radio_resolves(tmp_path: Path):
@@ -127,18 +180,20 @@ default_radio = "b"
 [radios.a]
 audio.input = "Codec A"
 audio.output = "Codec A"
+channels = ["fm"]
 ptt.backend = "vox"
 
 [radios.b]
 audio.input = "Codec B"
 audio.output = "Codec B"
+channels = ["fm"]
 ptt.backend = "vox"
 ''')
     inventory = radios.load_radios(path)
     assert inventory.default == "b"
-    assert radios.get_radio(None, path).name == "b"
+    assert radios.get_radio(None, path).id == "b"
     # explicit names are unaffected by the default
-    assert radios.get_radio("a", path).name == "a"
+    assert radios.get_radio("a", path).id == "a"
 
 
 def test_unknown_default_radio_raises(tmp_path: Path):
@@ -149,6 +204,7 @@ default_radio = "nope"
 [radios.a]
 audio.input = "Codec A"
 audio.output = "Codec A"
+channels = ["fm"]
 ptt.backend = "vox"
 ''')
     with pytest.raises(ValueError):
@@ -161,11 +217,13 @@ def test_no_default_among_multiple_radios_raises_on_none(tmp_path: Path):
 [radios.a]
 audio.input = "Codec A"
 audio.output = "Codec A"
+channels = ["fm"]
 ptt.backend = "vox"
 
 [radios.b]
 audio.input = "Codec B"
 audio.output = "Codec B"
+channels = ["fm"]
 ptt.backend = "vox"
 ''')
     inventory = radios.load_radios(path)
@@ -180,14 +238,17 @@ def test_save_and_load_round_trips_multi_radio_inventory(tmp_path: Path):
         {
             "shack-icom": radios.Radio(
                 "shack-icom", "Icom controlled over CI-V", "IC-705", "IC-705", "icom-civ",
-                {"usb_id": "0C26:0036", "radio_name": "IC-705", "address": 0xA4},
+                frozenset({"fm", "hf"}),
+                {"usb_id": "0C26:0036", "address": 0xA4},
             ),
             "rigctl": radios.Radio(
                 "rigctl", "rigctl", "USB Audio CODEC", "USB Audio CODEC", "hamlib",
+                frozenset({"hf"}),
                 {"model": 3073, "device": "/dev/ttyUSB0", "baud": 115200},
             ),
             "digirig": radios.Radio(
                 "digirig", "digirig", "USB Audio Device", "USB Audio Device", "serial-line",
+                frozenset({"fm"}),
                 {"port": "/dev/ttyUSB0", "line": "rts", "active_high": False, "timeout": 0.5},
             ),
         },
@@ -201,7 +262,8 @@ def test_save_and_load_round_trips_multi_radio_inventory(tmp_path: Path):
 def test_save_radios_quotes_non_bare_keys(tmp_path: Path):
     path = tmp_path / "radios.toml"
     original = radios.RadioInventory(
-        {"my radio": radios.Radio("my radio", "has a space", "Codec", "Codec", "vox", {})},
+        {"my radio": radios.Radio("my radio", "has a space", "Codec", "Codec", "vox",
+                                  frozenset({"fm"}), {})},
         default="my radio",
     )
     radios.save_radios(path, original)

@@ -67,7 +67,8 @@ def test_navigation_up_down_through_backend_specific_rows():
     assert view.ptt_backend == "serial-line"
     rows = view._rows()
     keys = [r.key for r in rows]
-    assert keys == ["name", "description", "audio_input_name", "audio_output_name", "ptt_backend",
+    assert keys == ["name", "description", "audio_input_name", "audio_output_name",
+                     "channel_fm", "channel_hf", "ptt_backend",
                      "port", "line", "baud", "active_high", "save", "cancel"]
 
     view.selected = 0
@@ -130,7 +131,7 @@ def test_adding_fresh_seeds_blank_description_from_name():
 
 
 def test_editing_existing_radio_name_does_not_overwrite_existing_description():
-    radio = Radio("old", "My IC-705", "IC-705", "IC-705", "vox", {})
+    radio = Radio("old", "My IC-705", "IC-705", "IC-705", "vox", frozenset({"fm"}), {})
     view = _new_view(existing=("old", radio))
     _select_row(view, "name")
     _enter(view)
@@ -147,8 +148,8 @@ def test_backend_cycling_changes_visible_rows():
     view = _new_view()
     assert view.ptt_backend == "vox"
     assert [r.key for r in view._rows() if r.key not in ("name", "description", "audio_input_name",
-                                                           "audio_output_name", "ptt_backend",
-                                                           "save", "cancel")] == []
+                                                           "audio_output_name", "channel_fm", "channel_hf",
+                                                           "ptt_backend", "save", "cancel")] == []
 
     _select_row(view, "ptt_backend")
     _enter(view)
@@ -192,6 +193,29 @@ def test_selector_and_bool_rows_toggle():
     assert view.backend_config["serial-line"]["active_high"] is True
     _enter(view)
     assert view.backend_config["serial-line"]["active_high"] is False
+
+
+def test_channel_rows_default_fm_only_and_toggle_independently():
+    view = _new_view()
+    assert view.channel_fm is True
+    assert view.channel_hf is False
+
+    _select_row(view, "channel_hf")
+    _enter(view)
+    assert view.channel_hf is True
+    assert view.channel_fm is True  # unrelated toggle untouched
+
+    _select_row(view, "channel_fm")
+    view.handle_key(ord(" "))
+    assert view.channel_fm is False
+    assert view.channel_hf is True
+
+
+def test_editing_existing_radio_seeds_channel_toggles_from_its_channels():
+    radio = Radio("ic7300", "IC-7300", "IC-7300", "IC-7300", "vox", frozenset({"hf"}), {})
+    view = _new_view(existing=("ic7300", radio))
+    assert view.channel_fm is False
+    assert view.channel_hf is True
 
 
 # -- validation failures --
@@ -247,6 +271,19 @@ def test_save_fails_on_name_collision_with_other_names():
     assert result is NOTHING
     assert "taken" in view.status
     assert "already exists" in view.status
+
+
+def test_save_fails_when_no_channel_is_selected():
+    view = _new_view()
+    _fill_text(view, "name", "ht")
+    _fill_text(view, "description", "desc")
+    _fill_audio(view, "Card")
+    _select_row(view, "channel_fm")
+    _enter(view)  # turn the default-on fm toggle off, leaving neither channel on
+    _select_row(view, "save")
+    result = _enter(view)
+    assert result is NOTHING
+    assert "channel" in view.status.lower()
 
 
 def test_save_fails_on_missing_serial_line_port():
@@ -342,7 +379,8 @@ def test_full_valid_save_vox():
     assert result is POP
     assert captured["old_name"] is None
     assert captured["new_name"] == "handheld"
-    assert captured["radio"] == Radio("handheld", "Handheld VOX radio", "USB Audio", "USB Audio", "vox", {})
+    assert captured["radio"] == Radio("handheld", "Handheld VOX radio", "USB Audio", "USB Audio", "vox",
+                                      frozenset({"fm"}), {})
 
 
 def test_full_valid_save_icom_civ_hex_address():
@@ -357,7 +395,6 @@ def test_full_valid_save_icom_civ_hex_address():
     _fill_audio(view, "IC-705")
     _goto_backend(view, "icom-civ")
     _fill_text(view, "usb_id", "0C26:0036")
-    _fill_text(view, "radio_name", "IC-705")
     _fill_text(view, "address", "0xA4")
     _select_row(view, "save")
     result = _enter(view)
@@ -367,8 +404,8 @@ def test_full_valid_save_icom_civ_hex_address():
     assert old_name is None
     assert new_name == "ic705"
     assert radio == Radio(
-        "ic705", "IC-705", "IC-705", "IC-705", "icom-civ",
-        {"usb_id": "0C26:0036", "radio_name": "IC-705", "address": 164},
+        "ic705", "IC-705", "IC-705", "IC-705", "icom-civ", frozenset({"fm"}),
+        {"usb_id": "0C26:0036", "address": 164},
     )
     assert isinstance(radio.ptt_config["address"], int)
 
@@ -433,13 +470,13 @@ def test_esc_pops_without_calling_on_done():
 # -- RadioListView._apply_edit --
 
 def _list_view(names, default=None, selected=0):
-    radios = {name: Radio(name, "d", "Card", "Card", "vox", {}) for name in names}
+    radios = {name: Radio(name, "d", "Card", "Card", "vox", frozenset({"fm"}), {}) for name in names}
     return RadioListView(path="unused.toml", radios=radios, default=default, selected=selected)
 
 
 def test_apply_edit_add_inserts_under_new_name():
     view = _list_view(["a"])
-    new_radio = Radio("b", "desc", "Card", "Card", "vox", {})
+    new_radio = Radio("b", "desc", "Card", "Card", "vox", frozenset({"fm"}), {})
     view._apply_edit(None, "b", new_radio)
     assert view.radios["b"] == new_radio
     assert view.radios.keys() == {"a", "b"}
@@ -448,7 +485,7 @@ def test_apply_edit_add_inserts_under_new_name():
 
 def test_apply_edit_edit_without_rename_replaces_in_place():
     view = _list_view(["a", "b"], default="a")
-    updated = Radio("a", "new desc", "Card2", "Card2", "vox", {})
+    updated = Radio("a", "new desc", "Card2", "Card2", "vox", frozenset({"fm"}), {})
     view._apply_edit("a", "a", updated)
     assert view.radios["a"] == updated
     assert view.radios.keys() == {"a", "b"}
@@ -457,7 +494,7 @@ def test_apply_edit_edit_without_rename_replaces_in_place():
 
 def test_apply_edit_edit_with_rename_moves_entry():
     view = _list_view(["a", "b"], default="b")
-    updated = Radio("renamed", "desc", "Card", "Card", "vox", {})
+    updated = Radio("renamed", "desc", "Card", "Card", "vox", frozenset({"fm"}), {})
     view._apply_edit("a", "renamed", updated)
     assert view.radios.keys() == {"renamed", "b"}
     assert "a" not in view.radios
@@ -466,7 +503,7 @@ def test_apply_edit_edit_with_rename_moves_entry():
 
 def test_apply_edit_rename_of_current_default_carries_default_along():
     view = _list_view(["a", "b"], default="a")
-    updated = Radio("renamed", "desc", "Card", "Card", "vox", {})
+    updated = Radio("renamed", "desc", "Card", "Card", "vox", frozenset({"fm"}), {})
     view._apply_edit("a", "renamed", updated)
     assert view.radios.keys() == {"renamed", "b"}
     assert view.default == "renamed"  # must not dangle

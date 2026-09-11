@@ -135,7 +135,7 @@ def main():
         for radio, call, cmd_port, data_port in stations:
             cmd = [sys.executable, "-m", "whale.vara_server", "--radio", radio,
                    "--mycall", call, "--cmd-port", str(cmd_port),
-                   "--data-port", str(data_port), "--channel", "hf-ssb", "--verbose"]
+                   "--data-port", str(data_port), "--channel", "hf", "--verbose"]
             if args.radio_config:
                 cmd += ["--radio-config", args.radio_config]
             print(f"launching station {call}: {' '.join(cmd)}", file=sys.stderr)

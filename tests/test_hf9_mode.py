@@ -76,10 +76,10 @@ def test_hf9_frequency_hint_uses_the_local_search_window(monkeypatch):
 
 
 def test_hf9_is_experimental_and_rate_ordered_below_hc1w():
-    assert (qualification_level("hf-ssb", HF9.mode_id)
+    assert (qualification_level("hf", HF9.mode_id)
             is QualificationLevel.EXPERIMENTAL)
-    assert HF9.mode_id not in registry("hf-ssb", "default").supported_ids
-    experimental = registry("hf-ssb", "experimental")
+    assert HF9.mode_id not in registry("hf", "default").supported_ids
+    experimental = registry("hf", "experimental")
     names = [mode.name for mode in experimental.modes]
     assert names.index("hc0") < names.index("hf9") < names.index("hc1w")
 

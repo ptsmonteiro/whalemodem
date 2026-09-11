@@ -23,7 +23,7 @@ from scipy.signal import hilbert
 
 from whale import dsp
 from whale.channel import SnrKind, SnrSpec
-from whale.scenario import HfSsbScenario
+from whale.scenario import HfScenario
 
 
 FS = 48_000
@@ -128,7 +128,7 @@ def screen(snr_db: float, trials: int) -> None:
         score = 0
         failures: dict[str, int] = {}
         for trial in range(trials):
-            channel = HfSsbScenario.from_preset(
+            channel = HfScenario.from_preset(
                 preset, sample_rate=FS,
                 snr=SnrSpec(snr_db, SnrKind.WAVEFORM,
                             reference_start=0, reference_stop=len(waveform.audio)),

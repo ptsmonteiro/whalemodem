@@ -5,10 +5,10 @@ unbounded by CI runtime expectations. Increase --trials until the confidence
 interval is useful, retain result.json, and quote every channel parameter.
 
 Examples:
-    python scripts/benchmark_simulated_channels.py --model fm --policy vhf-fm \
+    python scripts/benchmark_simulated_channels.py --model fm --policy fm \
         --points 5 10 15 20 25 30 --trials 100
     python scripts/benchmark_simulated_channels.py --model watterson \
-        --policy hf-ssb --watterson-preset mid_latitude_moderate \
+        --policy hf --watterson-preset mid_latitude_moderate \
         --points 4 9 14 19 24 --trials 100
 """
 
@@ -185,10 +185,10 @@ def main(argv=None):
     if args.workers is not None and args.workers < 1:
         ap.error("--workers must be positive")
     workers = available_cpu_count() if args.workers is None else args.workers
-    if args.model == "watterson" and args.policy != "hf-ssb":
-        ap.error("the Watterson benchmark requires --policy hf-ssb")
-    if args.model == "fm" and args.policy != "vhf-fm":
-        ap.error("the FM benchmark requires --policy vhf-fm")
+    if args.model == "watterson" and args.policy != "hf":
+        ap.error("the Watterson benchmark requires --policy hf")
+    if args.model == "fm" and args.policy != "fm":
+        ap.error("the FM benchmark requires --policy fm")
     selected_policy = policy.by_name(args.policy)
     registry = mode_qualification.registry(
         args.policy, args.mode_level, selected_policy.max_useful_frame_seconds)

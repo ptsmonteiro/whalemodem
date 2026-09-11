@@ -23,13 +23,13 @@ description of the present implementation and not a compatibility promise.
 
 A station is started on a *channel*, which is a `whale.policy.ChannelPolicy`:
 one set of timeouts, retry budgets and keying limits, plus the mode ladder
-that suits the path. `vhf-fm` is the two-FM-handhelds bench this modem was
-built and measured against; `hf-ssb` is HF single sideband, which offers mode
+that suits the path. `fm` is the two-FM-handhelds bench this modem was
+built and measured against; `hf` is HF single sideband, which offers mode
 10 (HR0) as its control mode, with modes 5 (HC0) and 16 (HC1W) above it. Nothing about a channel is negotiated or goes on air -- two
 stations running different policies interoperate, and negotiation over the
 advertised mode IDs does the rest. Select one with
-`python -m whale.vara_server --channel hf-ssb` or
-`scripts/run_acceptance_test.py --channel hf-ssb`.
+`python -m whale.vara_server --channel hf` or
+`scripts/run_acceptance_test.py --channel hf`.
 
 The HF policy's timeouts and retry budget are reasoned placeholders, not
 measurements -- `whale/policy.py` says so field by field. Its waveforms are
@@ -115,8 +115,8 @@ CONNECT_ACK v5 Content is:
 | Listener transmit mode | 1 byte | Mode selected for listener-to-caller traffic |
 
 Mode count may be zero only if both selected/proposed mode fields name the
-listener's control mode, which is always a valid fallback -- mode 0 on the VHF
-FM ladder, mode 5 on the HF SSB one. Callsigns are compared according to the
+listener's control mode, which is always a valid fallback -- mode 0 on the FM
+ladder, mode 5 on the HF one. Callsigns are compared according to the
 existing link addressing policy after their encoding has been validated.
 The limits above bound all variable fields before allocation.
 
@@ -193,10 +193,10 @@ Each endpoint adapts only its own transmit direction from ARQ outcomes:
 - Three unanswered attempts change one step down before retrying the same chunk.
 - Three consecutive first-attempt chunks change one step up before the next chunk.
 - Steps follow registry order and are limited to modes the peer advertised.
-  The default VHF FM ladder is 0, 1, 2 with mode 3 (VF3) appended above them;
+  The default FM ladder is 0, 1, 2 with mode 3 (VF3) appended above them;
   the explicit experimental registry also appends mode 6 (VF6) as its fastest
   current experimental mode (see
-  `whale/modes/`. The HF SSB
+  `whale/modes/`. The HF
   ladder is mode 10 (HR0, the control mode), then mode 5 (HC0) and mode 16
   (HC1W).
 
@@ -388,7 +388,7 @@ is an implementation detail and must not be used for application framing.
   isn't handed the policy object at all, so there is no channel-derived
   value to use instead without adding that plumbing. A real bandwidth is
   only ever reported when the client sets it explicitly.
-- The HF SSB policy sets `require_clear_channel`, and nothing enforces it:
-  there is no busy-channel detector in this codebase. A station on `hf-ssb`
+- The HF policy sets `require_clear_channel`, and nothing enforces it:
+  there is no busy-channel detector in this codebase. A station on `hf`
   transmits without listening first, which is fine on a bench pair and is not
   fine on a shared band.

@@ -1,4 +1,4 @@
-"""HC1W: 23-carrier differential-QPSK OFDM for HF SSB.
+"""HC1W: 23-carrier differential-QPSK OFDM for HF.
 
 The 468.75-2531.25 Hz carrier plan uses 93.75 Hz spacing, a 2.67 ms cyclic
 prefix, a 5.895 s frame, and terminated rate-1/2 K=9 coding.

@@ -108,7 +108,7 @@ def test_hf7_native_preamble_is_fixed_and_part_of_the_waveform():
 
 
 def test_hf7_is_the_top_rung_of_the_default_hf_ladder():
-    modes = registry("hf-ssb", "default").modes
+    modes = registry("hf", "default").modes
     assert HF7.mode_id in {mode.mode_id for mode in modes}
     rates = [8 * mode.chunk_size / mode.airtime(mode.chunk_size) for mode in modes]
     hf7_rate = 8 * HF7.chunk_size / HF7.airtime(HF7.chunk_size)

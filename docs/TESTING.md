@@ -46,7 +46,7 @@ python -m pytest -m channel_regression -q
 For explicit Monte Carlo measurements:
 
 ```console
-python scripts/benchmark_simulated_channels.py --model fm --policy vhf-fm \
+python scripts/benchmark_simulated_channels.py --model fm --policy fm \
   --points 5 10 15 20 25 30 --trials 100
 ```
 

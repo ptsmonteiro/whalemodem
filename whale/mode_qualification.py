@@ -42,19 +42,19 @@ class QualificationEntry:
 # explicitly provisional in MODE_QUALIFICATION.md; the manifest describes
 # product availability, not a claim that every evidence gate has passed.
 MANIFEST = (
-    QualificationEntry("vhf-fm", 0, QualificationLevel.DEFAULT),
-    QualificationEntry("vhf-fm", 1, QualificationLevel.DEFAULT),
-    QualificationEntry("vhf-fm", 2, QualificationLevel.DEFAULT),
-    QualificationEntry("vhf-fm", 3, QualificationLevel.DEFAULT),
-    QualificationEntry("vhf-fm", 8, QualificationLevel.EXPERIMENTAL),
-    QualificationEntry("vhf-fm", 6, QualificationLevel.EXPERIMENTAL),
-    QualificationEntry("hf-ssb", 5, QualificationLevel.DEFAULT),
+    QualificationEntry("fm", 0, QualificationLevel.DEFAULT),
+    QualificationEntry("fm", 1, QualificationLevel.DEFAULT),
+    QualificationEntry("fm", 2, QualificationLevel.DEFAULT),
+    QualificationEntry("fm", 3, QualificationLevel.DEFAULT),
+    QualificationEntry("fm", 8, QualificationLevel.EXPERIMENTAL),
+    QualificationEntry("fm", 6, QualificationLevel.EXPERIMENTAL),
+    QualificationEntry("hf", 5, QualificationLevel.DEFAULT),
     # Owner approved the 32-FSK HR0 replacement on 2026-09-06 despite its
     # unproven 3 dB measured margin; Default is availability, not qualification.
-    QualificationEntry("hf-ssb", 10, QualificationLevel.DEFAULT),
-    QualificationEntry("hf-ssb", 7, QualificationLevel.EXPERIMENTAL),
-    QualificationEntry("hf-ssb", 12, QualificationLevel.EXPERIMENTAL),
-    QualificationEntry("hf-ssb", 13, QualificationLevel.EXPERIMENTAL),
+    QualificationEntry("hf", 10, QualificationLevel.DEFAULT),
+    QualificationEntry("hf", 7, QualificationLevel.EXPERIMENTAL),
+    QualificationEntry("hf", 12, QualificationLevel.EXPERIMENTAL),
+    QualificationEntry("hf", 13, QualificationLevel.EXPERIMENTAL),
     # HF7 is the maximum-speed HF data rung, installed as DEFAULT on
     # 2026-09-07 by owner decision on the evidence in
     # experiments/hf18_ofdm49_vara/RESULTS.md (100 trials per arm,
@@ -63,7 +63,7 @@ MANIFEST = (
     # 2,300 Hz occupied-bandwidth ceiling -- 2,253 Hz measured -- but its
     # Level-4 operating-envelope evidence has not been run. Default is
     # availability, not qualification.
-    QualificationEntry("hf-ssb", 14, QualificationLevel.DEFAULT),
+    QualificationEntry("hf", 14, QualificationLevel.DEFAULT),
     # HF8 is HF7's carrier plan and guard at 8PSK with rate-2/3 LDPC, double
     # the pilot density and a 5.940 s frame: 3,292 bit/s against HF7's 6,504,
     # bought for an 8 dB lower simulated AWGN floor (12 dB vs 20) and the only
@@ -71,15 +71,15 @@ MANIFEST = (
     # Watterson from 16 dB, where HF7 manages 7/40 at 24 dB.
     #
     # Installed as DEFAULT on 2026-09-07 by owner decision, on two-direction
-    # hardware drive sweeps (logs/mode_qualification/hf-ssb/hf19/): HF8's
+    # hardware drive sweeps (logs/mode_qualification/hf/hf19/): HF8's
     # breakpoint is 12 dB below HF7's on IC-7300 -> IC-705, and on the weaker
     # non-clipping IC-705 -> IC-7300 path HF7 delivers 0/10 at every drive
     # level while HF8 delivers 10/10 with 3 dB to spare. Those runs establish
     # the margin claim on radios; the FADING envelope that motivates the mode
     # is still simulation only. Default is availability, not qualification.
-    QualificationEntry("hf-ssb", 15, QualificationLevel.DEFAULT),
-    QualificationEntry("hf-ssb", 16, QualificationLevel.DEFAULT),
-    QualificationEntry("hf-ssb", 17, QualificationLevel.EXPERIMENTAL),
+    QualificationEntry("hf", 15, QualificationLevel.DEFAULT),
+    QualificationEntry("hf", 16, QualificationLevel.DEFAULT),
+    QualificationEntry("hf", 17, QualificationLevel.EXPERIMENTAL),
 )
 
 
@@ -97,14 +97,14 @@ def registry(policy: str, level: QualificationLevel | str =
              QualificationLevel.DEFAULT, budget=None) -> ModeRegistry:
     """Return the cumulative registry available at ``level`` for ``policy``."""
     requested = QualificationLevel.parse(level)
-    if policy == "vhf-fm":
+    if policy == "fm":
         from . import afsk
         from .modes.vf3_mode import VF3
         from .modes.vf4_mode import VF4
         from .modes.vf6_mode import VF6
         base = afsk.default_registry() if budget is None else afsk.default_registry(budget)
         candidates, control = tuple(base.modes) + (VF3, VF4, VF6), base.control
-    elif policy == "hf-ssb":
+    elif policy == "hf":
         from .modes.hr0_mode import HR0
         from .modes.hc0_mode import HC0
         from .modes.hc1w_mode import HC1W

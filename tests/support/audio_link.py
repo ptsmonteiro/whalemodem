@@ -18,7 +18,7 @@ from acceptance_test import StationClient
 from whale import afsk, link, rx_audio
 from whale.channel import AudioChannel, ChannelResult, IdentityChannel
 from whale.link import Link
-from whale.policy import ChannelPolicy, VHF_FM
+from whale.policy import ChannelPolicy, FM
 from whale.service import ModemService
 from whale.vara_server import StationServer
 
@@ -211,7 +211,7 @@ def _close_client(client):
 
 
 def run_audio_session(payload_ab: bytes, payload_ba: bytes, mode_registry=None,
-                      policy: ChannelPolicy = VHF_FM,
+                      policy: ChannelPolicy = FM,
                       audio_link: DirectionalAudioLink | None = None,
                       channel_ab: AudioChannel | None = None,
                       channel_ba: AudioChannel | None = None,

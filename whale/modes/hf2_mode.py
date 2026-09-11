@@ -1,7 +1,7 @@
 """HF2 as a negotiable `WaveformMode`.
 
 HF2 is a pilot-assisted coherent 16-QAM OFDM data mode targeting Level 2 of
-the HF SSB speed ladder in `SPEED_LADDERS.md` (general-purpose data, quiet
+the HF speed ladder in `SPEED_LADDERS.md` (general-purpose data, quiet
 Watterson fading at +14 dB and above, moderate at +19 dB and above under the
 current SNR/3 kHz convention). It
 carries frequency-diversity carrier grouping -- each 16-QAM value is sent on

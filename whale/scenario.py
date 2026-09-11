@@ -19,8 +19,8 @@ from .fm_channel import ComplexFmChannel, FM_RADIO_PRESETS, FmRfPath
 
 
 @dataclass(frozen=True)
-class HfSsbScenarioPreset:
-    """One complete HF SSB simulation recipe."""
+class HfScenarioPreset:
+    """One complete HF simulation recipe."""
 
     name: str
     watterson_preset: str
@@ -32,17 +32,17 @@ class HfSsbScenarioPreset:
     interference: tuple[NarrowbandInterference, ...]
 
 
-HF_SSB_SCENARIO_PRESETS = {
-    "quiet": HfSsbScenarioPreset(
+HF_SCENARIO_PRESETS = {
+    "quiet": HfScenarioPreset(
         "quiet", "mid_latitude_quiet", (250.0, 3_100.0), (250.0, 3_100.0),
         0.98, 0.5, 0.01,
         (NarrowbandInterference(1_800.0, -40.0, power_reference="relative"),)),
-    "moderate": HfSsbScenarioPreset(
+    "moderate": HfScenarioPreset(
         "moderate", "mid_latitude_moderate", (300.0, 2_900.0),
         (300.0, 2_900.0), 0.85, 3.0, 0.10,
         (NarrowbandInterference(1_800.0, -24.0, power_reference="relative",
                                 drift_hz_per_second=0.2, duty_cycle=0.25),)),
-    "disturbed": HfSsbScenarioPreset(
+    "disturbed": HfScenarioPreset(
         "disturbed", "mid_latitude_disturbed", (350.0, 2_700.0),
         (350.0, 2_700.0), 0.70, 10.0, 0.50,
         (NarrowbandInterference(1_650.0, -15.0, power_reference="relative",
@@ -65,10 +65,10 @@ class _ScenarioChannel(ChannelChain):
                 "stages": [dict(stage.describe()) for stage in self.stages]}
 
 
-class HfSsbScenario:
-    """A complete HF SSB path assembled in physical stage order."""
+class HfScenario:
+    """A complete HF path assembled in physical stage order."""
 
-    def __init__(self, preset: HfSsbScenarioPreset, *, sample_rate: int,
+    def __init__(self, preset: HfScenarioPreset, *, sample_rate: int,
                  snr: SnrSpec, seed: int):
         if sample_rate <= 0:
             raise ValueError("sample_rate must be positive")
@@ -81,13 +81,13 @@ class HfSsbScenario:
 
     @classmethod
     def from_preset(cls, preset: str, *, sample_rate: int, snr: SnrSpec,
-                    seed: int) -> "HfSsbScenario":
+                    seed: int) -> "HfScenario":
         try:
-            definition = HF_SSB_SCENARIO_PRESETS[preset]
+            definition = HF_SCENARIO_PRESETS[preset]
         except KeyError:
             raise ValueError(
-                f"unknown HF SSB scenario preset {preset!r}; "
-                f"have {sorted(HF_SSB_SCENARIO_PRESETS)}") from None
+                f"unknown HF scenario preset {preset!r}; "
+                f"have {sorted(HF_SCENARIO_PRESETS)}") from None
         return cls(definition, sample_rate=sample_rate, snr=snr, seed=seed)
 
     def build(self) -> ChannelChain:
@@ -105,7 +105,7 @@ class HfSsbScenario:
             FilterChannel(rate, low_hz=p.rx_band_hz[0], high_hz=p.rx_band_hz[1]),
         )
         return _ScenarioChannel(stages, {
-            "type": "hf_ssb_scenario", "preset": p.name, "seed": self.seed})
+            "type": "hf_scenario", "preset": p.name, "seed": self.seed})
 
     def describe(self) -> Mapping[str, object]:
         return self.build().describe()
@@ -188,7 +188,3 @@ class FmScenario:
 
     def describe(self) -> Mapping[str, object]:
         return self.build().describe()
-
-
-# An explicit VHF spelling is convenient at call sites that also use HF SSB.
-VhfFmScenario = FmScenario

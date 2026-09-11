@@ -89,7 +89,7 @@ import numpy as np
 from whale import afsk, mode_history
 from whale.streaming import ReceiveStream
 from whale import link_protocol as protocol
-from whale.policy import VHF_FM
+from whale.policy import FM
 
 # Public compatibility aliases.  The wire-format implementation lives in
 # link_protocol; callers that historically imported these from whale.link
@@ -246,7 +246,7 @@ def net_bits_per_second(mode):
 # The retry budget itself moved to whale/policy.py: how many times to try
 # again is a bet about the channel, not a protocol fact. See ChannelPolicy
 # and _channel_value below for what this name still does here.
-MAX_RETRIES = VHF_FM.max_retries
+MAX_RETRIES = FM.max_retries
 
 #: `_send_chunk_with_arq` returning this means "no ACK, and the step-down it
 #: just took landed on a mode whose chunk_size cannot carry the chunk in
@@ -302,13 +302,13 @@ def _new_session_id():
 # from its peer before tearing the session down. Moved, with the bench
 # measurement that produced it, to ChannelPolicy.inactivity_timeout -- see
 # _channel_value below for what this name still does here.
-INACTIVITY_TIMEOUT = VHF_FM.inactivity_timeout
+INACTIVITY_TIMEOUT = FM.inactivity_timeout
 
 # Kept as a compatibility name for diagnostics/tests. No fixed dead-air delay
-# is applied on VHF FM: replies begin after the checked frame ends, and
+# is applied on FM: replies begin after the checked frame ends, and
 # calibrated head audio absorbs the effective direction-change loss. Now
 # ChannelPolicy.tx_turnaround_delay -- see _channel_value below.
-TX_TURNAROUND_DELAY = VHF_FM.tx_turnaround_delay
+TX_TURNAROUND_DELAY = FM.tx_turnaround_delay
 
 # How much older than the turnaround itself an anchor may be and still be
 # believed. Beyond that it is not evidence about when the peer stopped
@@ -323,7 +323,7 @@ ANCHOR_AGE_SLACK = DECODE_POLL_INTERVAL
 # Mid-session emergency fallback threshold. Statistical mode selection lives
 # on ChannelPolicy; this name remains as the VHF value for diagnostics and
 # bench scripts.
-STEP_DOWN_AFTER_ATTEMPTS = VHF_FM.step_down_after_attempts
+STEP_DOWN_AFTER_ATTEMPTS = FM.step_down_after_attempts
 
 # The module names above are no longer what the Link reads -- it reads
 # self.policy -- but they are not vestigial either. The test suite and the
@@ -337,7 +337,7 @@ STEP_DOWN_AFTER_ATTEMPTS = VHF_FM.step_down_after_attempts
 # So each name stays as a live override: reassigning it to something other
 # than the VHF value wins over whatever policy the Link holds. Leaving it
 # alone -- the normal case, and the only case in production -- means the
-# policy decides, so a station running HF_SSB is not silently given VHF
+# policy decides, so a station running HF is not silently given VHF
 # numbers.
 _CHANNEL_OVERRIDES = {
     "tx_turnaround_delay": "TX_TURNAROUND_DELAY",
@@ -350,7 +350,7 @@ _CHANNEL_OVERRIDES = {
 def _channel_value(policy, field):
     """`policy.<field>`, unless the module-level alias has been reassigned."""
     override = globals()[_CHANNEL_OVERRIDES[field]]
-    if override != getattr(VHF_FM, field):
+    if override != getattr(FM, field):
         return override
     return getattr(policy, field)
 
@@ -535,7 +535,7 @@ class Link:
     """
 
     def __init__(self, transport, mycall, on_event=None, mode_history_store=None,
-                 mode_registry=None, policy=VHF_FM):
+                 mode_registry=None, policy=FM):
         self.transport = transport
         # What this station assumes about the channel it is on -- retry
         # budget, timeouts, keying length, how eagerly it speeds up. See

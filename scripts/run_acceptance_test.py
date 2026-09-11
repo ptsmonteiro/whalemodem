@@ -20,8 +20,8 @@ Run:
     python scripts/run_acceptance_test.py --a-radio ic705 --b-radio ht --size 8192
 
     # the HF bench: both radios on one SSB frequency in data mode, both
-    # stations on the HC0/HC1W ladder selected by the hf-ssb channel
-    python scripts/run_acceptance_test.py --channel hf-ssb \
+    # stations on the HC0/HC1W ladder selected by the hf channel
+    python scripts/run_acceptance_test.py --channel hf \
         --a-radio ic7300 --b-radio ic705 --size 1024
 
     # start both legs at 600 baud, have each station step up after its
@@ -86,7 +86,7 @@ def _env_with(overrides):
 
 
 def _start_server(radio, mycall, cmd_port, data_port, host, log_path, name,
-                  env_overrides=(), channel="vhf-fm"):
+                  env_overrides=(), channel="fm"):
     log_file = open(log_path, "w")
     if env_overrides:
         header = f"# station {name} environment: {' '.join(env_overrides)}\n"
@@ -131,9 +131,9 @@ def main():
     ap.add_argument("--b-cmd", type=int, default=8310)
     ap.add_argument("--b-data", type=int, default=8311)
     ap.add_argument("--size", type=int, default=4096)
-    ap.add_argument("--channel", default="vhf-fm",
+    ap.add_argument("--channel", default="fm",
                     help="channel both stations run on (see whale/policy.py's "
-                         "CHANNELS): vhf-fm or hf-ssb")
+                         "CHANNELS): fm or hf")
     ap.add_argument("--connect-timeout", type=float, default=180.0)
     ap.add_argument("--transfer-timeout", type=float, default=300.0)
     ap.add_argument("--log-dir", default=str(ROOT / "logs"))

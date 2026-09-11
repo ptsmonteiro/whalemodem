@@ -1,6 +1,6 @@
 """VF4: mid-rung 58-carrier OFDM with square 16-QAM and RS protection.
 
-VF4 fills VHF FM speed-ladder Level 3 ("Fast data").  It reuses VF6's
+VF4 fills FM speed-ladder Level 3 ("Fast data").  It reuses VF6's
 qualified 48 kHz / 6.155 s / 214-symbol OFDM frame geometry, header, and
 pilot-tracking approach verbatim -- the same 58 carriers at 46.875 Hz
 spacing, the same 15-symbol coherent header, and the same ten interspersed

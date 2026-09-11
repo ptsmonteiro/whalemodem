@@ -6,10 +6,10 @@ byte-for-byte. The selected ChannelPolicy supplies the ordered mode registry,
 so adding a rung to a ladder automatically adds it to this sweep.
 
 Examples:
-    python scripts/sweep_modes.py --channel vhf-fm
-    python scripts/sweep_modes.py --channel hf-ssb --trials 10
-    python scripts/sweep_modes.py --channel hf-ssb --modes hc0 --direction ab
-    python scripts/sweep_modes.py --channel hf-ssb --mode-level experimental --modes hf2 --direction ab
+    python scripts/sweep_modes.py --channel fm
+    python scripts/sweep_modes.py --channel hf --trials 10
+    python scripts/sweep_modes.py --channel hf --modes hc0 --direction ab
+    python scripts/sweep_modes.py --channel hf --mode-level experimental --modes hf2 --direction ab
 """
 
 from __future__ import annotations
@@ -44,8 +44,8 @@ DEFAULT_TRIALS = 5
 DEFAULT_CAPTURE_TAIL = 1.5
 DEFAULT_INTER_TRIAL = 0.5
 DEFAULT_RADIOS = {
-    "vhf-fm": ("ic705", "ht"),
-    "hf-ssb": ("ic7300", "ic705"),
+    "fm": ("ic705", "ht"),
+    "hf": ("ic7300", "ic705"),
 }
 
 
@@ -200,7 +200,7 @@ def _default_output_dir():
 def main(argv=None, *, pair_factory=bench.radio_pair):
     ap = argparse.ArgumentParser(description=__doc__,
                                  formatter_class=argparse.RawDescriptionHelpFormatter)
-    ap.add_argument("--channel", choices=sorted(policy.CHANNELS), default="vhf-fm")
+    ap.add_argument("--channel", choices=sorted(policy.CHANNELS), default="fm")
     ap.add_argument("--mode-level", choices=("default", "optional", "experimental"),
                     default="default",
                     help="highest qualification registry to expose (default: default)")

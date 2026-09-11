@@ -1,4 +1,4 @@
-"""HC0 adapter and its position below HC1W in the HF SSB ladder.
+"""HC0 adapter and its position below HC1W in the HF ladder.
 
 HC0 carries the control plane and provides the robust data fallback. Its
 fixed-length frames use HC0's native fixed preamble, length and CRC framing, and
@@ -89,7 +89,7 @@ HC0 = Hc0Mode()
 
 
 def hf_registry(fast=True):
-    """The mode ladder a station on an HF SSB channel runs.
+    """The mode ladder a station on an HF channel runs.
 
     HC0 is the control mode and the bottom rung; HC1W is appended above it
     for a channel that can carry it, and `_maybe_adapt` probes it then uses

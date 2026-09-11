@@ -11,13 +11,21 @@ except ModuleNotFoundError:  # pragma: no cover - compatibility for dev Python 3
 from typing import Any, Mapping
 from .ptt_backends import PttCapabilities, available_backends, open_backend
 
+#: The channels (whale/policy.py's CHANNELS keys: "fm", "hf") a radio
+#: may be selected for. Kept as a literal set rather than importing
+#: whale.policy so this hardware-inventory module doesn't take a dependency
+#: on the link-layer policy module; whale/vara_server.py checks the running
+#: --channel against this set at startup.
+VALID_CHANNELS = frozenset({"fm", "hf"})
+
 @dataclass(frozen=True)
 class Radio:
+    id: str
     name: str
-    description: str
     audio_input_name: str
     audio_output_name: str
     ptt_backend: str
+    channels: frozenset[str]
     ptt_config: Mapping[str, Any] = field(default_factory=dict)
 
     @property
@@ -30,22 +38,38 @@ class Radio:
         return (audio_io.find_device(self.audio_output_name, "output"), audio_io.find_device(self.audio_input_name, "input"))
 
     def ptt(self):
-        return open_backend(self.ptt_backend, self.ptt_config)
+        config = self.ptt_config
+        if self.ptt_backend == "icom-civ":
+            # The icom-civ backend wants a human-readable label for its error
+            # messages; reuse the radio's own name rather than asking for a
+            # second, redundant one in ptt.* config.
+            config = {**config, "radio_name": self.name}
+        return open_backend(self.ptt_backend, config)
 
 @dataclass(frozen=True)
 class RadioInventory:
     radios: dict[str, Radio]
     default: str | None = None
 
-def _radio(name: str, value: Mapping[str, Any]) -> Radio:
+def _radio(id_: str, value: Mapping[str, Any]) -> Radio:
     ptt_value = value.get("ptt", {})
     audio_value = value.get("audio", {})
     try:
         backend, audio_input, audio_output = ptt_value["backend"], audio_value["input"], audio_value["output"]
     except (KeyError, TypeError):
-        raise ValueError(f"radio {name!r} requires audio.input, audio.output, and ptt.backend") from None
+        raise ValueError(f"radio {id_!r} requires audio.input, audio.output, and ptt.backend") from None
+    channels_value = value.get("channels")
+    if not isinstance(channels_value, list) or not channels_value:
+        raise ValueError(
+            f"radio {id_!r} requires a non-empty channels list, one or more of "
+            f"{sorted(VALID_CHANNELS)}")
+    channels = frozenset(channels_value)
+    if not channels <= VALID_CHANNELS:
+        raise ValueError(
+            f"radio {id_!r} has invalid channels {sorted(channels - VALID_CHANNELS)}; "
+            f"must be a subset of {sorted(VALID_CHANNELS)}")
     config = {key: item for key, item in ptt_value.items() if key != "backend"}
-    return Radio(name, value.get("description", name), audio_input, audio_output, backend, config)
+    return Radio(id_, value.get("name", id_), audio_input, audio_output, backend, channels, config)
 
 def load_radios(path: str | os.PathLike[str]) -> RadioInventory:
     """Load ``[radios.NAME]`` tables and the optional ``default_radio`` key from a TOML inventory.
@@ -62,7 +86,7 @@ def load_radios(path: str | os.PathLike[str]) -> RadioInventory:
     values = document.get("radios")
     if not isinstance(values, dict) or not values:
         raise ValueError(f"{path} contains no [radios.NAME] tables")
-    radios = {name: _radio(name, value) for name, value in values.items()}
+    radios = {id_: _radio(id_, value) for id_, value in values.items()}
     default = document.get("default_radio")
     if default is not None:
         if not isinstance(default, str):
@@ -124,11 +148,13 @@ def save_radios(path: str | os.PathLike[str], inventory: RadioInventory) -> None
     if inventory.default is not None:
         lines.append(f"default_radio = {_toml_string(inventory.default)}")
         lines.append("")
-    for name, radio in inventory.radios.items():
-        lines.append(f"[radios.{_toml_key(name)}]")
-        lines.append(f"description = {_toml_string(radio.description)}")
+    for id_, radio in inventory.radios.items():
+        lines.append(f"[radios.{_toml_key(id_)}]")
+        lines.append(f"name = {_toml_string(radio.name)}")
         lines.append(f"audio.input = {_toml_string(radio.audio_input_name)}")
         lines.append(f"audio.output = {_toml_string(radio.audio_output_name)}")
+        channels_literal = ", ".join(_toml_string(channel) for channel in sorted(radio.channels))
+        lines.append(f"channels = [{channels_literal}]")
         lines.append(f"ptt.backend = {_toml_string(radio.ptt_backend)}")
         for key, value in radio.ptt_config.items():
             lines.append(f"ptt.{_toml_key(key)} = {_toml_value(value)}")

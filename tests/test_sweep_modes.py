@@ -59,9 +59,9 @@ def fake_pair_factory(a, b, warmup):
 
 
 def test_channel_registries_drive_mode_selection():
-    vhf = sweep_modes.registry_for("vhf-fm")
-    hf = sweep_modes.registry_for("hf-ssb")
-    hf_experimental = sweep_modes.registry_for("hf-ssb", "experimental")
+    vhf = sweep_modes.registry_for("fm")
+    hf = sweep_modes.registry_for("hf")
+    hf_experimental = sweep_modes.registry_for("hf", "experimental")
     assert sweep_modes.select_modes(vhf, None) == tuple(vhf.modes)
     assert [mode.name for mode in sweep_modes.select_modes(vhf, ["0", "vf3"])] == [
         "300baud", "vf3"]
@@ -95,7 +95,7 @@ def test_main_writes_strict_json_and_summary_without_real_hardware(tmp_path, mon
 
     monkeypatch.setattr(sweep_modes, "registry_for", lambda _channel, _level: Registry())
     exit_code = sweep_modes.main([
-        "--channel", "vhf-fm", "--trials", "2", "--capture", "none",
+        "--channel", "fm", "--trials", "2", "--capture", "none",
         "--capture-tail", "0", "--inter-trial", "0",
         "--output-dir", str(tmp_path),
     ], pair_factory=fake_pair_factory)
@@ -121,7 +121,7 @@ def test_main_records_git_state_before_creating_output(tmp_path, monkeypatch):
     monkeypatch.setattr(sweep_modes, "_git_dirty", output_dir.exists)
 
     exit_code = sweep_modes.main([
-        "--channel", "vhf-fm", "--trials", "1", "--capture", "all",
+        "--channel", "fm", "--trials", "1", "--capture", "all",
         "--capture-tail", "0", "--inter-trial", "0",
         "--output-dir", str(output_dir),
     ], pair_factory=fake_pair_factory)

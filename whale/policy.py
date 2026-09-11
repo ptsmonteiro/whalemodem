@@ -4,12 +4,12 @@ rather than the protocol.
 whale/link.py grew up against one channel -- two FM handhelds on 2 m, a few
 metres apart -- and every timing constant in it was measured or reasoned
 against that. None of those numbers is wrong, but most of them are not facts
-about the protocol either: they are facts about VHF FM. A packet type id, a
+about the protocol either: they are facts about FM. A packet type id, a
 sync word, a sequence mask and a header size are the same on any channel,
 because both ends have to agree on them byte for byte. A retry budget, an
 inactivity timeout and a keying length are not: they are a bet about how a
 particular radio path behaves, and the same ARQ engine wants a different bet
-on HF SSB, where the path fades, keying is slower, and the band is shared
+on HF, where the path fades, keying is slower, and the band is shared
 with stations this modem cannot hear well.
 
 So the channel bets are hoisted here, into one frozen dataclass a Link is
@@ -43,7 +43,7 @@ class ChannelPolicy:
 
     # -- turnaround ------------------------------------------------------
     #
-    # Kept as a compatibility name for diagnostics/tests. On VHF FM no fixed
+    # Kept as a compatibility name for diagnostics/tests. On FM no fixed
     # dead-air delay is applied: replies begin after the checked frame ends,
     # and calibrated head audio absorbs the effective direction-change loss.
     # A channel whose radios need real settling time before the reply is
@@ -109,7 +109,7 @@ class ChannelPolicy:
     #: which use the same figure for the data and control planes. It covers
     #: everything the airtime arithmetic does not: PTT lead and tail,
     #: output-stream startup, the peer's decode poll interval, and the
-    #: scheduling jitter of two Python stations. Sized against VHF FM
+    #: scheduling jitter of two Python stations. Sized against FM
     #: turnaround; a channel with slower T/R or a non-negligible propagation
     #: delay needs more.
     ack_timeout_slack: float
@@ -157,7 +157,7 @@ class ChannelPolicy:
     require_clear_channel: bool = False
 
     #: Whether validated receive frames may seed a session-wide audio carrier
-    #: offset. HF waveforms share that useful SSB/BFO error; VHF FM does not.
+    #: offset. HF waveforms share that useful SSB/BFO error; FM does not.
     track_frequency_offset: bool = False
 
     # -- which waveforms suit this channel -------------------------------
@@ -174,7 +174,7 @@ class ChannelPolicy:
     #
     # It lives here rather than at each call site because the pairing is not
     # free to vary: the CPFSK profiles carry no carrier-frequency estimate,
-    # so running the VHF ladder against HF_SSB's timeouts is not a slower
+    # so running the VHF ladder against HF's timeouts is not a slower
     # link but a broken one, and the reverse wastes the FM bench's whole
     # speed ladder. Keeping the two together makes that impossible to get
     # half right.
@@ -202,8 +202,8 @@ class ChannelPolicy:
 #: value below is exactly what the corresponding constant held before it was
 #: hoisted, so a Link constructed with this policy -- the default -- behaves
 #: identically to the pre-policy code.
-VHF_FM = ChannelPolicy(
-    name="VHF FM",
+FM = ChannelPolicy(
+    name="FM",
     tx_turnaround_delay=0.0,
     inactivity_timeout=150.0,
     max_retries=6,
@@ -216,13 +216,13 @@ VHF_FM = ChannelPolicy(
     mode_ladder=modes.default_registry,
 )
 
-#: A documented starting point for HF SSB.
+#: A documented starting point for HF.
 #:
 #: THESE POLICY NUMBERS ARE UNVALIDATED PLACEHOLDERS. The HC0/HC1W ladder has
 #: carried the end-to-end acceptance test over the IC-7300/IC-705 HF bench,
 #: validating the waveforms and protocol path, but that clean run did not
 #: measure the timeout, retry, turnaround, or adaptation choices below. None
-#: of those figures should be quoted as measured -- contrast VHF_FM's
+#: of those figures should be quoted as measured -- contrast FM's
 #: inactivity_timeout, which has a forced-loss bench run and a script behind
 #: it. They are reasoned from how an HF path differs from the VHF one, and
 #: every one of them wants replacing with a dedicated measurement;
@@ -251,8 +251,8 @@ VHF_FM = ChannelPolicy(
 #:     antisocial and, in most regulatory regimes, not merely rude. Hence
 #:     require_clear_channel, which stays unenforced until a busy detector
 #:     exists -- so this policy is not yet safe to actually put on air.
-HF_SSB = ChannelPolicy(
-    name="HF SSB",
+HF = ChannelPolicy(
+    name="HF",
     tx_turnaround_delay=0.3,
     inactivity_timeout=300.0,
     max_retries=10,
@@ -267,7 +267,7 @@ HF_SSB = ChannelPolicy(
 
 #: The channels a station can be started on, by the name the CLI takes.
 #: See whale/vara_server.py's --channel and scripts/run_acceptance_test.py.
-CHANNELS = {"vhf-fm": VHF_FM, "hf-ssb": HF_SSB}
+CHANNELS = {"fm": FM, "hf": HF}
 
 
 def by_name(name: str) -> ChannelPolicy:

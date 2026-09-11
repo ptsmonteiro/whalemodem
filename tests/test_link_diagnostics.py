@@ -17,7 +17,7 @@ from dataclasses import dataclass, field
 import numpy as np
 
 from whale import link
-from whale.policy import HF_SSB, VHF_FM
+from whale.policy import HF, FM
 from whale.waveform import ModeRegistry
 
 import link_harness as harness
@@ -115,7 +115,7 @@ def test_hf_frequency_hint_is_shared_across_modes_and_session_scoped():
                        supports_frequency_hint=True)
     transport = harness.FakeTransport()
     transport.peer = harness.FakeTransport()
-    a_link = link.Link(transport, "STA1", policy=HF_SSB,
+    a_link = link.Link(transport, "STA1", policy=HF,
                        mode_registry=ModeRegistry((first, second), first))
     a_link._rx_frequency_hint_hz = 7.25
 
@@ -134,7 +134,7 @@ def test_vhf_policy_does_not_offer_a_frequency_hint_to_modes():
     mode = _StubMode("mode", 1, _StubCodec(result={"payload": b"ok"}),
                      supports_frequency_hint=True)
     a_link, _ = _stub_link(mode)
-    assert a_link.policy is VHF_FM
+    assert a_link.policy is FM
     a_link._rx_frequency_hint_hz = 7.25
 
     a_link._decode_attempt(mode, np.zeros(RX_RATE, dtype=np.float32))

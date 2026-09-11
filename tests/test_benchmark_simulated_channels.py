@@ -14,7 +14,7 @@ SPEC.loader.exec_module(benchmark)
 def test_one_point_benchmark_writes_versioned_replayable_result(tmp_path):
     output = tmp_path / "result.json"
     result = benchmark.main([
-        "--model", "awgn", "--policy", "vhf-fm", "--points", "40",
+        "--model", "awgn", "--policy", "fm", "--points", "40",
         "--trials", "1", "--modes", "300baud", "--seed", "17",
         "--workers", "1",
         "--out", str(output),
@@ -44,7 +44,7 @@ def test_one_point_benchmark_writes_versioned_replayable_result(tmp_path):
 def test_explicit_payload_records_requested_data_and_actual_frame_sizes(tmp_path):
     output = tmp_path / "result.json"
     assert benchmark.main([
-        "--model", "awgn", "--policy", "vhf-fm", "--points", "40",
+        "--model", "awgn", "--policy", "fm", "--points", "40",
         "--trials", "1", "--modes", "1200baud", "--seed", "18",
         "--workers", "1",
         "--payload-bytes", "88", "--out", str(output),
@@ -64,7 +64,7 @@ def test_explicit_payload_records_requested_data_and_actual_frame_sizes(tmp_path
 def test_payload_rejects_negative_or_invalid_values(value, tmp_path, capsys):
     with pytest.raises(SystemExit):
         benchmark.main([
-            "--model", "awgn", "--policy", "vhf-fm", "--points", "40",
+            "--model", "awgn", "--policy", "fm", "--points", "40",
             "--trials", "1", "--modes", "1200baud",
             "--payload-bytes", value, "--out", str(tmp_path / "result.json"),
         ])
@@ -74,7 +74,7 @@ def test_payload_rejects_negative_or_invalid_values(value, tmp_path, capsys):
 def test_payload_must_fit_every_selected_mode(tmp_path, capsys):
     with pytest.raises(SystemExit):
         benchmark.main([
-            "--model", "awgn", "--policy", "vhf-fm", "--points", "40",
+            "--model", "awgn", "--policy", "fm", "--points", "40",
             "--trials", "1", "--modes", "300baud", "600baud",
             "--payload-bytes", "89", "--out", str(tmp_path / "result.json"),
         ])
@@ -87,7 +87,7 @@ def test_payload_must_fit_every_selected_mode(tmp_path, capsys):
 def test_workers_must_be_positive(value, tmp_path, capsys):
     with pytest.raises(SystemExit):
         benchmark.main([
-            "--model", "awgn", "--policy", "vhf-fm", "--points", "40",
+            "--model", "awgn", "--policy", "fm", "--points", "40",
             "--trials", "1", "--modes", "300baud", "--workers", value,
             "--out", str(tmp_path / "result.json"),
         ])

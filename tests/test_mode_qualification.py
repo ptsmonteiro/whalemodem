@@ -8,7 +8,7 @@ from whale.mode_qualification import (MANIFEST, QualificationLevel,
 from whale.qualification import net_data_frame_metrics
 
 
-@pytest.mark.parametrize("policy", ("vhf-fm", "hf-ssb"))
+@pytest.mark.parametrize("policy", ("fm", "hf"))
 def test_registry_levels_are_cumulative(policy):
     default = set(registry(policy, "default").supported_ids)
     optional = set(registry(policy, "optional").supported_ids)
@@ -24,32 +24,32 @@ def test_manifest_keys_and_global_mode_ids_are_unique():
 
 
 def test_every_registry_mode_has_its_declared_level():
-    for policy in ("vhf-fm", "hf-ssb"):
+    for policy in ("fm", "hf"):
         for mode in registry(policy, "experimental").modes:
             assert isinstance(qualification_level(policy, mode.mode_id),
                               QualificationLevel)
 
 
 def test_compatibility_builders_are_default_registries():
-    assert modes.default_registry().supported_ids == registry("vhf-fm").supported_ids
-    assert modes.hf_registry().supported_ids == registry("hf-ssb").supported_ids
+    assert modes.default_registry().supported_ids == registry("fm").supported_ids
+    assert modes.hf_registry().supported_ids == registry("hf").supported_ids
 
 
 def test_filter_excludes_opt_in_mode_from_default(monkeypatch):
     manifest = tuple(
         QualificationEntry(entry.policy, entry.mode_id,
                            QualificationLevel.OPTIONAL
-                           if (entry.policy, entry.mode_id) == ("vhf-fm", 3)
+                           if (entry.policy, entry.mode_id) == ("fm", 3)
                            else entry.level)
         for entry in MANIFEST)
     monkeypatch.setattr(qualification, "MANIFEST", manifest)
-    assert 3 not in registry("vhf-fm", "default").supported_ids
-    assert 3 in registry("vhf-fm", "optional").supported_ids
+    assert 3 not in registry("fm", "default").supported_ids
+    assert 3 in registry("fm", "optional").supported_ids
 
 
 def test_unknown_level_and_policy_are_rejected():
     with pytest.raises(ValueError, match="qualification level"):
-        registry("vhf-fm", "qualified-ish")
+        registry("fm", "qualified-ish")
     with pytest.raises(ValueError, match="channel policy"):
         registry("moon-bounce")
 

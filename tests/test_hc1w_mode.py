@@ -31,8 +31,8 @@ def test_hc1w_round_trips_a_full_data_frame():
 
 
 def test_hc1w_is_available_in_the_default_hf_ladder():
-    default = mode_qualification.registry("hf-ssb", "default")
-    experimental = mode_qualification.registry("hf-ssb", "experimental")
+    default = mode_qualification.registry("hf", "default")
+    experimental = mode_qualification.registry("hf", "experimental")
     assert HC1W.mode_id in default.supported_ids
     assert HC1W.mode_id in experimental.supported_ids
     assert 4 not in experimental.supported_ids

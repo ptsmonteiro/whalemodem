@@ -8,18 +8,24 @@ in [TESTING.md](TESTING.md) before keying a transmitter.
 Hardware is selected from a TOML inventory. Copy `radios.example.toml`, edit
 it for the local station, and pass it with `--radio-config PATH`, or set
 `WHALE_RADIO_CONFIG`. Each entry names an audio input device, an audio
-output device, and one PTT backend with its backend-specific settings.
+output device, the `--channel` values it may be selected for, and one PTT
+backend with its backend-specific settings.
 
 ```toml
 [radios.station-a]
-description = "Icom controlled over CI-V"
+name = "Icom controlled over CI-V"
 audio.input = "IC-705"
 audio.output = "IC-705"
+channels = ["fm", "hf"]
 ptt.backend = "icom-civ"
 ptt.usb_id = "0C26:0036"
-ptt.radio_name = "IC-705"
 ptt.address = 0xA4
 ```
+
+`channels` is a non-empty list drawn from the same names `--channel` takes
+(`fm`, `hf`, see [Starting a station](#starting-a-station)) -- a
+radio may support one or both. `--radio` (below) is refused at startup if
+the named radio's `channels` doesn't include the selected `--channel`.
 
 The server's `--radio` value is the inventory key (`station-a` above), not an
 audio-device name. When no inventory is selected, `--radio-config` and
@@ -54,7 +60,8 @@ Add/edit form: `↑`/`↓` or `j`/`k` to move between fields, `Enter` to start
 editing a text field or cycle a selector/toggle field, `Space` also cycles
 a selector/toggle field, `Esc` to cancel (a mid-edit `Esc` reverts just that
 field; from the form itself it discards the whole add/edit and returns to
-the list). The Audio input and Audio output fields are picker-only -- there
+the list). Channel: fm and Channel: hf are independent toggles; at
+least one must be on and `Save` refuses to proceed otherwise. The Audio input and Audio output fields are picker-only -- there
 is no manual typing for these two, `Enter` or `p` always opens a list of the
 currently connected input/output devices to choose from. If the stored
 device for either field is not among the currently connected devices (radio
@@ -218,18 +225,18 @@ a bench trial.
 
 ## Starting a station
 
-For VHF FM:
+For FM:
 
 ```console
 python -m whale.vara_server --radio-config radios.toml --radio station-a \
-  --mycall STA1 --cmd-port 8300 --data-port 8301 --channel vhf-fm
+  --mycall STA1 --cmd-port 8300 --data-port 8301 --channel fm
 ```
 
-For HF SSB, both peers must select the HF policy:
+For HF, both peers must select the HF policy:
 
 ```console
 python -m whale.vara_server --radio-config radios.toml --radio station-a \
-  --mycall STA1 --cmd-port 8300 --data-port 8301 --channel hf-ssb
+  --mycall STA1 --cmd-port 8300 --data-port 8301 --channel hf
 ```
 
 The channel selects local timeouts, retry policy, useful-keying budget, and
@@ -249,15 +256,15 @@ smallest test to the full link:
 ```console
 python scripts/hw_smoke_single_frame.py
 python scripts/hw_smoke_link.py
-python scripts/sweep_modes.py --channel vhf-fm
+python scripts/sweep_modes.py --channel fm
 ```
 
 For the original HF bench:
 
 ```console
 python scripts/hw_hf_frames.py --mode hc0
-python scripts/sweep_modes.py --channel hf-ssb
-python scripts/run_acceptance_test.py --channel hf-ssb \
+python scripts/sweep_modes.py --channel hf
+python scripts/run_acceptance_test.py --channel hf \
   --a-radio ic7300 --b-radio ic705 --size 1024
 ```
 

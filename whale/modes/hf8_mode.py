@@ -71,7 +71,7 @@ Interleaved transmit-drive ladders against HF7 on 2026-09-07:
     between two real radios on which the installed default top rung does not
     work and this mode does.
 
-See `logs/mode_qualification/hf-ssb/hf19/20260907T194237Z-drive-sweep/` and
+See `logs/mode_qualification/hf/hf19/20260907T194237Z-drive-sweep/` and
 `.../20260907T195827Z-ba-drive-sweep/`.
 
 **The fading claims, which are the reason this mode exists, remain

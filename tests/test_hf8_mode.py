@@ -132,14 +132,14 @@ def test_hf8_sits_between_hc1w_and_hf7_on_the_default_ladder():
     MODE_QUALIFICATION.md). The ladder is ordered by rate because
     `_maybe_adapt` climbs it in order, so HF8's position is behaviour, not
     presentation: at 3,299 bit/s it belongs between HC1W and HF7."""
-    names = [m.name for m in registry("hf-ssb", "default").modes]
+    names = [m.name for m in registry("hf", "default").modes]
     assert "hf8" in names
     assert names.index("hc1w") < names.index("hf8") < names.index("hf7")
 
 def test_default_hf_ladder_is_ordered_by_rate():
     """The whole ladder, not just HF8: adaptation climbs it one rung at a
     time, so an out-of-order rung would make a step down to a *faster* mode."""
-    modes = registry("hf-ssb", "default").modes
+    modes = registry("hf", "default").modes
     rates = [8 * m.chunk_size / m.airtime(m.chunk_size) for m in modes]
     assert rates == sorted(rates), [
         (m.name, round(r)) for m, r in zip(modes, rates)]

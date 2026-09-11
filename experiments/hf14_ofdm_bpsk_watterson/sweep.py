@@ -1,5 +1,5 @@
 """hf14 -- simulation sweep for the most ROBUST BPSK OFDM geometry in the
-HF SSB 300-2700 Hz passband, judged on Watterson fading channels.
+HF 300-2700 Hz passband, judged on Watterson fading channels.
 
 This is a SIMULATION-ONLY harness. No radio hardware is touched anywhere in
 this file; its purpose is to narrow a large geometry grid down to a handful

@@ -73,14 +73,14 @@ class ModemService:
 
         ``policy`` is the :class:`whale.policy.ChannelPolicy` this station
         runs -- its timeouts, its retry budget and, through
-        ``mode_ladder``, the waveforms it offers. Defaults to the VHF FM
+        ``mode_ladder``, the waveforms it offers. Defaults to the FM
         bench the modem was built against.
         """
-        from whale.policy import VHF_FM
+        from whale.policy import FM
         from whale.transport import RadioTransport
 
         link = Link(RadioTransport(radio_name, radio_config), mycall,
-                    policy=policy or VHF_FM, mode_registry=mode_registry)
+                    policy=policy or FM, mode_registry=mode_registry)
         return cls(link, **kwargs)
 
     @property

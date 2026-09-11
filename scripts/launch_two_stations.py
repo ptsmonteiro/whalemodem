@@ -2,8 +2,8 @@
 """Launch two whale vara_server instances, one per radio, for VARA-API testing.
 
 Starts:
-  - station A on the IC-705 (hf-ssb channel), cmd/data ports 8300/8301
-  - station B on the IC-7300 (hf-ssb channel), cmd/data ports 8310/8311
+  - station A on the IC-705 (hf channel), cmd/data ports 8300/8301
+  - station B on the IC-7300 (hf channel), cmd/data ports 8310/8311
 
 Point two VARA-chat-compatible clients at 127.0.0.1:8300/8301 and
 127.0.0.1:8310/8311 respectively to test a real connection between them.
@@ -24,8 +24,8 @@ def main():
                                   formatter_class=argparse.RawDescriptionHelpFormatter)
     ap.add_argument("--call-705", default="N0CALL-1", help="MYCALL for the IC-705 station")
     ap.add_argument("--call-7300", default="N0CALL-2", help="MYCALL for the IC-7300 station")
-    ap.add_argument("--channel-705", default="hf-ssb", choices=("vhf-fm", "hf-ssb"))
-    ap.add_argument("--channel-7300", default="hf-ssb", choices=("vhf-fm", "hf-ssb"))
+    ap.add_argument("--channel-705", default="hf", choices=("fm", "hf"))
+    ap.add_argument("--channel-7300", default="hf", choices=("fm", "hf"))
     ap.add_argument("--cmd-port-705", type=int, default=8300)
     ap.add_argument("--data-port-705", type=int, default=8301)
     ap.add_argument("--cmd-port-7300", type=int, default=8310)

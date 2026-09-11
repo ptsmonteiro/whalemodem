@@ -28,23 +28,23 @@ def default_registry(budget=None):
     payload is fixed by its OFDM frame structure, not by a time budget.
     """
     from ..mode_qualification import registry
-    return registry("vhf-fm", "default", budget)
+    return registry("fm", "default", budget)
 
 
 def optional_registry(budget=None):
     """VHF modes available after explicit operator opt-in."""
     from ..mode_qualification import registry
-    return registry("vhf-fm", "optional", budget)
+    return registry("fm", "optional", budget)
 
 
 def experimental_registry(budget=None):
     """All declared VHF modes, for explicit development and qualification."""
     from ..mode_qualification import registry
-    return registry("vhf-fm", "experimental", budget)
+    return registry("fm", "experimental", budget)
 
 
 def hf_registry(budget=None):
-    """The HF SSB ladder: HR0 control, then HC0, HC1W, HF8, and HF7.
+    """The HF ladder: HR0 control, then HC0, HC1W, HF8, and HF7.
 
     HR0 is the short-control 32-FSK Level-0 control mode. HC0 and HC1W
     are retained above it for progressively faster data on supporting paths.
@@ -65,14 +65,14 @@ def hf_registry(budget=None):
     keying-time budget, in exactly the way VF3's is.
     """
     from ..mode_qualification import registry
-    return registry("hf-ssb", "default", budget)
+    return registry("hf", "default", budget)
 
 
 def hf_optional_registry(budget=None):
     from ..mode_qualification import registry
-    return registry("hf-ssb", "optional", budget)
+    return registry("hf", "optional", budget)
 
 
 def hf_experimental_registry(budget=None):
     from ..mode_qualification import registry
-    return registry("hf-ssb", "experimental", budget)
+    return registry("hf", "experimental", budget)

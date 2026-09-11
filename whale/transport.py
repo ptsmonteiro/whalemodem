@@ -159,7 +159,7 @@ class RadioTransport:
             logging.getLogger(__name__).warning(
                 "%s: audio input overflow -- capture samples were dropped and "
                 "any frame in flight is corrupted (%d so far)",
-                self.radio.name, self._rx_overflows)
+                self.radio.id, self._rx_overflows)
         # Decimate under its own lock rather than the buffer's: this runs on
         # PortAudio's realtime thread, and snapshot_rx() holds the buffer lock
         # while it concatenates the whole buffer. Waiting on that here is how
@@ -320,7 +320,7 @@ class RadioTransport:
         """
         if self.receive_only:
             raise RuntimeError(
-                f"{self.radio.name} was opened receive-only and must not transmit")
+                f"{self.radio.id} was opened receive-only and must not transmit")
         ptt_lead = 0.0 if ptt_lead is None else ptt_lead
         ptt_tail = 0.0 if ptt_tail is None else ptt_tail
         with self._tx_lock:
@@ -402,12 +402,12 @@ class RadioTransport:
             # LookupError (the card is genuinely gone or now ambiguous), or
             # anything PortAudio throws while enumerating a sick bus.
             logging.getLogger(__name__).warning(
-                "could not re-resolve the TX device for %s: %s", self.radio.name, exc)
+                "could not re-resolve the TX device for %s: %s", self.radio.id, exc)
             return
         if index != self.out_device:
             logging.getLogger(__name__).warning(
                 "TX device for %s moved from index %d to %d; using the new one",
-                self.radio.name, self.out_device, index)
+                self.radio.id, self.out_device, index)
             self.out_device = index
 
     def close(self):
@@ -425,4 +425,4 @@ class RadioTransport:
         except Exception as exc:
             logging.getLogger(__name__).error(
                 "closing PTT for %s failed (%s: %s). THE TRANSMITTER MAY STILL BE KEYED.",
-                self.radio.name, type(exc).__name__, exc)
+                self.radio.id, type(exc).__name__, exc)

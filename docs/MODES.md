@@ -15,7 +15,7 @@ captured as 12 kHz audio from the IC-705, and measured from the received
 audio spectrum. The 2026-09-08 measurement was 33.96 dB, rounded to 34.0 dB
 in the table. Drive multipliers and decoder estimates are not SNR.
 
-## VHF FM
+## FM
 
 | Mode | Frequency span | Modulation geometry | Modulation order | FEC rate | FEC technique | DATA payload/frame | Frame duration | Net/frame | Pure SNR passed | Radio tested |
 | --- | --- | --- | ---: | ---: | --- | ---: | ---: | ---: | --- | --- |
@@ -24,7 +24,7 @@ in the table. Drive multipliers and decoder estimates are not SNR.
 | 1200baud | 1,200-2,200 Hz | 2-tone CPFSK | 2 (2-FSK) | none | none | 402 B | 3.933 s | 818 bit/s | not retained as pure SNR | not measured |
 | vf3 | 468.75-3,140.625 Hz | 58-carrier differential-QPSK OFDM | 4 (QPSK) | 1/2 | terminated K=7 convolutional, interleaved, soft-decision Viterbi | 1,426 B | 6.155 s | 1,853 bit/s | — | not measured |
 
-## HF SSB
+## HF
 
 | Mode | Frequency span | Modulation geometry | Modulation order | FEC rate | FEC technique | DATA payload/frame | Frame duration | Net/frame | Pure SNR passed | Watterson passed | Radio tested |
 | --- | --- | --- | ---: | ---: | --- | ---: | ---: | ---: | --- | --- | --- |

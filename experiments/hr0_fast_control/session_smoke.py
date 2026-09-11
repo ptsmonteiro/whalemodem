@@ -11,7 +11,7 @@ ROOT = Path(__file__).resolve().parents[2]
 sys.path[:0] = [str(ROOT), str(ROOT / 'tests')]
 from support.audio_link import run_audio_session
 from whale.waveform import ModeRegistry
-from whale.policy import HF_SSB
+from whale.policy import HF
 from whale.modes.hc0_mode import HC0
 from experiments.hr0_fast_control.legacy_hr0_mode import HR0
 from experiments.hr0_fast_control.candidate import FAST16, FAST32, MARGIN32
@@ -19,7 +19,7 @@ out = []
 for raw in [HR0, FAST16, FAST32, MARGIN32]:
     control = raw if raw is HR0 else replace(raw, mode_id=240)
     registry = ModeRegistry((control, HC0), control)
-    result = run_audio_session(bytes(range(128)), bytes(range(127,-1,-1)), mode_registry=registry, policy=HF_SSB)
+    result = run_audio_session(bytes(range(128)), bytes(range(127,-1,-1)), mode_registry=registry, policy=HF)
     row = dict(mode=raw.name, setup_airtime=result.setup_airtime, transfer_airtime=result.transfer_airtime, disconnect_airtime=result.disconnect_airtime)
     out.append(row)
     print(row, flush=True)

@@ -1,4 +1,4 @@
-"""Focused conformance tests for experimental Level-3 VHF FM mode VF4."""
+"""Focused conformance tests for experimental Level-3 FM mode VF4."""
 
 import numpy as np
 import pytest

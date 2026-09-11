@@ -4,7 +4,7 @@
 fresh alternative to VARA HF and VARA FM, driven through the same VARA TCP
 interface your applications already speak.**
 
-Whale is a small, readable Python implementation of a complete HF SSB and VHF
+Whale is a small, readable Python implementation of a complete HF and
 FM data modem: waveforms, FEC, ARQ link layer, PTT/CAT control, and a
 VARA-shaped local TCP command/data interface.
 
@@ -58,7 +58,7 @@ install on the station machine.
 
 Whale is in early development, but the full path already works: two stations
 connect, transfer data in both directions with verification, and disconnect,
-on HF SSB and VHF FM. The on-air protocol is native, so Whale talks to Whale.
+on HF and FM. The on-air protocol is native, so Whale talks to Whale.
 
 ## Contributing
 

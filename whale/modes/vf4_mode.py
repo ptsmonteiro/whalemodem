@@ -1,4 +1,4 @@
-"""Negotiable adapter for experimental Level-3 VHF FM mode VF4."""
+"""Negotiable adapter for experimental Level-3 FM mode VF4."""
 
 from __future__ import annotations
 

@@ -9,7 +9,7 @@ def test_one_session_benchmark_writes_directional_full_stack_metrics(tmp_path):
     output = tmp_path / "sessions.json"
     completed = subprocess.run([
         sys.executable, str(root / "scripts" / "benchmark_sessions.py"),
-        "--model", "awgn", "--policy", "vhf-fm", "--points", "40",
+        "--model", "awgn", "--policy", "fm", "--points", "40",
         "--trials", "1", "--bytes", "1", "--seed", "17",
         "--out", str(output),
     ], cwd=root, timeout=30)

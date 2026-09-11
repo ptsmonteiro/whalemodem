@@ -5,8 +5,8 @@ from whale.radio_config_tui import NOTHING, QUIT, RadioListView
 
 
 def _radio(name, description="d", audio_input_name="AudioCard", audio_output_name="AudioCard",
-           ptt_backend="vox"):
-    return Radio(name, description, audio_input_name, audio_output_name, ptt_backend, {})
+           ptt_backend="vox", channels=frozenset({"fm"})):
+    return Radio(name, description, audio_input_name, audio_output_name, ptt_backend, channels, {})
 
 
 def _view(names, default=None, selected=0):
@@ -172,15 +172,17 @@ def test_full_load_mutate_save_round_trip(tmp_path):
     path.write_text(
         'default_radio = "shack-icom"\n\n'
         "[radios.shack-icom]\n"
-        'description = "Shack IC-7300"\n'
+        'name = "Shack IC-7300"\n'
         'audio.input = "IC-7300"\n'
         'audio.output = "IC-7300"\n'
+        'channels = ["hf"]\n'
         'ptt.backend = "icom-civ"\n'
         "ptt.address = 148\n\n"
         "[radios.portable]\n"
-        'description = "Portable HT"\n'
+        'name = "Portable HT"\n'
         'audio.input = "USB Audio"\n'
         'audio.output = "USB Audio"\n'
+        'channels = ["fm"]\n'
         'ptt.backend = "serial-line"\n'
         'ptt.port = "COM5"\n'
         'ptt.line = "rts"\n\n'
@@ -206,7 +208,7 @@ def test_full_load_mutate_save_round_trip(tmp_path):
     reloaded = load_radios(path)
     assert reloaded.default == "portable"
     assert reloaded.radios.keys() == {"portable"}
-    assert reloaded.radios["portable"].description == "Portable HT"
+    assert reloaded.radios["portable"].name == "Portable HT"
     assert reloaded.radios["portable"].ptt_backend == "serial-line"
     assert reloaded.radios["portable"].ptt_config == {"port": "COM5", "line": "rts"}
 

@@ -174,8 +174,10 @@ class RadioListView:
                 name = names[index]
                 radio = self.radios[name]
                 marker = "*" if name == effective_default else " "
-                line = (f"{marker} {name}  {radio.description}  "
-                        f"in={radio.audio_input_name} out={radio.audio_output_name}  ptt={radio.ptt_backend}")
+                channels = "/".join(sorted(radio.channels))
+                line = (f"{marker} {name}  {radio.name}  "
+                        f"in={radio.audio_input_name} out={radio.audio_output_name}  "
+                        f"channels={channels}  ptt={radio.ptt_backend}")
                 attr = curses.A_REVERSE if index == self.selected else 0
                 _safe_addnstr(stdscr, row, 0, line, attr)
                 row += 1
@@ -461,7 +463,6 @@ _BACKEND_ROWS: dict[str, list[_Row]] = {
     ],
     "icom-civ": [
         _Row("usb_id", "USB ID (VID:PID)", "text", picker="serial_icom"),
-        _Row("radio_name", "Radio name", "text"),
         _Row("address", "Address", "text"),
     ],
     "hamlib": [
@@ -495,7 +496,7 @@ def _default_backend_values(backend: str) -> dict[str, Any]:
     if backend == "serial-line":
         return {"port": "", "line": "rts", "baud": "", "active_high": True}
     if backend == "icom-civ":
-        return {"usb_id": "", "radio_name": "", "address": ""}
+        return {"usb_id": "", "address": ""}
     if backend == "hamlib":
         return {"model": "", "device": "", "baud": "", "civaddr": "", "timeout": "", "retry": ""}
     return {}  # vox has no extra rows
@@ -518,7 +519,7 @@ def _values_from_config(backend: str, config: Mapping[str, Any]) -> dict[str, An
         if "active_high" in config:
             values["active_high"] = bool(config["active_high"])
     elif backend == "icom-civ":
-        for key in ("usb_id", "radio_name", "address"):
+        for key in ("usb_id", "address"):
             if key in config:
                 values[key] = str(config[key])
     elif backend == "hamlib":
@@ -542,7 +543,8 @@ class RadioDetailView:
     """
 
     BACKEND_ORDER = ["vox", "serial-line", "icom-civ", "hamlib"]
-    _TOP_LEVEL_FIELDS = {"name", "description", "audio_input_name", "audio_output_name"}
+    _TOP_LEVEL_FIELDS = {"name", "description", "audio_input_name", "audio_output_name",
+                          "channel_fm", "channel_hf"}
 
     def __init__(self, existing: tuple[str, Radio] | None, other_names: list[str],
                  on_done: Callable[[str | None, str, Radio], None] | None) -> None:
@@ -551,10 +553,12 @@ class RadioDetailView:
         self.on_done = on_done
 
         radio = existing[1] if existing else None
-        self.name = radio.name if radio else ""
-        self.description = radio.description if radio else ""
+        self.name = radio.id if radio else ""
+        self.description = radio.name if radio else ""
         self.audio_input_name = radio.audio_input_name if radio else ""
         self.audio_output_name = radio.audio_output_name if radio else ""
+        self.channel_fm = "fm" in radio.channels if radio else True
+        self.channel_hf = "hf" in radio.channels if radio else False
         self.ptt_backend = radio.ptt_backend if (radio and radio.ptt_backend in self.BACKEND_ORDER) else "vox"
 
         self.backend_config: dict[str, dict[str, Any]] = {
@@ -575,6 +579,8 @@ class RadioDetailView:
             _Row("description", "Description", "text"),
             _Row("audio_input_name", "Audio input", "device", picker="audio_input"),
             _Row("audio_output_name", "Audio output", "device", picker="audio_output"),
+            _Row("channel_fm", "Channel: fm", "bool"),
+            _Row("channel_hf", "Channel: hf", "bool"),
             _Row("ptt_backend", "PTT backend", "backend_selector"),
         ]
         rows.extend(_BACKEND_ROWS[self.ptt_backend])
@@ -959,15 +965,21 @@ class RadioDetailView:
         if not audio_output_name:
             errors.append("audio output is required")
 
+        channels = frozenset(channel for channel, selected in
+                             (("fm", self.channel_fm), ("hf", self.channel_hf))
+                             if selected)
+        if not channels:
+            errors.append("at least one channel (fm or hf) is required")
+
         ptt_config = self._build_ptt_config(errors)
 
         if errors:
             self.status = "; ".join(errors)
             return NOTHING
 
-        radio = Radio(name=name, description=description, audio_input_name=audio_input_name,
+        radio = Radio(id=name, name=description, audio_input_name=audio_input_name,
                       audio_output_name=audio_output_name, ptt_backend=self.ptt_backend,
-                      ptt_config=ptt_config)
+                      channels=channels, ptt_config=ptt_config)
         if self.on_done is not None:
             self.on_done(self.old_name, name, radio)
         return POP
@@ -1000,9 +1012,6 @@ class RadioDetailView:
                 errors.append("usb_id is required")
             else:
                 config["usb_id"] = usb_id
-            radio_name = values["radio_name"].strip()
-            if radio_name:
-                config["radio_name"] = radio_name
             address_text = values["address"].strip()
             if address_text:
                 try:
