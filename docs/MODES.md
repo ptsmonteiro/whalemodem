@@ -24,6 +24,11 @@ in the table. Drive multipliers and decoder estimates are not SNR.
 | 1200baud | 1,200-2,200 Hz | 2-tone CPFSK | 2 (2-FSK) | none | none | 402 B | 3.933 s | 818 bit/s | not retained as pure SNR | not measured |
 | vf3 | 468.75-3,140.625 Hz | 58-carrier differential-QPSK OFDM | 4 (QPSK) | 1/2 | terminated K=7 convolutional, interleaved, soft-decision Viterbi | 1,426 B | 6.155 s | 1,853 bit/s | — | not measured |
 
+vf12 (FM): 4,690 net application bit/s per full-capacity DATA frame.
+Simulated pure-SNR pass points: not measured. Calibrated radio-test SNR
+pass points: 2026-09-13, IC-705<->HT FM, 20/20 exact-payload frames both
+directions (10 each way) at ~15 dB measured effective SNR.
+
 ## HF
 
 | Mode | Frequency span | Modulation geometry | Modulation order | FEC rate | FEC technique | DATA payload/frame | Frame duration | Net/frame | Pure SNR passed | Watterson passed | Radio tested |

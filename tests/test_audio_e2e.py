@@ -6,10 +6,12 @@ physical boundary is replaced: instead of sound cards, PTT and radios, each
 transport puts its transmitted waveform into its peer's receive buffer.
 
 Two sessions run here.  The first is the shipped CPFSK ladder.  The second
-adds VF3 (`whale/modes/vf3_mode.py`) as a fourth rung, which is the test that
-the `WaveformMode` boundary is real: a waveform sharing no DSP, no framing and
-no synchronisation with CPFSK carries a session through the same link, ARQ
-and TCP front end, with nothing above the mode changed to admit it.
+climbs onto VF12 (`whale/modes/vf12.py`), the top rung of the default FM
+ladder above VF3, which is the test that the `WaveformMode` boundary is real:
+a waveform sharing no DSP, no framing and no synchronisation with CPFSK
+carries a session through the same link, ARQ and TCP front end, with nothing
+above the mode changed to admit it.  A third, VF3-pinned session keeps VF3
+itself covered end to end now that ordinary negotiation climbs past it.
 
 Because the transports hand audio over instantly, wall-clock time here means
 nothing.  What is measured instead is airtime -- the seconds of audio each
@@ -31,7 +33,9 @@ from whale.modes.hf7_mode import HF7
 from whale.modes.hf8_mode import HF8
 from whale.modes.hr0_mode import HR0
 from whale.modes.vf3_mode import VF3
+from whale.modes.vf12 import VF12
 from whale.policy import HF, FM
+from whale.waveform import ModeRegistry
 
 
 def _run_session(*args, **kwargs):
@@ -166,42 +170,66 @@ def test_full_stack_session_over_directional_complex_fm_presets():
     assert tb.channel_results[0].measurements["rf_carrier_to_noise_db"] == 25
 
 
-def test_vf3_carries_a_session_through_the_same_stack():
+def test_vf12_carries_a_session_through_the_same_stack():
     """A non-CPFSK waveform, negotiated and driven by the unchanged link.
 
-    The transfers are sized to climb the ladder: each rung steps up after one
-    clean chunk, so 88 + 193 + 402 bytes at 300/600/1200 baud is enough to
-    arrive at VF3 with several full 1,426-byte chunks still to send.  Nothing
-    pins the mode -- reaching VF3 is the negotiation's own doing, which is the
-    part worth testing.
+    The transfers are sized to climb the whole default ladder: each rung
+    steps up after one clean chunk, so 88 + 193 + 402 bytes at 300/600/1200
+    baud plus one 1,426-byte VF3 chunk -- 2,109 bytes total -- is enough to
+    arrive at VF12, the top rung above VF3.  With 12,000 bytes each way that
+    leaves 9,891 bytes for VF12's 2,900-byte chunks: three full chunks plus a
+    trailing partial one, so the session genuinely carries data on VF12
+    rather than just touching it.  Nothing pins the mode -- reaching VF12 is
+    the negotiation's own doing, which is the part worth testing.
     """
-    payload_ab = _payload(4_000, 7, 11)
-    payload_ba = _payload(4_000, 13, 5)
-    # No mode_registry: VF3 is on the default ladder, so this also asserts
+    payload_ab = _payload(12_000, 7, 11)
+    payload_ba = _payload(12_000, 13, 5)
+    # No mode_registry: VF12 is on the default ladder, so this also asserts
     # that an ordinary station reaches it without being told to.
     link_a, link_b, ta, tb = _run_session(payload_ab, payload_ba)
 
-    # Both directions climbed to VF3 and stayed there.  rx_profile is the
+    # Both directions climbed to VF12 and stayed there.  rx_profile is the
     # peer's tx as far as each station knows, so agreement across the two
     # links is also the mode-confirmation path working.
-    assert link_a.tx_profile is VF3 and link_b.rx_profile is VF3
-    assert link_b.tx_profile is VF3 and link_a.rx_profile is VF3
+    assert link_a.tx_profile is VF12 and link_b.rx_profile is VF12
+    assert link_b.tx_profile is VF12 and link_a.rx_profile is VF12
 
     # And it was worth doing.  Airtime is what a radio would spend; the
     # CPFSK-only ladder carrying the same bytes is the thing to beat.
     #
-    # Measured at 4,000 bytes each way: 66.6 s against 93.9 s, a 1.41x
-    # saving.  The ratio is this modest only because the session is short --
-    # climbing the ladder costs the same three slow chunks either way, and a
-    # 6.155 s VF3 chunk is still answered by a 0.70 s ACK on the 300-baud
-    # control plane.  At 16,000 bytes each way the same measurement gives
-    # 161.0 s against 315.7 s, or 1.96x.  The floor here is deliberately well
-    # under 1.41 so this catches a regression rather than ordinary variation.
+    # Measured at 12,000 bytes each way: 113.3 s against 368.6 s, a 3.25x
+    # saving.  At 24,000 bytes each way the same measurement gives 166.2 s
+    # against 707.5 s, or 4.26x -- VF12's 4,690 bit/s payload rate leaves the
+    # CPFSK ladder much further behind than VF3 did, so the ratio here is
+    # comfortably larger than VF3's was.  The floor is deliberately well
+    # under 3.25 so this catches a regression rather than ordinary variation.
     fast = ta.airtime + tb.airtime
     slow = sum(t.airtime for t in _run_session(
         payload_ab, payload_ba, mode_registry=afsk.default_registry())[2:])
-    assert slow > 1.25 * fast, (
-        f"VF3 session spent {fast:.1f}s of air against CPFSK's {slow:.1f}s")
+    assert slow > 2.75 * fast, (
+        f"VF12 session spent {fast:.1f}s of air against CPFSK's {slow:.1f}s")
+
+
+def test_vf3_carries_a_session_through_the_same_stack_when_pinned():
+    """VF3 end-to-end coverage, now that ordinary negotiation climbs past it.
+
+    `test_vf12_carries_a_session_through_the_same_stack` used to be VF3's
+    only exercise through the real link/audio stack; now that VF12 outranks
+    VF3 on the default ladder, an unpinned session no longer settles there.
+    Pinning the registry to the CPFSK rungs plus VF3 (mirroring how
+    `test_the_hf_channel_carries_a_session_with_hr0_in_control` pins its own
+    ladder via a policy) keeps VF3 itself covered end to end.
+    """
+    registry = ModeRegistry(afsk.default_registry().modes + (VF3,),
+                             afsk.default_registry().control)
+    payload_ab = _payload(4_000, 7, 11)
+    payload_ba = _payload(4_000, 13, 5)
+    link_a, link_b, ta, tb = _run_session(
+        payload_ab, payload_ba, mode_registry=registry)
+
+    assert link_a.tx_profile is VF3 and link_b.rx_profile is VF3
+    assert link_b.tx_profile is VF3 and link_a.rx_profile is VF3
+    assert ta.airtime and tb.airtime
 
 
 def test_the_hf_channel_carries_a_session_with_hr0_in_control():

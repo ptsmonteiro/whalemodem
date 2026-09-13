@@ -57,7 +57,7 @@ def test_rs_packet_rejects_an_impossible_declared_length():
 
 
 def test_experimental_registry_appends_vf4_but_default_does_not():
-    assert modes.default_registry().supported_ids == (0, 1, 2, 3)
+    assert modes.default_registry().supported_ids == (0, 1, 2, 3, 18)
     registry = modes.experimental_registry()
     assert 8 in registry.supported_ids
     assert registry.control is afsk.CONTROL_PROFILE

@@ -48,6 +48,15 @@ MANIFEST = (
     QualificationEntry("fm", 3, QualificationLevel.DEFAULT),
     QualificationEntry("fm", 8, QualificationLevel.EXPERIMENTAL),
     QualificationEntry("fm", 6, QualificationLevel.EXPERIMENTAL),
+    # VF12 is the HF7-geometry FM data rung: 51-carrier 50 Hz OFDM, 16-QAM,
+    # rate-3/4 LDPC with comb-pilot channel tracking, 4,690 bit/s. Installed
+    # as DEFAULT on 2026-09-13 by owner decision, on two-direction hardware
+    # runs against the IC-705 <-> HT FM path (logs/vf12_edgefix): 20/20
+    # exact-payload frames, 10 each direction, at ~15 dB measured effective
+    # SNR. The rungs above it were measured and rejected on the same path --
+    # 32-QAM delivers 0/16 there -- so this is the top FM rate that holds.
+    # Default is availability, not qualification.
+    QualificationEntry("fm", 18, QualificationLevel.DEFAULT),
     QualificationEntry("hf", 5, QualificationLevel.DEFAULT),
     # Owner approved the 32-FSK HR0 replacement on 2026-09-06 despite its
     # unproven 3 dB measured margin; Default is availability, not qualification.
@@ -102,8 +111,11 @@ def registry(policy: str, level: QualificationLevel | str =
         from .modes.vf3_mode import VF3
         from .modes.vf4_mode import VF4
         from .modes.vf6_mode import VF6
+        from .modes.vf12 import VF12
         base = afsk.default_registry() if budget is None else afsk.default_registry(budget)
-        candidates, control = tuple(base.modes) + (VF3, VF4, VF6), base.control
+        # Rate order, which is the order _maybe_adapt climbs: VF12's 4,690
+        # bit/s sits between VF3 and the faster but still experimental VF4.
+        candidates, control = tuple(base.modes) + (VF3, VF12, VF4, VF6), base.control
     elif policy == "hf":
         from .modes.hr0_mode import HR0
         from .modes.hc0_mode import HC0
