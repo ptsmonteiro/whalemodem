@@ -13,9 +13,10 @@ scratch_captures*/
 /build/
 /dist/
 
-# Generated JSON and log artifacts at the project root.
+# Generated JSON, log and CSV artifacts at the project root.
 /*.json
 /*.log
+/*.csv
 
 logs/mode_qualification/**/*-captures/
 # scripts/sweep_modes.py writes its per-trial audio to <output-dir>/captures/,

@@ -7,8 +7,10 @@ it from ht's captured audio, then does the same ht -> ic705. This isolates
 machinery layered on top.
 
 Run: python scripts/hw_smoke_single_frame.py
+    python scripts/hw_smoke_single_frame.py --profile fm1
 """
 
+import argparse
 import logging
 import sys
 import time
@@ -20,14 +22,16 @@ from whale import afsk
 
 PAYLOAD = (b"hello whale " * 4)
 
+PROFILES_BY_NAME = {f"fm{p.mode_id}": p for p in afsk.PROFILES}
 
-def try_one_way(tx_name, tx, rx_name, rx, settle_s=2.0, listen_s=6.0):
-    print(f"\n== {tx_name} -> {rx_name} ==")
+
+def try_one_way(tx_name, tx, rx_name, rx, profile, settle_s=2.0, listen_s=6.0):
+    print(f"\n== {tx_name} -> {rx_name} ({profile.name}) ==")
     rx.snapshot_rx()  # clear whatever accumulated so far
     time.sleep(settle_s)
     rx.snapshot_rx()
 
-    audio = afsk.modulate(PAYLOAD)
+    audio = afsk.modulate(PAYLOAD, profile=profile)
     print(f"   sending {len(PAYLOAD)} bytes, tx audio {len(audio)/afsk.SAMPLE_RATE:.2f}s")
     # Deliberately the production PTT margins rather than generous ones, so
     # this stays a real test of them (they are measured, not guessed -- see
@@ -39,7 +43,7 @@ def try_one_way(tx_name, tx, rx_name, rx, settle_s=2.0, listen_s=6.0):
     time.sleep(listen_s)
     captured = rx.snapshot_rx()
     print(f"   captured {len(captured)/afsk.SAMPLE_RATE:.2f}s of audio, decoding...")
-    result = afsk.demodulate(captured)
+    result = afsk.demodulate(captured, profile=profile, sample_rate=afsk.RX_SAMPLE_RATE)
     print(f"   synced={result.get('synced')} confidence={result.get('confidence')}")
     if result.get("synced"):
         ok = result["payload"] == PAYLOAD
@@ -51,10 +55,17 @@ def try_one_way(tx_name, tx, rx_name, rx, settle_s=2.0, listen_s=6.0):
 
 
 def main():
+    ap = argparse.ArgumentParser(description=__doc__,
+                                 formatter_class=argparse.RawDescriptionHelpFormatter)
+    ap.add_argument("--profile", default="fm0", choices=sorted(PROFILES_BY_NAME),
+                    help="which CPFSK profile to put on the air")
+    args = ap.parse_args()
+    profile = PROFILES_BY_NAME[args.profile]
+
     with bench.radio_pair(warmup=3.0) as (ic705, ht):
-        r1 = try_one_way("ic705", ic705, "ht", ht)
+        r1 = try_one_way("ic705", ic705, "ht", ht, profile)
         time.sleep(1)
-        r2 = try_one_way("ht", ht, "ic705", ic705)
+        r2 = try_one_way("ht", ht, "ic705", ic705, profile)
 
         print("\n== RESULTS ==")
         print(f"ic705 -> ht: {'OK' if r1 else 'FAIL'}")
