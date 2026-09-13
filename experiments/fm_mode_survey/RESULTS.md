@@ -69,11 +69,14 @@ Pass is >= 80% exact-payload frames in **both** directions.
 Raw output and saved failure captures are in
 `logs/mode_qualification/fm/2026-09-13-uvb5/` and
 `logs/mode_qualification/fm/2026-09-13-kguv9d-level-fixed/`. The superseded
-clipped run is kept alongside as `2026-09-13-kguv9d/`.
+clipped run is kept alongside as `2026-09-13-kguv9d/`. The vf12 drive
+follow-up is in `2026-09-13-kguv9d-drive-sweep/` (per-trial CSVs) and
+`2026-09-13-kguv9d-drive0077/` (sweep at the new drive).
 
 ## Result
 
-Measured 2026-09-13 at commit `f26d3b0` (working tree dirty). A is the IC-705,
+Measured 2026-09-13 at commit `f26d3b0` (working tree dirty); the vf12 drive
+follow-up at `5ccf0c5` plus the drive change. A is the IC-705,
 B is the handheld.
 
 | Mode | ID | Level | Frequency span | Geometry | Order | FEC | Net bit/s | UV-B5 A->B | UV-B5 B->A | UV-B5 | KG-UV9D A->B | KG-UV9D B->A | KG-UV9D |
@@ -90,14 +93,16 @@ B is the handheld.
 | vf6 | 6 | experimental | 468.75-3,140.625 Hz | 58-carrier 256-QAM OFDM | 256 | RS(254,238) | 13,281 | 0/10 | 0/10 | fail | 0/10 | 0/10 | fail |
 
 Rows are in rate order. `vf11`'s counts are its best-scoring map per direction.
+`vf12`'s rows are at its former 0.22 peak drive; at 0.077 it passes 10/10
+both ways on the Wouxun (see *vf12 transmit drive*).
 
 Fastest mode that passes:
 
 | Handheld | Fastest passing | Rate |
 | --- | --- | ---: |
-| Baofeng UV-B5 | `vf12` | 4,690 bit/s |
-| Wouxun KG-UV9D Plus | `vf11` at margin -2, sounded | 2,261 bit/s |
-| Wouxun KG-UV9D Plus, registered modes only | `vf3` | 1,853 bit/s |
+| Baofeng UV-B5 | `vf12` at 0.22 drive | 4,690 bit/s |
+| Wouxun KG-UV9D Plus | `vf12` at 0.077 drive | 4,690 bit/s |
+| Wouxun KG-UV9D Plus, at 0.22 drive | `vf11` at margin -2, sounded | 2,261 bit/s |
 
 ### vf11 by margin
 
@@ -124,7 +129,8 @@ audio it transmits arrives at the IC-705 5-6 dB worse than the reverse, which
 is what breaks `1200baud` and `vf3` in one direction only. The Wouxun path is
 asymmetric the other way and more steeply -- 13.0 dB median sounded on A->B
 against 8.6 dB on B->A. So the QPSK modes the UV-B5 was breaking now pass,
-while `vf12` and `vf10`, which need the margin, fail on the Wouxun's weak leg.
+while `vf10` fails on the Wouxun's weak leg. `vf12` failed there too, but
+for a different reason: the handheld distorting it on transmit (below).
 
 **1200baud on the UV-B5** -- acquisition is perfect (zero bit errors in the
 255-bit sync word, confidence 0.91-0.92). The 2,200 Hz space tone arrives
@@ -145,11 +151,11 @@ header-fit channel estimate, giving 2.5-5.8% raw BER. On the Wouxun it is
 **vf12 on the Wouxun** -- it acquires perfectly every time. Failures report
 `synced=True` at confidence 0.935-0.968 with the frame start in the same
 sample window as on the UV-B5, so this is not an acquisition, lead-in or
-timing failure. It is corrupt payload: 0/48 codewords on the weak leg, where
-median effective SNR falls to 10.8-13.4 dB from the ~15 dB the mode is
-calibrated at. The UV-B5's single failure sat at 15.3 dB with 47/48 codewords
--- one bit from passing. **vf12 has almost no margin at its operating point**,
-which is why it is the mode that moves most between handhelds.
+timing failure. It is corrupt payload: 0/48 codewords, at a reported median
+effective SNR of 10.8-13.4 dB. The first reading of this -- too little SNR
+for 16-QAM -- was wrong. The cause is the Wouxun's transmit audio chain being
+driven too hard; see *vf12 transmit drive*. The UV-B5's single failure sat at
+15.3 dB with 47/48 codewords.
 
 **vf4, vf6 and vf10** -- a constellation-order failure on both paths, not a
 band or acquisition one. All 58 carriers were present in every `vf4`/`vf6`
@@ -186,6 +192,82 @@ that **receive level has to be checked before a session's numbers mean
 anything**, because nothing in the mode results themselves reveals it: vf12
 failed at 0/20 with perfect acquisition and plausible SNR both times.
 
+### vf12 transmit drive
+
+`vf12` is not SNR-limited on the Wouxun's weak leg. It is limited by the
+Wouxun's transmit audio chain, which its drive level was pushing into
+distortion. Lowering the mode's peak drive from 0.22 to 0.077 took that leg
+from 0/10 to 10/10.
+
+**Offline, the captures ruled out the receiver.** Comparing the 10 failures
+against the reconstructed transmit signal: no clipping (0.001% of samples)
+and no compression of the outer 16-QAM points (outer/inner gain 0.98-1.03).
+Errors were flat across the frame, so this is not drift or fading. Feeding
+the LDPC decoder the *true* per-carrier noise recovered 19.9/48 codewords
+on average and no frames, so no receiver change closes it.
+
+Two things did not fit plain noise:
+
+- True SNR was **worst at the low carriers** -- 3-9 dB below 1,050 Hz,
+  11-15 dB above 2,150 Hz -- the opposite of this leg's high-frequency
+  rolloff. Difference-frequency products of many carriers land low in the
+  band.
+- The receiver's SNR estimate, from pilot changes between consecutive
+  symbols, read 2-4 dB high. Error that persists from one symbol to the
+  next cancels out of that estimate; random noise would not.
+
+Neither the simulator nor the `kg_uv9d_to_ic705` preset reproduces the
+failure: through `ComplexFmChannel` both Wouxun directions and an ideal
+channel need the same C/N. The preset models band shape, clock error and
+mute, and none of those is what breaks this leg.
+
+**On air, drive level decides it.** HT->IC-705 only, vf12's transmit audio
+scaled before the digirig, 4 interleaved trials per level, fresh payload
+each. Ground-truth SNR is per-carrier median in each band:
+
+| Scale | Peak | TX RMS | RX RMS | Frames | Useful bit/s | Codewords/48 | Reported SNR | True SNR <1,100 / mid / >2,150 Hz |
+| ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | --- |
+| 0.25 | 0.055 | 0.011 | 0.055 | 3/4 | 3,285 | 36.0 | 15.1 dB | 8.7 / 10.8 / 12.2 dB |
+| **0.35** | **0.077** | **0.018** | **0.057** | **4/4** | **4,379** | **48.0** | **15.2 dB** | **10.2 / 13.0 / 15.3 dB** |
+| 0.50 | 0.110 | 0.023 | 0.059 | 2/4 | 2,190 | 35.5 | 13.3 dB | 7.1 / 9.2 / 10.2 dB |
+| 0.71 | 0.156 | 0.037 | 0.061 | 0/4 | 0 | 25.5 | 11.9 dB | 5.4 / 7.7 / 8.7 dB |
+| 1.00 | 0.220 | 0.053 | 0.063 | 0/4 | 0 | 10.5 | 12.5 dB | 7.1 / 10.2 / 12.6 dB |
+| 1.41 | 0.310 | 0.074 | 0.065 | 0/4 | 0 | 1.2 | 11.8 dB | 5.9 / 9.3 / 12.2 dB |
+
+Useful bit/s is `sweep_modes.py`'s definition: delivered fraction x 8 x
+2,900 B `chunk_size` / 5.30 s keyed. A clean vf12 frame is 4,379 bit/s by
+that measure, against the 4,690 bit/s nominal, which excludes PTT lead and
+guards.
+
+Above 0.077, more drive delivers fewer codewords -- impossible for an
+additive-noise path. Transmit RMS spans 16.5 dB but received RMS moves only
+1.3 dB, so the handheld compresses its microphone input; past its range the
+multicarrier signal distorts. Below 0.077 the signal starts losing to noise
+(0.055: 3/4). The working window on this bench is narrow.
+
+A single 1,500 Hz tone at the same RMS came through at 25.0 dB (0.22) and
+25.7 dB (0.077), with 4.5-5.2% AM and 0.04-0.10 rad PM. A tone has a crest
+factor of 3 dB against vf12's 12.8 dB, and it survives either level. That
+rules out gain pumping or a fast-varying channel, and puts the loss on the
+signal's peaks.
+
+Confirmation at scale 0.35, HT->IC-705: 10/10, 48/48 codewords every frame.
+Then `sweep_modes.py` with vf12's `drive_scale` set to 0.077, 10 trials per
+direction:
+
+| Direction | Drive | Frames | Useful bit/s | Reported SNR |
+| --- | ---: | ---: | ---: | --- |
+| IC-705 -> Wouxun | 0.22 | 10/10 | 4,380 | not recorded here |
+| Wouxun -> IC-705 | 0.22 | 0/10 | 0 | 10.8-13.4 dB |
+| IC-705 -> Wouxun | 0.077 | 10/10 | 4,379 | 16.1-17.0 dB |
+| Wouxun -> IC-705 | 0.077 | 10/10 | 4,379 | 14.7-16.3 dB |
+
+The IC-705 leg did not lose from the lower drive; its SNR is up from ~15 dB.
+
+The 0.22 default was tuned against the UV-B5 over 0.15-0.6, where the
+ceiling did not move with drive. The UV-B5 has not been measured at 0.077.
+Transmit drive is a per-mode constant; nothing sets it per radio.
+
 ### Bench characterisation refreshed
 
 The measured radio presets in `whale/fm_channel.py` were re-measured against
@@ -207,11 +289,16 @@ separates them.
 
 - Mode results are a property of the path *and the levels*, not of the mode
   alone. `vf12` and `vf3` swap places on a handheld change, and `vf12` swaps
-  again on a volume knob. Any single-radio result in `docs/MODES.md` should be
-  read that way.
-- `vf12` is the fastest mode measured working on any FM path here, but it is
-  also the most fragile, and it does not hold both directions on the Wouxun.
-  It is the shipped DEFAULT top rung.
+  again on a volume knob, and again on its own transmit drive. Any
+  single-radio result in `docs/MODES.md` should be read that way.
+- `vf12` is the fastest mode measured working on any FM path here. At 0.077
+  peak drive it holds both directions on the Wouxun (20/20); at 0.22 it did
+  not. It is the shipped DEFAULT top rung, now at 0.077, unverified on the
+  UV-B5 at that drive.
+- Handheld transmit audio chains are nonlinear and differ by radio. A
+  low-crest-factor probe (a single tone) cannot find the limit a
+  multicarrier mode hits, and neither can the `fm_channel` presets. Drive is
+  set per mode, but the right value is a property of the radio.
 - `vf3` and `1200baud` are DEFAULT rungs that deliver nothing B->A on the
   UV-B5 path. A link that climbs to either there stalls until it falls back.
 - Bit loading earns its keep on both paths and degrades gracefully where fixed

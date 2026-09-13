@@ -33,12 +33,12 @@ level at all.
 vf12 (FM): 4,690 net application bit/s per full-capacity DATA frame.
 Simulated pure-SNR pass points: not measured. Calibrated radio-test SNR
 pass points: 2026-09-13, IC-705<->Baofeng UV-B5 FM, 19/20 exact-payload
-frames (10/10 IC-705->HT, 9/10 HT->IC-705) at ~15 dB measured effective SNR.
-On the same date and station A, IC-705<->Wouxun KG-UV9D Plus FM delivered
-10/10 IC-705->HT and 0/10 HT->IC-705, the failing leg at 10.8-13.4 dB
-measured effective SNR with every frame acquired and none decoded. This
-mode's margin at ~15 dB is thin enough that a handheld change removes it in
-one direction.
+frames (10/10 IC-705->HT, 9/10 HT->IC-705) at ~15 dB measured effective SNR,
+at the former 0.22 peak drive. 2026-09-13, IC-705<->Wouxun KG-UV9D Plus FM at
+the current 0.077 peak drive: 20/20 (10/10 each direction) at 14.7-17.0 dB
+measured effective SNR; at 0.22 the HT->IC-705 leg delivered 0/10, the
+handheld's transmit audio chain distorting the multicarrier signal. The
+UV-B5 has not been re-measured at 0.077.
 
 ## HF
 
