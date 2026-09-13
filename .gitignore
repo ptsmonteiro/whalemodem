@@ -18,6 +18,10 @@ scratch_captures*/
 /*.log
 
 logs/mode_qualification/**/*-captures/
+# scripts/sweep_modes.py writes its per-trial audio to <output-dir>/captures/,
+# which the rule above does not match. These are large, station-specific
+# recordings; see docs/HARDWARE.md on not committing them by default.
+logs/mode_qualification/**/captures/
 
 # Experiment run output is scratch, not repository content: raw captures and
 # per-trial dumps under results/, captures/ and hardware/, plus any array or

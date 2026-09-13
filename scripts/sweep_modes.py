@@ -43,6 +43,12 @@ DEFAULT_SEED = 20260829
 DEFAULT_TRIALS = 5
 DEFAULT_CAPTURE_TAIL = 1.5
 DEFAULT_INTER_TRIAL = 0.5
+# Consecutive failures after which a direction is abandoned. A mode that has
+# missed this many in a row is not going to clear the bar over the remaining
+# trials, and every further attempt is airtime and transmitter wear spent
+# confirming it. The trials actually run are what gets recorded, so a mode
+# stopped at 0/3 is reported as 0/3 and not as 0/10.
+DEFAULT_ABORT_AFTER = 3
 DEFAULT_RADIOS = {
     "fm": ("ic705", "ht"),
     "hf": ("ic7300", "ic705"),
@@ -90,8 +96,10 @@ def _capture_path(capture_dir, mode, direction, trial, captured, payload):
 
 def run_direction(tx, rx, mode, direction, trials, seed, *, capture_dir=None,
                   capture="failures", capture_tail=DEFAULT_CAPTURE_TAIL,
-                  inter_trial=DEFAULT_INTER_TRIAL, sleep=time.sleep):
+                  inter_trial=DEFAULT_INTER_TRIAL, sleep=time.sleep,
+                  abort_after=DEFAULT_ABORT_AFTER):
     records = []
+    consecutive_failures = 0
     direction_code = 0 if direction.startswith("A:") else 1
     payload_bytes = full_packet_bytes(mode)
     print(f"\n  {direction}: {trials} x {payload_bytes} B")
@@ -135,6 +143,11 @@ def run_direction(tx, rx, mode, direction, trials, seed, *, capture_dir=None,
         print(f"    {trial}/{trials}: keyed={keyed:.2f}s rx={len(captured)} "
               f"confidence={confidence_text} {outcome.value}"
               + (f" ({error})" if error else ""))
+        consecutive_failures = 0 if record.decoded else consecutive_failures + 1
+        if abort_after and consecutive_failures >= abort_after:
+            print(f"    stopping this direction: {consecutive_failures} "
+                  f"consecutive failures")
+            break
         if trial != trials:
             sleep(inter_trial)
     return records
@@ -215,6 +228,10 @@ def main(argv=None, *, pair_factory=bench.radio_pair):
                     default="failures")
     ap.add_argument("--capture-tail", type=float, default=DEFAULT_CAPTURE_TAIL)
     ap.add_argument("--inter-trial", type=float, default=DEFAULT_INTER_TRIAL)
+    ap.add_argument("--abort-after", type=int, default=DEFAULT_ABORT_AFTER,
+                    metavar="N",
+                    help="abandon a direction after N consecutive failures "
+                         "(0 disables; default: %(default)s)")
     ap.add_argument("--required-rate", type=float, default=1.0,
                     help="minimum success fraction for a passing exit status")
     ap.add_argument("--output-dir", type=Path,
@@ -264,13 +281,13 @@ def main(argv=None, *, pair_factory=bench.radio_pair):
                     transport_a, transport_b, mode, f"A:{radio_a}->B:{radio_b}",
                     args.trials, args.seed, capture_dir=capture_dir,
                     capture=args.capture, capture_tail=args.capture_tail,
-                    inter_trial=args.inter_trial))
+                    inter_trial=args.inter_trial, abort_after=args.abort_after))
             if args.direction in ("both", "ba"):
                 records.extend(run_direction(
                     transport_b, transport_a, mode, f"B:{radio_b}->A:{radio_a}",
                     args.trials, args.seed, capture_dir=capture_dir,
                     capture=args.capture, capture_tail=args.capture_tail,
-                    inter_trial=args.inter_trial))
+                    inter_trial=args.inter_trial, abort_after=args.abort_after))
 
     rows = summarize(records, {mode.mode_id: mode.chunk_size for mode in selected})
     print("\n== RESULTS ==")

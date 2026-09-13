@@ -1,0 +1,56 @@
+opening radios (ic705, ht)...
+warming up 2s...
+
+=== vf9: 49 carriers 500-2900 Hz, QPSK, LDPC 3/4 ===
+lead-in 0.50s, frame 5.28s, payload 1816 B, 2751 bps effective
+  [ic705->ht] trial 1/10: keyed=5.63s captured=79800 conf=0.942 codewords=30/30 crc=True match=True snr=12.2dB per-carrier 7.6/12.2/18.5 dB
+  [ic705->ht] trial 2/10: keyed=5.63s captured=79560 conf=0.942 codewords=30/30 crc=True match=True snr=12.2dB per-carrier 7.3/12.2/18.9 dB
+  [ic705->ht] trial 3/10: keyed=5.63s captured=79680 conf=0.942 codewords=30/30 crc=True match=True snr=12.1dB per-carrier 7.2/12.1/18.6 dB
+  [ic705->ht] trial 4/10: keyed=5.63s captured=79680 conf=0.942 codewords=30/30 crc=True match=True snr=12.1dB per-carrier 7.3/12.1/17.4 dB
+  [ic705->ht] trial 5/10: keyed=5.63s captured=79680 conf=0.942 codewords=30/30 crc=True match=True snr=12.2dB per-carrier 7.2/12.2/17.6 dB
+  [ic705->ht] trial 6/10: keyed=5.63s captured=79680 conf=0.940 codewords=30/30 crc=True match=True snr=11.7dB per-carrier 7.3/11.7/17.2 dB
+  [ic705->ht] trial 7/10: keyed=5.63s captured=79560 conf=0.941 codewords=30/30 crc=True match=True snr=12.0dB per-carrier 7.4/12.0/17.7 dB
+  [ic705->ht] trial 8/10: keyed=5.63s captured=79680 conf=0.941 codewords=30/30 crc=True match=True snr=12.2dB per-carrier 7.5/12.2/17.4 dB
+  [ic705->ht] trial 9/10: keyed=5.63s captured=79680 conf=0.943 codewords=30/30 crc=True match=True snr=12.2dB per-carrier 7.5/12.2/18.0 dB
+  [ic705->ht] trial 10/10: keyed=5.63s captured=79680 conf=0.942 codewords=30/30 crc=True match=True snr=12.3dB per-carrier 7.3/12.3/17.9 dB
+  [ic705->ht] => 10/10 frames (100%), 2751 bps when it lands
+  [ht->ic705] trial 1/10: keyed=5.63s captured=79560 conf=0.937 codewords=30/30 crc=True match=True snr=13.6dB per-carrier 2.5/13.6/22.2 dB
+  [ht->ic705] trial 2/10: keyed=5.63s captured=79680 conf=0.936 codewords=30/30 crc=True match=True snr=12.9dB per-carrier 2.5/12.9/20.9 dB
+  [ht->ic705] trial 3/10: keyed=5.63s captured=79560 conf=0.937 codewords=30/30 crc=True match=True snr=13.3dB per-carrier 2.4/13.3/22.0 dB
+  [ht->ic705] trial 4/10: keyed=5.63s captured=79680 conf=0.936 codewords=0/30 crc=False match=False snr=13.5dB per-carrier 2.3/13.5/22.1 dB
+  [ht->ic705] trial 5/10: keyed=5.63s captured=79560 conf=0.936 codewords=30/30 crc=True match=True snr=13.5dB per-carrier 2.4/13.5/21.8 dB
+  [ht->ic705] trial 6/10: keyed=5.63s captured=79560 conf=0.936 codewords=30/30 crc=True match=True snr=13.4dB per-carrier 2.3/13.4/22.6 dB
+  [ht->ic705] trial 7/10: keyed=5.63s captured=79560 conf=0.935 codewords=6/30 crc=False match=False snr=13.6dB per-carrier 2.3/13.6/22.0 dB
+  [ht->ic705] trial 8/10: keyed=5.63s captured=79680 conf=0.936 codewords=26/30 crc=False match=False snr=13.5dB per-carrier 2.1/13.5/22.2 dB
+  [ht->ic705] trial 9/10: keyed=5.63s captured=79680 conf=0.935 codewords=0/30 crc=False match=False snr=13.3dB per-carrier 2.1/13.3/22.3 dB
+  [ht->ic705] trial 10/10: keyed=5.63s captured=79560 conf=0.936 codewords=30/30 crc=True match=True snr=13.1dB per-carrier 2.3/13.1/21.9 dB
+  [ht->ic705] => 6/10 frames (60%), 2751 bps when it lands
+
+=== vf10: 49 carriers 500-2900 Hz, 8PSK, LDPC 3/4 ===
+lead-in 0.50s, frame 5.28s, payload 2727 B, 4131 bps effective
+  [ic705->ht] trial 1/10: keyed=5.63s captured=79680 conf=0.939 codewords=0/45 crc=False match=False snr=12.0dB per-carrier 7.6/12.0/18.0 dB
+  [ic705->ht] trial 2/10: keyed=5.63s captured=79680 conf=0.942 codewords=0/45 crc=False match=False snr=12.2dB per-carrier 7.6/12.2/17.6 dB
+  [ic705->ht] trial 3/10: keyed=5.63s captured=79680 conf=0.942 codewords=0/45 crc=False match=False snr=12.3dB per-carrier 7.3/12.3/18.9 dB
+  [ic705->ht] trial 4/10: keyed=5.63s captured=79800 conf=0.941 codewords=2/45 crc=False match=False snr=12.1dB per-carrier 7.3/12.1/16.7 dB
+  [ic705->ht] trial 5/10: keyed=5.63s captured=79680 conf=0.942 codewords=0/45 crc=False match=False snr=12.0dB per-carrier 7.4/12.0/18.4 dB
+  [ic705->ht] trial 6/10: keyed=5.63s captured=79680 conf=0.941 codewords=0/45 crc=False match=False snr=12.3dB per-carrier 7.3/12.3/17.6 dB
+  [ic705->ht] trial 7/10: keyed=5.63s captured=79680 conf=0.942 codewords=0/45 crc=False match=False snr=12.2dB per-carrier 7.2/12.2/19.2 dB
+  [ic705->ht] trial 8/10: keyed=5.63s captured=79680 conf=0.941 codewords=0/45 crc=False match=False snr=12.1dB per-carrier 7.4/12.1/17.4 dB
+  [ic705->ht] trial 9/10: keyed=5.63s captured=79560 conf=0.941 codewords=0/45 crc=False match=False snr=12.2dB per-carrier 7.3/12.2/17.5 dB
+  [ic705->ht] trial 10/10: keyed=5.63s captured=79680 conf=0.941 codewords=2/45 crc=False match=False snr=11.9dB per-carrier 7.2/11.9/18.2 dB
+  [ic705->ht] => 0/10 frames (0%), 4131 bps when it lands
+  [ht->ic705] trial 1/10: keyed=5.63s captured=79680 conf=0.938 codewords=0/45 crc=False match=False snr=13.6dB per-carrier 2.3/13.6/22.4 dB
+  [ht->ic705] trial 2/10: keyed=5.63s captured=79680 conf=0.937 codewords=0/45 crc=False match=False snr=13.3dB per-carrier 2.4/13.3/21.2 dB
+  [ht->ic705] trial 3/10: keyed=5.63s captured=79680 conf=0.936 codewords=0/45 crc=False match=False snr=13.4dB per-carrier 2.4/13.4/21.5 dB
+  [ht->ic705] trial 4/10: keyed=5.63s captured=79560 conf=0.932 codewords=0/45 crc=False match=False snr=12.6dB per-carrier 2.6/12.6/22.5 dB
+  [ht->ic705] trial 5/10: keyed=5.63s captured=79560 conf=0.936 codewords=39/45 crc=False match=False snr=13.2dB per-carrier 2.4/13.2/21.8 dB
+  [ht->ic705] trial 6/10: keyed=5.63s captured=79680 conf=0.936 codewords=0/45 crc=False match=False snr=13.3dB per-carrier 2.4/13.3/21.2 dB
+  [ht->ic705] trial 7/10: keyed=5.63s captured=79560 conf=0.935 codewords=0/45 crc=False match=False snr=13.3dB per-carrier 2.3/13.3/21.6 dB
+  [ht->ic705] trial 8/10: keyed=5.63s captured=79680 conf=0.935 codewords=0/45 crc=False match=False snr=13.1dB per-carrier 2.1/13.1/21.4 dB
+  [ht->ic705] trial 9/10: keyed=5.63s captured=79560 conf=0.935 codewords=0/45 crc=False match=False snr=13.4dB per-carrier 2.1/13.4/22.5 dB
+  [ht->ic705] trial 10/10: keyed=5.63s captured=79680 conf=0.935 codewords=31/45 crc=False match=False snr=13.4dB per-carrier 2.3/13.4/21.9 dB
+  [ht->ic705] => 0/10 frames (0%), 4131 bps when it lands
+
+== RESULTS ==
+  vf9 lead=0.50s (2751 bps): ic705->ht 100%  ht->ic705 60%  -> worst 60%
+  vf10 lead=0.50s (4131 bps): ic705->ht 0%  ht->ic705 0%  -> worst 0%

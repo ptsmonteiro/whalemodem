@@ -1,0 +1,203 @@
+channel fm: 300baud(0) -> 600baud(1) -> 1200baud(2) -> vf3(3) -> vf12(18) -> vf4(8) -> vf6(6)
+radios A=ic705, B=ht; seed=20260829; trials=10
+opening radios (ic705, ht)...
+warming up 3s...
+
+== 300baud (ID 0, DATA chunk 88 B) ==
+
+  A:ic705->B:ht: 10 x 98 B
+    1/10: keyed=4.34s rx=70200 confidence=0.991 decoded
+    2/10: keyed=4.34s rx=70080 confidence=0.991 decoded
+    3/10: keyed=4.34s rx=70080 confidence=0.991 decoded
+    4/10: keyed=4.34s rx=70200 confidence=0.991 decoded
+    5/10: keyed=4.34s rx=70080 confidence=0.991 decoded
+    6/10: keyed=4.34s rx=70200 confidence=0.991 decoded
+    7/10: keyed=4.34s rx=70200 confidence=0.991 decoded
+    8/10: keyed=4.34s rx=70080 confidence=0.991 decoded
+    9/10: keyed=4.34s rx=70080 confidence=0.991 decoded
+    10/10: keyed=4.34s rx=70080 confidence=0.991 decoded
+
+  B:ht->A:ic705: 10 x 98 B
+    1/10: keyed=4.33s rx=69960 confidence=0.991 decoded
+    2/10: keyed=4.34s rx=70200 confidence=0.991 decoded
+    3/10: keyed=4.34s rx=70080 confidence=0.991 decoded
+    4/10: keyed=4.34s rx=70080 confidence=0.991 decoded
+    5/10: keyed=4.34s rx=70200 confidence=0.991 decoded
+    6/10: keyed=4.34s rx=70200 confidence=0.991 decoded
+    7/10: keyed=4.33s rx=70080 confidence=0.991 decoded
+    8/10: keyed=4.34s rx=70080 confidence=0.990 decoded
+    9/10: keyed=4.33s rx=69960 confidence=0.991 decoded
+    10/10: keyed=4.34s rx=70200 confidence=0.991 decoded
+
+== 600baud (ID 1, DATA chunk 193 B) ==
+
+  A:ic705->B:ht: 10 x 203 B
+    1/10: keyed=4.35s rx=70200 confidence=0.992 decoded
+    2/10: keyed=4.35s rx=70200 confidence=0.991 decoded
+    3/10: keyed=4.35s rx=70200 confidence=0.991 decoded
+    4/10: keyed=4.35s rx=70200 confidence=0.993 decoded
+    5/10: keyed=4.35s rx=70320 confidence=0.992 decoded
+    6/10: keyed=4.35s rx=70200 confidence=0.992 decoded
+    7/10: keyed=4.35s rx=70200 confidence=0.993 decoded
+    8/10: keyed=4.35s rx=70320 confidence=0.991 decoded
+    9/10: keyed=4.35s rx=70200 confidence=0.993 decoded
+    10/10: keyed=4.35s rx=70200 confidence=0.993 decoded
+
+  B:ht->A:ic705: 10 x 203 B
+    1/10: keyed=4.35s rx=70200 confidence=0.988 decoded
+    2/10: keyed=4.35s rx=70320 confidence=0.988 decoded
+    3/10: keyed=4.35s rx=70200 confidence=0.988 decoded
+    4/10: keyed=4.35s rx=70200 confidence=0.989 decoded
+    5/10: keyed=4.35s rx=70320 confidence=0.988 decoded
+    6/10: keyed=4.35s rx=70200 confidence=0.988 decoded
+    7/10: keyed=4.35s rx=70200 confidence=0.989 decoded
+    8/10: keyed=4.35s rx=70320 confidence=0.989 decoded
+    9/10: keyed=4.35s rx=70200 confidence=0.988 decoded
+    10/10: keyed=4.35s rx=70320 confidence=0.988 decoded
+
+== 1200baud (ID 2, DATA chunk 402 B) ==
+
+  A:ic705->B:ht: 10 x 412 B
+    1/10: keyed=4.35s rx=70200 confidence=0.969 decoded
+    2/10: keyed=4.35s rx=70320 confidence=0.968 decoded
+    3/10: keyed=4.35s rx=70200 confidence=0.970 decoded
+    4/10: keyed=4.35s rx=70200 confidence=0.972 decoded
+    5/10: keyed=4.35s rx=70200 confidence=0.972 decoded
+    6/10: keyed=4.35s rx=70200 confidence=0.972 decoded
+    7/10: keyed=4.35s rx=70320 confidence=0.962 decoded
+    8/10: keyed=4.35s rx=70200 confidence=0.972 decoded
+    9/10: keyed=4.35s rx=70200 confidence=0.972 decoded
+    10/10: keyed=4.35s rx=70200 confidence=0.972 decoded
+
+  B:ht->A:ic705: 10 x 412 B
+    1/10: keyed=4.35s rx=70200 confidence=0.921 payload_failed
+    2/10: keyed=4.35s rx=70200 confidence=0.917 payload_failed
+    3/10: keyed=4.35s rx=70320 confidence=0.921 payload_failed
+    4/10: keyed=4.35s rx=70200 confidence=0.916 payload_failed
+    5/10: keyed=4.35s rx=70320 confidence=0.924 payload_failed
+    6/10: keyed=4.35s rx=70200 confidence=0.914 payload_failed
+    7/10: keyed=4.35s rx=70200 confidence=0.919 payload_failed
+    8/10: keyed=4.35s rx=70320 confidence=0.920 payload_failed
+    9/10: keyed=4.35s rx=70200 confidence=0.916 payload_failed
+    10/10: keyed=4.35s rx=70320 confidence=0.920 payload_failed
+
+== vf3 (ID 3, DATA chunk 1426 B) ==
+
+  A:ic705->B:ht: 10 x 1436 B
+    1/10: keyed=6.51s rx=96360 confidence=0.996 decoded
+    2/10: keyed=6.51s rx=96240 confidence=0.996 decoded
+    3/10: keyed=6.51s rx=96360 confidence=0.997 decoded
+    4/10: keyed=6.51s rx=96360 confidence=0.996 decoded
+    5/10: keyed=6.51s rx=96360 confidence=0.997 decoded
+    6/10: keyed=6.51s rx=96360 confidence=0.997 decoded
+    7/10: keyed=6.51s rx=96360 confidence=0.997 decoded
+    8/10: keyed=6.51s rx=96360 confidence=0.997 decoded
+    9/10: keyed=6.51s rx=96360 confidence=0.996 decoded
+    10/10: keyed=6.51s rx=96360 confidence=0.997 decoded
+
+  B:ht->A:ic705: 10 x 1436 B
+    1/10: keyed=6.51s rx=96360 confidence=0.992 payload_failed
+    2/10: keyed=6.51s rx=96360 confidence=0.993 payload_failed
+    3/10: keyed=6.51s rx=96360 confidence=0.989 payload_failed
+    4/10: keyed=6.51s rx=96360 confidence=0.990 decoded
+    5/10: keyed=6.51s rx=96240 confidence=0.991 payload_failed
+    6/10: keyed=6.51s rx=96240 confidence=0.990 payload_failed
+    7/10: keyed=6.51s rx=96360 confidence=0.992 payload_failed
+    8/10: keyed=6.51s rx=96360 confidence=0.989 payload_failed
+    9/10: keyed=6.51s rx=96360 confidence=0.991 payload_failed
+    10/10: keyed=6.51s rx=96360 confidence=0.993 payload_failed
+
+== vf12 (ID 18, DATA chunk 2900 B) ==
+
+  A:ic705->B:ht: 10 x 2910 B
+    1/10: keyed=5.30s rx=81840 confidence=0.967 decoded
+    2/10: keyed=5.30s rx=81720 confidence=0.974 decoded
+    3/10: keyed=5.30s rx=81600 confidence=0.975 decoded
+    4/10: keyed=5.30s rx=81600 confidence=0.974 decoded
+    5/10: keyed=5.30s rx=81600 confidence=0.974 decoded
+    6/10: keyed=5.30s rx=81720 confidence=0.974 decoded
+    7/10: keyed=5.30s rx=81720 confidence=0.974 decoded
+    8/10: keyed=5.30s rx=81600 confidence=0.974 decoded
+    9/10: keyed=5.30s rx=81600 confidence=0.974 decoded
+    10/10: keyed=5.30s rx=81600 confidence=0.974 decoded
+
+  B:ht->A:ic705: 10 x 2910 B
+    1/10: keyed=5.30s rx=81720 confidence=0.982 decoded
+    2/10: keyed=5.30s rx=81600 confidence=0.970 decoded
+    3/10: keyed=5.30s rx=81720 confidence=0.968 payload_failed
+    4/10: keyed=5.30s rx=81720 confidence=0.972 decoded
+    5/10: keyed=5.30s rx=81720 confidence=0.976 decoded
+    6/10: keyed=5.30s rx=81600 confidence=0.972 decoded
+    7/10: keyed=5.30s rx=81720 confidence=0.973 decoded
+    8/10: keyed=5.30s rx=81720 confidence=0.973 decoded
+    9/10: keyed=5.30s rx=81720 confidence=0.976 decoded
+    10/10: keyed=5.30s rx=81720 confidence=0.979 decoded
+
+== vf4 (ID 8, DATA chunk 4982 B) ==
+
+  A:ic705->B:ht: 10 x 4992 B
+    1/10: keyed=6.51s rx=96720 confidence=0.997 payload_failed
+    2/10: keyed=6.51s rx=96600 confidence=0.997 payload_failed
+    3/10: keyed=6.51s rx=96600 confidence=0.997 payload_failed
+    4/10: keyed=6.51s rx=96600 confidence=0.997 payload_failed
+    5/10: keyed=6.51s rx=96600 confidence=0.997 payload_failed
+    6/10: keyed=6.51s rx=96720 confidence=0.997 payload_failed
+    7/10: keyed=6.51s rx=96600 confidence=0.996 payload_failed
+    8/10: keyed=6.51s rx=96600 confidence=0.997 payload_failed
+    9/10: keyed=6.51s rx=96600 confidence=0.996 payload_failed
+    10/10: keyed=6.51s rx=96600 confidence=0.996 payload_failed
+
+  B:ht->A:ic705: 10 x 4992 B
+    1/10: keyed=6.51s rx=96600 confidence=0.995 payload_failed
+    2/10: keyed=6.51s rx=96600 confidence=0.993 payload_failed
+    3/10: keyed=6.51s rx=96600 confidence=0.995 payload_failed
+    4/10: keyed=6.51s rx=96600 confidence=0.991 payload_failed
+    5/10: keyed=6.51s rx=96600 confidence=0.995 payload_failed
+    6/10: keyed=6.51s rx=96600 confidence=0.994 payload_failed
+    7/10: keyed=6.51s rx=96720 confidence=0.994 payload_failed
+    8/10: keyed=6.51s rx=96600 confidence=0.994 payload_failed
+    9/10: keyed=6.51s rx=96600 confidence=0.994 payload_failed
+    10/10: keyed=6.51s rx=96600 confidence=0.995 payload_failed
+
+== vf6 (ID 6, DATA chunk 10218 B) ==
+
+  A:ic705->B:ht: 10 x 10228 B
+    1/10: keyed=6.51s rx=97080 confidence=0.995 payload_failed
+    2/10: keyed=6.51s rx=97080 confidence=0.995 payload_failed
+    3/10: keyed=6.51s rx=97080 confidence=0.995 payload_failed
+    4/10: keyed=6.51s rx=97080 confidence=0.995 payload_failed
+    5/10: keyed=6.51s rx=96960 confidence=0.994 payload_failed
+    6/10: keyed=6.51s rx=96960 confidence=0.994 payload_failed
+    7/10: keyed=6.51s rx=97080 confidence=0.994 payload_failed
+    8/10: keyed=6.51s rx=97080 confidence=0.994 payload_failed
+    9/10: keyed=6.51s rx=96960 confidence=0.995 payload_failed
+    10/10: keyed=6.51s rx=97080 confidence=0.995 payload_failed
+
+  B:ht->A:ic705: 10 x 10228 B
+    1/10: keyed=6.51s rx=97560 confidence=0.991 payload_failed
+    2/10: keyed=6.51s rx=97080 confidence=0.992 payload_failed
+    3/10: keyed=6.51s rx=97080 confidence=0.990 payload_failed
+    4/10: keyed=6.51s rx=97080 confidence=0.991 payload_failed
+    5/10: keyed=6.51s rx=97080 confidence=0.988 payload_failed
+    6/10: keyed=6.51s rx=97080 confidence=0.992 payload_failed
+    7/10: keyed=6.51s rx=97080 confidence=0.991 payload_failed
+    8/10: keyed=6.51s rx=97080 confidence=0.992 payload_failed
+    9/10: keyed=6.51s rx=97080 confidence=0.990 payload_failed
+    10/10: keyed=6.51s rx=97080 confidence=0.992 payload_failed
+
+== RESULTS ==
+   300baud A:ic705->B:ht: 10/10 (100.0%), 95% CI 72.2-100.0%, 162 useful bit/s
+   300baud B:ht->A:ic705: 10/10 (100.0%), 95% CI 72.2-100.0%, 162 useful bit/s
+   600baud A:ic705->B:ht: 10/10 (100.0%), 95% CI 72.2-100.0%, 355 useful bit/s
+   600baud B:ht->A:ic705: 10/10 (100.0%), 95% CI 72.2-100.0%, 355 useful bit/s
+  1200baud A:ic705->B:ht: 10/10 (100.0%), 95% CI 72.2-100.0%, 740 useful bit/s
+  1200baud B:ht->A:ic705: 0/10 (0.0%), 95% CI 0.0-27.8%, 0 useful bit/s
+       vf3 A:ic705->B:ht: 10/10 (100.0%), 95% CI 72.2-100.0%, 1753 useful bit/s
+       vf3 B:ht->A:ic705: 1/10 (10.0%), 95% CI 1.8-40.4%, 175 useful bit/s
+      vf12 A:ic705->B:ht: 10/10 (100.0%), 95% CI 72.2-100.0%, 4380 useful bit/s
+      vf12 B:ht->A:ic705: 9/10 (90.0%), 95% CI 59.6-98.2%, 3942 useful bit/s
+       vf4 A:ic705->B:ht: 0/10 (0.0%), 95% CI 0.0-27.8%, 0 useful bit/s
+       vf4 B:ht->A:ic705: 0/10 (0.0%), 95% CI 0.0-27.8%, 0 useful bit/s
+       vf6 A:ic705->B:ht: 0/10 (0.0%), 95% CI 0.0-27.8%, 0 useful bit/s
+       vf6 B:ht->A:ic705: 0/10 (0.0%), 95% CI 0.0-27.8%, 0 useful bit/s
+wrote logs\mode_qualification\vhf-fm\all-modes-20260913\result.json

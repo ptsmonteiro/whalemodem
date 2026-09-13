@@ -1,0 +1,60 @@
+opening radios (ic705, ht)...
+warming up 2s...
+
+=== ic705->ht ===
+  sounded ic705->ht over 2 frames: per-carrier SNR min/median/max = 4.1/8.5/11.0 dB
+  margin +2: vf11 [0b:21 1b:28] 28 bits/sym, 8 codewords, 480 B, 664 bps
+    [ic705->ht margin+2] 1/5: codewords=8/8 crc=True match=True snr=12.1dB
+    [ic705->ht margin+2] 2/5: codewords=8/8 crc=True match=True snr=12.1dB
+    [ic705->ht margin+2] 3/5: codewords=8/8 crc=True match=True snr=12.3dB
+    [ic705->ht margin+2] 4/5: codewords=8/8 crc=True match=True snr=12.0dB
+    [ic705->ht margin+2] 5/5: codewords=8/8 crc=True match=True snr=12.1dB
+    [ic705->ht margin+2] => 5/5 (100%), 664 bps raw, 664 bps goodput
+  margin +0: vf11 [0b:9 1b:20 2b:20] 60 bits/sym, 18 codewords, 1087 B, 1504 bps
+    [ic705->ht margin+0] 1/5: codewords=18/18 crc=True match=True snr=12.3dB
+    [ic705->ht margin+0] 2/5: codewords=18/18 crc=True match=True snr=12.1dB
+    [ic705->ht margin+0] 3/5: codewords=18/18 crc=True match=True snr=12.4dB
+    [ic705->ht margin+0] 4/5: codewords=18/18 crc=True match=True snr=12.0dB
+    [ic705->ht margin+0] 5/5: codewords=18/18 crc=True match=True snr=12.2dB
+    [ic705->ht margin+0] => 5/5 (100%), 1504 bps raw, 1504 bps goodput
+  margin -2: vf11 [1b:13 2b:36] 85 bits/sym, 26 codewords, 1573 B, 2177 bps
+    [ic705->ht margin-2] 1/5: codewords=26/26 crc=True match=True snr=11.9dB
+    [ic705->ht margin-2] 2/5: codewords=26/26 crc=True match=True snr=11.9dB
+    [ic705->ht margin-2] 3/5: codewords=26/26 crc=True match=True snr=12.1dB
+    [ic705->ht margin-2] 4/5: codewords=23/26 crc=False match=False snr=11.9dB
+    [ic705->ht margin-2] 5/5: codewords=26/26 crc=True match=True snr=11.9dB
+    [ic705->ht margin-2] => 4/5 (80%), 2177 bps raw, 1741 bps goodput
+
+=== ht->ic705 ===
+  sounded ht->ic705 over 2 frames: per-carrier SNR min/median/max = 4.2/7.9/10.1 dB
+  margin +2: vf11 [0b:25 1b:24] 24 bits/sym, 7 codewords, 419 B, 580 bps
+    [ht->ic705 margin+2] 1/5: codewords=7/7 crc=True match=True snr=13.1dB
+    [ht->ic705 margin+2] 2/5: codewords=7/7 crc=True match=True snr=12.9dB
+    [ht->ic705 margin+2] 3/5: codewords=7/7 crc=True match=True snr=13.1dB
+    [ht->ic705 margin+2] 4/5: codewords=7/7 crc=True match=True snr=13.2dB
+    [ht->ic705 margin+2] 5/5: codewords=7/7 crc=True match=True snr=13.2dB
+    [ht->ic705 margin+2] => 5/5 (100%), 580 bps raw, 580 bps goodput
+  margin +0: vf11 [0b:4 1b:38 2b:7] 52 bits/sym, 15 codewords, 905 B, 1252 bps
+    [ht->ic705 margin+0] 1/5: codewords=15/15 crc=True match=True snr=13.5dB
+    [ht->ic705 margin+0] 2/5: codewords=15/15 crc=True match=True snr=13.5dB
+    [ht->ic705 margin+0] 3/5: codewords=15/15 crc=True match=True snr=13.5dB
+    [ht->ic705 margin+0] 4/5: codewords=15/15 crc=True match=True snr=13.6dB
+    [ht->ic705 margin+0] 5/5: codewords=15/15 crc=True match=True snr=13.6dB
+    [ht->ic705 margin+0] => 5/5 (100%), 1252 bps raw, 1252 bps goodput
+  margin -2: vf11 [1b:11 2b:38] 87 bits/sym, 26 codewords, 1573 B, 2177 bps
+    [ht->ic705 margin-2] 1/5: codewords=26/26 crc=True match=True snr=13.0dB
+    [ht->ic705 margin-2] 2/5: codewords=26/26 crc=True match=True snr=13.2dB
+    [ht->ic705 margin-2] 3/5: codewords=26/26 crc=True match=True snr=13.1dB
+    [ht->ic705 margin-2] 4/5: codewords=26/26 crc=True match=True snr=13.0dB
+    [ht->ic705 margin-2] 5/5: codewords=26/26 crc=True match=True snr=13.2dB
+    [ht->ic705 margin-2] => 5/5 (100%), 2177 bps raw, 2177 bps goodput
+
+== SUMMARY (goodput = raw bps x frame success) ==
+  ic705->ht      margin+2                  664 bps x 100% =    664 bps
+  ic705->ht      margin+0                 1504 bps x 100% =   1504 bps
+  ic705->ht      margin-2                 2177 bps x  80% =   1741 bps
+  ht->ic705      margin+2                  580 bps x 100% =    580 bps
+  ht->ic705      margin+0                 1252 bps x 100% =   1252 bps
+  ht->ic705      margin-2                 2177 bps x 100% =   2177 bps
+  best on ht->ic705: margin-2 at 2177 bps goodput
+  best on ic705->ht: margin-2 at 1741 bps goodput

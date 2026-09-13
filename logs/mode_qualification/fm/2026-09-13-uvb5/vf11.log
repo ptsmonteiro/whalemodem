@@ -1,0 +1,60 @@
+opening radios (ic705, ht)...
+warming up 2s...
+
+=== ic705->ht ===
+  sounded ic705->ht over 2 frames: per-carrier SNR min/median/max = 8.7/10.9/13.2 dB
+  margin +2: vf11 [1b:25 2b:24] 73 bits/sym, 22 codewords, 1330 B, 1841 bps
+    [ic705->ht margin+2] 1/5: codewords=22/22 crc=True match=True snr=15.1dB
+    [ic705->ht margin+2] 2/5: codewords=22/22 crc=True match=True snr=15.1dB
+    [ic705->ht margin+2] 3/5: codewords=22/22 crc=True match=True snr=15.3dB
+    [ic705->ht margin+2] 4/5: codewords=22/22 crc=True match=True snr=15.3dB
+    [ic705->ht margin+2] 5/5: codewords=22/22 crc=True match=True snr=14.8dB
+    [ic705->ht margin+2] => 5/5 (100%), 1841 bps raw, 1841 bps goodput
+  margin +0: vf11 [1b:2 2b:47] 96 bits/sym, 29 codewords, 1755 B, 2429 bps
+    [ic705->ht margin+0] 1/5: codewords=29/29 crc=True match=True snr=15.4dB
+    [ic705->ht margin+0] 2/5: codewords=29/29 crc=True match=True snr=15.5dB
+    [ic705->ht margin+0] 3/5: codewords=29/29 crc=True match=True snr=15.1dB
+    [ic705->ht margin+0] 4/5: codewords=29/29 crc=True match=True snr=15.2dB
+    [ic705->ht margin+0] 5/5: codewords=29/29 crc=True match=True snr=15.0dB
+    [ic705->ht margin+0] => 5/5 (100%), 2429 bps raw, 2429 bps goodput
+  margin -2: vf11 [2b:43 3b:6] 104 bits/sym, 31 codewords, 1877 B, 2597 bps
+    [ic705->ht margin-2] 1/5: codewords=31/31 crc=True match=True snr=15.1dB
+    [ic705->ht margin-2] 2/5: codewords=31/31 crc=True match=True snr=15.7dB
+    [ic705->ht margin-2] 3/5: codewords=31/31 crc=True match=True snr=15.3dB
+    [ic705->ht margin-2] 4/5: codewords=31/31 crc=True match=True snr=15.4dB
+    [ic705->ht margin-2] 5/5: codewords=31/31 crc=True match=True snr=15.2dB
+    [ic705->ht margin-2] => 5/5 (100%), 2597 bps raw, 2597 bps goodput
+
+=== ht->ic705 ===
+  sounded ht->ic705 over 2 frames: per-carrier SNR min/median/max = 7.9/10.8/13.1 dB
+  margin +2: vf11 [0b:2 1b:27 2b:20] 67 bits/sym, 20 codewords, 1209 B, 1673 bps
+    [ht->ic705 margin+2] 1/5: codewords=20/20 crc=True match=True snr=16.4dB
+    [ht->ic705 margin+2] 2/5: codewords=20/20 crc=True match=True snr=17.1dB
+    [ht->ic705 margin+2] 3/5: codewords=20/20 crc=True match=True snr=17.2dB
+    [ht->ic705 margin+2] 4/5: codewords=20/20 crc=True match=True snr=16.8dB
+    [ht->ic705 margin+2] 5/5: codewords=20/20 crc=True match=True snr=17.4dB
+    [ht->ic705 margin+2] => 5/5 (100%), 1673 bps raw, 1673 bps goodput
+  margin +0: vf11 [1b:2 2b:47] 96 bits/sym, 29 codewords, 1755 B, 2429 bps
+    [ht->ic705 margin+0] 1/5: codewords=29/29 crc=True match=True snr=16.9dB
+    [ht->ic705 margin+0] 2/5: codewords=17/29 crc=False match=False snr=16.9dB
+    [ht->ic705 margin+0] 3/5: codewords=29/29 crc=True match=True snr=16.9dB
+    [ht->ic705 margin+0] 4/5: codewords=29/29 crc=True match=True snr=16.7dB
+    [ht->ic705 margin+0] 5/5: codewords=29/29 crc=True match=True snr=16.7dB
+    [ht->ic705 margin+0] => 4/5 (80%), 2429 bps raw, 1943 bps goodput
+  margin -2: vf11 [2b:38 3b:11] 109 bits/sym, 33 codewords, 1998 B, 2765 bps
+    [ht->ic705 margin-2] 1/5: codewords=33/33 crc=True match=True snr=17.8dB
+    [ht->ic705 margin-2] 2/5: codewords=33/33 crc=True match=True snr=17.6dB
+    [ht->ic705 margin-2] 3/5: codewords=33/33 crc=True match=True snr=16.9dB
+    [ht->ic705 margin-2] 4/5: codewords=33/33 crc=True match=True snr=17.0dB
+    [ht->ic705 margin-2] 5/5: codewords=33/33 crc=True match=True snr=18.1dB
+    [ht->ic705 margin-2] => 5/5 (100%), 2765 bps raw, 2765 bps goodput
+
+== SUMMARY (goodput = raw bps x frame success) ==
+  ic705->ht      margin+2                 1841 bps x 100% =   1841 bps
+  ic705->ht      margin+0                 2429 bps x 100% =   2429 bps
+  ic705->ht      margin-2                 2597 bps x 100% =   2597 bps
+  ht->ic705      margin+2                 1673 bps x 100% =   1673 bps
+  ht->ic705      margin+0                 2429 bps x  80% =   1943 bps
+  ht->ic705      margin-2                 2765 bps x 100% =   2765 bps
+  best on ht->ic705: margin-2 at 2765 bps goodput
+  best on ic705->ht: margin-2 at 2597 bps goodput

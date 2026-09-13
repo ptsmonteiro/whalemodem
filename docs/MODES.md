@@ -17,17 +17,28 @@ in the table. Drive multipliers and decoder estimates are not SNR.
 
 ## FM
 
+FM radio results use a handheld at one end. Its volume knob is an analog
+control that is never at exactly the same setting twice, so receive audio
+level is uncontrolled: two runs of the same mode on the same pair of radios
+are not level-matched, and two different handhelds are not comparable on
+level at all.
+
 | Mode | Frequency span | Modulation geometry | Modulation order | FEC rate | FEC technique | DATA payload/frame | Frame duration | Net/frame | Pure SNR passed | Radio tested |
 | --- | --- | --- | ---: | ---: | --- | ---: | ---: | ---: | --- | --- |
 | 300baud | 1,200-1,800 Hz | 2-tone CPFSK | 2 (2-FSK) | none | none | 88 B | 3.717 s | 189 bit/s | not retained as pure SNR | not measured |
 | 600baud | 1,200-1,800 Hz | 2-tone CPFSK | 2 (2-FSK) | none | none | 193 B | 3.865 s | 399 bit/s | not retained as pure SNR | not measured |
 | 1200baud | 1,200-2,200 Hz | 2-tone CPFSK | 2 (2-FSK) | none | none | 402 B | 3.933 s | 818 bit/s | not retained as pure SNR | not measured |
-| vf3 | 468.75-3,140.625 Hz | 58-carrier differential-QPSK OFDM | 4 (QPSK) | 1/2 | terminated K=7 convolutional, interleaved, soft-decision Viterbi | 1,426 B | 6.155 s | 1,853 bit/s | — | not measured |
+| vf3 | 468.75-3,140.625 Hz | 58-carrier differential-QPSK OFDM | 4 (QPSK) | 1/2 | terminated K=7 convolutional, interleaved, soft-decision Viterbi | 1,426 B | 6.155 s | 1,853 bit/s | — | 2026-09-13, IC-705<->Wouxun KG-UV9D Plus FM, 19/20 (10/10 IC-705->HT, 9/10 HT->IC-705); IC-705<->Baofeng UV-B5 FM, 11/20 (10/10 IC-705->HT, 1/10 HT->IC-705). SNR not calibrated either session |
 
 vf12 (FM): 4,690 net application bit/s per full-capacity DATA frame.
 Simulated pure-SNR pass points: not measured. Calibrated radio-test SNR
-pass points: 2026-09-13, IC-705<->HT FM, 20/20 exact-payload frames both
-directions (10 each way) at ~15 dB measured effective SNR.
+pass points: 2026-09-13, IC-705<->Baofeng UV-B5 FM, 19/20 exact-payload
+frames (10/10 IC-705->HT, 9/10 HT->IC-705) at ~15 dB measured effective SNR.
+On the same date and station A, IC-705<->Wouxun KG-UV9D Plus FM delivered
+10/10 IC-705->HT and 0/10 HT->IC-705, the failing leg at 10.8-13.4 dB
+measured effective SNR with every frame acquired and none decoded. This
+mode's margin at ~15 dB is thin enough that a handheld change removes it in
+one direction.
 
 ## HF
 

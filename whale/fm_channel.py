@@ -45,11 +45,16 @@ class FmSyntheticProfile:
     squelch_open_db: float; squelch_close_db: float; squelch_attack_seconds: float
     squelch_hang_seconds: float; squelch_close_seconds: float
 
-_BS="experiments/ofdm/results/measurements/bandwidth.json"; _CS="scripts/measure_clock_offset.py (measurements in module docstring)"
+_BS="experiments/ofdm/results/measurements/bandwidth.json, regenerated 2026-09-13 by scripts/measure_fm_audio_band.py"; _CS="scripts/measure_clock_offset.py"
+# Squelch blackout is the one field with no measurement tool: it is retained
+# from the retired experiments/ofdm/ bench rather than re-measured, because
+# what a capture shows at its start is the PTT lead and the blackout summed,
+# and nothing here separates them.
+_SQ="leading_mute_seconds retained from the retired experiments/ofdm/ bench, not re-measured"
 FM_RADIO_PRESETS={
- "ic705_to_kg_uv9d":FmRadioPreset("ic705_to_kg_uv9d",(430.9,1905.5),(384.8,2453.2),-3.7,.110,.505,f"{_BS}; {_CS}; squelch measurement from the retired experiments/ofdm/ bench, see experiments/RETIRED.md"),
- "kg_uv9d_to_ic705":FmRadioPreset("kg_uv9d_to_ic705",(425.1,1746.4),(363.,2372.3),3.1,0.,.815,f"{_BS}; {_CS}"),
- "vhf_bench_conservative":FmRadioPreset("vhf_bench_conservative",(430.9,1746.4),(384.8,2372.3),-3.7,.110,.815,"worst directional values from both VHF bench presets")}
+ "ic705_to_kg_uv9d":FmRadioPreset("ic705_to_kg_uv9d",(445.,1929.7),(399.2,2490.),-5.2,.110,.446,f"{_BS}; {_CS}; {_SQ}"),
+ "kg_uv9d_to_ic705":FmRadioPreset("kg_uv9d_to_ic705",(487.8,1631.7),(436.4,2228.2),1.2,0.,.717,f"{_BS}; {_CS}"),
+ "vhf_bench_conservative":FmRadioPreset("vhf_bench_conservative",(487.8,1631.7),(436.4,2228.2),-5.2,.110,.717,"worst directional values from both FM bench presets")}
 FM_SYNTHETIC_PROFILES={
  "flat_nbfm":FmSyntheticProfile("flat_nbfm",(300.,3000.),(300.,3000.),75e-6,75e-6,.8,-18.,-22.,.015,.120,.010),
  "handheld_nbfm":FmSyntheticProfile("handheld_nbfm",(350.,2700.),(400.,2500.),75e-6,75e-6,.65,-15.,-20.,.080,.180,.020)}
