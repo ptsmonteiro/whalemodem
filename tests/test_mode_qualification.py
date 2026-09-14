@@ -47,11 +47,6 @@ def test_filter_excludes_opt_in_mode_from_default(monkeypatch):
     assert 3 in registry("fm", "optional").supported_ids
 
 
-def test_1200_baud_is_optional_on_fm():
-    assert 2 not in registry("fm", "default").supported_ids
-    assert 2 in registry("fm", "optional").supported_ids
-
-
 def test_unknown_level_and_policy_are_rejected():
     with pytest.raises(ValueError, match="qualification level"):
         registry("fm", "qualified-ish")

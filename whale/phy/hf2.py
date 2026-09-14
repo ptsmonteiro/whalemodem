@@ -16,7 +16,7 @@ rate-1/2 K=7 convolutional code and CRC32/length framing
 (`whale.dsp.acquire`), frequency and timing recovery (`whale.dsp.freq`,
 `whale.dsp.timing`), and header equalization (`whale.dsp.equalize`).  Every
 geometry number, the pilot layout and the 16-QAM mapping are HF2's own,
-picked independently of HC0/HC1W/VF6/HR0 per that DESIGN.md.
+picked independently of HC0/HC1W/HR0 per that DESIGN.md.
 
 Frame shape:
 

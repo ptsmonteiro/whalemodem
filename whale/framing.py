@@ -50,14 +50,9 @@ def _lfsr_bits(num_bits, order, taps, seed=1):
 # not follow the rule, and it is what a receiver has to survive the start of
 # a transmission with.
 #
-# It was a fixed 63-bit PN word, i.e. 210ms at 300 baud but only 52ms at
-# 1200. So the profile with the least margin against a fixed-duration
-# impairment was always the fastest one -- the opposite of what you want,
-# since the fast profile is also the one carrying the most payload behind
-# that sync word. That is not a hypothetical: swapping the bench HT for one
-# that blacks out for ~110ms after its squelch opens killed PROFILE_1200
-# outright while 300 and 600 baud kept working, because at 1200 the whole
-# sync word fitted inside the blackout. See HEAD_SECONDS.
+# The original fixed 63-bit PN word shrank in duration as baud increased, so
+# the fastest profile had the least margin against a fixed-duration impairment.
+# Every profile now gets a sync word close to SYNC_SECONDS instead.
 #
 # Every profile now gets SYNC_SECONDS of sync word, so a blackout costs each
 # one the same *fraction* of its sync word rather than a fraction that
@@ -67,7 +62,6 @@ def _lfsr_bits(num_bits, order, taps, seed=1):
 #
 #     300 baud   order 6    63 bits   210.0ms
 #     600 baud   order 7   127 bits   211.7ms
-#    1200 baud   order 8   255 bits   212.5ms
 #    2400 baud   order 9   511 bits   212.9ms
 #
 # 0.21s is 300 baud's existing 63 bits, so the control profile's sync word
@@ -75,8 +69,8 @@ def _lfsr_bits(num_bits, order, taps, seed=1):
 #
 # ON-AIR FORMAT CHANGE, on the same footing as LENGTH_FIELD_BITS: a station
 # built before this does not share a sync word with one built after at 600
-# or 1200 baud, and since the sync word is what a receiver locks on, the two
-# do not interoperate at those speeds at all. 300 baud is unchanged, and
+# baud, and since the sync word is what a receiver locks on, the two do not
+# interoperate at that speed. 300 baud is unchanged, and
 # because that is CONTROL_PROFILE, a mismatched pair still fails the way an
 # out-of-range station does -- no CONNECT_ACK -- rather than by half-opening
 # a session it cannot carry data on.
@@ -102,12 +96,8 @@ def sync_bits(baud):
 
 # The length field, and everything it can express.
 #
-# This was 8 bits / 255 bytes, which was the binding constraint at 1200 baud:
-# the useful-frame duration budget leaves room for a larger payload there, so
-# of every keying went unspent purely because the field could not describe
-# it. 16 bits spends that, and leaves headroom for whatever faster profile
-# turns up -- it covers a full keying up to roughly 230 kbaud, which is far
-# past anything a 3 kHz audio channel will ever carry.
+# The field is deliberately wider than the payload budget, leaving headroom
+# for faster profiles without making the frame-size limit a protocol limit.
 #
 # ON-AIR FORMAT CHANGE: stations built either side of this do not
 # interoperate, and unlike the mode negotiation there is no way to straddle
@@ -154,9 +144,9 @@ _HEAD_PAD_TAPS = (1, 15)
 # i.e. no receiver on the bench at the time needed any of it, so the figure
 # was margin rather than a measured floor. Swapping the HT produced one that
 # does need it, and it is worth knowing what that failure looked like,
-# because nothing about it pointed here: PROFILE_1200 stopped working in one
-# direction while 300 and 600 kept running, which reads like a tone-placement
-# or frame-size problem at the fast profile and is neither.
+# because receiver startup can briefly contain broadband energy rather than
+# the transmitted tone, which reads like a tone-placement or frame-size
+# problem and is neither.
 #
 # What that HT does is black out for ~110ms after its squelch opens. Not
 # attenuate -- black out.
@@ -194,19 +184,9 @@ _HEAD_PAD_TAPS = (1, 15)
 # The other is that the sync word is where the loss lands. Aligning a real
 # capture against the frame that was sent, by the frame body:
 #
-#            head pad     sync word      bit errors
-#   600      0-80ms       80-185ms       0 of 63 sync, 0 of 850 body
-#   1200     0-80ms       80-132ms      14 of 63 sync, 1 of 868 body
-#
-# The 1200-baud *body* arrives essentially perfect and the frame is thrown
-# away anyway, because 14-15 of its 63 sync symbols land inside the blackout
-# every time and hold the correlation at 0.60-0.62 against
-# afsk.CONFIDENCE_THRESHOLD's 0.7. A frame nobody can sync on is
-# indistinguishable from one that never arrived. And 1200 baud was alone in
-# failing because its sync word was the shortest in *time* -- see SYNC_SECONDS
-# above, which is the structural half of this fix and the reason a blackout
-# now costs every profile the same fraction of its sync word rather than a
-# fraction that doubles with baud.
+# A frame nobody can sync on is indistinguishable from one that never arrived.
+# SYNC_SECONDS keeps a fixed-duration blackout from consuming a larger
+# fraction of the sync word as baud increases.
 #
 # So there are two allowances against a blackout, and they buy different
 # things per millisecond of air time:
@@ -214,7 +194,7 @@ _HEAD_PAD_TAPS = (1, 15)
 #   - this pad, 1:1 -- every ms of it is a ms of blackout the sync word
 #     never sees;
 #   - the sync word's length, at about 0.4:1 -- a lock survives losing
-#     roughly the first 40% of the sync word (identical at all three
+#     roughly the first 40% of the sync word (identical across the shipped
 #     profiles, and holding to 40% while breaking at 50%; see
 #     test_a_lock_survives_losing_the_opening_of_the_sync_word).
 #
@@ -222,22 +202,6 @@ _HEAD_PAD_TAPS = (1, 15)
 # SYNC_SECONDS, or pad + ~85ms. Sizing this is picking how much margin to
 # hold over the worst receiver you expect; the sync word covers the rest and
 # costs the same at every profile.
-#
-# Measured on the weak leg (ic705->ht), 1200 baud, 100-byte payload, with
-# the duration-scaled sync word in place:
-#
-#    20ms   1/8            blackout eats ~42% of the sync word
-#    50ms   8/8  conf 0.8
-#    80ms   8/8  conf 0.9
-#   150ms   8/8  conf 0.9
-#   280ms   8/8  conf 1.0
-#
-# 50ms is the knee on this radio and 150ms is what ships: ~235ms of total
-# tolerance against the 110ms this HT actually needs, so a receiver twice as
-# slow as the worst one seen still works. Before the sync word was scaled,
-# the same sweep needed 280ms to reach 8/8 and failed outright at 80 --
-# the 130ms saved is what the structural fix bought back, and it is spent
-# here on margin rather than returned to the payload.
 #
 # Note this pad is also the cheaper allowance to grow later: it is the one
 # that does not have to be paid at every profile equally, since a slow

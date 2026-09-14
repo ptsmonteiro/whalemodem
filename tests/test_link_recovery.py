@@ -20,9 +20,6 @@ were fatal, and the ones that were not are the ones that hid the bug:
     300 -> 600   survivable   the peer keeps transmitting at 300, which is
                               afsk.CONTROL_PROFILE and therefore always a
                               decode candidate
-    600 -> 1200  FATAL        candidates were (CONTROL, 1200); the peer is
-                              still at 600, which is neither
-    1200 -> 600  FATAL        same, mirrored
     600 -> 300   FATAL        candidates collapse to (CONTROL,) alone
 
 The survivable row is kept as a test in its own right so that a future
@@ -32,7 +29,7 @@ change cannot quietly convert it into a fatal one.
 import threading
 import time
 
-from whale import afsk, link, mode_history, modes
+from whale import afsk, link, mode_history
 
 import link_harness as harness
 
@@ -77,55 +74,6 @@ def test_three_silent_attempts_downgrade_and_retry_the_same_chunk():
         assert got.get("msg") == b"silent downgrade"
         assert a.tx_profile is afsk.PROFILE_300
         assert b.rx_profile is afsk.PROFILE_300
-    finally:
-        _stop(a, b)
-
-
-def test_a_step_down_re_cuts_a_chunk_too_big_for_the_new_mode(caplog):
-    """Every rung down the ladder carries less: 88 / 193 / 402 bytes for the
-    CPFSK profiles, 1426 for VF3. So a chunk cut at the mode in force when
-    send_message sliced it can be larger than the mode the ARQ loop steps
-    down to three silent attempts later -- and the air-header shape check
-    rejects a DATA body over the mode's chunk_size, which used to surface as
-    a ValueError that killed the sending thread mid-message.
-
-    Started at 1200 (chunk_size 402) with a payload that needs a full-size
-    chunk, so the step down to 600 (chunk_size 193) lands with 402 bytes in
-    hand. Nothing here is VF3-specific; VF3 only widened the gap enough that
-    a bench run hit it on the first try."""
-    history = {}
-    a, b, ta, tb = harness.make_pair(
-        history=history, mode_registry=modes.optional_registry())
-    try:
-        mode_history.record_good_mode(history, a.mycall, b.mycall,
-                                      afsk.PROFILE_1200.mode_id)
-        ok, _ = harness.handshake(a, b)
-        assert ok
-        assert a.tx_profile is afsk.PROFILE_1200, a.tx_profile
-        a.data_ack_timeout = FAST_DATA_TIMEOUT
-        harness.drop_next(a, "DATA", occurrences=(1, 2, 3))
-
-        payload = bytes(range(256)) * 2  # 512 > PROFILE_1200.chunk_size
-        assert len(payload) > afsk.PROFILE_1200.chunk_size
-
-        got = {}
-        receiver = threading.Thread(
-            target=lambda: got.update(msg=b.recv_message(timeout=60)))
-        receiver.start()
-        try:
-            with caplog.at_level("INFO", logger="whale.link"):
-                a.send_message(payload)
-        finally:
-            receiver.join(timeout=60)
-
-        # The whole message arrives, re-cut, with no gap or duplication at
-        # the seam where the mode changed.
-        assert got.get("msg") == payload
-        # And it really did go through the re-cut path rather than, say,
-        # never stepping down at all. The profile afterwards is deliberately
-        # not asserted: the smaller chunks ACK cleanly and _maybe_adapt is
-        # then free to climb back to 1200, which is correct behaviour.
-        assert any("re-cutting seq=" in r.message for r in caplog.records),             [r.message for r in caplog.records]
     finally:
         _stop(a, b)
 
@@ -193,62 +141,12 @@ def obsolete_lost_mode_ack_stepping_up_from_the_control_profile():
     print(f"test_lost_mode_ack_stepping_up_from_the_control_profile OK (-> {target.name})")
 
 
-def obsolete_lost_mode_ack_stepping_up_between_data_profiles():
-    """600 -> 1200. Fatal before the fix: the peer goes on transmitting at
-    600, which is neither afsk.CONTROL_PROFILE nor the new rx_profile, so
-    nothing it sends decodes at all and the disagreement can never be
-    observed."""
-    target = _mode_step_survives_a_lost_ack(afsk.PROFILE_600.mode_id, +1)
-    print(f"test_lost_mode_ack_stepping_up_between_data_profiles OK (-> {target.name})")
-
-
-def obsolete_lost_mode_ack_stepping_down_between_data_profiles():
-    """1200 -> 600, the mirror of the above and fatal for the same reason.
-    Worse in practice: a step down happens because the link is already in
-    trouble, which is exactly when the ack is most likely to be the frame
-    that gets lost."""
-    target = _mode_step_survives_a_lost_ack(afsk.PROFILE_1200.mode_id, -1)
-    print(f"test_lost_mode_ack_stepping_down_between_data_profiles OK (-> {target.name})")
-
-
 def obsolete_lost_mode_ack_stepping_down_to_the_control_profile():
     """600 -> 300. The worst shape of it: the candidate list collapses to
     afsk.CONTROL_PROFILE alone, so there is not even a second profile being
     tried by accident."""
     target = _mode_step_survives_a_lost_ack(afsk.PROFILE_600.mode_id, -1)
     print(f"test_lost_mode_ack_stepping_down_to_the_control_profile OK (-> {target.name})")
-
-
-def obsolete_recovery_from_a_lost_mode_ack_costs_one_frame():
-    """"Bounded number of frames" made specific: the very first data frame
-    after the lost ack is the one that settles it, because a frame that
-    decoded is not a belief about the peer, it is the peer."""
-    history = {}
-    a, b, ta, tb = harness.make_pair(history=history)
-    try:
-        mode_history.record_good_mode(history, a.mycall, b.mycall, afsk.PROFILE_600.mode_id)
-        ok, _ = harness.handshake(a, b)
-        assert ok
-        a.control_ack_timeout = FAST_CONTROL_TIMEOUT
-        harness.drop_next(b, "MODE_ACK")
-
-        one_chunk = b"x" * a.tx_profile.chunk_size
-        got = {}
-        receiver = threading.Thread(target=lambda: got.update(msg=b.recv_message(timeout=60)))
-        receiver.start()
-        try:
-            a._request_mode_step(+1)
-            assert b.rx_profile.mode_id == afsk.PROFILE_1200.mode_id
-            a.send_message(one_chunk)
-        finally:
-            receiver.join(timeout=60)
-
-        assert got.get("msg") == one_chunk
-        assert b.rx_profile.mode_id == afsk.PROFILE_600.mode_id, b.rx_profile
-        assert b._rx_profile_fallback is None, "the fallback should be dropped once settled"
-        print("test_recovery_from_a_lost_mode_ack_costs_one_frame OK")
-    finally:
-        _stop(a, b)
 
 
 def obsolete_a_control_frame_does_not_drag_the_rx_profile_back_down():
@@ -259,14 +157,14 @@ def obsolete_a_control_frame_does_not_drag_the_rx_profile_back_down():
     history = {}
     a, b, ta, tb = harness.make_pair(history=history)
     try:
-        mode_history.record_good_mode(history, a.mycall, b.mycall, afsk.PROFILE_1200.mode_id)
+        mode_history.record_good_mode(history, a.mycall, b.mycall, afsk.PROFILE_600.mode_id)
         ok, _ = harness.handshake(a, b)
-        assert ok and b.rx_profile.mode_id == afsk.PROFILE_1200.mode_id
+        assert ok and b.rx_profile.mode_id == afsk.PROFILE_600.mode_id
 
         # A MODE_REQ from A, decoded by B at the control profile. B's rx
         # expectation for A's *data* must be untouched by it.
-        b._handle_raw(bytes([link.PT_MODE_REQ, afsk.PROFILE_1200.mode_id]), afsk.CONTROL_PROFILE)
-        assert b.rx_profile.mode_id == afsk.PROFILE_1200.mode_id, b.rx_profile
+        b._handle_raw(bytes([link.PT_MODE_REQ, afsk.PROFILE_600.mode_id]), afsk.CONTROL_PROFILE)
+        assert b.rx_profile.mode_id == afsk.PROFILE_600.mode_id, b.rx_profile
         print("test_a_control_frame_does_not_drag_the_rx_profile_back_down OK")
     finally:
         _stop(a, b)
@@ -417,9 +315,9 @@ def test_a_connect_ack_for_an_earlier_session_is_ignored():
     a = link.Link(harness.FakeTransport(), "STA1")
     a.control_ack_timeout = 0.2
     a._tx_packet = lambda ptype, body: None
-    stale = link._encode_connect_ack("STA2", "STA1", [0, 1, 2],
-                                     afsk.PROFILE_1200.mode_id,
-                                     afsk.PROFILE_1200.mode_id, 0x22)
+    stale = link._encode_connect_ack("STA2", "STA1", [0, 1],
+                                     afsk.PROFILE_600.mode_id,
+                                     afsk.PROFILE_600.mode_id, 0x22)
     replies = [(link.PT_CONNECT_ACK, stale)]
     a._wait_packet = lambda types, timeout: replies.pop(0) if replies else None
 
@@ -470,10 +368,10 @@ def test_drop_hook_parses_the_environment_the_bench_uses():
 
 def test_mode_step_script_parses_the_environment_the_bench_uses():
     assert link._mode_step_script({}) == {}
-    assert link._mode_step_script({"WHALE_MODE_STEP_SCRIPT": "2:up,5:down"}) == {2: +1, 5: -1}
+    assert link._mode_step_script({"WHALE_MODE_STEP_SCRIPT": "1:up,5:down"}) == {1: +1, 5: -1}
     supported = afsk.default_registry().supported_ids
     assert link._forced_mode_id({}) is None
-    assert link._forced_mode_id({"WHALE_FORCE_MODE": "2"}, supported) == afsk.PROFILE_1200.mode_id
+    assert link._forced_mode_id({"WHALE_FORCE_MODE": "1"}, supported) == afsk.PROFILE_600.mode_id
     assert link._forced_mode_id({"WHALE_FORCE_MODE": "99"}, supported) is None
     # mode_id 0 is a real profile and is falsy, so "no override" has to be
     # None rather than anything the callers can confuse with zero.

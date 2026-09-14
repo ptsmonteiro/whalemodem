@@ -41,33 +41,12 @@ def test_one_point_benchmark_writes_versioned_replayable_result(tmp_path):
     assert document["trials"][0]["decoder_metrics"]["total_bit_errors"] == 0
 
 
-def test_explicit_payload_records_requested_data_and_actual_frame_sizes(tmp_path):
-    output = tmp_path / "result.json"
-    assert benchmark.main([
-        "--model", "awgn", "--policy", "fm", "--points", "40",
-        "--mode-level", "optional",
-        "--trials", "1", "--modes", "1200baud", "--seed", "18",
-        "--workers", "1",
-        "--payload-bytes", "88", "--out", str(output),
-    ]) == 0
-    document = json.loads(output.read_text())
-    assert document["metadata"]["requested_payload_bytes"] == 88
-    assert document["metadata"]["data_payload_bytes_by_mode"] == {"2": 88}
-    assert document["metadata"]["actual_payload_bytes_by_mode"] == {"2": 98}
-    assert document["trials"][0]["payload_bytes"] == 98
-    summary = document["metadata"]["summary_by_mode_point"][0]
-    assert summary["requested_payload_bytes"] == 88
-    assert summary["data_payload_bytes"] == 88
-    assert summary["actual_payload_bytes"] == 98
-
-
 @pytest.mark.parametrize("value", ["-1", "not-an-integer"])
 def test_payload_rejects_negative_or_invalid_values(value, tmp_path, capsys):
     with pytest.raises(SystemExit):
         benchmark.main([
             "--model", "awgn", "--policy", "fm", "--points", "40",
-            "--mode-level", "optional",
-            "--trials", "1", "--modes", "1200baud",
+            "--trials", "1", "--modes", "300baud",
             "--payload-bytes", value, "--out", str(tmp_path / "result.json"),
         ])
     assert "payload-bytes" in capsys.readouterr().err

@@ -2,7 +2,7 @@
 
 VF3 is the 58-carrier differential-QPSK OFDM frame validated on the bench in
 `experiments/vf3/` -- 6/6 full-capacity frames byte-for-byte in both
-directions -- at about 2,200 net user bit/s against `PROFILE_1200`'s 947.
+directions -- at about 2,200 net user bit/s against `PROFILE_600`'s 399.
 This module is the adapter that lets `whale/link.py` negotiate and drive it
 without knowing any of that: the link deals in `encode` / `decode` /
 `airtime`, `chunk_size` and `mode_id`, exactly as it does for an

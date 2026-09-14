@@ -12,8 +12,7 @@ Bypasses whale.link's ARQ entirely (like scripts/probe_600_ack.py) so each
 data point is a single direct modulate -> TX -> capture -> demodulate, no
 retries/acks muddying the result. See scripts/bench.py.
 
-Trials here are *unpadded*, unlike sweep_baud_600_2300.py and
-sweep_payload_1200_2200.py: the frame starts at t=0 of the TX buffer, so
+Trials here are *unpadded*: the frame starts at t=0 of the TX buffer, so
 these numbers include whatever the audio chain's post-PTT settling costs.
 That is the configuration production actually runs in.
 
@@ -26,7 +25,7 @@ import bench
 from whale import afsk
 
 # baud candidates to probe, holding PROFILE_600's tones fixed
-BAUD_CANDIDATES = [300, 450, 600, 900, 1200, 1600, 2000, 2400, 3000]
+BAUD_CANDIDATES = [300, 450, 600, 900, 1600, 2000, 2400, 3000]
 PAYLOAD_CANDIDATES = [2, 4, 6, 8, 10, 20, 40, 80, 120, 160, 200, 255]
 
 

@@ -62,7 +62,7 @@ def test_sync_words_are_full_period_m_sequences():
     and a wrong entry would still produce a plausible-looking bit string --
     just a short-period one, with sidelobes to match.
     """
-    for baud in (300, 600, 1200, 2400):
+    for baud in (300, 600, 2400):
         bits = framing.sync_bits(baud)
         order = (len(bits) + 1).bit_length() - 1
         assert len(bits) == (1 << order) - 1, (baud, len(bits))
@@ -78,7 +78,7 @@ def test_sync_words_are_full_period_m_sequences():
     # And each lasts about framing.SYNC_SECONDS on air -- the point of
     # scaling it at all. See framing.sync_bits for why a fixed bit count
     # left the fastest profile with the least margin.
-    for baud in (300, 600, 1200, 2400):
+    for baud in (300, 600, 2400):
         seconds = len(framing.sync_bits(baud)) / baud
         assert abs(seconds - framing.SYNC_SECONDS) / framing.SYNC_SECONDS < 0.02, \
             (baud, seconds)
@@ -141,11 +141,11 @@ def test_a_lock_survives_losing_the_opening_of_the_sync_word():
     What must hold is that the survivable loss is the same *fraction* of the
     sync word at every profile. Since every profile's sync word is the same
     duration, an equal fraction is an equal number of milliseconds -- so one
-    head-pad figure protects all three, instead of protecting the slow ones
-    while the fast one silently runs on a fraction of the margin.
+    head-pad figure protects both shipped profiles, instead of protecting the
+    slow one while the fast one silently runs on a fraction of the margin.
 
-    With a fixed 63-bit sync word this failed badly: the same 110ms blackout
-    cost 300 baud a quarter of its sync word and 1200 baud all of it.
+    With a fixed 63-bit sync word this failed badly: a fixed blackout cost the
+    faster profile a much larger fraction of its sync word.
     """
     payload = bytes(range(100))
     rng = np.random.default_rng(11)
@@ -198,10 +198,8 @@ def test_every_keying_fits_the_budget_and_uses_it():
         assert useful <= afsk.MAX_USEFUL_FRAME_SECONDS + 1e-9, \
             (profile.name, payload, round(useful, 3))
 
-        # One more byte must not fit. This used to be conditional, because
-        # at 1200 baud what stopped us was the 8-bit length field rather
-        # than the clock; with framing.LENGTH_FIELD_BITS at 16 the budget
-        # binds at every profile and the exemption is gone.
+        # One more byte must not fit: the 16-bit length field leaves the
+        # airtime budget as the limiting factor for every shipped profile.
         assert payload < framing.MAX_PAYLOAD_BYTES, \
             f"{profile.name} is capped by the length field again, not the clock"
         assert afsk.useful_data_seconds(payload + 1, profile) > afsk.MAX_USEFUL_FRAME_SECONDS, \
@@ -296,8 +294,8 @@ ASSUMED_WORST_CASE_PPM = 500
 
 # The production frame: link.py sends chunk_size DATA bytes after the shared
 # air header. This is per profile rather than one number now that chunk_size
-# is derived from the useful-frame budget -- 98, 203 and 412 physical-layer
-# payload bytes at 300, 600 and 1200 baud, all three landing on a useful frame
+# is derived from the useful-frame budget, with every shipped profile landing
+# on a useful frame
 # of at most afsk.MAX_USEFUL_FRAME_SECONDS. Derived rather than restated so
 # these tests keep measuring what the link actually sends.
 def production_payload_bytes(profile):
@@ -466,15 +464,14 @@ def test_decodes_at_production_size_under_bench_clock_offset():
 
         300 baud    98 bytes    895 bits    ~559 ppm
         600 baud   203 bytes   1799 bits    ~278 ppm
-       1200 baud   412 bytes   3599 bits    ~139 ppm
 
-    -- and the two faster profiles are the ones that cannot hold 500. Note
+    -- and the faster profile is the one that cannot hold 500. Note
     the shape: the frames are sized by *airtime*, so a faster profile spends
     its budget on more bits, and more bits is exactly what this decoder
     cannot keep timing across. The tolerance therefore falls as the link
     speeds up, which is the opposite of the reassuring direction. It costs
-    nothing on this bench (the two cards measure 3.4 ppm apart, ~70x inside
-    even the 1200 baud figure) and it is the first thing to check on
+    nothing on this bench (the two cards measure 3.4 ppm apart) and it is the
+    first thing to check on
     hardware whose clocks are not this close.
     """
     rng = np.random.default_rng(13)
@@ -576,8 +573,8 @@ def test_an_implausible_declared_length_is_a_dead_sync_not_a_frame_in_flight():
     Nothing can validate a length field before buffering everything it
     claims -- the CRC sits after the payload it describes -- so the decoder
     has to judge the claim on its face. A false sync on noise yields a
-    uniformly random 16-bit value, and at 1200 baud ~98% of those describe a
-    frame longer than transport.RX_BUFFER_SECONDS can ever hold. Reporting
+    uniformly random 16-bit value, and most of those describe a frame longer
+    than transport.RX_BUFFER_SECONDS can ever hold. Reporting
     one of those as 'still arriving' tells whale/link.py's decode loop to
     stop pruning and re-search the whole buffer every poll (see
     _prune_stale), which lands straight on the turnaround.

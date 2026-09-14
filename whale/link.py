@@ -7,7 +7,7 @@ Correctness first.
 Throughput on a half-duplex link is dominated by turnaround, not by baud.
 Timing the acceptance run frame by frame (both stations' logs, PTT-on
 recovered as logged_time - keyed_seconds) put a steady-state 100-byte
-exchange at 1200 baud at 3.91s, of which:
+exchange on the fast historical AFSK profile at 3.91s, of which:
 
     2.00s  turnaround dead air, two 1.0s fixed sleeps
     0.85s  PTT lead + output-stream startup + PTT tail, two transmissions
@@ -25,7 +25,7 @@ worked on the bench: the ic705->ht leg recovered exactly one frame from 32
 of its 34 two-frame bursts, the second frame syncing cleanly and then
 failing its CRC every time, which is the same "sync locks, frame does not
 verify" signature as the per-frame size ceilings in
-scripts/sweep_payload_1200_2200.py and the 600 baud sweep. That is not
+the baud sweeps. That is not
 understood, and bursting is parked until it is. What survives from the
 attempt is the sequence numbering (below) and the decoder fixes it forced
 in whale/afsk.py, which were real bugs in their own right.

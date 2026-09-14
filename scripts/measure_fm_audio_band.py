@@ -21,8 +21,8 @@ Two things differ from the retired version, both deliberate:
     on the retired package.
   * Tone phases are Schroeder rather than a data-derived sequence. A 127-tone
     comb at equal phase has a ~21 dB crest factor, and this path is
-    intermodulation-limited rather than noise-limited (see
-    `whale/modes/vf9.py`): probing it with a signal that clips the transmitter
+    intermodulation-limited rather than noise-limited: probing it with a signal
+    that clips the transmitter
     would measure our own distortion. Schroeder brings it to ~4 dB.
 
 Neither changes what is being measured. Band edges are read from the
@@ -64,7 +64,7 @@ BLOCK = 4                      # periods per window; 133 ms at this geometry
 TRIALS = 3
 CAPTURE_TAIL = 0.8
 INTER_TRIAL = 0.6
-AMPLITUDE = 0.4                # see vf9.py: this path is IMD-limited, back off
+AMPLITUDE = 0.4                # this path is IMD-limited, so back off
 DELAY_FLOOR_DB = -20.0
 
 DEFAULT_OUT = "experiments/ofdm/results/measurements/bandwidth.json"

@@ -26,7 +26,7 @@ Run:
 
     # start both legs at 600 baud, have each station step up after its
     # first ACKed chunk, and lose the first MODE_ACK at each end -- i.e.
-    # the 600->1200 transition failing in both directions at once
+    # the 600->VF13 transition failing in both directions at once
     python scripts/run_acceptance_test.py \
         --a-env WHALE_FORCE_MODE=1 --a-env WHALE_MODE_STEP_SCRIPT=1:up \
         --a-env WHALE_DROP_PTYPE=MODE_ACK \

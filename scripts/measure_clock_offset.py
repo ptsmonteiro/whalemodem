@@ -2,8 +2,8 @@
 
 This settles, without decoding anything, whether the two sound cards run at
 meaningfully different rates -- a mechanism once proposed for the
-frame-size ceiling that scripts/sweep_payload_1200_2200.py and the 600-baud
-sweep both hit (160-byte payloads fail while 120 passes, at every baud).
+frame-size ceiling that the historical baud sweeps hit (160-byte payloads fail
+while 120 passes, at every baud).
 
 Measured on this bench, and the answer is no:
 

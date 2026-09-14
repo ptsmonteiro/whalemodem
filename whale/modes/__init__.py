@@ -8,7 +8,7 @@ not know which modulation is underneath.
 
 
 def default_registry(budget=None):
-    """The station's negotiable mode ladder: the CPFSK profiles, VF3, then VF12.
+    """The station's negotiable mode ladder: CPFSK, VF13, VF3, then VF12.
 
     This -- not `afsk.default_registry()` -- is what a Link uses when it is
     not handed a registry.  `afsk.default_registry()` remains the CPFSK-only

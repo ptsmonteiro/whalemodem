@@ -45,22 +45,22 @@ def test_vf3_satisfies_the_waveform_mode_protocol():
 
 def test_vf3_is_the_top_rung_of_the_ladder_and_steps_both_ways():
     registry = registry_with_vf3()
-    assert registry.supported_ids == (0, 1, 2, 3)
+    assert registry.supported_ids == (0, 1, 3)
     assert registry.control is afsk.CONTROL_PROFILE  # control plane unchanged
     assert registry.step(VF3, +1) is None
-    assert registry.step(VF3, -1) is afsk.PROFILE_1200
-    assert registry.step(afsk.PROFILE_1200, +1) is VF3
+    assert registry.step(VF3, -1) is afsk.PROFILE_600
+    assert registry.step(afsk.PROFILE_600, +1) is VF3
 
 
 def test_a_vf3_keying_is_fixed_length_whatever_it_carries():
     assert VF3.airtime(1) == VF3.airtime(VF3.chunk_size) == pytest.approx(6.155)
 
 
-def test_a_full_chunk_is_worth_more_than_four_1200_baud_keyings():
+def test_a_full_chunk_is_worth_more_than_two_600_baud_keyings():
     # The reason for the mode, kept as an assertion so a chunk_size or frame
     # change that quietly gives the win back fails here.
     vf3_rate = VF3.chunk_size * 8 / VF3.airtime(VF3.chunk_size)
-    cpfsk = afsk.PROFILE_1200
+    cpfsk = afsk.PROFILE_600
     cpfsk_rate = (cpfsk.chunk_size * 8
                   / cpfsk.airtime(framing.AIR_HEADER_BYTES + cpfsk.chunk_size))
     assert vf3_rate > 2 * cpfsk_rate
