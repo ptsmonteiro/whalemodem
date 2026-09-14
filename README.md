@@ -42,6 +42,10 @@ browsing the audio devices, serial ports, and hamlib models it finds:
 whale-configure
 ```
 
+Use `whale-levels --radio station-a` to check received level with open
+squelch and choose a conservative transmit attenuation; see
+[radio audio setup](docs/HARDWARE.md#whale-levels).
+
 **Run.** Start one server per radio, then point your VARA-capable
 application at its command and data ports:
 

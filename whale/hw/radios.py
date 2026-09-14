@@ -1,6 +1,7 @@
 """Configured radios: audio-device selection plus a pluggable PTT backend."""
 from __future__ import annotations
 from dataclasses import dataclass, field
+import math
 import os
 import re
 from pathlib import Path
@@ -27,6 +28,11 @@ class Radio:
     ptt_backend: str
     channels: frozenset[str]
     ptt_config: Mapping[str, Any] = field(default_factory=dict)
+    tx_level_db: float = 0.0
+
+    @property
+    def tx_level_linear(self) -> float:
+        return 10.0 ** (self.tx_level_db / 20.0)
 
     @property
     def capabilities(self) -> PttCapabilities:
@@ -69,7 +75,10 @@ def _radio(id_: str, value: Mapping[str, Any]) -> Radio:
             f"radio {id_!r} has invalid channels {sorted(channels - VALID_CHANNELS)}; "
             f"must be a subset of {sorted(VALID_CHANNELS)}")
     config = {key: item for key, item in ptt_value.items() if key != "backend"}
-    return Radio(id_, value.get("name", id_), audio_input, audio_output, backend, channels, config)
+    level = audio_value.get("tx_level_db", 0.0)
+    if isinstance(level, bool) or not isinstance(level, (int, float)) or not math.isfinite(level) or not -60 <= level <= 0:
+        raise ValueError(f"radio {id_!r} audio.tx_level_db must be between -60 and 0 dB")
+    return Radio(id_, value.get("name", id_), audio_input, audio_output, backend, channels, config, float(level))
 
 def load_radios(path: str | os.PathLike[str]) -> RadioInventory:
     """Load ``[radios.NAME]`` tables and the optional ``default_radio`` key from a TOML inventory.
@@ -153,6 +162,8 @@ def save_radios(path: str | os.PathLike[str], inventory: RadioInventory) -> None
         lines.append(f"name = {_toml_string(radio.name)}")
         lines.append(f"audio.input = {_toml_string(radio.audio_input_name)}")
         lines.append(f"audio.output = {_toml_string(radio.audio_output_name)}")
+        if radio.tx_level_db != 0:
+            lines.append(f"audio.tx_level_db = {radio.tx_level_db:g}")
         channels_literal = ", ".join(_toml_string(channel) for channel in sorted(radio.channels))
         lines.append(f"channels = [{channels_literal}]")
         lines.append(f"ptt.backend = {_toml_string(radio.ptt_backend)}")

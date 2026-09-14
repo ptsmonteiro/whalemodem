@@ -321,6 +321,7 @@ class RadioTransport:
         if self.receive_only:
             raise RuntimeError(
                 f"{self.radio.id} was opened receive-only and must not transmit")
+        tx_audio = np.asarray(tx_audio, dtype=np.float32) * getattr(self.radio, "tx_level_linear", 1.0)
         ptt_lead = 0.0 if ptt_lead is None else ptt_lead
         ptt_tail = 0.0 if ptt_tail is None else ptt_tail
         with self._tx_lock:

@@ -78,6 +78,28 @@ back into the in-memory inventory (still not on disk until `s` on the list
 view), or
 `Cancel` to discard the form.
 
+### `whale-levels`
+
+From the dev tree, run `python -m whale.level_tui --radio ht` (or add
+`--radio-config PATH`) with the modem server stopped. Only the configured
+Digirig and HT are needed. Open squelch on an unused channel and slowly raise
+the HT volume while watching the live two-second input peak/RMS meter. Keep
+clipped samples at zero and leave headroom below 0 dBFS. Open-squelch noise
+is a rough input check; a received data signal can have a different level.
+If available, adjust the PC's recording gain only if it acts before the
+sound-card ADC. Digital attenuation cannot repair an already clipped input.
+
+When no TX attenuation is configured, the tuner starts at -24 dB rather than
+full PC output. Press `+`/`-` to change it by 1 dB. Press `t` to key a
+1200/2200 Hz test tone for at most 15 seconds, and `t` again to stop. The
+displayed TX peak is the PC's digital output level, not the level or
+distortion at the radio mic port. Without a radio deviation/monitor meter or
+another receiver, TX calibration remains provisional. Press `s` to store the chosen
+`audio.tx_level_db` (between -60 and 0 dB) in `radios.toml`; regular modem
+transmissions then use that attenuation. Saving rewrites the inventory using
+the same writer as `whale-configure`. `q` exits and unkeys any active test.
+Verify the final setting with an actual fast-data exchange when possible.
+
 ## Audio backend
 
 Radios' USB sound cards are opened through whichever PortAudio host API sits

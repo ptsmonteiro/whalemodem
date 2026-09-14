@@ -557,6 +557,7 @@ class RadioDetailView:
         self.description = radio.name if radio else ""
         self.audio_input_name = radio.audio_input_name if radio else ""
         self.audio_output_name = radio.audio_output_name if radio else ""
+        self.tx_level_db = radio.tx_level_db if radio else 0.0
         self.channel_fm = "fm" in radio.channels if radio else True
         self.channel_hf = "hf" in radio.channels if radio else False
         self.ptt_backend = radio.ptt_backend if (radio and radio.ptt_backend in self.BACKEND_ORDER) else "vox"
@@ -979,7 +980,7 @@ class RadioDetailView:
 
         radio = Radio(id=name, name=description, audio_input_name=audio_input_name,
                       audio_output_name=audio_output_name, ptt_backend=self.ptt_backend,
-                      channels=channels, ptt_config=ptt_config)
+                      channels=channels, ptt_config=ptt_config, tx_level_db=self.tx_level_db)
         if self.on_done is not None:
             self.on_done(self.old_name, name, radio)
         return POP

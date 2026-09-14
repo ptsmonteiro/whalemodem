@@ -1,6 +1,6 @@
 # Standalone build (PyInstaller)
 
-Builds `whale-server` and `whale-configure` into a standalone,
+Builds `whale-server`, `whale-configure`, and `whale-levels` into a standalone,
 no-Python-required onedir bundle, so an end user does not need Python,
 numpy/scipy, or a system hamlib/PortAudio install to run a station or
 configure its radio inventory.
@@ -19,11 +19,11 @@ Then, from the repo root:
 pyinstaller packaging/pyinstaller/whale.spec
 ```
 
-The bundle lands in `dist/whale/`, holding both `whale-server` and
-`whale-configure` next to one shared `_internal/` (their common Python
-runtime and vendored hamlib binaries, deduped via PyInstaller's `MERGE()`
-rather than copied into two separate folders). Run either with
-`dist/whale/whale-server --help` or `dist/whale/whale-configure --help`.
+The bundle lands in `dist/whale/`, holding all three commands next to one
+shared `_internal/` (their common Python runtime and vendored hamlib binaries,
+deduped via PyInstaller's `MERGE()`). Run them with
+`dist/whale/whale-server --help`, `dist/whale/whale-configure --help`, or
+`dist/whale/whale-levels --help`.
 
 The build must run **natively** on each target OS/arch -- no
 cross-compilation -- because the spec bundles that build host's own
