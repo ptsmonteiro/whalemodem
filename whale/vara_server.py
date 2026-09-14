@@ -443,10 +443,40 @@ def main():
                     default="default", help="qualification registry to advertise; "
                     "optional/experimental require explicit operator selection")
     ap.add_argument("-v", "--verbose", action="store_true")
+    ap.add_argument("--tui", action="store_true",
+                    help="run a live curses status dashboard instead of logging to stderr")
+    ap.add_argument("--log-file", help="write logs here instead of stderr (used with --tui)")
     args = ap.parse_args()
 
-    logging.basicConfig(level=logging.DEBUG if args.verbose else logging.INFO,
-                         format="%(asctime)s %(levelname)s %(name)s: %(message)s")
+    if not args.tui:
+        logging.basicConfig(level=logging.DEBUG if args.verbose else logging.INFO,
+                             format="%(asctime)s %(levelname)s %(name)s: %(message)s")
+
+        channel = policy.by_name(args.channel)
+        radio = get_radio(args.radio, args.radio_config)
+        if args.channel not in radio.channels:
+            ap.error(f"radio {args.radio!r} is not configured for channel {args.channel!r} "
+                     f"(radio channels: {sorted(radio.channels)})")
+        from whale.mode_qualification import registry
+        mode_registry = registry(args.channel, args.mode_level,
+                                 channel.max_useful_frame_seconds)
+        logger.info("channel: %s", channel.name)
+        logger.info("mode qualification level: %s; IDs: %s",
+                    args.mode_level, mode_registry.supported_ids)
+        service = ModemService.for_radio(args.radio, args.mycall,
+                                         radio_config=args.radio_config,
+                                         policy=channel, mode_registry=mode_registry)
+        server = StationServer(service, args.mycall, args.cmd_port, args.data_port, args.host)
+        server.serve_forever()
+        return
+
+    # --tui: an additive branch. It builds the same channel/radio/mode
+    # registry/service/server as above, but runs the server's accept loop on
+    # a background thread and drives a curses dashboard on the main thread
+    # instead of logging to stderr. See whale/modem_tui.py.
+    import curses
+
+    from whale import modem_tui
 
     channel = policy.by_name(args.channel)
     radio = get_radio(args.radio, args.radio_config)
@@ -456,14 +486,33 @@ def main():
     from whale.mode_qualification import registry
     mode_registry = registry(args.channel, args.mode_level,
                              channel.max_useful_frame_seconds)
+
+    state = modem_tui.TuiState(args.mycall, args.radio, args.channel, mode_registry=mode_registry)
+    handlers = [modem_tui.LogTap(state)]
+    if args.log_file:
+        file_handler = logging.FileHandler(args.log_file)
+        file_handler.setFormatter(
+            logging.Formatter("%(asctime)s %(levelname)s %(name)s: %(message)s"))
+        handlers.append(file_handler)
+    logging.basicConfig(level=logging.DEBUG if args.verbose else logging.INFO,
+                         handlers=handlers, force=True)
     logger.info("channel: %s", channel.name)
     logger.info("mode qualification level: %s; IDs: %s",
                 args.mode_level, mode_registry.supported_ids)
+
     service = ModemService.for_radio(args.radio, args.mycall,
                                      radio_config=args.radio_config,
                                      policy=channel, mode_registry=mode_registry)
     server = StationServer(service, args.mycall, args.cmd_port, args.data_port, args.host)
-    server.serve_forever()
+    unsubscribe = service.subscribe(state.on_event)
+    server_thread = threading.Thread(target=server.serve_forever, name="vara-server", daemon=True)
+    server_thread.start()
+    try:
+        curses.wrapper(modem_tui.run, state, server, service, server_thread)
+    finally:
+        unsubscribe()
+        server.stop()
+        server_thread.join(timeout=5.0)
 
 
 if __name__ == "__main__":
