@@ -193,7 +193,7 @@ Each endpoint adapts only its own transmit direction from ARQ outcomes:
 - Three unanswered attempts change one step down before retrying the same chunk.
 - Three consecutive first-attempt chunks change one step up before the next chunk.
 - Steps follow registry order and are limited to modes the peer advertised.
-  The default FM ladder is 0, 1, 2 with mode 3 (VF3) appended above them;
+  The default FM ladder is 0, 1, 19, 3, 18 (300/600 baud, VF13, VF3, VF12);
   the explicit experimental registry also appends mode 6 (VF6) as its fastest
   current experimental mode (see
   `whale/modes/`. The HF

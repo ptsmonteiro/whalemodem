@@ -45,6 +45,7 @@ def test_explicit_payload_records_requested_data_and_actual_frame_sizes(tmp_path
     output = tmp_path / "result.json"
     assert benchmark.main([
         "--model", "awgn", "--policy", "fm", "--points", "40",
+        "--mode-level", "optional",
         "--trials", "1", "--modes", "1200baud", "--seed", "18",
         "--workers", "1",
         "--payload-bytes", "88", "--out", str(output),
@@ -65,6 +66,7 @@ def test_payload_rejects_negative_or_invalid_values(value, tmp_path, capsys):
     with pytest.raises(SystemExit):
         benchmark.main([
             "--model", "awgn", "--policy", "fm", "--points", "40",
+            "--mode-level", "optional",
             "--trials", "1", "--modes", "1200baud",
             "--payload-bytes", value, "--out", str(tmp_path / "result.json"),
         ])

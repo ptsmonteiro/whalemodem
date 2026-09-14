@@ -236,6 +236,89 @@ def test_decoders_reject_an_odd_coded_bit_count(decode):
         getattr(dsp.K7, decode)(np.zeros(11))
 
 
+# -- puncturing -------------------------------------------------------------
+
+@pytest.mark.parametrize("rate", ["2/3", "3/4", "5/6", "7/8"])
+def test_puncture_matches_its_own_advertised_rate(rate):
+    pattern = fec.PUNCTURE_PATTERNS[rate]
+    assert fec.PUNCTURE_RATE_VALUE[rate] == pytest.approx(
+        (len(pattern) / 2) / int(pattern.sum()))
+
+
+@pytest.mark.parametrize("rate", ["1/2", "2/3", "3/4", "5/6", "7/8"])
+def test_puncture_then_depuncture_at_kept_positions_is_lossless(rate):
+    period = 2 if rate == "1/2" else len(fec.PUNCTURE_PATTERNS[rate])
+    local_rng = np.random.default_rng(0xFEC0 + period)
+    mother = local_rng.integers(0, 2, period * 30).astype(np.uint8)
+    coded = fec.puncture(mother, rate)
+    back = fec.depuncture(coded.astype(np.float64), rate, len(mother),
+                          erasure=np.nan)
+    pattern = (np.ones(period, dtype=bool) if rate == "1/2"
+              else fec.PUNCTURE_PATTERNS[rate])
+    mask = np.tile(pattern, len(mother) // period)
+    assert np.array_equal(back[mask], mother[mask].astype(np.float64))
+    assert np.all(np.isnan(back[~mask])) or rate == "1/2"
+
+
+def test_puncture_rejects_a_length_not_a_multiple_of_the_period():
+    with pytest.raises(ValueError):
+        fec.puncture(np.zeros(5, dtype=np.uint8), "3/4")
+
+
+@pytest.mark.parametrize("rate", ["2/3", "3/4", "5/6", "7/8"])
+def test_punctured_packet_codec_round_trips_clean_channel(rate):
+    period = len(fec.PUNCTURE_PATTERNS[rate])
+    mother_bits = period * 220
+    stride = 7
+    while np.gcd(stride, mother_bits) != 1:
+        stride += 1
+    codec = framing.PacketCodec(
+        payload_bits=mother_bits,
+        interleaver=interleave.multiplicative(mother_bits, stride),
+        whitener_seed=3, puncture_rate=rate)
+    assert codec.coded_bits < codec.payload_bits
+    local_rng = np.random.default_rng(0xFEC1 + period)
+    payload = local_rng.integers(0, 256, codec.max_payload_bytes,
+                                 dtype=np.uint8).tobytes()
+    coded = codec.encode(payload)
+    assert len(coded) == codec.coded_bits
+    soft = np.where(coded == 0, 4.0, -4.0)
+    out, meta = codec.decode_soft(soft)
+    assert out == payload
+    assert meta["crc_ok"]
+
+
+def test_punctured_packet_codec_carries_more_payload_at_a_fixed_air_budget():
+    """The whole point of puncturing: for the same number of *transmitted*
+    (on-air) bits, a higher rate buys more information bits, at the cost
+    of coding gain -- not something this clean-channel test measures."""
+    transmitted_bits = 3_600
+    def _codec(rate):
+        period = 2 if rate == "1/2" else len(fec.PUNCTURE_PATTERNS[rate])
+        kept = period if rate == "1/2" else int(fec.PUNCTURE_PATTERNS[rate].sum())
+        mother_bits = (transmitted_bits // kept) * period
+        stride = 7
+        while np.gcd(stride, mother_bits) != 1:
+            stride += 1
+        return framing.PacketCodec(
+            payload_bits=mother_bits,
+            interleaver=interleave.multiplicative(mother_bits, stride),
+            whitener_seed=1, puncture_rate=rate)
+    half = _codec("1/2")
+    three_quarter = _codec("3/4")
+    assert half.coded_bits == three_quarter.coded_bits == transmitted_bits
+    assert three_quarter.max_payload_bytes > half.max_payload_bytes
+
+
+def test_punctured_packet_codec_decode_hard_is_refused():
+    codec = framing.PacketCodec(
+        payload_bits=4 * 200,
+        interleaver=interleave.multiplicative(4 * 200, 7),
+        whitener_seed=1, puncture_rate="2/3")
+    with pytest.raises(NotImplementedError):
+        codec.decode_hard(np.zeros(codec.coded_bits, dtype=np.uint8))
+
+
 # -- the payload codec at other sizes -------------------------------------
 
 def test_codec_dimensions_follow_from_the_frame_size():

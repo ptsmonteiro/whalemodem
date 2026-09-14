@@ -44,10 +44,22 @@ class QualificationEntry:
 MANIFEST = (
     QualificationEntry("fm", 0, QualificationLevel.DEFAULT),
     QualificationEntry("fm", 1, QualificationLevel.DEFAULT),
-    QualificationEntry("fm", 2, QualificationLevel.DEFAULT),
+    QualificationEntry("fm", 2, QualificationLevel.OPTIONAL),
     QualificationEntry("fm", 3, QualificationLevel.DEFAULT),
     QualificationEntry("fm", 8, QualificationLevel.EXPERIMENTAL),
     QualificationEntry("fm", 6, QualificationLevel.EXPERIMENTAL),
+    # VF13 is a combinatorial noncoherent-MFSK FM data rung: 16 tones, 6
+    # active per symbol, 150 Bd, punctured K=7 convolutional rate 7/8,
+    # 1,438.8 bit/s -- slower than VF3 (1,853 bit/s), so it sits below VF3
+    # in rate order and does not change which rung ordinary negotiation
+    # reaches while VF3 holds; it gives the default ladder a slower fallback
+    # below VF3 and sits between 1200baud CPFSK and VF3 in the optional
+    # registry. Installed as DEFAULT on 2026-09-14 by
+    # owner decision, following how VF12 was installed: two-direction
+    # hardware runs against the IC-705 <-> Wouxun KG-UV9D Plus FM path at
+    # drive 0.077, 150/150 exact-payload frames (90/90 ht->ic705, 60/60
+    # ic705->ht). Default is availability, not qualification.
+    QualificationEntry("fm", 19, QualificationLevel.DEFAULT),
     # VF12 is the HF7-geometry FM data rung: 51-carrier 50 Hz OFDM, 16-QAM,
     # rate-3/4 LDPC with comb-pilot channel tracking, 4,690 bit/s. Installed
     # as DEFAULT on 2026-09-13 by owner decision, on two-direction hardware
@@ -112,10 +124,14 @@ def registry(policy: str, level: QualificationLevel | str =
         from .modes.vf4_mode import VF4
         from .modes.vf6_mode import VF6
         from .modes.vf12 import VF12
+        from .modes.vf13 import VF13
         base = afsk.default_registry() if budget is None else afsk.default_registry(budget)
-        # Rate order, which is the order _maybe_adapt climbs: VF12's 4,690
-        # bit/s sits between VF3 and the faster but still experimental VF4.
-        candidates, control = tuple(base.modes) + (VF3, VF12, VF4, VF6), base.control
+        # Rate order, which is the order _maybe_adapt climbs: VF13's 1,438.8
+        # bit/s sits between the CPFSK profiles and VF3 (1,853 bit/s); VF12's
+        # 4,690 bit/s sits between VF3 and the faster but still experimental
+        # VF4.
+        candidates, control = (tuple(base.modes)
+                               + (VF13, VF3, VF12, VF4, VF6)), base.control
     elif policy == "hf":
         from .modes.hr0_mode import HR0
         from .modes.hc0_mode import HC0

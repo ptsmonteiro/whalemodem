@@ -112,7 +112,7 @@ def speed_up():
     link.DECODE_POLL_INTERVAL = 0.01
 
 
-def make_pair(history=None, a_call="STA1", b_call="STA2"):
+def make_pair(history=None, a_call="STA1", b_call="STA2", mode_registry=None):
     """Two started-but-unconnected Links over paired fake transports, so a
     test can set profiles, history or suppression before the handshake.
     Returns (a, b, transport_a, transport_b)."""
@@ -120,8 +120,10 @@ def make_pair(history=None, a_call="STA1", b_call="STA2"):
     ta, tb = FakeTransport(), FakeTransport()
     ta.peer, tb.peer = tb, ta
     history = {} if history is None else history
-    a = link.Link(ta, a_call, mode_history_store=history)
-    b = link.Link(tb, b_call, mode_history_store=history)
+    a = link.Link(ta, a_call, mode_history_store=history,
+                  mode_registry=mode_registry)
+    b = link.Link(tb, b_call, mode_history_store=history,
+                  mode_registry=mode_registry)
     a.start()
     b.start()
     return a, b, ta, tb

@@ -172,6 +172,78 @@ class ConvolutionalCode:
 
 K7 = ConvolutionalCode()
 
+#: Standard rate-1/2-mother puncturing patterns (period given in mother
+#: x,y-interleaved bit order; True = transmitted, False = dropped).  These
+#: are the widely published K=7 puncturing tables (802.11a/DVB-S lineage),
+#: not derived here -- only checked for output length against the target
+#: rate.  Puncturing removes coded bits from the mother rate-1/2 stream to
+#: raise the effective code rate; depuncturing reinserts zero-LLR
+#: (erasure) at the dropped positions so `ConvolutionalCode.decode_soft`
+#: sees a full-length mother-rate soft-bit array again.
+PUNCTURE_PATTERNS: dict[str, np.ndarray | None] = {
+    "1/2": None,
+    "2/3": np.array([1, 1, 1, 0], dtype=bool),
+    "3/4": np.array([1, 1, 1, 0, 0, 1], dtype=bool),
+    "5/6": np.array([1, 1, 0, 1, 1, 0, 0, 1, 1, 0], dtype=bool),
+    "7/8": np.array([1, 1, 0, 1, 0, 1, 0, 1, 1, 0, 0, 1, 1, 0], dtype=bool),
+}
+
+#: code_rate = info_bits / transmitted_bits for each pattern above (and for
+#: "1/2", the mother rate itself).
+PUNCTURE_RATE_VALUE: dict[str, float] = {
+    rate: (0.5 if pattern is None else (len(pattern) / 2) / int(pattern.sum()))
+    for rate, pattern in PUNCTURE_PATTERNS.items()
+}
+
+
+def _pattern(rate: str) -> np.ndarray | None:
+    try:
+        return PUNCTURE_PATTERNS[rate]
+    except KeyError:
+        raise ValueError(
+            f"unknown puncture rate {rate!r}; have {sorted(PUNCTURE_PATTERNS)}"
+        ) from None
+
+
+def puncture(mother_bits: np.ndarray, rate: str) -> np.ndarray:
+    """Drop the bits `rate`'s pattern marks False from a mother (rate-1/2)
+    coded-bit stream, tiling the pattern across its whole length."""
+    pattern = _pattern(rate)
+    mother_bits = np.asarray(mother_bits).reshape(-1)
+    if pattern is None:
+        return mother_bits
+    if len(mother_bits) % len(pattern):
+        raise ValueError(
+            f"{len(mother_bits)} mother bits is not a multiple of the "
+            f"rate-{rate} puncture period {len(pattern)}")
+    mask = np.tile(pattern, len(mother_bits) // len(pattern))
+    return mother_bits[mask]
+
+
+def depuncture(coded_bits: np.ndarray, rate: str, mother_length: int,
+               erasure: float = 0.0) -> np.ndarray:
+    """Inverse of `puncture`: reinsert `erasure` (zero LLR by default) at
+    the dropped positions so the result is `mother_length` long again."""
+    pattern = _pattern(rate)
+    coded_bits = np.asarray(coded_bits, dtype=np.float64).reshape(-1)
+    if pattern is None:
+        if len(coded_bits) != mother_length:
+            raise ValueError("rate-1/2 coded bits must equal mother_length")
+        return coded_bits
+    if mother_length % len(pattern):
+        raise ValueError(
+            f"mother_length {mother_length} is not a multiple of the "
+            f"rate-{rate} puncture period {len(pattern)}")
+    mask = np.tile(pattern, mother_length // len(pattern))
+    if int(mask.sum()) != len(coded_bits):
+        raise ValueError(
+            f"expected {int(mask.sum())} punctured coded bits for "
+            f"mother_length={mother_length} at rate {rate}, got "
+            f"{len(coded_bits)}")
+    out = np.full(mother_length, erasure, dtype=np.float64)
+    out[mask] = coded_bits
+    return out
+
 #: Rate-1/2, K=9 (561, 753) -- standard octal generators, one more bit of
 #: constraint length than K7.  Free distance 12 against K7's 10, roughly
 #: 0.6-1 dB more coding gain in the regime these modes operate in, at 4x the

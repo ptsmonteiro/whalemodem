@@ -174,13 +174,9 @@ def test_vf12_carries_a_session_through_the_same_stack():
     """A non-CPFSK waveform, negotiated and driven by the unchanged link.
 
     The transfers are sized to climb the whole default ladder: each rung
-    steps up after one clean chunk, so 88 + 193 + 402 bytes at 300/600/1200
-    baud plus one 1,426-byte VF3 chunk -- 2,109 bytes total -- is enough to
-    arrive at VF12, the top rung above VF3.  With 12,000 bytes each way that
-    leaves 9,891 bytes for VF12's 2,900-byte chunks: three full chunks plus a
-    trailing partial one, so the session genuinely carries data on VF12
-    rather than just touching it.  Nothing pins the mode -- reaching VF12 is
-    the negotiation's own doing, which is the part worth testing.
+    steps up after one clean chunk through 300/600 baud, VF13, and VF3 before
+    arriving at VF12, the top rung.  Nothing pins the mode -- reaching VF12
+    is the negotiation's own doing, which is the part worth testing.
     """
     payload_ab = _payload(12_000, 7, 11)
     payload_ba = _payload(12_000, 13, 5)

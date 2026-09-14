@@ -33,7 +33,9 @@ MASTER_SEED = 20260829
     ("vf3", 1, 1),
 ])
 def test_vhf_modes_at_measured_fm_bench_point(mode_name, trials, minimum):
-    mode = next(mode for mode in modes.default_registry().modes
+    registry = (modes.optional_registry()
+                if mode_name == "1200baud" else modes.default_registry())
+    mode = next(mode for mode in registry.modes
                 if mode.name == mode_name)
     records = run_frame_trials(
         mode,
@@ -144,7 +146,7 @@ def test_hf2_on_moderate_watterson_at_19db_snr_3khz():
 def test_mode2_recorded_frame_boundary_replays_exactly(preset, trial,
                                                         terminal_bit):
     """Pin both terminal-bit values, including the recorded trial-1 failure."""
-    mode = next(mode for mode in modes.default_registry().modes
+    mode = next(mode for mode in modes.optional_registry().modes
                 if mode.mode_id == 2)
     seed = trial_seed(MASTER_SEED, mode.mode_id, 0, trial)
     payload = np.random.default_rng(seed).integers(

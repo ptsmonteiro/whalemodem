@@ -32,7 +32,7 @@ change cannot quietly convert it into a fatal one.
 import threading
 import time
 
-from whale import afsk, link, mode_history
+from whale import afsk, link, mode_history, modes
 
 import link_harness as harness
 
@@ -94,7 +94,8 @@ def test_a_step_down_re_cuts_a_chunk_too_big_for_the_new_mode(caplog):
     hand. Nothing here is VF3-specific; VF3 only widened the gap enough that
     a bench run hit it on the first try."""
     history = {}
-    a, b, ta, tb = harness.make_pair(history=history)
+    a, b, ta, tb = harness.make_pair(
+        history=history, mode_registry=modes.optional_registry())
     try:
         mode_history.record_good_mode(history, a.mycall, b.mycall,
                                       afsk.PROFILE_1200.mode_id)

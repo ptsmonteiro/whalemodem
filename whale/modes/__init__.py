@@ -19,7 +19,8 @@ def default_registry(budget=None):
     VF12 sits at the top because it is the fastest and least robust rung:
     the ladder is ordered by rate, and `_maybe_adapt` compares decayed
     delivery statistics and expected goodput, so a link that cannot hold
-    VF12 falls back through VF3 to 1200 baud on its own. Negotiation is
+    VF12 falls back through VF3 and VF13 to the 600-baud rung on its own.
+    Negotiation is
     per-station -- a peer that does not advertise mode 18 simply never has
     it selected.
 

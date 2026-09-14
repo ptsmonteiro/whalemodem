@@ -23,7 +23,7 @@ from functools import cached_property
 import numpy as np
 
 from . import bits as _bits
-from .fec import K7, ConvolutionalCode
+from .fec import K7, ConvolutionalCode, depuncture, puncture
 from .interleave import Interleaver
 
 LENGTH_BYTES = 2
@@ -32,12 +32,25 @@ CRC_BYTES = 4
 
 @dataclass(frozen=True)
 class PacketCodec:
-    """Payload bytes <-> the coded, interleaved bits of one frame."""
+    """Payload bytes <-> the coded, interleaved bits of one frame.
+
+    `payload_bits` is the mother (rate-1/2) interleaved codeword length --
+    the interleaver's domain -- regardless of `puncture_rate`.  With the
+    default `puncture_rate="1/2"` that is also exactly what `encode`
+    transmits, unchanged from before puncturing existed.  A higher
+    `puncture_rate` (see `whale.dsp.fec.PUNCTURE_PATTERNS`) drops some of
+    those mother bits after interleaving -- so `encode` returns fewer bits
+    than `payload_bits` -- trading coding gain for more information bits
+    per mother codeword at a fixed on-air bit budget.  `decode_soft`
+    reinserts zero-LLR erasures at the dropped positions before
+    de-interleaving and Viterbi decoding.
+    """
 
     payload_bits: int
     interleaver: Interleaver
     whitener_seed: int
     code: ConvolutionalCode = field(default=K7)
+    puncture_rate: str = "1/2"
 
     def __post_init__(self) -> None:
         if self.payload_bits % 2:
@@ -48,6 +61,17 @@ class PacketCodec:
                 f"frame carries {self.payload_bits}")
         if self.information_bits <= self.code.tail_bits:
             raise ValueError("frame is too small to carry a terminated packet")
+        if self.puncture_rate != "1/2":
+            puncture(np.zeros(self.payload_bits, dtype=np.uint8),
+                     self.puncture_rate)  # validates period divides evenly
+
+    @property
+    def coded_bits(self) -> int:
+        """Bits actually transmitted per frame, after puncturing."""
+        if self.puncture_rate == "1/2":
+            return self.payload_bits
+        return int(puncture(np.zeros(self.payload_bits, dtype=np.uint8),
+                            self.puncture_rate).size)
 
     @property
     def information_bits(self) -> int:
@@ -86,22 +110,33 @@ class PacketCodec:
         information[:self.packet_bytes * 8] = (
             np.unpackbits(np.frombuffer(packet, dtype=np.uint8))
             ^ self._whitener)
-        return self.interleaver.spread(self.code.encode(information))
+        mother = self.interleaver.spread(self.code.encode(information))
+        if self.puncture_rate == "1/2":
+            return mother
+        return puncture(mother, self.puncture_rate)
 
     def decode_hard(self, coded_bits: np.ndarray) -> tuple[bytes | None, dict]:
+        if self.puncture_rate != "1/2":
+            raise NotImplementedError(
+                "decode_hard has no erasure handling; punctured codecs "
+                "must use decode_soft")
         coded_bits = np.asarray(coded_bits, dtype=np.uint8).reshape(-1)
-        if len(coded_bits) != self.payload_bits:
+        if len(coded_bits) != self.coded_bits:
             raise ValueError(
-                f"expected {self.payload_bits} bits, got {len(coded_bits)}")
+                f"expected {self.coded_bits} bits, got {len(coded_bits)}")
         gathered = self.interleaver.gather(coded_bits)
         return self._unpack(self.code.decode_hard(gathered))
 
     def decode_soft(self, soft_bits: np.ndarray) -> tuple[bytes | None, dict]:
         soft_bits = np.asarray(soft_bits, dtype=np.float64).reshape(-1)
-        if len(soft_bits) != self.payload_bits:
+        if len(soft_bits) != self.coded_bits:
             raise ValueError(
-                f"expected {self.payload_bits} soft bits, got {len(soft_bits)}")
-        gathered = self.interleaver.gather(soft_bits)
+                f"expected {self.coded_bits} soft bits, got {len(soft_bits)}")
+        if self.puncture_rate == "1/2":
+            mother = soft_bits
+        else:
+            mother = depuncture(soft_bits, self.puncture_rate, self.payload_bits)
+        gathered = self.interleaver.gather(mother)
         return self._unpack(self.code.decode_soft(gathered))
 
     def _unpack(self, information: np.ndarray) -> tuple[bytes | None, dict]:
