@@ -92,3 +92,8 @@ def test_workers_must_be_positive(value, tmp_path, capsys):
             "--out", str(tmp_path / "result.json"),
         ])
     assert "workers" in capsys.readouterr().err
+
+
+def test_default_worker_count_uses_eighty_percent_of_available_cpus(monkeypatch):
+    monkeypatch.setattr(benchmark, "available_cpu_count", lambda: 10)
+    assert benchmark.default_worker_count() == 8

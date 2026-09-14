@@ -44,6 +44,12 @@ def available_cpu_count():
     return count or 1
 
 
+def default_worker_count():
+    """Return the default number of benchmark worker processes."""
+
+    return max(1, int(available_cpu_count() * 0.8))
+
+
 def _run_trial_worker(task):
     """Run one independently seeded trial in a worker process."""
 
@@ -163,8 +169,8 @@ def main(argv=None):
     ap.add_argument("--trials", type=int, default=100)
     ap.add_argument(
         "--workers", type=int, default=None,
-        help=("worker processes; default: all CPUs available to this process; "
-              "use 1 for sequential execution"))
+        help=("worker processes; default: 80%% of CPUs available to this "
+              "process; use 1 for sequential execution"))
     ap.add_argument("--seed", type=int, default=DEFAULT_SEED)
     ap.add_argument("--modes", nargs="+", help="mode names or IDs")
     ap.add_argument(
@@ -184,7 +190,7 @@ def main(argv=None):
         ap.error("--trials must be positive")
     if args.workers is not None and args.workers < 1:
         ap.error("--workers must be positive")
-    workers = available_cpu_count() if args.workers is None else args.workers
+    workers = default_worker_count() if args.workers is None else args.workers
     if args.model == "watterson" and args.policy != "hf":
         ap.error("the Watterson benchmark requires --policy hf")
     if args.model == "fm" and args.policy != "fm":
