@@ -157,7 +157,7 @@ def modulate(bank: ToneBank, tones: np.ndarray, amplitude: float = 1.0
     and no discontinuity to splatter.  The result is constant-envelope,
     which is why this mode can be driven far harder than an OFDM one
     through the same transmitter: a peak-limited PA delivers roughly 8 dB
-    more average power for a crest factor of 1.41 than for VF3-class 3.9.
+    more average power for a crest factor of 1.41 than for OFDM at 3.9.
     """
     tones = np.asarray(tones, dtype=np.int64).reshape(-1)
     phase = 2.0 * np.pi * np.arange(bank.symbol_samples) / bank.symbol_samples

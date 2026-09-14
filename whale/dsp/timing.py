@@ -7,8 +7,7 @@ a per-symbol timing error; a straight-line fit across the frame separates a
 constant offset (`intercept`) from a drifting sample clock (`slope`).
 
 The vectorized search is required to be bit-for-bit what the original
-per-symbol Python loop produced -- `tests/test_vf3_kernels.py` holds it
-there -- which is why the winning candidate's score is deliberately
+per-symbol Python loop produced, which is why the winning candidate's score is deliberately
 re-derived with the same reduction the scalar version used rather than
 read out of the batched computation.
 """

@@ -21,7 +21,7 @@ import numpy as np
 
 from .ofdm import Geometry
 
-# Defaults carried over from VF3.  The proposal threshold has slack -- it
+# The proposal threshold has slack -- it
 # can be moved a long way without changing the answer on any recorded
 # capture -- so it is a knob for how many groups get ranked, not a
 # decision boundary.  `confidence` is what callers actually gate on.

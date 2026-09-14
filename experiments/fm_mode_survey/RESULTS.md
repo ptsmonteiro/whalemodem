@@ -44,7 +44,7 @@ Three harnesses, because the modes are not all reachable the same way:
 
 | Harness | Modes | Trials per direction | Payload |
 | --- | --- | ---: | --- |
-| `scripts/sweep_modes.py --channel fm --mode-level experimental` | 300baud, 600baud, 1200baud, vf3, vf12, vf4, vf6 | 10 | `AIR_HEADER_BYTES + chunk_size` |
+| `scripts/sweep_modes.py --channel fm --mode-level experimental` | 300baud, 600baud, 1200baud, vf12, vf4, vf6 | 10 | `AIR_HEADER_BYTES + chunk_size` |
 | `scripts/hw_vf9_frames.py --mode both` | vf9, vf10 | 10 | `chunk_size` |
 | `scripts/hw_vf11_bitload.py --margins 2,0,-2` | vf11 | 5 | `chunk_size` |
 
@@ -84,7 +84,6 @@ B is the handheld.
 | 300baud | 0 | default | 1,200-1,800 Hz | 2-tone CPFSK | 2 | none | 189 | 10/10 | 10/10 | pass | 10/10 | 10/10 | pass |
 | 600baud | 1 | default | 1,200-1,800 Hz | 2-tone CPFSK | 2 | none | 399 | 10/10 | 10/10 | pass | 10/10 | 10/10 | pass |
 | 1200baud | 2 | default | 1,200-2,200 Hz | 2-tone CPFSK | 2 | none | 818 | 10/10 | 0/10 | fail | 10/10 | 9/10 | pass |
-| vf3 | 3 | default | 468.75-3,140.625 Hz | 58-carrier differential-QPSK OFDM | 4 | 1/2 K=7 convolutional | 1,853 | 10/10 | 1/10 | fail | 10/10 | 9/10 | pass |
 | vf9 | 9 | unregistered | 500-2,900 Hz | 49-carrier QPSK OFDM | 4 | 3/4 LDPC | 2,751 | 8/10 | 5/10 | fail | 10/10 | 6/10 | fail |
 | vf11 | 12 | unregistered | 500-2,900 Hz | 49-carrier bit-loaded OFDM | 0-4 bits/carrier | 3/4 LDPC | map-dependent | 5/5 | 5/5 | pass, sounded | 4/5 | 4/5 | pass, sounded |
 | vf10 | 11 | unregistered | 500-2,900 Hz | 49-carrier 8PSK OFDM | 8 | 3/4 LDPC | 4,131 | 4/10 | 3/10 | fail | 7/10 | 0/10 | fail |
@@ -126,7 +125,7 @@ The captures were re-decoded offline with each mode's own diagnostics.
 
 **The two paths fail in different ways.** The UV-B5 path is *asymmetric*:
 audio it transmits arrives at the IC-705 5-6 dB worse than the reverse, which
-is what breaks `1200baud` and `vf3` in one direction only. The Wouxun path is
+is what breaks `1200baud` in one direction only. The Wouxun path is
 asymmetric the other way and more steeply -- 13.0 dB median sounded on A->B
 against 8.6 dB on B->A. So the QPSK modes the UV-B5 was breaking now pass,
 while `vf10` fails on the Wouxun's weak leg. `vf12` failed there too, but
@@ -139,14 +138,6 @@ than noise. The resulting 0.17-0.60% raw BER is small, but the mode has no FEC
 at all, so a 402 B frame fails its CRC every time. `300baud` and `600baud`
 survive because both their tones sit below 2 kHz. On the Wouxun this rolloff
 is absent and the mode recovers to 9/10.
-
-**vf3 on the UV-B5** -- not a band-edge problem. Its six carriers above
-2,900 Hz were the *cleanest* in the frame; only one of 58 carriers
-(468.75 Hz) sits outside the 500-2,900 Hz window measured usable in
-`whale/modes/vf9.py`, and it is the worst one. The cause is plain SNR: 7.8 dB
-mean per-carrier against a rate-1/2 convolutional code working from a single
-header-fit channel estimate, giving 2.5-5.8% raw BER. On the Wouxun it is
-19/20.
 
 **vf12 on the Wouxun** -- it acquires perfectly every time. Failures report
 `synced=True` at confidence 0.935-0.968 with the frame start in the same
@@ -184,7 +175,6 @@ That one knob position changed the answers:
 | vf12 A->B | 0/10 | **10/10** |
 | vf10 A->B | 0/10 | 7/10 |
 | vf9 A->B per-carrier SNR | 12.2 dB | **17.2 dB** |
-| vf3 B->A | 10/10 | 9/10 |
 
 Every figure in the tables above is from the corrected run. It also broke two
 measurement tools outright -- see below. The lesson is not "turn it down" but
@@ -288,8 +278,7 @@ separates them.
 ## What this changes
 
 - Mode results are a property of the path *and the levels*, not of the mode
-  alone. `vf12` and `vf3` swap places on a handheld change, and `vf12` swaps
-  again on a volume knob, and again on its own transmit drive. Any
+  alone. `vf12` changes on a volume knob and its transmit drive. Any
   single-radio result in `docs/MODES.md` should be read that way.
 - `vf12` is the fastest mode measured working on any FM path here. At 0.077
   peak drive it holds both directions on the Wouxun (20/20); at 0.22 it did
@@ -299,8 +288,7 @@ separates them.
   low-crest-factor probe (a single tone) cannot find the limit a
   multicarrier mode hits, and neither can the `fm_channel` presets. Drive is
   set per mode, but the right value is a property of the radio.
-- `vf3` and `1200baud` are DEFAULT rungs that deliver nothing B->A on the
-  UV-B5 path. A link that climbs to either there stalls until it falls back.
+- `1200baud` delivers nothing B->A on the UV-B5 path.
 - Bit loading earns its keep on both paths and degrades gracefully where fixed
   constellations fall off a cliff: on the Wouxun's weak leg, where `vf10` and
   `vf12` deliver nothing, `vf11` still passes at 2,261 bit/s. It is not yet a

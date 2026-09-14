@@ -94,7 +94,7 @@ def hf_registry(fast=True):
     HC0 is the control mode and the bottom rung; HC1W is appended above it
     for a channel that can carry it, and `_maybe_adapt` probes it then uses
     delivery statistics to climb or fall back, exactly as the VHF ladder
-    climbs to VF3.
+    climbs to faster data modes.
 
     `fast=False` drops HC1W, leaving the robust rung alone.  That is for
     measuring HC0 on its own on the bench, not for ordinary operation --

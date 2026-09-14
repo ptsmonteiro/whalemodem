@@ -9,7 +9,7 @@ raw waveform (geometry, mapping, FEC, framing, acquisition/timing/frequency
 recovery) -- not the `WaveformMode` promotion,
 which is a later stage.
 
-Like HC1W and VF3, this is geometry and wiring on top of the shared
+Like HC1W, this is geometry and wiring on top of the shared
 `whale/dsp/` kernels: OFDM symbol build/analyze (`whale.dsp.ofdm`), the
 rate-1/2 K=7 convolutional code and CRC32/length framing
 (`whale.dsp.fec`, `whale.dsp.framing`), acquisition
@@ -48,7 +48,7 @@ for equalizing the payload), so per-symbol pilot tracking is HF2-local glue.
 Coding is `whale.dsp.framing.PacketCodec` unchanged: length field, CRC32,
 whitening, rate-1/2 K=7 soft-Viterbi and a multiplicative bit interleaver,
 all inside the payload grid (`whale.framing`'s PN-sync format is bypassed,
-the same choice VF3/HC0/HC1W each made independently).
+the same choice HC0/HC1W each made independently).
 
 Frame size: that DESIGN.md's starting point of 40 payload symbols does not
 divide into a whole number of packet bytes at any pilot/data-carrier split

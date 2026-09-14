@@ -193,7 +193,7 @@ Each endpoint adapts only its own transmit direction from ARQ outcomes:
 - Three unanswered attempts change one step down before retrying the same chunk.
 - Three consecutive first-attempt chunks change one step up before the next chunk.
 - Steps follow registry order and are limited to modes the peer advertised.
-  The FM ladder is 0, 1, 19, 3, 18 (300/600 baud, VF13, VF3, VF12; see
+  The FM ladder is 0, 1, 19, 22, 18 (300/600 baud, VF13, VF16, VF12; see
   `whale/modes/`). The HF
   ladder is mode 10 (HR0, the control mode), then mode 5 (HC0) and mode 16
   (HC1W).

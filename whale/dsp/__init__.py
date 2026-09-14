@@ -5,7 +5,7 @@ the same OFDM build/analyze pair, acquisition correlator, cyclic-prefix
 timing fit, Viterbi decoder and CRC framing.  Those are the kernels; this
 package is the one place they live, parameterized on frame geometry rather
 than on a mode's module-level constants.  A mode becomes a choice of
-geometry and a wiring of these together -- see `whale/modes/vf3.py`.
+geometry and a wiring of these together.
 
   `bits`          PN sequences, QPSK mapping and slicing
   `ofdm`          the frame `Geometry`, symbol build/analyze, carrier banks
@@ -23,9 +23,8 @@ geometry and a wiring of these together -- see `whale/modes/vf3.py`.
 Nothing here imports from `whale/phy/` or `whale/modes/`: these kernels are
 the bottom of the stack, and `tests/test_layering.py` holds them there.
 
-Everything here is numerically pinned by `tests/test_dsp_kernels.py` and,
-through VF3, by the recorded-capture replay in
-`tests/test_vf3_capture_replay.py`.  These are on-air-compatible
+Everything here is numerically pinned by `tests/test_dsp_kernels.py`.
+These are on-air-compatible
 definitions, not a tidy-up: changing one changes what a station transmits.
 """
 

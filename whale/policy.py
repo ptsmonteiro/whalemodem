@@ -139,8 +139,7 @@ class ChannelPolicy:
     #
     # Threaded into CPFSK profile construction via afsk.default_registry's
     # `budget` (see Link.__init__), so the number is not restated anywhere.
-    # VF3's chunk_size is deliberately not derived from it: that mode's
-    # payload is fixed by its OFDM frame structure, not by a time budget.
+    # Fixed-frame modes derive payload capacity from their frame structure.
     max_useful_frame_seconds: float
 
     # -- listen before transmit ------------------------------------------

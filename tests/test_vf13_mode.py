@@ -113,12 +113,11 @@ def test_mode_for_reproduces_the_shipped_geometry():
     assert built.max_payload_bytes == VF13.max_payload_bytes
 
 
-def test_vf13_sits_below_vf3_in_rate_order_on_the_default_fm_ladder():
-    """VF13 (1,438.8 bit/s) is slower than VF3 (1,853 bit/s), so it belongs
-    below VF3 in the negotiable ladder -- see whale/mode_qualification.py."""
-    from whale.modes.vf3_mode import VF3
+def test_vf13_sits_below_vf16_in_rate_order_on_the_default_fm_ladder():
+    """VF13 is slower than VF16 in the negotiable ladder."""
+    from whale.modes.vf16 import VF16
     from whale.mode_qualification import registry
     r = registry("fm", "default")
     ids = [mode.mode_id for mode in r.modes]
-    assert VF13.net_bit_rate() < 1853.0  # VF3's net bit/s, see docs/MODES.md
-    assert ids.index(VF13.mode_id) < ids.index(VF3.mode_id)
+    assert VF13.net_bit_rate() < VF16.chunk_size * 8 / VF16.airtime(VF16.chunk_size)
+    assert ids.index(VF13.mode_id) < ids.index(VF16.mode_id)

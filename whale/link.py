@@ -136,7 +136,7 @@ logger = logging.getLogger(__name__)
 def _decode_snr(result):
     """Return this decode's receive SNR as ``(dB, kind)``, or ``(None, None)``.
 
-    HC0 measures the winning tone against the other tones. VF3 and HC1W
+    HC0 measures the winning tone against the other tones. HC1W
     estimate every carrier separately, for which the median is the stable
     frame-level summary. CPFSK fits its confirmed sync tones and reports
     their power against the unexplained residual.
@@ -250,9 +250,8 @@ MAX_RETRIES = FM.max_retries
 
 #: `_send_chunk_with_arq` returning this means "no ACK, and the step-down it
 #: just took landed on a mode whose chunk_size cannot carry the chunk in
-#: hand".  Every rung down the ladder is smaller (88 / 193 / 402 / 1426
-#: bytes), so this is reachable from any step-down, not just VF3's -- VF3
-#: only made it easy to hit.  The chunk was never ACKed, so nothing on the
+#: hand". A lower rung can have a smaller chunk size. The chunk was never
+#: ACKed, so nothing on the
 #: receiver depends on its size: the sender re-cuts it at the new mode's
 #: chunk_size and retries under the same sequence number.
 _RESIZE = object()
@@ -429,7 +428,7 @@ def _forced_mode_id(env=None, supported_ids=None):
     """The mode_id WHALE_FORCE_MODE pins this station's own TX to, or None.
 
     supported_ids is the station's own mode registry, not the built-in AFSK
-    profile table: a station carrying an extra waveform (VF3, mode 3) must be
+    profile table: a station carrying an extra waveform must be
     able to pin itself to it. An id this station cannot transmit is ignored,
     but loudly -- a silently dropped override looks exactly like a bench run
     that never set the variable.

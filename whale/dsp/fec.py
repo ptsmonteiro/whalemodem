@@ -4,7 +4,7 @@ Parameterized on the generator polynomials and constraint length, but the
 default is the K=7 (171, 133) code every VF mode has used, and the
 vectorized soft decoder is required to stay bit-for-bit what the scalar
 trellis walk produced -- survivor selection, and therefore the CRC,
-hangs off its tie-breaking.  `tests/test_vf3_kernels.py` holds it there.
+hangs off its tie-breaking. `tests/test_dsp_kernels.py` exercises it.
 """
 
 from __future__ import annotations

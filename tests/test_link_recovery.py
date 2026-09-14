@@ -377,9 +377,9 @@ def test_mode_step_script_parses_the_environment_the_bench_uses():
     # None rather than anything the callers can confuse with zero.
     assert link._forced_mode_id({"WHALE_FORCE_MODE": "0"}, supported) == afsk.PROFILE_300.mode_id
     # A mode outside the built-in AFSK table is honoured when the station
-    # actually carries it -- this is what VF3 bench runs depend on.
-    assert link._forced_mode_id({"WHALE_FORCE_MODE": "3"}, supported) is None
-    assert link._forced_mode_id({"WHALE_FORCE_MODE": "3"}, tuple(supported) + (3,)) == 3
+    # actually carries it.
+    assert link._forced_mode_id({"WHALE_FORCE_MODE": "19"}, supported) is None
+    assert link._forced_mode_id({"WHALE_FORCE_MODE": "19"}, tuple(supported) + (19,)) == 19
     print("test_mode_step_script_parses_the_environment_the_bench_uses OK")
 
 

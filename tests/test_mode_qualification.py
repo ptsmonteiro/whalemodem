@@ -39,12 +39,12 @@ def test_filter_excludes_opt_in_mode_from_default(monkeypatch):
     manifest = tuple(
         QualificationEntry(entry.policy, entry.mode_id,
                            QualificationLevel.OPTIONAL
-                           if (entry.policy, entry.mode_id) == ("fm", 3)
+                           if (entry.policy, entry.mode_id) == ("fm", 19)
                            else entry.level)
         for entry in MANIFEST)
     monkeypatch.setattr(qualification, "MANIFEST", manifest)
-    assert 3 not in registry("fm", "default").supported_ids
-    assert 3 in registry("fm", "optional").supported_ids
+    assert 19 not in registry("fm", "default").supported_ids
+    assert 19 in registry("fm", "optional").supported_ids
 
 
 def test_unknown_level_and_policy_are_rejected():

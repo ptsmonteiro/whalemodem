@@ -44,18 +44,7 @@ class QualificationEntry:
 MANIFEST = (
     QualificationEntry("fm", 0, QualificationLevel.DEFAULT),
     QualificationEntry("fm", 1, QualificationLevel.DEFAULT),
-    QualificationEntry("fm", 3, QualificationLevel.DEFAULT),
-    # VF13 is a combinatorial noncoherent-MFSK FM data rung: 16 tones, 6
-    # active per symbol, 150 Bd, punctured K=7 convolutional rate 7/8,
-    # 1,438.8 bit/s -- slower than VF3 (1,853 bit/s), so it sits below VF3
-    # in rate order and does not change which rung ordinary negotiation
-    # reaches while VF3 holds; it gives the default ladder a slower fallback
-    # below VF3 and sits between 600-baud CPFSK and VF3 in the
-    # registry. Installed as DEFAULT on 2026-09-14 by
-    # owner decision, following how VF12 was installed: two-direction
-    # hardware runs against the IC-705 <-> Wouxun KG-UV9D Plus FM path at
-    # drive 0.077, 150/150 exact-payload frames (90/90 ht->ic705, 60/60
-    # ic705->ht). Default is availability, not qualification.
+    # VF13 is the 1,438.8 bit/s combinatorial MFSK rung below VF16 and VF12.
     QualificationEntry("fm", 19, QualificationLevel.DEFAULT),
     # VF16 is VF12's 8-PSK, rate-2/3 LDPC sibling. The conservative FM C/N
     # simulator delivered 50/50 at +5 dB where VF12 delivered 0/50; the
@@ -121,17 +110,13 @@ def registry(policy: str, level: QualificationLevel | str =
     requested = QualificationLevel.parse(level)
     if policy == "fm":
         from . import afsk
-        from .modes.vf3_mode import VF3
         from .modes.vf12 import VF12
         from .modes.vf13 import VF13
         from .modes.vf16 import VF16
         base = afsk.default_registry() if budget is None else afsk.default_registry(budget)
-        # Rate order, which is the order _maybe_adapt climbs: VF13's 1,438.8
-        # bit/s sits between the CPFSK profiles and VF3 (1,853 bit/s); VF12's
-        # 4,690 bit/s sits above VF3.
-        # VF16 sits between VF3 and VF12 by net DATA rate.
+        # Rate order is the order _maybe_adapt climbs.
         candidates, control = (tuple(base.modes)
-                               + (VF13, VF3, VF16, VF12)), base.control
+                               + (VF13, VF16, VF12)), base.control
     elif policy == "hf":
         from .modes.hr0_mode import HR0
         from .modes.hc0_mode import HC0

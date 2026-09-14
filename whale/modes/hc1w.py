@@ -166,7 +166,7 @@ def symbol_carriers(symbol_audio: np.ndarray,
 def sync_core() -> np.ndarray:
     """The 512-sample periodic waveform the head and sync symbols share.
 
-    Core-periodic and not symbol-periodic, for VF3's reason: acquisition
+    Core-periodic and not symbol-periodic: acquisition
     correlates the capture against itself one whole symbol (640 samples)
     apart, and a head built from repeated symbols would hold that
     correlation high across the entire head and leave the candidate ranking
@@ -241,7 +241,7 @@ def _header_bank(analytic: np.ndarray, start: int) -> np.ndarray | None:
 def _header_candidate_snr(analytic: np.ndarray, start: int) -> float:
     """Acquisition's scorer: how well a candidate start fits the header.
 
-    Unlike VF3's, this corrects the candidate's own coarse frequency offset
+    This corrects the candidate's own coarse frequency offset
     first.  Without that the ranking degrades exactly when the mode is
     needed: a real header arriving 30 Hz off fits the reference no better
     than noise does, so acquisition would rank it below whatever periodic

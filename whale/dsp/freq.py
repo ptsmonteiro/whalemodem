@@ -21,10 +21,7 @@ slightly *narrower* than the coarse estimator's, which spans only a core.
 Correct with the coarse estimate before trusting the fine one on a signal
 that may be off by more than half a carrier spacing.
 
-Neither is currently in VF3's decode path: VF3 rides on a differential
-payload and a per-carrier equalizer that absorb a static offset, so these
-are reported as diagnostics.  A coherent HF waveform would correct with
-them before analysis.
+Coherent waveforms correct with these estimates before carrier analysis.
 """
 
 from __future__ import annotations

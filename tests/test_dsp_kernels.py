@@ -1,11 +1,7 @@
 """The DSP kernels on their own terms.
 
-`tests/test_vf3_*.py` exercise these through VF3, which is the strongest
-evidence they are right -- it is the configuration that has been on the
-air.  But VF3 uses one geometry, one code and one interleaver, and three
-kernels it does not use at all: the block interleaver, the frequency
-offset estimators and the pilot equalizer.  This file covers the
-parameterization VF3 cannot, and pins the three that no mode calls yet.
+This file exercises shared kernel parameterization, including block
+interleaving, frequency offset estimation, and pilot equalization.
 
 Software only -- no radios, no sound cards.
 """
@@ -420,7 +416,7 @@ def test_timing_finds_a_constant_offset():
     # prefix and correlates just as well, which is ambiguous by
     # construction rather than a failure of the estimator.
     rng = np.random.default_rng(12)
-    # VF3's own proportions: a 128-sample guard searched +-32.  A short
+    # A 128-sample guard searched +-32. A short
     # guard over few carriers gives a correlation too shallow to locate a
     # boundary to within a sample, which is a property of the geometry
     # rather than of the estimator.

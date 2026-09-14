@@ -5,10 +5,10 @@ prefix, which FFT bins carry data, and the time-domain amplitude scale --
 and everything downstream (acquisition, timing, equalization) is written
 against that object rather than against module-level constants.
 
-The transforms themselves are VF3's, unchanged in order of operations:
+The transforms retain their order of operations:
 `build_symbol` scales after the inverse FFT and `symbol_carriers` divides
 after the forward one, so the two remain exact inverses and the recorded
-captures keep replaying bit-for-bit.
+waveform remains consistent.
 """
 
 from __future__ import annotations

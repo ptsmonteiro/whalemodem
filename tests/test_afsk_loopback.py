@@ -1054,7 +1054,7 @@ def test_link_negotiation_and_mode_step():
         assert a.rx_profile.mode_id == afsk.CONTROL_PROFILE.mode_id, a.rx_profile
         assert b.rx_profile.mode_id == afsk.PROFILE_600.mode_id, b.rx_profile
         assert b.tx_profile.mode_id == afsk.CONTROL_PROFILE.mode_id, b.tx_profile
-        # The whole default ladder, VF3 included -- not just the CPFSK
+        # The whole default ladder, including data modes -- not just the CPFSK
         # profiles: what each end advertises is its registry, and stations
         # run whale.modes.default_registry().
         expected = set(modes.default_registry().supported_ids)

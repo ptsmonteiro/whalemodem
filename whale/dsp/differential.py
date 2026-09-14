@@ -6,11 +6,11 @@ channel rotation the equalizer did not fully remove -- cancels instead of
 destroying the constellation.  The cost is roughly 3 dB against coherent
 QPSK and error pairing, since one bad symbol corrupts two differences.
 
-This is what VF3 puts on the air, at the default M=4 (QPSK).  Every function
+The default M=4 is QPSK. Every function
 below takes the constellation as an optional `points`/`labels` pair so a
 higher-order mode (HC2's differential 8-PSK) can reuse the same kernels
 instead of duplicating them; omitting them reproduces the original QPSK
-behaviour bit-for-bit, which is what VF3 and HC1W rely on.
+behaviour bit-for-bit, which HC1W relies on.
 """
 
 from __future__ import annotations

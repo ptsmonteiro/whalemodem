@@ -23,7 +23,6 @@ MASTER_SEED = 20260829
 @pytest.mark.parametrize("mode_name,trials,minimum", [
     ("300baud", 1, 1),
     ("600baud", 1, 1),
-    ("vf3", 1, 1),
 ])
 def test_vhf_modes_at_measured_fm_bench_point(mode_name, trials, minimum):
     mode = next(mode for mode in modes.default_registry().modes

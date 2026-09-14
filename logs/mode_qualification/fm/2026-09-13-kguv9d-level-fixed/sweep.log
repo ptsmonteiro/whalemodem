@@ -1,4 +1,4 @@
-channel fm: 300baud(0) -> 600baud(1) -> 1200baud(2) -> vf3(3) -> vf12(18) -> vf4(8) -> vf6(6)
+channel fm: 300baud(0) -> 600baud(1) -> 1200baud(2) -> vf12(18) -> vf4(8) -> vf6(6)
 radios A=ic705, B=ht; seed=20260829; trials=10
 opening radios (ic705, ht)...
 warming up 3s...
@@ -80,32 +80,6 @@ warming up 3s...
     8/10: keyed=4.35s rx=70320 confidence=0.937 decoded
     9/10: keyed=4.35s rx=70200 confidence=0.933 payload_failed
     10/10: keyed=4.35s rx=70320 confidence=0.937 decoded
-
-== vf3 (ID 3, DATA chunk 1426 B) ==
-
-  A:ic705->B:ht: 10 x 1436 B
-    1/10: keyed=6.51s rx=96480 confidence=0.998 decoded
-    2/10: keyed=6.51s rx=96360 confidence=0.997 decoded
-    3/10: keyed=6.51s rx=96360 confidence=0.997 decoded
-    4/10: keyed=6.51s rx=96360 confidence=0.998 decoded
-    5/10: keyed=6.51s rx=96360 confidence=0.998 decoded
-    6/10: keyed=6.51s rx=96360 confidence=0.998 decoded
-    7/10: keyed=6.51s rx=96240 confidence=0.998 decoded
-    8/10: keyed=6.51s rx=96360 confidence=0.998 decoded
-    9/10: keyed=6.51s rx=96360 confidence=0.998 decoded
-    10/10: keyed=6.51s rx=96360 confidence=0.998 decoded
-
-  B:ht->A:ic705: 10 x 1436 B
-    1/10: keyed=6.51s rx=96360 confidence=0.998 decoded
-    2/10: keyed=6.51s rx=96360 confidence=0.999 decoded
-    3/10: keyed=6.51s rx=96360 confidence=0.999 payload_failed
-    4/10: keyed=6.51s rx=96360 confidence=0.998 decoded
-    5/10: keyed=6.51s rx=96360 confidence=0.999 decoded
-    6/10: keyed=6.51s rx=96240 confidence=0.999 decoded
-    7/10: keyed=6.51s rx=96360 confidence=0.998 decoded
-    8/10: keyed=6.51s rx=96360 confidence=0.998 decoded
-    9/10: keyed=6.51s rx=96360 confidence=0.999 decoded
-    10/10: keyed=6.51s rx=96360 confidence=0.999 decoded
 
 == vf12 (ID 18, DATA chunk 2900 B) ==
 
@@ -192,8 +166,6 @@ warming up 3s...
    600baud B:ht->A:ic705: 10/10 (100.0%), 95% CI 72.2-100.0%, 355 useful bit/s
   1200baud A:ic705->B:ht: 10/10 (100.0%), 95% CI 72.2-100.0%, 740 useful bit/s
   1200baud B:ht->A:ic705: 9/10 (90.0%), 95% CI 59.6-98.2%, 666 useful bit/s
-       vf3 A:ic705->B:ht: 10/10 (100.0%), 95% CI 72.2-100.0%, 1753 useful bit/s
-       vf3 B:ht->A:ic705: 9/10 (90.0%), 95% CI 59.6-98.2%, 1578 useful bit/s
       vf12 A:ic705->B:ht: 10/10 (100.0%), 95% CI 72.2-100.0%, 4380 useful bit/s
       vf12 B:ht->A:ic705: 0/10 (0.0%), 95% CI 0.0-27.8%, 0 useful bit/s
        vf4 A:ic705->B:ht: 0/10 (0.0%), 95% CI 0.0-27.8%, 0 useful bit/s

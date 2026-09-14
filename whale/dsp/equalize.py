@@ -6,8 +6,7 @@ Two estimators, for the two structures a frame can offer:
 symbols at the front of the frame.  It fits a gain *and* an additive
 constant per carrier -- the constant absorbs a carrier-frequency leak or a
 DC-ish interferer that would otherwise bias the gain -- and the residual
-around the fit is a direct per-carrier SNR estimate.  This is VF3's, and
-it is what the header is for.
+around the fit is a direct per-carrier SNR estimate.
 
 `pilot_phase` tracks the channel *through* the frame from pilot symbols
 scattered along it, interpolating each carrier's phase between them.  This

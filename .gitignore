@@ -57,8 +57,6 @@ experiments/**/hardware/**/.gitkeep
 # scripts or documentation. These exceptions go away when their experiment is
 # retired; see experiments/RETIRED.md.
 !experiments/ofdm/results/measurements/bandwidth.json
-!experiments/vf3/results/final_dqpsk_both_3.json
-!experiments/vf3/results/captures/**
 !experiments/hf3/results/**
 !experiments/hr0_fast_control/results/**
 !experiments/hf14_ofdm_bpsk_watterson/hardware/**

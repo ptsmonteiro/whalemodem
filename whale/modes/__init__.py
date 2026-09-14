@@ -8,7 +8,7 @@ not know which modulation is underneath.
 
 
 def default_registry(budget=None):
-    """The station's negotiable mode ladder: CPFSK, VF13, VF3, VF16, VF12.
+    """The station's negotiable mode ladder: CPFSK, VF13, VF16, VF12.
 
     This -- not `afsk.default_registry()` -- is what a Link uses when it is
     not handed a registry.  `afsk.default_registry()` remains the CPFSK-only
@@ -19,14 +19,14 @@ def default_registry(budget=None):
     VF12 sits at the top because it is the fastest and least robust rung:
     the ladder is ordered by rate, and `_maybe_adapt` compares decayed
     delivery statistics and expected goodput, so a link that cannot hold
-    VF12 falls back through VF16, VF3, and VF13 to the 600-baud rung on its own.
+    VF12 falls back through VF16 and VF13 to the 600-baud rung on its own.
     Negotiation is
     per-station -- a peer that does not advertise mode 18 simply never has
     it selected.
 
     `budget` is the useful-frame budget in seconds (see
     whale/policy.py's `max_useful_frame_seconds`), which sizes the CPFSK
-    rungs' chunks; None means afsk's own default. VF3, VF16, and VF12 are
+    rungs' chunks; None means afsk's own default. VF16 and VF12 are
     unaffected -- their payload is fixed by their OFDM frame structure,
     not by a time budget.
     """
@@ -65,7 +65,7 @@ def hf_registry(budget=None):
     `budget` is accepted and ignored, so this is interchangeable with
     `default_registry` where a `ChannelPolicy` selects one -- both HF rungs
     have a payload fixed by their frame structure rather than by a
-    keying-time budget, in exactly the way VF3's is.
+    keying-time budget.
     """
     from ..mode_qualification import registry
     return registry("hf", "default", budget)

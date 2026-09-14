@@ -1,4 +1,4 @@
-"""VF13: combinatorial noncoherent MFSK for analog FM, below VF3 in rate.
+"""VF13: combinatorial noncoherent MFSK for analog FM.
 
 Reuses HF16's geometry (`experiments/hf16_mfsk_lowsnr`, retained there, not
 here) transplanted to the FM passband: one M-ary decision per symbol, scored
@@ -21,11 +21,7 @@ convolutional rate 7/8 (`whale.dsp.fec.PUNCTURE_PATTERNS`), interleaved, an
 
 Measured on radios (IC-705 <-> Wouxun KG-UV9D Plus FM, drive 0.077,
 2026-09-14): 150/150 exact-payload frames (90/90 ht->ic705, 60/60
-ic705->ht). Installed as DEFAULT, following how VF12 was installed: rate
-order below VF3 (1,853 bit/s) since 1,438.8 < 1,853, so it does not change
-which rung ordinary negotiation reaches when VF3 holds -- it only gives the
-ladder a slower fallback rung between 1200baud CPFSK and VF3. Availability,
-not qualification.
+ic705->ht). Installed as DEFAULT below the faster OFDM data rungs.
 """
 
 from __future__ import annotations

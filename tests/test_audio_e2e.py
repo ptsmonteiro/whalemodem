@@ -7,11 +7,10 @@ transport puts its transmitted waveform into its peer's receive buffer.
 
 Two sessions run here.  The first is the shipped CPFSK ladder.  The second
 climbs onto VF12 (`whale/modes/vf12.py`), the top rung of the default FM
-ladder above VF3, which is the test that the `WaveformMode` boundary is real:
+ladder, which is the test that the `WaveformMode` boundary is real:
 a waveform sharing no DSP, no framing and no synchronisation with CPFSK
 carries a session through the same link, ARQ and TCP front end, with nothing
-above the mode changed to admit it.  A third, VF3-pinned session keeps VF3
-itself covered end to end now that ordinary negotiation climbs past it.
+above the mode changed to admit it.
 
 Because the transports hand audio over instantly, wall-clock time here means
 nothing.  What is measured instead is airtime -- the seconds of audio each
@@ -32,7 +31,6 @@ from whale.modes.hc1w_mode import HC1W
 from whale.modes.hf7_mode import HF7
 from whale.modes.hf8_mode import HF8
 from whale.modes.hr0_mode import HR0
-from whale.modes.vf3_mode import VF3
 from whale.modes.vf12 import VF12
 from whale.policy import HF, FM
 from whale.waveform import ModeRegistry
@@ -174,7 +172,7 @@ def test_vf12_carries_a_session_through_the_same_stack():
     """A non-CPFSK waveform, negotiated and driven by the unchanged link.
 
     The transfers are sized to climb the whole default ladder: each rung
-    steps up after one clean chunk through 300/600 baud, VF13, and VF3 before
+    steps up after one clean chunk through 300/600 baud and VF13 before
     arriving at VF12, the top rung.  Nothing pins the mode -- reaching VF12
     is the negotiation's own doing, which is the part worth testing.
     """
@@ -196,8 +194,7 @@ def test_vf12_carries_a_session_through_the_same_stack():
     # Measured at 12,000 bytes each way: 113.3 s against 368.6 s, a 3.25x
     # saving.  At 24,000 bytes each way the same measurement gives 166.2 s
     # against 707.5 s, or 4.26x -- VF12's 4,690 bit/s payload rate leaves the
-    # CPFSK ladder much further behind than VF3 did, so the ratio here is
-    # comfortably larger than VF3's was.  The floor is deliberately well
+    # CPFSK ladder far behind. The floor is deliberately well
     # under 3.25 so this catches a regression rather than ordinary variation.
     fast = ta.airtime + tb.airtime
     slow = sum(t.airtime for t in _run_session(
@@ -206,34 +203,12 @@ def test_vf12_carries_a_session_through_the_same_stack():
         f"VF12 session spent {fast:.1f}s of air against CPFSK's {slow:.1f}s")
 
 
-def test_vf3_carries_a_session_through_the_same_stack_when_pinned():
-    """VF3 end-to-end coverage, now that ordinary negotiation climbs past it.
-
-    `test_vf12_carries_a_session_through_the_same_stack` used to be VF3's
-    only exercise through the real link/audio stack; now that VF12 outranks
-    VF3 on the default ladder, an unpinned session no longer settles there.
-    Pinning the registry to the CPFSK rungs plus VF3 (mirroring how
-    `test_the_hf_channel_carries_a_session_with_hr0_in_control` pins its own
-    ladder via a policy) keeps VF3 itself covered end to end.
-    """
-    registry = ModeRegistry(afsk.default_registry().modes + (VF3,),
-                             afsk.default_registry().control)
-    payload_ab = _payload(4_000, 7, 11)
-    payload_ba = _payload(4_000, 13, 5)
-    link_a, link_b, ta, tb = _run_session(
-        payload_ab, payload_ba, mode_registry=registry)
-
-    assert link_a.tx_profile is VF3 and link_b.rx_profile is VF3
-    assert link_b.tx_profile is VF3 and link_a.rx_profile is VF3
-    assert ta.airtime and tb.airtime
-
-
 def test_the_hf_channel_carries_a_session_with_hr0_in_control():
     """The HF station, whole: HF's policy, HF's ladder, live on air.
 
     This is the software half of the HF acceptance test -- everything
     `scripts/run_acceptance_test.py --channel hf` does except the
-    radios.  It matters more than the VF3 session does, because HR0 is the
+    radios. HR0 is the
     *control* mode: the connect handshake, the timing calibration, every
     ACK, the floor handover and the disconnect all ride a waveform that
     shares no DSP with CPFSK, and is deliberately more robust (and slower)
