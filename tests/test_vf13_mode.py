@@ -32,7 +32,6 @@ def test_default_mode_contract_and_shipped_config_a():
     assert VF13.symbol_samples == 320
     assert VF13.band_lo_hz == 600.0 and VF13.band_hi_hz == 3000.0
     assert VF13.fec_rate == "7/8"
-    assert VF13.drive_scale == 1.0
     assert VF13.bits_per_symbol == 12
     assert VF13.chunk_size + framing.AIR_HEADER_BYTES == VF13.max_payload_bytes
 
@@ -107,7 +106,7 @@ def test_mode_for_reproduces_the_shipped_geometry():
     built = mode_for(tone_count=16, subbands=1, mapping="combinatorial",
                      active_tones=6, symbol_samples=320, band_lo_hz=600.0,
                      band_hi_hz=3000.0, frame_seconds=8.0, fec_rate="7/8",
-                     drive_scale=1.0, constraint=7)
+                     constraint=7)
     assert built.payload_symbols == VF13.payload_symbols
     assert built.net_bit_rate() == pytest.approx(VF13.net_bit_rate())
     assert built.max_payload_bytes == VF13.max_payload_bytes

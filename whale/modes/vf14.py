@@ -91,7 +91,6 @@ class Vf14Mode:
     #: -`preemph_db` at the highest relative to the RMS-normalized set, the
     #: same knob as `Vf13Mode.preemph_db`.
     preemph_db: float = 0.0
-    drive_scale: float = 1.0
     sync_seed: int = 0x0B91D
     head_seed: int = 0x13A57
     whitener_seed: int = 0x0E14A
@@ -103,8 +102,6 @@ class Vf14Mode:
     def __post_init__(self):
         if self.symbol_samples % DECIMATION:
             raise ValueError(f"symbol_samples must be a multiple of {DECIMATION}")
-        if not 0 < self.drive_scale <= 1:
-            raise ValueError("drive_scale must be a peak amplitude in (0, 1]")
         if self.fec_rate not in dsp.fec.PUNCTURE_PATTERNS:
             raise ValueError(f"unknown fec_rate {self.fec_rate!r}; have "
                              f"{sorted(dsp.fec.PUNCTURE_PATTERNS)}")
@@ -283,7 +280,7 @@ class Vf14Mode:
         peak = float(np.max(np.abs(audio)))
         if peak > MAX_SAMPLE:
             audio *= MAX_SAMPLE / peak
-        return (audio * self.drive_scale).astype(np.float32)
+        return audio.astype(np.float32)
 
     def encode(self, payload: bytes) -> np.ndarray:
         return self.modulate(payload)

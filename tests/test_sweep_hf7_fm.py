@@ -35,7 +35,6 @@ class FakeMode:
                                           config.get("bits_per_carrier"))
         self.fft_size = config.get("fft_size", 240)
         self.cp_len = config["cp_len"]
-        self.drive_scale = config.get("drive_scale")
 
     def encode(self, payload):
         assert len(payload) == self.chunk_size + framing.AIR_HEADER_BYTES
@@ -100,23 +99,21 @@ def _pair_factory(fail_on_send=None):
     return factory
 
 
-def test_sweep_expands_drives_and_keeps_config_ids_and_header_accounting(tmp_path,
-                                                                          monkeypatch):
+def test_sweep_keeps_config_ids_and_header_accounting(tmp_path, monkeypatch):
     monkeypatch.setitem(sys.modules, "fake_sweep_modes", FakeModule())
     monkeypatch.setattr(sweep.time, "sleep", lambda *_args: None)
     rc = sweep.main([
         "--module", "fake_sweep_modes", "--trials", "1",
-        "--drive-scales", "0.2,0.4", "--output-dir", str(tmp_path),
+        "--output-dir", str(tmp_path),
         "--config", "band_lo_hz=300,band_hi_hz=2700",
         "--config", "band_lo_hz=500,band_hi_hz=2900",
     ], pair_factory=_pair_factory())
     assert rc == 0
     document = json.loads((tmp_path / "result.json").read_text())
-    assert [entry["config_id"] for entry in document["modes"]] == [0, 1, 2, 3]
-    assert {entry["config"]["drive_scale"] for entry in document["modes"]} == {0.2, 0.4}
+    assert [entry["config_id"] for entry in document["modes"]] == [0, 1]
     assert all(row["payload_bytes"] == 7 + framing.AIR_HEADER_BYTES
                for row in document["results"])
-    assert {row["config_id"] for row in document["results"]} == {0, 1, 2, 3}
+    assert {row["config_id"] for row in document["results"]} == {0, 1}
 
 
 def test_sweep_writes_completed_rows_when_a_later_trial_raises(tmp_path,
@@ -125,7 +122,7 @@ def test_sweep_writes_completed_rows_when_a_later_trial_raises(tmp_path,
     monkeypatch.setattr(sweep.time, "sleep", lambda *_args: None)
     rc = sweep.main([
         "--module", "fake_sweep_modes", "--trials", "2",
-        "--config", "drive_scale=0.3", "--output-dir", str(tmp_path),
+        "--output-dir", str(tmp_path),
     ], pair_factory=_pair_factory(fail_on_send=2))
     assert rc == 1
     document = json.loads((tmp_path / "result.json").read_text())

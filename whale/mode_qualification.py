@@ -56,7 +56,7 @@ MANIFEST = (
     QualificationEntry("fm", 21, QualificationLevel.EXPERIMENTAL),
     # VF16 is VF12's 8-PSK, rate-2/3 LDPC sibling. The conservative FM C/N
     # simulator delivered 50/50 at +5 dB where VF12 delivered 0/50; the
-    # same waveform passed 10/10 in each radio direction at drive 1.
+    # same waveform passed 10/10 in each radio direction.
     QualificationEntry("fm", 22, QualificationLevel.DEFAULT),
     # VF12 is the HF7-geometry FM data rung: 51-carrier 50 Hz OFDM, 16-QAM,
     # rate-3/4 LDPC with comb-pilot channel tracking, 4,690 bit/s. Installed

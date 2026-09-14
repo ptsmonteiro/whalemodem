@@ -134,7 +134,6 @@ def validate_mode(mode, config):
         "bits_per_carrier": ("bits_per_carrier",),
         "fft_size": ("fft_size",),
         "cp_len": ("cp_len",),
-        "drive_scale": ("drive_scale",),
     }.items():
         if requested not in config:
             continue
@@ -267,8 +266,6 @@ def main(argv=None, *, pair_factory=bench.radio_pair):
     parser.add_argument("--seed", type=int, default=20260913)
     parser.add_argument("--capture-tail", type=float, default=1.5)
     parser.add_argument("--inter-trial", type=float, default=0.5)
-    parser.add_argument("--drive-scales", default="0.15,0.25,0.4,0.6",
-                        help="drive_scale values; ignored for configs that set it")
     parser.add_argument("--output-dir", type=Path, required=True)
     parser.add_argument("--offline", action="store_true",
                         help="run the exact payload/encode/decode loop through rx_audio.downsample; no radios")
@@ -276,14 +273,6 @@ def main(argv=None, *, pair_factory=bench.radio_pair):
     if args.trials < 1 or args.capture_tail < 0 or args.inter_trial < 0:
         parser.error("trials must be positive and timing intervals nonnegative")
     configs = args.config or [dict(DEFAULT_CONFIG)]
-    drives = [float(value) for value in args.drive_scales.split(",") if value.strip()]
-    expanded = []
-    for config in configs:
-        if "drive_scale" in config:
-            expanded.append(config)
-        else:
-            expanded.extend({**config, "drive_scale": drive} for drive in drives)
-    configs = expanded
     modes = []
     for cfg in configs:
         mode = make_mode(args.module, cfg)

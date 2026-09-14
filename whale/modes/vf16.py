@@ -26,7 +26,6 @@ class Vf16Mode(Vf12Mode):
     cp_len: int = 36
     lead_in_seconds: float = 0.5
     n_codewords: int = 36
-    drive_scale: float = 1.0
     pilot_comb_stride: int = 8
     pilot_time_span: int = 3
 

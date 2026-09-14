@@ -17,7 +17,6 @@ def test_mode_contract_and_requested_capacity():
     assert VF16.max_payload_bytes == VF16.chunk_size + framing.AIR_HEADER_BYTES
     assert VF16.fec_rate == "2/3"
     assert VF16.bits_per_carrier == 3  # 8-PSK
-    assert VF16.drive_scale == 1
     assert VF16.n_codewords == 36
     assert VF16.payload_symbols == VF12.payload_symbols == 181
 

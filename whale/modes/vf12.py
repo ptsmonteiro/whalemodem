@@ -44,8 +44,6 @@ class Vf12Mode:
     lead_in_seconds: float = 0.5
     target_airtime_seconds: float = 5.0
     n_codewords: int | None = None
-    #drive_scale: float = 0.077  # peak DAC amplitude
-    drive_scale: float = 1  # peak DAC amplitude
     confidence_threshold: float = 0.7
     pilot_comb_stride: int = 8  # 0 disables comb pilots (today's static-header path)
     pilot_time_span: int = 3  # moving-average window, in symbols, for tracking; 1 disables
@@ -66,8 +64,6 @@ class Vf12Mode:
             raise ValueError("passband must lie within 50..5950 Hz")
         if self.band_lo_hz % 50 or self.band_hi_hz % 50:
             raise ValueError("passband edges must be on the 50 Hz grid")
-        if not 0 < self.drive_scale <= 1:
-            raise ValueError("drive_scale must be a peak amplitude in (0, 1]")
         if not np.isfinite(self.lead_in_seconds) or self.lead_in_seconds < 0:
             raise ValueError("lead_in_seconds must be finite and nonnegative")
         if not np.isfinite(self.target_airtime_seconds) or self.target_airtime_seconds <= 0:
@@ -204,7 +200,7 @@ class Vf12Mode:
         lead[:fade] *= np.linspace(0, 1, fade)
         audio = np.concatenate((lead, symbols, np.zeros(4800)))
         peak = np.max(np.abs(audio))
-        return (audio * (self.drive_scale / peak)).astype(np.float32)
+        return (audio / peak).astype(np.float32)
 
     def _extract(self, audio, start, count):
         if start < 0 or start + count * self.symbol_samples > len(audio):
@@ -303,7 +299,7 @@ class Vf12Mode:
                 "band_lo_hz": self.band_lo_hz, "band_hi_hz": self.band_hi_hz,
                 "bits_per_carrier": self.bits_per_carrier, "cp_len": self.cp_len,
                 "fec_rate": self.fec_rate, "lead_in_seconds": self.lead_in_seconds,
-                "n_codewords": self.n_codewords, "drive_scale": self.drive_scale,
+                "n_codewords": self.n_codewords,
                 "pilot_comb_stride": self.pilot_comb_stride, "pilot_time_span": self.pilot_time_span,
                 "net_bps": self.bits_per_second}
 

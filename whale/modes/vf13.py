@@ -19,8 +19,7 @@ C(16,6)=8008 truncated to a 4,096-entry codebook), 150 Bd (320 samples at
 convolutional rate 7/8 (`whale.dsp.fec.PUNCTURE_PATTERNS`), interleaved, an
 8 s fixed frame: 1,438.8 net application bit/s.
 
-Measured on radios (IC-705 <-> Wouxun KG-UV9D Plus FM, drive 0.077,
-2026-09-14): 150/150 exact-payload frames (90/90 ht->ic705, 60/60
+Measured on radios (IC-705 <-> Wouxun KG-UV9D Plus FM, 2026-09-14): 150/150 exact-payload frames (90/90 ht->ic705, 60/60
 ic705->ht). Installed as DEFAULT below the faster OFDM data rungs.
 
 Simulated flat_nbfm C/N floor: not measured.
@@ -134,8 +133,6 @@ class Vf13Mode:
     repeat: int = 1
     constraint: int = 7                  # 7 or 9
     amplitude: float | None = None       # None => DEFAULT_AMPLITUDE/sqrt(k)
-    #drive_scale: float = 0.077           # final peak-audio multiplier
-    drive_scale: float = 1           # final peak-audio multiplier
     head_seconds: float = 0.10
     tail_seconds: float = 0.05
     soft_metric: str = "normalized"      # "normalized" | "raw" | "snr"
@@ -170,8 +167,6 @@ class Vf13Mode:
             raise ValueError("constraint must be 7 or 9")
         if self.repeat < 1:
             raise ValueError("repeat must be at least 1")
-        if not 0 < self.drive_scale <= 1:
-            raise ValueError("drive_scale must be a peak amplitude in (0, 1]")
         if self.soft_metric not in ("normalized", "raw", "snr"):
             raise ValueError(f"unknown soft_metric {self.soft_metric!r}")
         if self.band_lo_hz <= 0 or self.band_lo_hz >= self.band_hi_hz:
@@ -307,8 +302,8 @@ class Vf13Mode:
         0 dB (weight 1) at the lowest active tone, `+preemph_db` dB at the
         highest; the whole set is then rescaled so its RMS across every
         tone in every subband is 1, which keeps total transmitted power
-        equal to the unweighted case (`drive_scale`/peak-clip behavior is
-        unaffected -- it is applied afterwards, in `modulate`).
+        equal to the unweighted case (peak-clip behavior is unaffected -- it
+        is applied afterwards, in `modulate`).
         """
         banks = self.tx_banks
         lo = float(banks[0].tone_hz[0])
@@ -518,7 +513,6 @@ class Vf13Mode:
         peak = float(np.max(np.abs(audio))) if len(audio) else 0.0
         if peak > MAX_SAMPLE:
             audio = audio * (MAX_SAMPLE / peak)
-        audio = audio * self.drive_scale
         return audio.astype(np.float32)
 
     def encode(self, payload: bytes) -> np.ndarray:

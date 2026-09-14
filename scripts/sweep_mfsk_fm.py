@@ -59,9 +59,6 @@ DEFAULT_CONFIG = {
     "band_lo_hz": 600.0,
     "band_hi_hz": 3000.0,
     "fec_rate": "7/8",
-    # drive_scale is deliberately left out: --drive-scales expands each
-    # config across drive levels unless a --config string sets its own, and
-    # VF13's shipped drive (0.077) is exactly this default's first value.
 }
 
 
@@ -120,8 +117,7 @@ def _phy_value(mode, key):
 
 def validate_mode(mode, config):
     """Reject a candidate when its exposed geometry contradicts the request."""
-    for requested in ("tone_count", "subbands", "symbol_samples", "constraint",
-                      "drive_scale"):
+    for requested in ("tone_count", "subbands", "symbol_samples", "constraint"):
         if requested not in config:
             continue
         actual = _phy_value(mode, requested)
@@ -335,8 +331,6 @@ def main(argv=None, *, pair_factory=bench.radio_pair):
     parser.add_argument("--seed", type=int, default=20260913)
     parser.add_argument("--capture-tail", type=float, default=1.5)
     parser.add_argument("--inter-trial", type=float, default=0.5)
-    parser.add_argument("--drive-scales", default="0.077,0.15,0.25",
-                        help="drive_scale values; ignored for configs that set it")
     parser.add_argument("--output-dir", type=Path, required=True)
     parser.add_argument("--offline", action="store_true",
                         help="run the exact payload/encode/decode loop through rx_audio.downsample; no radios")
@@ -344,14 +338,6 @@ def main(argv=None, *, pair_factory=bench.radio_pair):
     if args.trials < 1 or args.capture_tail < 0 or args.inter_trial < 0:
         parser.error("trials must be positive and timing intervals nonnegative")
     configs = args.config or [dict(DEFAULT_CONFIG)]
-    drives = [float(value) for value in args.drive_scales.split(",") if value.strip()]
-    expanded = []
-    for config in configs:
-        if "drive_scale" in config:
-            expanded.append(config)
-        else:
-            expanded.extend({**config, "drive_scale": drive} for drive in drives)
-    configs = expanded
     modes = []
     for cfg in configs:
         mode = make_mode(args.module, cfg)

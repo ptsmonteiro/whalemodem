@@ -23,37 +23,15 @@ level is uncontrolled: two runs of the same mode on the same pair of radios
 are not level-matched, and two different handhelds are not comparable on
 level at all.
 
-| Mode | Frequency span | Modulation geometry | Modulation order | FEC rate | FEC technique | DATA payload/frame | Frame duration | Net/frame | Pure SNR passed | Radio tested |
+The default FM ladder, in rate order. vf14-4 is the control mode. `Sim C/N
+passed` is the simulated `flat_nbfm` RF C/N pass point.
+
+| Mode | Frequency span | Modulation geometry | Modulation order | FEC rate | FEC technique | DATA payload/frame | Frame duration | Net/frame | Sim C/N passed | Radio tested |
 | --- | --- | --- | ---: | ---: | --- | ---: | ---: | ---: | --- | --- |
-| vf13 | 600-3,000 Hz | 16-tone combinatorial noncoherent MFSK (6-of-16 per symbol) | 4,096 (of C(16,6)=8,008) | 7/8 | punctured K=7 convolutional, interleaved, max-log LLR noncoherent energy detection | 1,437 B | 7.99 s | 1,438.8 bit/s | not measured | 2026-09-14, IC-705<->Wouxun KG-UV9D Plus FM, drive 0.077, 150/150 exact-payload frames (90/90 HT->IC-705, 60/60 IC-705->HT). Pre-FEC SER max 0.73%, median worst-tone SNR 8.4 dB (HT->IC-705) / 12.3 dB (IC-705->HT). SNR not calibrated this session |
-
-vf14-16 (FM experimental): 78.0 net application bit/s per full-capacity DATA
-frame. Simulated flat_nbfm RF C/N pass point: -7 dB (20/20 full-capacity
-frames); -8 dB did not pass (0/20). Calibrated radio-test SNR pass point:
-not measured.
-
-vf14-4 (FM control, mode 23): 628.6 net application bit/s per full-capacity
-DATA frame. Simulated flat_nbfm RF C/N pass point: 0 dB (20/20 full-capacity
-frames); -1 dB did not pass (14/20). Calibrated radio-test SNR pass point:
-not measured.
-
-vf14-8 (FM experimental): 107.2 net application bit/s per full-capacity DATA
-frame. Simulated pure-SNR pass point: not measured. Calibrated radio-test SNR
-pass point: not measured.
-
-vf16 (FM): 3,118 net application bit/s per full-capacity DATA frame.
-Simulated pure-SNR pass point: not measured. Calibrated radio-test SNR pass
-point: not measured.
-
-vf12 (FM): 4,690 net application bit/s per full-capacity DATA frame.
-Simulated pure-SNR pass points: not measured. Calibrated radio-test SNR
-pass points: 2026-09-13, IC-705<->Baofeng UV-B5 FM, 19/20 exact-payload
-frames (10/10 IC-705->HT, 9/10 HT->IC-705) at ~15 dB measured effective SNR,
-at the former 0.22 peak drive. 2026-09-13, IC-705<->Wouxun KG-UV9D Plus FM at
-the current 0.077 peak drive: 20/20 (10/10 each direction) at 14.7-17.0 dB
-measured effective SNR; at 0.22 the HT->IC-705 leg delivered 0/10, the
-handheld's transmit audio chain distorting the multicarrier signal. The
-UV-B5 has not been re-measured at 0.077.
+| vf14-4 | 600-2,400 Hz | 4-tone noncoherent FSK, 600 Bd | 4 (4-FSK) | 3/4 | punctured K=7 convolutional, interleaved, soft-decision Viterbi | 264 B | 3.360 s | 628.6 bit/s | 0 dB (20/20); not passed at -1 dB (14/20) | passed on bench radios; SNR not measured |
+| vf13 | 600-3,000 Hz | 16-tone combinatorial noncoherent MFSK, 6 of 16 tones per symbol, 150 Bd | 4,096 (of C(16,6)=8,008) | 7/8 | punctured K=7 convolutional, interleaved, soft-decision Viterbi | 1,427 B | 7.990 s | 1,428.8 bit/s | not measured | passed on bench radios; SNR not measured |
+| vf16 | 500-3,000 Hz | 51-carrier 8PSK OFDM (43 data, 8 comb pilots) | 8 (8PSK) | 2/3 | IEEE 802.11n QC-LDPC, interleaved | 1,928 B | 4.947 s | 3,117.8 bit/s | not measured | passed on bench radios; SNR not measured |
+| vf12 | 500-3,000 Hz | 51-carrier 16-QAM OFDM (43 data, 8 comb pilots) | 16 (16-QAM) | 3/4 | IEEE 802.11n QC-LDPC, interleaved | 2,900 B | 4.947 s | 4,689.7 bit/s | not measured | passed on bench radios; SNR not measured |
 
 ## HF
 

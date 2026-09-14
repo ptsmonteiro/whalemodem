@@ -44,7 +44,7 @@ def test_64qam_full_capacity_clean_loopback():
     # pilot_comb_stride=6: the FM-tuned default of 8 is too coarse for the
     # comb-pilot frequency interpolation to support 64-QAM (bits_per_carrier=6).
     mode = mode_for(bits_per_symbol=6, band_lo_hz=500, band_hi_hz=2900,
-                    n_codewords=75, drive_scale=.4, pilot_comb_stride=6)
+                    n_codewords=75, pilot_comb_stride=6)
     payload = np.arange(mode.max_payload_bytes, dtype=np.uint8).tobytes()
     result = mode.decode(rx_audio.downsample(mode.encode(payload)))
     assert result["payload"] == payload
