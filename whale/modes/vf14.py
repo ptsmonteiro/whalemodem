@@ -23,8 +23,9 @@ The short grid carries ACK/DISC/FLOOR traffic; the medium grid carries typical
 CONNECT exchanges; the full grid carries DATA and long control packets.
 CRC32 selects the decoded grid.
 
-Simulated flat_nbfm C/N floor: vf14-16 not measured; vf14-4 0 dB (20/20
-full-capacity frames, -1 dB did not pass at 14/20); vf14-8 not measured.
+Simulated flat_nbfm C/N floor: vf14-16 -7 dB (20/20 full-capacity frames,
+-8 dB did not pass at 0/20); vf14-4 0 dB (20/20 full-capacity frames, -1 dB
+did not pass at 14/20); vf14-8 not measured.
 """
 
 from __future__ import annotations
@@ -46,8 +47,7 @@ VF14_16_MODE_ID = 20
 VF14_4_MODE_ID = 23
 VF14_8_MODE_ID = 21
 
-#: Peak (= sine) amplitude of every tone. The 0.6 CPFSK uses
-#: (`afsk.modulate`), so a radio level set for 300 baud applies unchanged.
+#: Peak (= sine) amplitude of every tone.
 DEFAULT_AMPLITUDE = 0.6
 MAX_SAMPLE = 0.95
 
@@ -380,7 +380,10 @@ def _tone_snr_db(magnitudes: np.ndarray) -> float:
     return float(10.0 * np.log10(np.mean(best) / max(np.mean(rest), 1e-30)))
 
 
-#: Keep mode 20's control waveform unchanged for connections with old peers.
+#: Was the FM control mode; superseded by VF14_4 (below). Kept, and its
+#: on-air ID (mode 20) kept unreassigned, as an experimental waveform --
+#: see whale/mode_qualification.py's MANIFEST. Old peers that only know
+#: mode 20 as control no longer interoperate.
 VF14_16 = Vf14Mode(
     name="vf14-16", mode_id=VF14_16_MODE_ID, tone_count=16,
     symbol_samples=768, first_bin=9,

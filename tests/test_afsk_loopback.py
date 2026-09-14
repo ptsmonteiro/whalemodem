@@ -1,6 +1,14 @@
-"""Pure-software checks for framing + afsk -- no hardware, no radios.
+"""Pure-software checks for whale.link's protocol and ARQ behaviour.
 
 Run: python tests/test_afsk_loopback.py
+
+This file used to also carry the physical-layer unit tests for the 300/600
+baud CPFSK modes (whale/afsk.py's Profile/modulate/demodulate). Those modes
+and their machinery were removed from the product -- see
+whale/modes/vf14.py's VF14_4, the current FM control mode -- and their tests
+went with them. What remains here is protocol-level: packet formats and the
+generic ARQ/session behaviour, which link_harness.py exercises over the real
+default FM ladder (VF14_4 in control), not over a mock.
 """
 
 import threading
@@ -8,631 +16,14 @@ import time
 
 import numpy as np
 
-from whale import afsk, framing, link, mode_history, modes, rx_audio
-from whale.waveform import ModeRegistry
+from whale import link, mode_history, modes
+from whale.modes.vf13 import VF13
+from whale.modes.vf14 import VF14_4
 
 # The two-Link-in-one-process harness these tests share with
 # tests/test_link_recovery.py.
 from link_harness import (FakeTransport as _FakeTransport, connected_pair as _connected_pair,
                           silence_once as _silence_once, transfer as _transfer)
-
-
-def test_framing_roundtrip():
-    # 255/256 is where the old 8-bit length field ended, so both sides of
-    # that boundary are checked explicitly; 1000 is past anything a keying
-    # can carry but well within what the 16-bit field must describe.
-    for payload in (b"", b"hello", bytes(range(256))[:255],
-                    bytes(range(256)), bytes(i % 256 for i in range(1000))):
-        bits = framing.build_frame_bits(payload)
-        after_sync = len(framing.head_pad_bits(300)) + len(framing.sync_bits(300))
-        decoded = framing.parse_frame_bits(bits[after_sync:])
-        assert decoded == payload, (len(payload), len(decoded or b""))
-    print("test_framing_roundtrip OK")
-
-
-def test_link_header_and_body_have_independent_crcs():
-    header, body = link._encode_air_header(link.PT_DATA, afsk.PROFILE_600.mode_id,
-                                           b"\x07payload")
-    bits = framing.build_frame_bits(header + body, baud=600, include_head=False)
-    after_sync = bits[len(framing.sync_bits(600)):]
-    assert framing.header_is_valid(after_sync) is True
-    assert framing.parse_frame_bits(after_sync) == header + body
-
-    bad_header = after_sync.copy()
-    bad_header[framing.LENGTH_FIELD_BITS + 3] ^= 1
-    assert framing.header_is_valid(bad_header) is False
-
-    bad_body = after_sync.copy()
-    body_start = (framing.LENGTH_FIELD_BITS
-                  + 8 * framing.AIR_HEADER_BYTES + 16)
-    bad_body[body_start + 3] ^= 1
-    assert framing.header_is_valid(bad_body) is True
-    assert framing.parse_frame_bits(bad_body) is None
-
-
-def test_sync_words_are_full_period_m_sequences():
-    """Each profile's sync word must really be an m-sequence, because that
-    is the whole reason it works as a correlation target: an m-sequence's
-    periodic autocorrelation is a single peak with a flat -1 floor, so the
-    correlator has one unambiguous lock point rather than a ridge of
-    near-peaks it can settle on a symbol or two off.
-
-    Checked by construction rather than trusted from a table of primitive
-    polynomials, since framing._SYNC_TAPS carries one tap set per PN order
-    and a wrong entry would still produce a plausible-looking bit string --
-    just a short-period one, with sidelobes to match.
-    """
-    for baud in (300, 600, 2400):
-        bits = framing.sync_bits(baud)
-        order = (len(bits) + 1).bit_length() - 1
-        assert len(bits) == (1 << order) - 1, (baud, len(bits))
-
-        # Balance: an m-sequence has exactly one more 1 than 0 per period.
-        assert sum(bits) == (1 << (order - 1)), (baud, sum(bits))
-
-        # Periodic autocorrelation: +len at zero shift, exactly -1 elsewhere.
-        pm = np.where(np.array(bits) == 1, 1, -1)
-        for shift in range(1, len(pm)):
-            assert int(np.dot(pm, np.roll(pm, shift))) == -1, (baud, shift)
-
-    # And each lasts about framing.SYNC_SECONDS on air -- the point of
-    # scaling it at all. See framing.sync_bits for why a fixed bit count
-    # left the fastest profile with the least margin.
-    for baud in (300, 600, 2400):
-        seconds = len(framing.sync_bits(baud)) / baud
-        assert abs(seconds - framing.SYNC_SECONDS) / framing.SYNC_SECONDS < 0.02, \
-            (baud, seconds)
-    print("test_sync_words_are_full_period_m_sequences OK")
-
-
-def test_a_frame_does_not_sync_another_profiles_correlator():
-    """Every profile has to reject the others' frames, since all three share
-    a radio and 300/600 now share a tone pair as well -- so symbol timing
-    and the sync word itself are the only things telling them apart.
-
-    This matters at exactly one moment in a session: a mode step. Both ends
-    keep decoding at the old profile until a data frame settles the new one
-    (see whale/link.py), so for one turnaround the receiver is running a
-    correlator at a baud the transmitter has already left.
-    """
-    payload = bytes(range(64))
-    for tx_profile in afsk.PROFILES:
-        audio = afsk.modulate(payload, profile=tx_profile)
-        for rx_profile in afsk.PROFILES:
-            if rx_profile.mode_id == tx_profile.mode_id:
-                continue
-            result = afsk.demodulate(audio, profile=rx_profile)
-            assert result.get("payload") is None, \
-                (tx_profile.name, rx_profile.name, "decoded another profile's frame")
-            assert result.get("confidence", 0.0) < rx_profile.confidence_threshold, \
-                (tx_profile.name, rx_profile.name, result.get("confidence"))
-    print("test_a_frame_does_not_sync_another_profiles_correlator OK")
-
-
-def test_successful_decodes_report_effective_sync_snr():
-    """The post-lock estimator should track known full-band AWGN.
-
-    Its residual intentionally also counts receiver defects, but in this
-    controlled case the only unexplained component is noise.
-    """
-    rng = np.random.default_rng(20260828)
-    expected_db = 10.0
-    for profile in afsk.PROFILES:
-        clean = afsk.modulate(b"snr diagnostic", profile=profile).astype(float)
-        signal_power = np.mean(clean ** 2)
-        noise_rms = np.sqrt(signal_power / 10 ** (expected_db / 10))
-        audio = clean + rng.normal(0.0, noise_rms, len(clean))
-        result = afsk.demodulate(audio, profile=profile)
-        assert result["payload"] == b"snr diagnostic"
-        assert abs(result["snr_db"] - expected_db) < 1.0, (
-            profile.name, result["snr_db"])
-
-
-def test_a_lock_survives_losing_the_opening_of_the_sync_word():
-    """The structural property behind framing.SYNC_SECONDS.
-
-    A receiver that is still settling when a transmission starts destroys
-    the front of the frame -- on the bench HT, ~110ms of blackout after its
-    squelch opens, during which what arrives is broadband transient with no
-    tone in it. The frame body survives that easily; the sync word is what
-    the loss lands on, and a frame that cannot be synced on is lost however
-    clean the rest of it is.
-
-    What must hold is that the survivable loss is the same *fraction* of the
-    sync word at every profile. Since every profile's sync word is the same
-    duration, an equal fraction is an equal number of milliseconds -- so one
-    head-pad figure protects both shipped profiles, instead of protecting the
-    slow one while the fast one silently runs on a fraction of the margin.
-
-    With a fixed 63-bit sync word this failed badly: a fixed blackout cost the
-    faster profile a much larger fraction of its sync word.
-    """
-    payload = bytes(range(100))
-    rng = np.random.default_rng(11)
-
-    def decode_rate(profile, fraction, trials=6):
-        sps = round(afsk.SAMPLE_RATE / profile.baud)
-        sync_start = len(framing.head_pad_bits(profile.baud)) * sps
-        n_sync = len(framing.sync_bits(profile.baud))
-        ok = 0
-        for _ in range(trials):
-            audio = afsk.modulate(payload, profile=profile).astype(np.float64)
-            end = sync_start + int(fraction * n_sync * sps)
-            # Loud broadband noise, not silence: that is what the radio
-            # actually delivers, and it is the harder case -- it adds energy
-            # to the correlation window without adding signal.
-            level = np.sqrt(np.mean(audio[sync_start:sync_start + 10 * sps] ** 2))
-            audio[:end] = rng.normal(0, level * 1.5, end)
-            ok += int(afsk.demodulate(audio, profile=profile).get("payload") == payload)
-        return ok / trials
-
-    for profile in afsk.PROFILES:
-        assert decode_rate(profile, 0.4) == 1.0, \
-            (profile.name, "should survive losing the first 40% of the sync word")
-
-    # And the cliff is in the same place for every profile -- that sameness
-    # is the property, more than the exact figure.
-    for profile in afsk.PROFILES:
-        assert decode_rate(profile, 0.6) == 0.0, \
-            (profile.name, "60% of the sync word destroyed should not decode")
-    print("test_a_lock_survives_losing_the_opening_of_the_sync_word OK")
-
-
-def test_every_keying_fits_the_budget_and_uses_it():
-    """No useful DATA framing may outlast afsk.MAX_USEFUL_FRAME_SECONDS,
-    and every DATA frame should come as close to it as the format allows.
-
-    Both halves matter. The cap bounds how long the transmitter holds the
-    channel, which sets the cost of a single retransmit and the floor under
-    turnaround -- see afsk.MAX_USEFUL_FRAME_SECONDS. The tightness is the
-    throughput: chunk sizes are derived from the budget rather than chosen,
-    so a profile leaving room for another whole byte means the derivation
-    has drifted from the arithmetic, not that someone made a judgement
-    call.
-
-    A DATA frame is the long one, but the control plane rides the same air,
-    so the smaller frame types are checked too rather than assumed."""
-    for profile in afsk.PROFILES:
-        payload = profile.chunk_size
-        useful = afsk.useful_data_seconds(payload, profile)
-        assert useful <= afsk.MAX_USEFUL_FRAME_SECONDS + 1e-9, \
-            (profile.name, payload, round(useful, 3))
-
-        # One more byte must not fit: the 16-bit length field leaves the
-        # airtime budget as the limiting factor for every shipped profile.
-        assert payload < framing.MAX_PAYLOAD_BYTES, \
-            f"{profile.name} is capped by the length field again, not the clock"
-        assert afsk.useful_data_seconds(payload + 1, profile) > afsk.MAX_USEFUL_FRAME_SECONDS, \
-            f"{profile.name} leaves room for a bigger chunk than {profile.chunk_size}"
-
-    print("test_every_keying_fits_the_budget_and_uses_it OK "
-          + ", ".join(f"{p.name} {p.chunk_size}B/"
-                      f"{afsk.useful_data_seconds(p.chunk_size, p):.2f}s useful"
-                      for p in afsk.PROFILES))
-
-
-def test_afsk_clean_loopback():
-    rng = np.random.default_rng(0)
-    payload = bytes(rng.integers(0, 256, size=37, dtype=np.uint8))
-    tx = afsk.modulate(payload)
-    result = afsk.demodulate(tx)
-    assert result["synced"], result
-    assert result["payload"] == payload, (result["payload"], payload)
-    assert "tail_symbols_received" not in result
-    print("test_afsk_clean_loopback OK")
-
-
-def test_head_pad_is_a_full_period_pn_sequence():
-    period = (1 << framing._PAD_LFSR_ORDER) - 1
-    head = framing._lfsr_bits(period, framing._PAD_LFSR_ORDER,
-                              framing._HEAD_PAD_TAPS,
-                              seed=framing._PAD_LFSR_SEED)
-    assert len(set(head)) == 2
-
-    # A full m-sequence visits every nonzero state exactly once before it
-    # returns to the seed. Check the state cycle, not just the output bits.
-    def state_period(taps):
-        state = framing._PAD_LFSR_SEED
-        seen = set()
-        while state not in seen:
-            seen.add(state)
-            feedback = 0
-            for tap in taps:
-                feedback ^= (state >> (tap - 1)) & 1
-            state = ((state >> 1)
-                     | (feedback << (framing._PAD_LFSR_ORDER - 1)))
-        assert state == framing._PAD_LFSR_SEED
-        return len(seen)
-
-    assert state_period(framing._HEAD_PAD_TAPS) == period
-
-    for profile in afsk.PROFILES:
-        h = framing.head_pad_bits(profile.baud)
-        assert abs(sum(h) / len(h) - 0.5) < 0.1
-    print("test_head_pad_is_a_full_period_pn_sequence OK")
-
-
-def test_afsk_noisy_delayed_loopback():
-    rng = np.random.default_rng(1)
-    payload = bytes(rng.integers(0, 256, size=200, dtype=np.uint8))
-    tx = afsk.modulate(payload)
-    lead = np.zeros(int(rng.integers(0, 4000)))
-    tail = np.zeros(2000)
-    gain = 0.3
-    noisy = np.concatenate([lead, tx, tail]) * gain
-    noisy = noisy + rng.normal(0, 0.02, size=len(noisy))
-    result = afsk.demodulate(noisy)
-    assert result["synced"], result
-    assert result["payload"] == payload, "payload mismatch"
-    print("test_afsk_noisy_delayed_loopback OK")
-
-
-# -- independent receiver clock ---------------------------------------
-#
-# Everything above this point modulates and demodulates against one clock,
-# which is a thing that never happens on air. Two stations have two sound
-# cards with two crystals, and nothing disciplines them to each other. The
-# tests below put an offset between the two so the suite can express the
-# class of bug that a shared clock hides completely.
-
-# A robustness target, deliberately far beyond anything this bench shows.
-#
-# scripts/measure_clock_offset.py measured the real figure on the two
-# radios: -3.7 ppm ic705->ht and +3.1 ppm ht->ic705, summing to -0.6 ppm.
-# The two legs being reciprocal to within 0.6 ppm is what says that is a
-# genuine clock difference and not an artefact of the method. The two sound
-# cards are, for practical purposes, the same clock -- ~100x too close to
-# cost a single bit at any frame size the link sends, and never the cause of
-# anything failing on this bench.
-#
-# The tests below are kept anyway, because "the clocks happen to agree
-# today" is not a property of the modem. A different radio, a different
-# interface, or a colder shack changes it, and a decoder that silently
-# depends on it should be known to. 500 ppm is the bar a modem ought to
-# clear; it is not a measurement of this bench.
-ASSUMED_WORST_CASE_PPM = 500
-
-# The production frame: link.py sends chunk_size DATA bytes after the shared
-# air header. This is per profile rather than one number now that chunk_size
-# is derived from the useful-frame budget, with every shipped profile landing
-# on a useful frame
-# of at most afsk.MAX_USEFUL_FRAME_SECONDS. Derived rather than restated so
-# these tests keep measuring what the link actually sends.
-def production_payload_bytes(profile):
-    return framing.AIR_HEADER_BYTES + profile.chunk_size
-
-
-def resample_clock(audio, ppm):
-    """`audio` as heard by a receiver whose sample clock is `ppm` parts per
-    million away from the transmitter's.
-
-    A receiver clocking fast takes more samples of the same span of time, so
-    the signal arrives stretched: a symbol that was `sps` samples long
-    becomes sps*(1+ppm/1e6), and every tone lands at freq/(1+ppm/1e6). Both
-    effects come out of the one resampling, which is the point -- a crystal
-    offset moves timing and frequency together, and simulating the timing
-    alone would be simulating something that cannot physically happen.
-
-    Linear interpolation suffices: the highest tone in use (2200 Hz) is
-    oversampled ~22x at 48 kHz, so the interpolation error sits far below
-    the noise the other tests already decode through. Verified against a
-    known offset in test_clock_offset_simulation_is_faithful.
-    """
-    audio = np.asarray(audio, dtype=np.float64)
-    ratio = 1.0 + ppm * 1e-6
-    if ppm == 0:
-        return audio.copy()
-    n_out = int(len(audio) * ratio)
-    return np.interp(np.arange(n_out) / ratio, np.arange(len(audio)), audio)
-
-
-def _frame_bits(payload_len, baud):
-    """Bits from the start of the sync word to the end of the CRC -- the
-    span over which a timing error has to stay inside half a symbol.
-
-    Takes baud because the sync word's length does (framing.sync_bits)."""
-    return len(framing.sync_bits(baud)) + framing.frame_bits_for_length(payload_len)
-
-
-def expected_failure(reason):
-    """Marks a test that documents a known, unfixed defect.
-
-    The test asserts the behaviour we want, so it fails today. Rather than
-    leave the suite red -- which trains everyone to ignore it -- the failure
-    is caught and reported as XFAIL. If the test ever *passes*, that is
-    itself an error: the defect is fixed and the marker has to come off, so
-    the assertion moves from documentation to guarantee. Same contract as
-    pytest's strict xfail, without taking a pytest dependency in a suite
-    that otherwise runs as a plain script.
-    """
-    def decorate(fn):
-        def wrapper(*args, **kwargs):
-            try:
-                fn(*args, **kwargs)
-            except AssertionError as exc:
-                first = str(exc).strip().splitlines()[0] if str(exc).strip() else ""
-                print(f"{fn.__name__} XFAIL ({reason})" + (f": {first}" if first else ""))
-                return
-            raise AssertionError(
-                f"{fn.__name__} passed, but is marked as a known failure "
-                f"({reason}). If the decoder now handles this, remove the "
-                f"expected_failure marker so the test guards the fix."
-            )
-        wrapper.__name__ = fn.__name__
-        wrapper.__doc__ = fn.__doc__
-        return wrapper
-    return decorate
-
-
-def test_clock_offset_simulation_is_faithful():
-    """The offset helper is the instrument every test below reads through,
-    so check it against something with a known answer before trusting it: a
-    pure tone resampled by `ppm` must come back at freq/(1+ppm/1e6)."""
-    seconds, freq = 2.0, 1500.0
-    t = np.arange(int(seconds * afsk.SAMPLE_RATE)) / afsk.SAMPLE_RATE
-    tone = np.cos(2 * np.pi * freq * t)
-
-    assert np.array_equal(resample_clock(tone, 0), tone), "0 ppm must be identity"
-
-    for ppm in (-1000, -250, 250, 1000):
-        shifted = resample_clock(tone, ppm)
-        ratio = 1.0 + ppm * 1e-6
-        assert abs(len(shifted) - len(tone) * ratio) <= 1, ppm
-
-        # Frequency by phase slope, which resolves far below an FFT bin.
-        n = np.arange(len(shifted))
-        mixed = shifted * np.exp(-1j * 2 * np.pi * (freq / ratio) * n / afsk.SAMPLE_RATE)
-        win = int(afsk.SAMPLE_RATE * 0.002)
-        smooth = np.convolve(mixed, np.ones(win) / win, mode="valid")
-        phase = np.unwrap(np.angle(smooth))
-        tt = np.arange(len(phase)) / afsk.SAMPLE_RATE
-        residual_hz = np.polyfit(tt, phase, 1)[0] / (2 * np.pi)
-        # Expected tone is freq/ratio; anything left over is helper error.
-        assert abs(residual_hz) < 0.05, (ppm, residual_hz)
-    print("test_clock_offset_simulation_is_faithful OK")
-
-
-def test_decodes_through_a_small_clock_offset():
-    """Well-matched clocks must not be a problem at any frame size the link
-    actually sends. This is the regression guard for whatever fixes the
-    larger offsets -- a timing estimator that helps at 500 ppm and hurts at
-    50 would pass the tests below and still make the link worse."""
-    rng = np.random.default_rng(11)
-    for profile in afsk.PROFILES:
-        for n in (2, production_payload_bytes(profile), 160):
-            payload = bytes(rng.integers(0, 256, size=n, dtype=np.uint8))
-            tx = afsk.modulate(payload, profile=profile)
-            for ppm in (-50, 0, 50):
-                rx = resample_clock(tx, ppm)
-                result = afsk.demodulate(rx, profile=profile)
-                assert result.get("payload") == payload, \
-                    (profile.name, n, ppm, result.get("confidence"))
-    print("test_decodes_through_a_small_clock_offset OK")
-
-
-def test_clock_offset_tolerance_is_half_a_symbol_over_the_frame():
-    """Characterises exactly where today's decoder gives up, because the
-    shape of that boundary is what identifies the cause.
-
-    afsk.demodulate lays symbol sample points on a rigid grid of integer
-    `sps` from the sync peak, with no timing recovery, so a clock offset
-    accumulates a sampling error that grows along the frame. The frame dies
-    when that error reaches half a symbol, which puts the tolerance at
-    0.5/n_bits -- inversely proportional to frame length. It is very nearly
-    independent of baud too, since a faster profile has proportionally
-    shorter symbols; the sync word's length now scales with baud
-    (framing.sync_bits), so n_bits differs a little per profile for the same
-    payload and the bound is computed per profile rather than once.
-
-    Both of those are the signature the bench saw: a ceiling in *payload
-    bytes* that sat at the same byte count for all three profiles. Gradual
-    SNR falloff does not do that, and neither does anything in the RF path.
-
-    When timing recovery lands, this test fails -- that is the point of it.
-    Re-measure the boundary and update the bound; do not delete the test.
-    """
-    rng = np.random.default_rng(12)
-    for profile in afsk.PROFILES:
-        for n in (40, 120, 200):
-            payload = bytes(rng.integers(0, 256, size=n, dtype=np.uint8))
-            tx = afsk.modulate(payload, profile=profile)
-            predicted = 0.5e6 / _frame_bits(n, profile.baud)
-
-            # Comfortably inside the predicted boundary: must decode.
-            inside = resample_clock(tx, round(predicted * 0.6))
-            assert afsk.demodulate(inside, profile=profile).get("payload") == payload, \
-                ("expected decode inside the half-symbol bound", profile.name, n)
-
-            # Comfortably outside it: must not. If this half starts passing,
-            # the decoder has gained timing tolerance from somewhere.
-            outside = resample_clock(tx, round(predicted * 2.0))
-            assert afsk.demodulate(outside, profile=profile).get("payload") != payload, \
-                ("expected failure outside the half-symbol bound", profile.name, n)
-    print("test_clock_offset_tolerance_is_half_a_symbol_over_the_frame OK")
-
-
-@expected_failure("no symbol timing recovery in afsk.demodulate")
-def test_decodes_at_production_size_under_bench_clock_offset():
-    """The requirement, stated as the link needs it: a production-sized
-    frame survives the clock offset two independent sound cards can present,
-    in either direction, on every profile.
-
-    Fails today, for the reason in
-    test_clock_offset_tolerance_is_half_a_symbol_over_the_frame: the
-    decoder's half-symbol budget is 0.5/n_bits, so each profile's production
-    frame has its own tolerance --
-
-        300 baud    98 bytes    895 bits    ~559 ppm
-        600 baud   203 bytes   1799 bits    ~278 ppm
-
-    -- and the faster profile is the one that cannot hold 500. Note
-    the shape: the frames are sized by *airtime*, so a faster profile spends
-    its budget on more bits, and more bits is exactly what this decoder
-    cannot keep timing across. The tolerance therefore falls as the link
-    speeds up, which is the opposite of the reassuring direction. It costs
-    nothing on this bench (the two cards measure 3.4 ppm apart) and it is the
-    first thing to check on
-    hardware whose clocks are not this close.
-    """
-    rng = np.random.default_rng(13)
-    failures = []
-    for profile in afsk.PROFILES:
-        payload = bytes(rng.integers(0, 256, size=production_payload_bytes(profile),
-                                     dtype=np.uint8))
-        tx = afsk.modulate(payload, profile=profile)
-        for ppm in (-ASSUMED_WORST_CASE_PPM, ASSUMED_WORST_CASE_PPM):
-            result = afsk.demodulate(resample_clock(tx, ppm), profile=profile)
-            if result.get("payload") != payload:
-                failures.append((profile.name, ppm, round(result.get("confidence") or 0, 3)))
-    assert not failures, f"no decode at (profile, ppm, confidence): {failures}"
-    print("test_decodes_at_production_size_under_bench_clock_offset OK")
-
-
-@expected_failure("no symbol timing recovery in afsk.demodulate")
-def test_long_frames_lose_to_clock_offset_before_short_ones():
-    """Long frames are the first thing a clock offset takes away.
-
-    Worth pinning down because it is a trap, not because it is currently
-    biting: a decoder with no timing recovery degrades in a way that looks
-    exactly like a frame-size ceiling, and the bench has had frame-size
-    ceilings that were nothing of the kind. The clocks measure 3.4 ppm
-    apart, far too close to be the cause of any of them -- but from the
-    decoder's output alone a clock ceiling and any other kind are
-    indistinguishable, so if a size ceiling shows up, measure the clocks
-    before assuming it is the same thing twice.
-    """
-    rng = np.random.default_rng(14)
-    profile = afsk.PROFILE_600
-    ppm = 400  # inside 120 bytes' budget (478 ppm), outside 160 bytes' (366)
-
-    small = bytes(rng.integers(0, 256, size=120, dtype=np.uint8))
-    large = bytes(rng.integers(0, 256, size=160, dtype=np.uint8))
-    small_rx = afsk.demodulate(resample_clock(afsk.modulate(small, profile=profile), ppm),
-                               profile=profile)
-    large_rx = afsk.demodulate(resample_clock(afsk.modulate(large, profile=profile), ppm),
-                               profile=profile)
-
-    # The 120-byte half is not the defect and must hold regardless.
-    assert small_rx.get("payload") == small, "120 bytes should survive 400 ppm"
-    assert large_rx.get("payload") == large, \
-        f"160 bytes failed at {ppm} ppm (confidence {large_rx.get('confidence')})"
-    print("test_long_frames_lose_to_clock_offset_before_short_ones OK")
-
-
-def test_high_confidence_survives_the_offset_that_kills_the_payload():
-    """Why the ceiling looked mysterious rather than obvious.
-
-    The sync word is 127 symbols at this profile; a frame is ten times that.
-    An offset that has barely moved the sampling point by the end of it has
-    walked most of a symbol by the end of the payload, so the receiver
-    reports a near-perfect lock and then fails CRC. Any diagnostic that
-    reads confidence as "the frame arrived cleanly" is reading the first 5%
-    of the frame.
-    """
-    rng = np.random.default_rng(15)
-    profile = afsk.PROFILE_600
-    payload = bytes(rng.integers(0, 256, size=160, dtype=np.uint8))
-    tx = afsk.modulate(payload, profile=profile)
-
-    result = afsk.demodulate(resample_clock(tx, 800), profile=profile)
-    assert result.get("payload") is None, "expected the frame to fail at 800 ppm"
-    assert result.get("confidence", 0) > 0.9, \
-        f"expected a high-confidence near-miss, got {result.get('confidence')}"
-
-    # And the length field still reads correctly, because it sits in the
-    # bits immediately after the sync word, where the accumulated error is
-    # still negligible. This is worth
-    # pinning down: the sweep scripts reported a near-miss end_index ~1.2x
-    # the expected frame length and it was read as a false sync lock on
-    # garbage. It is not -- end_index is an absolute offset into the RX
-    # buffer, and the frame simply started ~1s into it.
-    assert "end_index" in result and "start_index" in result, result
-    span = result["end_index"] - result["start_index"]
-    sps = round(afsk.SAMPLE_RATE / profile.baud)
-    expected_bits = _frame_bits(len(payload), profile.baud)
-    assert abs(span - sps * expected_bits) < sps, \
-        ("length field decoded wrong", span, sps * expected_bits)
-    print("test_high_confidence_survives_the_offset_that_kills_the_payload OK")
-
-
-def _hand_built_frame(profile, length_field, payload_bytes):
-    """Audio for a frame whose length field is written directly, so it can
-    disagree with the payload that follows. modulate() cannot express this
-    -- it derives the field from the payload, which is the whole point."""
-    bits = (framing.head_pad_bits(profile.baud) + framing.sync_bits(profile.baud)
-            + framing.bytes_to_bits(
-                length_field.to_bytes(framing.LENGTH_FIELD_BITS // 8, "big") + payload_bytes))
-    sps = round(afsk.SAMPLE_RATE / profile.baud)
-    return afsk._cpfsk_tone(bits, sps, afsk.SAMPLE_RATE, profile.freq0, profile.freq1)
-
-
-def test_an_implausible_declared_length_is_a_dead_sync_not_a_frame_in_flight():
-    """The hazard the 16-bit length field introduces, and the check that
-    answers it.
-
-    Nothing can validate a length field before buffering everything it
-    claims -- the CRC sits after the payload it describes -- so the decoder
-    has to judge the claim on its face. A false sync on noise yields a
-    uniformly random 16-bit value, and most of those describe a frame longer
-    than transport.RX_BUFFER_SECONDS can ever hold. Reporting
-    one of those as 'still arriving' tells whale/link.py's decode loop to
-    stop pruning and re-search the whole buffer every poll (see
-    _prune_stale), which lands straight on the turnaround.
-
-    Under the old 8-bit field this could not happen: 255 bytes at 300 baud
-    is 7.1s, inside the buffer, so every value a garbage length byte could
-    take was one the decoder would collect in full and reject on CRC. That
-    property is now explicit rather than incidental -- see
-    afsk.MAX_CREDIBLE_FRAME_SECONDS.
-    """
-    profile = afsk.PROFILE_600
-    audio = _hand_built_frame(profile, 60000, b"nowhere near 60000 bytes")
-
-    result = afsk.demodulate(audio, profile=profile)
-    assert result.get("payload") is None, "a frame this broken must not decode"
-    assert result.get("confidence", 0) >= profile.confidence_threshold, \
-        f"the sync word should still lock, got {result.get('confidence')}"
-    assert "end_index" in result, \
-        "an unwaitable declared length must read as a dead sync, not as still-arriving"
-    print("test_an_implausible_declared_length_is_a_dead_sync_not_a_frame_in_flight OK")
-
-
-def test_a_plausible_frame_still_reads_as_still_arriving_while_incomplete():
-    """The other half, and the reason the check is a bound rather than a
-    blanket refusal: a real frame that is genuinely half-way through must
-    still suppress end_index, or the decode loop discards frames mid-flight
-    and pays a retransmit for each one."""
-    profile = afsk.PROFILE_600
-    payload = bytes([link.PT_DATA, 0]) + b"x" * 120
-    full = afsk.modulate(payload, profile=profile)
-
-    # Cut just past the length field, so the declared length is readable and
-    # credible but most of the payload has yet to arrive.
-    head = len(framing.head_pad_bits(profile.baud)) + len(framing.sync_bits(profile.baud)) + 32
-    sps = round(afsk.SAMPLE_RATE / profile.baud)
-    partial = full[:head * sps]
-
-    result = afsk.demodulate(partial, profile=profile)
-    assert result.get("payload") is None, "the frame is not complete yet"
-    assert "end_index" not in result, \
-        "a credible length still arriving must not be reported as a dead end"
-
-    # And the whole thing decodes once it has all landed.
-    assert afsk.demodulate(full, profile=profile).get("payload") == payload
-    print("test_a_plausible_frame_still_reads_as_still_arriving_while_incomplete OK")
-
-
-def test_link_packet_roundtrip():
-    """Same shape as whale.link's packet encode: type byte + body, through
-    modulate/demodulate."""
-    from whale.link import PT_DATA, EOF_BIT
-
-    body = bytes([0x00 | EOF_BIT]) + b"x" * 200
-    payload = bytes([PT_DATA]) + body
-    tx = afsk.modulate(payload)
-    result = afsk.demodulate(tx)
-    assert result["payload"] == payload
-    print("test_link_packet_roundtrip OK")
 
 
 def test_connect_body_roundtrip():
@@ -651,125 +42,21 @@ def test_connect_ack_body_roundtrip():
 
 def test_negotiate_mode():
     assert link._negotiate_mode([0, 1], 1) == 1
-    assert link._negotiate_mode([0], 1) == afsk.CONTROL_PROFILE.mode_id
+    assert link._negotiate_mode([0], 1) == VF14_4.mode_id
     assert link._negotiate_mode([0, 1], 0) == 0
     print("test_negotiate_mode OK")
-
-
-def test_link_uses_waveform_mode_contract():
-    """Link dispatches through a mode's codec rather than CPFSK directly."""
-    class SpyCodec:
-        tx_sample_rate = afsk.SAMPLE_RATE
-        rx_sample_rate = afsk.RX_SAMPLE_RATE
-
-        def __init__(self):
-            self.encoded = 0
-            self.decoded = 0
-
-        def encode(self, payload, profile, *, include_head=True):
-            self.encoded += 1
-            return afsk.modulate(payload, profile=profile,
-                                 include_head=include_head)
-
-        def decode(self, audio, profile, **kwargs):
-            self.decoded += 1
-            return afsk.demodulate(audio, profile=profile,
-                                   sample_rate=self.rx_sample_rate, **kwargs)
-
-        def airtime(self, payload_len, profile):
-            return afsk.frame_seconds(payload_len, profile)
-
-    codec = SpyCodec()
-    custom = afsk.Profile(
-        name="custom-waveform", mode_id=42, baud=600, freq0=700, freq1=1500,
-        chunk_size=80, codec=codec)
-    registry = ModeRegistry((afsk.PROFILE_300, custom), afsk.PROFILE_300)
-    ta, tb = _FakeTransport(), _FakeTransport()
-    ta.peer, tb.peer = tb, ta
-    a = link.Link(ta, "STA1", mode_registry=registry)
-    b = link.Link(tb, "STA2", mode_registry=registry)
-    a._apply_tx_profile(custom)
-    b._apply_rx_profile(custom)
-    a._await_turnaround = lambda: None
-
-    a._tx_packet(link.PT_DATA, bytes([link.EOF_BIT, 100]) + b"contract")
-    assert codec.encoded == 1
-    assert b._decode_one(tb.snapshot_rx())
-    assert codec.decoded >= 1
-    ptype, body = b._rx_packets.get_nowait()
-    assert ptype == link.PT_DATA
-    assert body[2:] == b"contract"
-    print("test_link_uses_waveform_mode_contract OK")
 
 
 def test_data_ack_carries_received_mode():
     """The ACK identifies both the sequence result and DATA mode decoded."""
     header, remainder = link._encode_air_header(
-        link.PT_DATA_ACK, afsk.CONTROL_PROFILE.mode_id,
-        bytes([7, 8, afsk.PROFILE_600.mode_id]))
+        link.PT_DATA_ACK, VF14_4.mode_id,
+        bytes([7, 8, VF13.mode_id]))
     assert len(remainder) == 1
     decoded = link._decode_air_header(header)
     assert decoded[-1] == bytes([7, 8])
-    assert remainder == bytes([afsk.PROFILE_600.mode_id])
+    assert remainder == bytes([VF13.mode_id])
     print("test_data_ack_carries_received_mode OK")
-
-
-def test_demodulate_returns_the_earliest_frame_not_the_loudest():
-    """The RX buffer can hold more than one sync-like thing -- a garbled
-    self-echo of our own last transmission alongside the peer's reply, say
-    -- so demodulate() has to return the *earliest* frame and the caller has
-    to be able to walk the buffer using end_index. The third frame here is
-    deliberately the loudest: under the old argmax-only sync search it would
-    have been decoded first and the two before it thrown away unread."""
-    payloads = [bytes([afsk.PROFILE_600.mode_id]) + b"first",
-                b"second" * 10,
-                b"third and loudest"]
-    frames = [afsk.modulate(p, profile=afsk.PROFILE_600) for p in payloads]
-    frames[2] = frames[2] * 3.0
-    rng = np.random.default_rng(7)
-    audio = np.concatenate([np.zeros(2000, dtype=np.float32)] + frames)
-    audio = audio + rng.normal(0, 0.01, size=len(audio)).astype(np.float32)
-
-    for expected in payloads:
-        result = afsk.demodulate(audio, profile=afsk.PROFILE_600)
-        assert result.get("payload") == expected, (expected, result.get("payload"))
-        audio = audio[result["end_index"]:]
-    print("test_demodulate_returns_the_earliest_frame_not_the_loudest OK")
-
-
-def test_sync_confidence_does_not_depend_on_surrounding_silence():
-    """The same frame must score the same whether it sits in six seconds of
-    idle noise or fills the buffer on its own -- the old
-    peak/median-noise-floor measure collapsed from 255 to 12 across exactly
-    that change, close enough to its own threshold that noise could
-    outscore a frame."""
-    prof = afsk.PROFILE_600
-    rng = np.random.default_rng(4)
-    payload = bytes([link.PT_DATA, 0]) + b"burst" * 12
-    frame = afsk.modulate(payload, profile=prof)
-
-    def noisy(x):
-        return (x + rng.normal(0, 0.05, size=len(x))).astype(np.float32)
-
-    quiet = np.zeros(int(3.0 * afsk.SAMPLE_RATE), dtype=np.float32)
-    sparse = afsk.demodulate(noisy(np.concatenate([quiet, frame, quiet])), profile=prof)
-    dense = afsk.demodulate(noisy(frame), profile=prof)
-    assert sparse.get("payload") == payload and dense.get("payload") == payload
-
-    assert abs(sparse["confidence"] - dense["confidence"]) < 0.1, \
-        (sparse["confidence"], dense["confidence"])
-    assert min(sparse["confidence"], dense["confidence"]) > prof.confidence_threshold
-
-    # Noise alone must stay well clear of the threshold, in a buffer of any
-    # length: real off-air recordings scored 7.8-214 under the old measure
-    # against a threshold of 4.0.
-    for seconds in (0.5, 2.0, 6.0):
-        n = noisy(np.zeros(int(seconds * afsk.SAMPLE_RATE), dtype=np.float32))
-        result = afsk.demodulate(n, profile=prof)
-        assert result.get("payload") is None
-        assert result.get("confidence", 0.0) < prof.confidence_threshold, \
-            (seconds, result.get("confidence"))
-    print("test_sync_confidence_does_not_depend_on_surrounding_silence OK")
 
 
 def test_seq_ahead_wraps():
@@ -810,13 +97,17 @@ def test_await_turnaround_applies_the_channel_policy(monkeypatch):
 def test_link_multi_chunk_message_roundtrip():
     """A whole message across several chunks, each acked before the next
     goes out. Sequence numbers are started near the top of the space so the
-    transfer runs through a wrap."""
+    transfer runs through a wrap.
+
+    Sized past 3 chunks even at the default ladder's largest chunk_size
+    (VF12's, currently 2900 bytes), so the wrap is forced regardless of
+    which rung mid-session adaptation steps the transfer onto."""
     a, b, ta, tb = _connected_pair()
     try:
         a._tx_seq = link.SEQ_MODULO - 3
         b._rx_expect_seq = link.SEQ_MODULO - 3
 
-        data = bytes((i * 7 + 11) % 256 for i in range(400))
+        data = bytes((i * 7 + 11) % 256 for i in range(9000))
         got = _transfer(a, b, data)
 
         assert got == data, (len(got or b""), len(data))
@@ -1019,9 +310,8 @@ def test_concurrent_send_attempts_do_not_collide():
 
 def test_link_negotiation_and_mode_step():
     """Each direction of the link negotiates and adapts independently: A's
-    TX rate to B need not match B's TX rate to A (see whale/afsk.py's
-    measured per-direction SNR on the real bench, which is what motivates
-    this)."""
+    TX rate to B need not match B's TX rate to A (this rig's two directions
+    can measure different SNR, which is what motivates this)."""
     link.TX_TURNAROUND_DELAY = 0.05  # keep the test fast; real hardware needs the settling time, this doesn't
 
     ta, tb = _FakeTransport(), _FakeTransport()
@@ -1032,11 +322,12 @@ def test_link_negotiation_and_mode_step():
     a.start()
     b.start()
     try:
-        # History says STA1->STA2 last spoke at PROFILE_600, but STA2->STA1
-        # has no history at all -- connect should bring up an asymmetric
-        # link: A's tx (and B's rx) at 600baud, B's tx (and A's rx) still
-        # at the control profile since B has nothing to go on yet.
-        mode_history.record_good_mode(history, "STA1", "STA2", afsk.PROFILE_600.mode_id)
+        # History says STA1->STA2 last spoke at VF13 (one rung above the
+        # control mode), but STA2->STA1 has no history at all -- connect
+        # should bring up an asymmetric link: A's tx (and B's rx) at VF13,
+        # B's tx (and A's rx) still at the control mode since B has nothing
+        # to go on yet.
+        mode_history.record_good_mode(history, "STA1", "STA2", VF13.mode_id)
 
         listen_result = {}
 
@@ -1050,13 +341,12 @@ def test_link_negotiation_and_mode_step():
 
         assert ok, "connect() failed"
         assert listen_result["peer"] == "STA1", listen_result
-        assert a.tx_profile.mode_id == afsk.PROFILE_600.mode_id, a.tx_profile
+        assert a.tx_profile.mode_id == VF13.mode_id, a.tx_profile
         assert a.rx_profile is a.modes.control, a.rx_profile
-        assert b.rx_profile.mode_id == afsk.PROFILE_600.mode_id, b.rx_profile
+        assert b.rx_profile.mode_id == VF13.mode_id, b.rx_profile
         assert b.tx_profile is b.modes.control, b.tx_profile
-        # The whole default ladder, including data modes -- not just the CPFSK
-        # profiles: what each end advertises is its registry, and stations
-        # run whale.modes.default_registry().
+        # The whole default ladder: what each end advertises is its
+        # registry, and stations run whale.modes.default_registry().
         expected = set(modes.default_registry().supported_ids)
         assert a.peer_supported_modes == expected
         assert b.peer_supported_modes == expected
@@ -1074,8 +364,8 @@ def test_link_negotiation_and_mode_step():
         a.send_message(b"mode confirmation")
         t.join(timeout=20)
 
-        assert a.tx_profile.mode_id == afsk.PROFILE_300.mode_id, a.tx_profile
-        assert b.rx_profile.mode_id == afsk.PROFILE_300.mode_id, b.rx_profile
+        assert a.tx_profile.mode_id == VF14_4.mode_id, a.tx_profile
+        assert b.rx_profile.mode_id == VF14_4.mode_id, b.rx_profile
         assert b.tx_profile is b.modes.control, b.tx_profile
         print("test_link_negotiation_and_mode_step OK")
     finally:
@@ -1084,32 +374,11 @@ def test_link_negotiation_and_mode_step():
 
 
 if __name__ == "__main__":
-    test_framing_roundtrip()
-    test_sync_words_are_full_period_m_sequences()
-    test_a_frame_does_not_sync_another_profiles_correlator()
-    test_a_lock_survives_losing_the_opening_of_the_sync_word()
-    test_every_keying_fits_the_budget_and_uses_it()
-    test_afsk_clean_loopback()
-    test_head_pad_is_a_full_period_pn_sequence()
-    test_afsk_noisy_delayed_loopback()
-    test_clock_offset_simulation_is_faithful()
-    test_decodes_through_a_small_clock_offset()
-    test_clock_offset_tolerance_is_half_a_symbol_over_the_frame()
-    test_high_confidence_survives_the_offset_that_kills_the_payload()
-    test_decodes_at_production_size_under_bench_clock_offset()
-    test_long_frames_lose_to_clock_offset_before_short_ones()
-    test_an_implausible_declared_length_is_a_dead_sync_not_a_frame_in_flight()
-    test_a_plausible_frame_still_reads_as_still_arriving_while_incomplete()
-    test_link_packet_roundtrip()
     test_connect_body_roundtrip()
     test_connect_ack_body_roundtrip()
     test_negotiate_mode()
-    test_link_uses_waveform_mode_contract()
     test_data_ack_carries_received_mode()
-    test_demodulate_returns_the_earliest_frame_not_the_loudest()
-    test_sync_confidence_does_not_depend_on_surrounding_silence()
     test_seq_ahead_wraps()
-    test_await_turnaround_does_not_add_dead_air()
     test_roles_assigned_at_connect()
     test_irs_can_request_and_use_the_floor()
     test_concurrent_send_attempts_do_not_collide()

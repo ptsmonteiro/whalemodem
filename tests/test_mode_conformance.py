@@ -4,8 +4,8 @@ MODE_QUALIFICATION.md section 1.4 requires each mode to reject silence,
 bounded white noise, a bare carrier, and non-finite or wrong-shaped audio
 without raising or doing unbounded work. Truncated audio, corrupt
 header/length, corrupt payload/CRC, and impossible declared length are
-already exercised per mode (most completely for CPFSK; HC0/HC1W are
-fixed-length) by test_afsk_loopback.py,
+already exercised per mode (most completely for VF14; HC0/HC1W are
+fixed-length) by test_vf14_mode.py,
 test_hc0_mode.py and test_hc1w_mode.py,
 so they are not repeated here.
 
@@ -15,7 +15,7 @@ Software only -- no radios, no sound cards.
 import numpy as np
 import pytest
 
-from whale import afsk, rx_audio
+from whale import rx_audio
 from whale.modes.hc0_mode import HC0
 from whale.modes.hc1w_mode import HC1W
 from whale.modes.hf2_mode import HF2
@@ -25,10 +25,9 @@ from whale.modes.hf7_mode import HF7
 from whale.modes.hf8_mode import HF8
 from whale.modes.hf9_mode import HF9
 from whale.modes.hr0_mode import HR0
-from whale.modes.vf14 import VF14_16, VF14_8
+from whale.modes.vf14 import VF14_16, VF14_4, VF14_8
 
-MODES = (afsk.PROFILE_300, afsk.PROFILE_600,
-         VF14_16, VF14_8, HC1W, HC0, HR0, HF2, HF5, HF6, HF7, HF8, HF9)
+MODES = (VF14_16, VF14_4, VF14_8, HC1W, HC0, HR0, HF2, HF5, HF6, HF7, HF8, HF9)
 
 RNG = np.random.default_rng(20260830)
 CAPTURE_SECONDS = 3

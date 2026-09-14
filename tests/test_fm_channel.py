@@ -7,9 +7,10 @@ import numpy as np
 import pytest
 from scipy.signal import freqz
 
-from whale import afsk, rx_audio
+from whale import rx_audio
 from whale.fm_channel import (FM_RADIO_PRESETS, FM_SYNTHETIC_PROFILES,
                               ComplexFmChannel, FmRfInterference, FmRfPath)
+from whale.modes.vf14 import VF14_4
 
 
 ROOT = Path(__file__).parents[1]
@@ -123,13 +124,13 @@ def test_static_rf_multipath_adds_its_differential_delay_to_capture():
 
 def test_vhf_control_mode_decodes_through_measured_fm_preset():
     payload = bytes(range(32))
-    transmitted = afsk.PROFILE_300.encode(payload)
+    transmitted = VF14_4.encode(payload)
     channel = ComplexFmChannel.from_preset(
         SAMPLE_RATE, "ic705_to_kg_uv9d", 35, seed=8)
     received = channel.process(transmitted).audio
     snapshot = rx_audio.downsample(np.concatenate((
         received, np.zeros(rx_audio.FILTER_DELAY_CAPTURE_SAMPLES))))
-    assert afsk.PROFILE_300.decode(snapshot)["payload"] == payload
+    assert VF14_4.decode(snapshot)["payload"] == payload
 
 
 def test_invalid_preset_and_rf_configuration_are_rejected():

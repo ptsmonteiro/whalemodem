@@ -1,5 +1,6 @@
 """Half-duplex point-to-point data link: connect / send / receive / disconnect
-over one radio, built as stop-and-wait ARQ on top of whale.afsk.
+over one radio, built as stop-and-wait ARQ over a negotiable physical-layer
+mode.
 
 One frame in flight at a time, acknowledged before the next goes out.
 Correctness first.
@@ -24,11 +25,11 @@ cumulative ACK, go-back-N -- was built and then rolled back. It never
 worked on the bench: the ic705->ht leg recovered exactly one frame from 32
 of its 34 two-frame bursts, the second frame syncing cleanly and then
 failing its CRC every time, which is the same "sync locks, frame does not
-verify" signature as the per-frame size ceilings in
-the baud sweeps. That is not
+verify" signature as the per-frame size ceilings seen sweeping the frame
+budget. That is not
 understood, and bursting is parked until it is. What survives from the
-attempt is the sequence numbering (below) and the decoder fixes it forced
-in whale/afsk.py, which were real bugs in their own right.
+attempt is the sequence numbering (below) and the decoder fixes it forced,
+which were real bugs in their own right.
 
 Losing a control frame
 ----------------------
@@ -86,7 +87,7 @@ import math
 
 import numpy as np
 
-from whale import afsk, mode_history
+from whale import mode_history
 from whale.streaming import ReceiveStream
 from whale import link_protocol as protocol
 from whale.policy import FM
@@ -204,8 +205,8 @@ def net_bits_per_second(mode):
 # decoded frame of one of these is therefore direct evidence of the profile
 # the peer is actually transmitting at, which is what makes rx_profile
 # self-correcting -- see _confirm_rx_profile. A decoded control-plane frame
-# says nothing of the sort, since it would have gone out at
-# afsk.CONTROL_PROFILE whatever either station had negotiated.
+# says nothing of the sort, since it would have gone out at the registry's
+# control mode whatever either station had negotiated.
 # The seq byte of a DATA frame: one flag bit and a seven-bit sequence
 # number.
 #
@@ -233,15 +234,15 @@ def net_bits_per_second(mode):
 # The first alone is what the pre-session-sequence code carried, and it is
 # unambiguous but says nothing about where the peer got to.
 #
-# Carrying both costs one byte of airtime (~27ms at 300 baud) and makes
-# every ACK say exactly which frame it answers and what it accomplished.
+# Carrying both costs one byte of airtime and makes every ACK say exactly
+# which frame it answers and what it accomplished.
 
 # CHUNK_SIZE (payload bytes per DATA frame -- kept small so a single
 # real-hardware bit error, observed near the tail of longer frames, only
 # costs a short retransmit instead of derailing a large chunk) and the
-# frame-airtime-derived ACK timeout both depend on the active afsk.Profile
-# (baud, in particular) -- see Link._apply_tx_profile/_apply_rx_profile,
-# which compute them per instance instead of as module constants.
+# frame-airtime-derived ACK timeout both depend on the active mode -- see
+# Link._apply_tx_profile/_apply_rx_profile, which compute them per instance
+# instead of as module constants.
 #
 # The retry budget itself moved to whale/policy.py: how many times to try
 # again is a bet about the channel, not a protocol fact. See ChannelPolicy
@@ -562,7 +563,7 @@ class Link:
         self._last_adaptive_mode_change_at = float("-inf")
         self._last_mode_change_direction = 0
 
-        # Control-plane frames always use afsk.CONTROL_PROFILE (see
+        # Control-plane frames always use the registry's control mode (see
         # _tx_packet), so this timeout is fixed for the life of the Link.
         self.control_ack_timeout = (self.modes.control.airtime(_CONTROL_FRAME_LEN_ESTIMATE)
                                     + self.policy.ack_timeout_slack)
@@ -570,10 +571,9 @@ class Link:
         # self.tx_profile / self.rx_profile are the *negotiated data*
         # profiles for each direction -- only meaningful once CONNECTED.
         # They're independent: this station's TX quality to its peer and
-        # the reverse leg can and do differ on real hardware (see
-        # whale/afsk.py's measured per-direction SNR numbers), so each side
+        # the reverse leg can and do differ on real hardware, so each side
         # is negotiated and adapted separately instead of sharing one
-        # profile. Both start at CONTROL_PROFILE as a harmless default.
+        # profile. Both start at the control mode as a harmless default.
         self.tx_profile = self.modes.control
         self.rx_profile = self.modes.control
         # A second profile the decoder keeps trying while it is not yet
@@ -672,7 +672,7 @@ class Link:
         """Sets the profile this station uses to transmit (DATA when it's
         the sender, DATA_ACK when it's replying -- both reflect the same
         outbound RF path to the peer). Control-plane frames are unaffected
-        -- they always use afsk.CONTROL_PROFILE regardless of this."""
+        -- they always use the registry's control mode regardless of this."""
         old = self.tx_profile
         self.tx_profile = profile
         if old is not profile and self.state == "CONNECTED":
@@ -739,8 +739,8 @@ class Link:
             p.airtime(_AIR_HEADER_LEN + p.chunk_size) for p in self.modes.modes) + 1.0)
 
     def _candidate_decode_profiles(self, snap=None):
-        """Which afsk.Profile(s) an incoming frame might be using right
-        now: control-plane traffic always uses CONTROL_PROFILE, and DATA
+        """Which WaveformMode(s) an incoming frame might be using right
+        now: control-plane traffic always uses the registry's control mode, and DATA
         traffic uses whatever self.rx_profile currently is (the peer's own
         tx_profile) -- try both since the decode loop can't otherwise tell
         which is arriving next.
@@ -1288,8 +1288,9 @@ class Link:
         self._rx_frequency_hint_hz = None
         self.state = "CONNECTING"
         own_supported = list(self.modes.supported_ids)
-        # Not `forced or history`: mode_id 0 is a real profile (300 baud)
-        # and a perfectly reasonable thing to pin a bench run to.
+        # Not `forced or history`: a forced mode_id can be falsy (0) and is
+        # still a real, deliberate override, not "no override" -- so this
+        # has to check `is None`, not truthiness.
         proposed_id = _forced_mode_id(supported_ids=own_supported)
         if proposed_id is None:
             proposed_id = mode_history.last_good_mode(self.mode_history, self.mycall, dst_call)
@@ -1377,9 +1378,9 @@ class Link:
             own_supported, proposed_id, fallback_id=self.modes.control.mode_id)
         # own_tx_id: independently, what rate *we* should use transmitting
         # back (mycall->src) -- our own history for this peer, downgraded
-        # to CONTROL_PROFILE if the caller hasn't told us it supports that
-        # mode. The two legs need not match: this rig's two directions
-        # measure different SNR (see whale/afsk.py's module docstring).
+        # to the control mode if the caller hasn't told us it supports that
+        # mode. The two legs need not match: this rig's two directions can
+        # measure different SNR.
         own_tx_id = _forced_mode_id(supported_ids=own_supported)  # mode_id 0 is falsy, so not `or`
         if own_tx_id is None:
             own_tx_id = mode_history.last_good_mode(self.mode_history, self.mycall, src)
@@ -1477,11 +1478,9 @@ class Link:
 
         Chunks are cut one at a time, immediately before each is sent, rather
         than pre-split up front: _maybe_adapt() can step tx_profile mid-message
-        and the profiles have different chunk_size (78 at 300 baud, 170 at 600,
-        each is whatever afsk.MAX_USEFUL_FRAME_SECONDS allows at that
-        baud), so a message pre-split at the starting profile would keep
-        sending undersized frames for the rest of the transfer even after
-        stepping up."""
+        and different modes have different chunk_size, so a message
+        pre-split at the starting profile would keep sending undersized
+        frames for the rest of the transfer even after stepping up."""
         if self.state != "CONNECTED":
             raise LinkError("not connected")
         if self.role != "ISS" and not self._acquire_floor():

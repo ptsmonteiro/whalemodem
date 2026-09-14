@@ -5,12 +5,12 @@ ModemServices, Links, framing, modulation, demodulation and ARQ.  Only the
 physical boundary is replaced: instead of sound cards, PTT and radios, each
 transport puts its transmitted waveform into its peer's receive buffer.
 
-Two sessions run here.  The first is the shipped CPFSK ladder.  The second
-climbs onto VF12 (`whale/modes/vf12.py`), the top rung of the default FM
-ladder, which is the test that the `WaveformMode` boundary is real:
-a waveform sharing no DSP, no framing and no synchronisation with CPFSK
-carries a session through the same link, ARQ and TCP front end, with nothing
-above the mode changed to admit it.
+Two sessions run here.  The first is the shipped default FM ladder.  The
+second climbs onto VF12 (`whale/modes/vf12.py`), the top rung of that
+ladder, which is the test that the `WaveformMode` boundary is real: a
+waveform sharing no DSP, no framing and no synchronisation with the ladder's
+control mode (VF14_4) carries a session through the same link, ARQ and TCP
+front end, with nothing above the mode changed to admit it.
 
 Because the transports hand audio over instantly, wall-clock time here means
 nothing.  What is measured instead is airtime -- the seconds of audio each
@@ -32,6 +32,7 @@ from whale.modes.hf7_mode import HF7
 from whale.modes.hf8_mode import HF8
 from whale.modes.hr0_mode import HR0
 from whale.modes.vf12 import VF12
+from whale.modes.vf14 import VF14_4
 from whale.policy import HF, FM
 from whale.waveform import ModeRegistry
 
@@ -169,12 +170,13 @@ def test_full_stack_session_over_directional_complex_fm_presets():
 
 
 def test_vf12_carries_a_session_through_the_same_stack():
-    """A non-CPFSK waveform, negotiated and driven by the unchanged link.
+    """VF12, negotiated and driven by the unchanged link.
 
     The transfers are sized to climb the whole default ladder: each rung
-    steps up after one clean chunk through 300/600 baud and VF13 before
-    arriving at VF12, the top rung.  Nothing pins the mode -- reaching VF12
-    is the negotiation's own doing, which is the part worth testing.
+    steps up after one clean chunk through VF14_4 (control) and VF13 and
+    VF16 before arriving at VF12, the top rung.  Nothing pins the mode --
+    reaching VF12 is the negotiation's own doing, which is the part worth
+    testing.
     """
     payload_ab = _payload(12_000, 7, 11)
     payload_ba = _payload(12_000, 13, 5)
@@ -188,19 +190,16 @@ def test_vf12_carries_a_session_through_the_same_stack():
     assert link_a.tx_profile is VF12 and link_b.rx_profile is VF12
     assert link_b.tx_profile is VF12 and link_a.rx_profile is VF12
 
-    # And it was worth doing.  Airtime is what a radio would spend; the
-    # CPFSK-only ladder carrying the same bytes is the thing to beat.
-    #
-    # Measured at 12,000 bytes each way: 113.3 s against 368.6 s, a 3.25x
-    # saving.  At 24,000 bytes each way the same measurement gives 166.2 s
-    # against 707.5 s, or 4.26x -- VF12's 4,690 bit/s payload rate leaves the
-    # CPFSK ladder far behind. The floor is deliberately well
-    # under 3.25 so this catches a regression rather than ordinary variation.
+    # And it was worth doing.  Airtime is what a radio would spend; a
+    # registry pinned to VF14_4 alone -- the ladder's control mode, and its
+    # slowest, most robust rung -- carrying the same bytes is the thing to
+    # beat.
     fast = ta.airtime + tb.airtime
+    control_only = ModeRegistry((VF14_4,), VF14_4)
     slow = sum(t.airtime for t in _run_session(
-        payload_ab, payload_ba, mode_registry=afsk.default_registry())[2:])
+        payload_ab, payload_ba, mode_registry=control_only)[2:])
     assert slow > 2.75 * fast, (
-        f"VF12 session spent {fast:.1f}s of air against CPFSK's {slow:.1f}s")
+        f"VF12 session spent {fast:.1f}s of air against VF14_4-only's {slow:.1f}s")
 
 
 def test_the_hf_channel_carries_a_session_with_hr0_in_control():

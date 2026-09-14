@@ -24,13 +24,14 @@ Run:
     python scripts/run_acceptance_test.py --channel hf \
         --a-radio ic7300 --b-radio ic705 --size 1024
 
-    # start both legs at 600 baud, have each station step up after its
-    # first ACKed chunk, and lose the first MODE_ACK at each end -- i.e.
-    # the 600->VF13 transition failing in both directions at once
+    # start both legs at the control mode (vf14-4, id 23), have each station
+    # step up after its first ACKed chunk, and lose the first MODE_ACK at
+    # each end -- i.e. the vf14-4->vf13 transition failing in both
+    # directions at once
     python scripts/run_acceptance_test.py \
-        --a-env WHALE_FORCE_MODE=1 --a-env WHALE_MODE_STEP_SCRIPT=1:up \
+        --a-env WHALE_FORCE_MODE=23 --a-env WHALE_MODE_STEP_SCRIPT=1:up \
         --a-env WHALE_DROP_PTYPE=MODE_ACK \
-        --b-env WHALE_FORCE_MODE=1 --b-env WHALE_MODE_STEP_SCRIPT=1:up \
+        --b-env WHALE_FORCE_MODE=23 --b-env WHALE_MODE_STEP_SCRIPT=1:up \
         --b-env WHALE_DROP_PTYPE=MODE_ACK
 """
 import argparse

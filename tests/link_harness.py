@@ -1,9 +1,10 @@
 """Two whale.link.Link instances driven against each other in one process,
 over fake transports that hand audio straight to one another.
 
-Not a mock of the protocol: the real afsk.modulate/demodulate run on every
-frame, so the decode-candidate logic, the sync search and the CRC are all
-genuinely exercised. What the fake replaces is only the radio -- no sound
+Not a mock of the protocol: each Link's real negotiated WaveformMode
+encodes/decodes every frame, so the decode-candidate logic, the sync search
+and the CRC are all genuinely exercised. What the fake replaces is only the
+radio -- no sound
 card, no PTT, no real time spent playing audio -- which is what makes a
 whole ARQ exchange take a second or two instead of a minute or two.
 

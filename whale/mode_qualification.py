@@ -42,13 +42,17 @@ class QualificationEntry:
 # explicitly provisional in MODE_QUALIFICATION.md; the manifest describes
 # product availability, not a claim that every evidence gate has passed.
 MANIFEST = (
-    QualificationEntry("fm", 0, QualificationLevel.DEFAULT),
-    QualificationEntry("fm", 1, QualificationLevel.DEFAULT),
     # VF13 is the 1,438.8 bit/s combinatorial MFSK rung below VF16 and VF12.
     QualificationEntry("fm", 19, QualificationLevel.DEFAULT),
-    # VF14-16 is the FM control and lowest data rung. VF14-8 remains an
-    # experimental faster fallback with less margin near FM threshold.
-    QualificationEntry("fm", 20, QualificationLevel.DEFAULT),
+    # VF14-16 (mode 20) was the original control mode. Superseded as control
+    # and dropped from the default ladder by VF14-4 (mode 23, below);
+    # demoted to experimental rather than removed so its waveform stays
+    # available. Old peers that only know mode 20 no longer interoperate --
+    # see mode_qualification.py's registry() control assignment.
+    QualificationEntry("fm", 20, QualificationLevel.EXPERIMENTAL),
+    # VF14-4 is the FM control mode and the lowest (most robust) rung of the
+    # default ladder: the 600-baud 4-FSK DATA rung, mode_id 23.
+    QualificationEntry("fm", 23, QualificationLevel.DEFAULT),
     QualificationEntry("fm", 21, QualificationLevel.EXPERIMENTAL),
     # VF16 is VF12's 8-PSK, rate-2/3 LDPC sibling. The conservative FM C/N
     # simulator delivered 50/50 at +5 dB where VF12 delivered 0/50; the
@@ -113,16 +117,16 @@ def registry(policy: str, level: QualificationLevel | str =
     """Return the cumulative registry available at ``level`` for ``policy``."""
     requested = QualificationLevel.parse(level)
     if policy == "fm":
-        from . import afsk
         from .modes.vf12 import VF12
         from .modes.vf13 import VF13
-        from .modes.vf14 import VF14_16, VF14_8
+        from .modes.vf14 import VF14_16, VF14_4, VF14_8
         from .modes.vf16 import VF16
-        base = afsk.default_registry() if budget is None else afsk.default_registry(budget)
-        # Rate order is the order _maybe_adapt climbs. VF14's two profiles
-        # are the slowest rungs, below the CPFSK ones.
-        candidates, control = ((VF14_16, VF14_8) + tuple(base.modes)
-                               + (VF13, VF16, VF12)), VF14_16
+        # VF14-4 is both the control mode and the lowest (most robust) rung
+        # of the default ladder. `budget` is accepted for interface
+        # symmetry with hf_registry but is unused: every FM waveform here is
+        # fixed-geometry, none derives its payload from a keying budget.
+        del budget
+        candidates, control = (VF14_16, VF14_8, VF14_4, VF13, VF16, VF12), VF14_4
     elif policy == "hf":
         from .modes.hr0_mode import HR0
         from .modes.hc0_mode import HC0
@@ -144,6 +148,10 @@ def registry(policy: str, level: QualificationLevel | str =
 
     selected = tuple(mode for mode in candidates
                      if qualification_level(policy, mode.mode_id) <= requested)
+    if policy == "fm":
+        from .framing import AIR_HEADER_BYTES
+        selected = tuple(sorted(selected, key=lambda mode:
+            8 * mode.chunk_size / mode.airtime(AIR_HEADER_BYTES + mode.chunk_size)))
     if control.mode_id not in {mode.mode_id for mode in selected}:
         raise ValueError(
             f"{policy} control mode {control.mode_id} is unavailable at "

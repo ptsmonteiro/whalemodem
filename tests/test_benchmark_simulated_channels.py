@@ -15,7 +15,7 @@ def test_one_point_benchmark_writes_versioned_replayable_result(tmp_path):
     output = tmp_path / "result.json"
     result = benchmark.main([
         "--model", "awgn", "--policy", "fm", "--points", "40",
-        "--trials", "1", "--modes", "300baud", "--seed", "17",
+        "--trials", "1", "--modes", "vf14-4", "--seed", "17",
         "--workers", "1",
         "--out", str(output),
     ])
@@ -27,9 +27,9 @@ def test_one_point_benchmark_writes_versioned_replayable_result(tmp_path):
     assert document["metadata"]["trials_per_point"] == 1
     assert document["metadata"]["worker_processes"] == 1
     assert document["metadata"]["requested_payload_bytes"] is None
-    assert document["metadata"]["data_payload_bytes_by_mode"] == {"0": 88}
-    assert document["metadata"]["actual_payload_bytes_by_mode"] == {"0": 98}
-    assert document["trials"][0]["payload_bytes"] == 98
+    assert document["metadata"]["data_payload_bytes_by_mode"] == {"23": 264}
+    assert document["metadata"]["actual_payload_bytes_by_mode"] == {"23": 274}
+    assert document["trials"][0]["payload_bytes"] == 274
     assert document["metadata"]["channel_descriptions_by_point"][0][
         "snr"]["db"] == 40
     assert document["trials"][0]["channel_measurements"]["snr_3khz_db"] == 40
@@ -37,8 +37,12 @@ def test_one_point_benchmark_writes_versioned_replayable_result(tmp_path):
     assert summary["acquisition_probability"]["rate"] == 1
     assert summary["frame_error_rate"]["rate"] == 0
     assert summary["payload_delivery_rate"]["rate"] == 1
-    assert summary["ber"]["evidence_frames"] == 1
-    assert document["trials"][0]["decoder_metrics"]["total_bit_errors"] == 0
+    # No mode currently ships bit-level decode diagnostics (that evidence
+    # was CPFSK-only, and the CPFSK modes are gone), so "ber" has no
+    # evidence frames and each trial's decoder_metrics has no bit-error
+    # keys -- see whale/qualification.py's run_frame_trial.
+    assert summary["ber"] is None
+    assert "total_bit_errors" not in document["trials"][0]["decoder_metrics"]
 
 
 @pytest.mark.parametrize("value", ["-1", "not-an-integer"])
@@ -46,7 +50,7 @@ def test_payload_rejects_negative_or_invalid_values(value, tmp_path, capsys):
     with pytest.raises(SystemExit):
         benchmark.main([
             "--model", "awgn", "--policy", "fm", "--points", "40",
-            "--trials", "1", "--modes", "300baud",
+            "--trials", "1", "--modes", "vf14-4",
             "--payload-bytes", value, "--out", str(tmp_path / "result.json"),
         ])
     assert "payload-bytes" in capsys.readouterr().err
@@ -56,12 +60,12 @@ def test_payload_must_fit_every_selected_mode(tmp_path, capsys):
     with pytest.raises(SystemExit):
         benchmark.main([
             "--model", "awgn", "--policy", "fm", "--points", "40",
-            "--trials", "1", "--modes", "300baud", "600baud",
-            "--payload-bytes", "89", "--out", str(tmp_path / "result.json"),
+            "--trials", "1", "--modes", "vf14-4", "vf13",
+            "--payload-bytes", "300", "--out", str(tmp_path / "result.json"),
         ])
     message = capsys.readouterr().err
     assert "exceeds the selected mode capacity" in message
-    assert "300baud: 88" in message
+    assert "vf14-4: 264" in message
 
 
 @pytest.mark.parametrize("value", ["0", "-1", "not-an-integer"])
@@ -69,7 +73,7 @@ def test_workers_must_be_positive(value, tmp_path, capsys):
     with pytest.raises(SystemExit):
         benchmark.main([
             "--model", "awgn", "--policy", "fm", "--points", "40",
-            "--trials", "1", "--modes", "300baud", "--workers", value,
+            "--trials", "1", "--modes", "vf14-4", "--workers", value,
             "--out", str(tmp_path / "result.json"),
         ])
     assert "workers" in capsys.readouterr().err

@@ -1,16 +1,17 @@
-"""Physical-layer modes beyond the baseline CPFSK profiles in whale/afsk.py.
+"""Physical-layer modes for the FM and HF channels.
 
 Each module here supplies a `WaveformMode` (see whale/waveform.py) that the
-link layer can negotiate exactly like an `afsk.Profile`: the link deals in
-packets, `encode`/`decode`/`airtime`, `chunk_size` and `mode_id`, and does
-not know which modulation is underneath.
+link layer can negotiate: the link deals in packets, `encode`/`decode`/
+`airtime`, `chunk_size` and `mode_id`, and does not know which modulation is
+underneath.
 """
 
 
 def default_registry(budget=None):
-    """The FM ladder with vf14-16 control, ordered by DATA rate.
+    """The FM ladder with vf14-4 control, ordered by DATA rate.
 
-    `budget` sizes the CPFSK frames; the VF frames have fixed capacities.
+    `budget` is accepted and ignored: every FM mode has a fixed frame
+    capacity, none sizes its payload from a keying-time budget.
     """
     from ..mode_qualification import registry
     return registry("fm", "default", budget)

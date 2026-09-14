@@ -54,7 +54,7 @@ HC0_CODEC = Hc0Codec()
 
 @dataclass(frozen=True)
 class Hc0Mode:
-    """One negotiable HC0 setting, shaped like `afsk.Profile`."""
+    """One negotiable HC0 setting, shaped to the `WaveformMode` contract."""
 
     name: str = "hc0"
     mode_id: int = HC0_MODE_ID

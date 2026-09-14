@@ -6,7 +6,8 @@ state, so protocol compatibility can be tested without constructing a
 ``Link``.  ``whale.link`` re-exports these names for backwards compatibility.
 """
 
-from whale import afsk, framing
+from whale import framing
+from whale.modes.vf14 import VF14_4_MODE_ID
 
 
 PT_CONNECT = 0x01
@@ -194,4 +195,4 @@ def decode_connect_ack(payload):
 def negotiate_mode(own_supported_ids, proposed_id, fallback_id=None):
     if proposed_id in own_supported_ids:
         return proposed_id
-    return afsk.CONTROL_PROFILE.mode_id if fallback_id is None else fallback_id
+    return VF14_4_MODE_ID if fallback_id is None else fallback_id

@@ -7,7 +7,7 @@ hardware/protocol issue, since it prints per-frame timing and events
 directly instead of through the VARA status-line layer.
 
 Run: python scripts/hw_smoke_link.py
-       python scripts/hw_smoke_link.py --profile 600baud
+       python scripts/hw_smoke_link.py --profile vf13
        python scripts/hw_smoke_link.py --control vf14-16
 
 --control runs the whole session (CONNECT, DATA, ACKs, DISC) on one VF14
@@ -19,7 +19,7 @@ and stepping up -- lets you bench a specific speed mode directly, including
 the pre-TX turnaround and waveform-embedded head settling that has to
 hold up at that profile's shorter frame timing. Printed timings
 below (PTT-on -> PTT-off wall clock per TX) are how you check that math:
-compare against afsk.frame_seconds(...) for the payload sent -- the gap
+compare against the mode's own .airtime(...) for the payload sent -- the gap
 between them is turnaround/PTT margin actually consumed, not just assumed.
 """
 import argparse
@@ -30,7 +30,7 @@ import time
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(name)s: %(message)s")
 
-from whale import afsk, link as link_mod, mode_history
+from whale import link as link_mod, mode_history, modes
 from whale.modes import vf14
 from whale.waveform import ModeRegistry
 from whale.link import Link
@@ -42,7 +42,7 @@ MSG_BA = b"reply from STA2 to STA1 " * 4   # 96 bytes
 
 def main():
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
-    profile_names = sorted(p.name for p in afsk.PROFILES)
+    profile_names = sorted(p.name for p in modes.default_registry().modes)
     ap.add_argument("--profile", default=None, choices=profile_names,
                      help="seed mode_history so both sides connect straight into this profile "
                           "(default: start at the control profile, as a normal connect would)")
@@ -68,7 +68,7 @@ def main():
 
     history_a, history_b = {}, {}
     if args.profile is not None:
-        profile = next(p for p in afsk.PROFILES if p.name == args.profile)
+        profile = next(p for p in modes.default_registry().modes if p.name == args.profile)
         mode_history.record_good_mode(history_a, "STA1", "STA2", profile.mode_id)
         mode_history.record_good_mode(history_b, "STA2", "STA1", profile.mode_id)
         print(f"forcing connect to start at profile {profile.name} via seeded mode_history")

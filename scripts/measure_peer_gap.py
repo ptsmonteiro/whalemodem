@@ -12,8 +12,8 @@ So this reads it out of the station logs instead. For each log it finds the
 CONNECTED span and reports the largest gap between consecutive frames
 decoded off the air, which is precisely what INACTIVITY_TIMEOUT is measured
 against. Both stations are reported separately, because the two legs of
-this bench differ materially in SNR (see whale/afsk.py) and the worse one
-is the one that has to decide.
+this bench can differ materially in SNR and the worse one is the one that
+has to decide.
 
 The two events the measurement has to include are usually absent from a
 clean run, so their computed worst cases are printed alongside: a full
@@ -29,7 +29,7 @@ import re
 from datetime import datetime
 from pathlib import Path
 
-from whale import afsk, link
+from whale import framing, link, modes
 
 TIMESTAMP = re.compile(r"^(\d{4}-\d\d-\d\d \d\d:\d\d:\d\d,\d{3}) ")
 RX_FRAME = re.compile(r"\[(?P<call>\S+)\] RX (?P<ptype>\S+) at (?P<profile>\S+)")
@@ -81,17 +81,16 @@ def worst_gap(path):
 def computed_worst_cases():
     """The two silences a clean run does not necessarily contain, from the
     same arithmetic _recompute_timings and control_ack_timeout use."""
+    registry = modes.default_registry()
     rows = []
-    for profile in afsk.PROFILES:
-        tx_airtime = afsk.frame_seconds(
-            profile.chunk_size + afsk.DATA_FRAME_HEADER_BYTES, profile)
-        ack_airtime = afsk.frame_seconds(3, profile)
+    for mode in registry.modes:
+        tx_airtime = mode.airtime(framing.AIR_HEADER_BYTES + mode.chunk_size)
+        ack_airtime = mode.airtime(3)
         data_ack_timeout = (tx_airtime + ack_airtime
                             + 2 * link.TX_TURNAROUND_DELAY + 3.0)
-        rows.append((profile.name, data_ack_timeout,
+        rows.append((mode.name, data_ack_timeout,
                      link.MAX_RETRIES * data_ack_timeout))
-    control = afsk.frame_seconds(link._CONTROL_FRAME_LEN_ESTIMATE,
-                                 afsk.CONTROL_PROFILE) + 3.0
+    control = registry.control.airtime(link._CONTROL_FRAME_LEN_ESTIMATE) + 3.0
     return rows, control
 
 

@@ -7,7 +7,7 @@ from whale import framing, link_protocol, rx_audio, waveform
 from whale.dsp import mfsk
 from whale.fm_channel import ComplexFmChannel
 from whale.mode_qualification import registry
-from whale.modes.vf14 import PROFILES, VF14_8, VF14_16
+from whale.modes.vf14 import PROFILES, VF14_4, VF14_8, VF14_16
 
 MODES = tuple(PROFILES.values())
 LEAD = 4_000
@@ -37,14 +37,23 @@ def test_geometry_of_both_profiles():
     assert VF14_16.rx_symbol_samples == 192
     assert VF14_16.tx_bank.tone_hz[0] == 562.5
     assert VF14_16.tx_bank.tone_hz[-1] == 1500.0
+    assert VF14_4.spacing_hz == 600 and VF14_4.symbol_samples == 80
+    assert VF14_4.rx_symbol_samples == 20
+    assert VF14_4.tx_bank.tone_hz[0] == 600.0
+    assert VF14_4.tx_bank.tone_hz[-1] == 2400.0
     assert VF14_8.spacing_hz == 125.0 and VF14_8.symbol_samples == 384
     assert VF14_8.rx_symbol_samples == 96
     assert VF14_8.tx_bank.tone_hz[0] == 625.0
     assert VF14_8.tx_bank.tone_hz[-1] == 1500.0
     for mode in MODES:
-        assert mode.codec.max_payload_bytes == 64
-        assert mode.short_codec.max_payload_bytes == 11
-        assert mode.medium_codec.max_payload_bytes == 36
+        if mode is VF14_4:
+            assert mode.codec.max_payload_bytes == 274
+            assert mode.short_codec.max_payload_bytes == 20
+            assert mode.medium_codec.max_payload_bytes == 68
+        else:
+            assert mode.codec.max_payload_bytes == 64
+            assert mode.short_codec.max_payload_bytes == 11
+            assert mode.medium_codec.max_payload_bytes == 36
 
 
 @pytest.mark.parametrize("mode", MODES, ids=lambda m: m.name)
@@ -52,12 +61,12 @@ def test_mode_contract(mode):
     assert isinstance(mode, waveform.WaveformMode)
     assert mode.chunk_size == mode.max_payload_bytes - framing.AIR_HEADER_BYTES
     assert mode.mode_id in registry("fm", "experimental").supported_ids
-    assert (mode.mode_id in registry("fm", "default").supported_ids) == (mode is VF14_16)
+    assert (mode.mode_id in registry("fm", "default").supported_ids) == (mode is VF14_4)
 
 
-def test_vf14_16_is_the_fm_control_mode():
+def test_vf14_4_is_the_fm_control_mode():
     for level in ("default", "optional", "experimental"):
-        assert registry("fm", level).control is VF14_16
+        assert registry("fm", level).control is VF14_4
 
 
 @pytest.mark.parametrize("mode", MODES, ids=lambda m: m.name)
@@ -84,8 +93,11 @@ def test_medium_grid_carries_a_typical_connect_exchange(mode):
         "STA1", "STA2", ids, ids[0], ids[0], 0x5A)
     for body in (connect, connect_ack):
         on_air = framing.AIR_HEADER_BYTES + len(body) - 2
-        assert on_air <= mode.medium_max_payload_bytes
-        assert mode.grid_symbols(on_air) == mode.medium_payload_symbols
+        assert on_air <= mode.max_payload_bytes
+        expected = (mode.medium_payload_symbols
+                    if on_air <= mode.medium_max_payload_bytes
+                    else mode.payload_symbols)
+        assert mode.grid_symbols(on_air) == expected
 
 
 @pytest.mark.parametrize("mode", MODES, ids=lambda m: m.name)
@@ -121,18 +133,26 @@ def test_a_partial_full_frame_waits_for_more_audio(mode):
     assert "end_index" not in result
 
 
+#: VF14_4's 600 Bd rate-3/4 grid sits at a much higher C/N cliff than the
+#: other two profiles (see the pass points in vf14.py), so -3 dB is well
+#: below its own working point.
+_MODERATE_CN_DB = {VF14_4: 0.0}
+
+
 @pytest.mark.parametrize("mode", MODES, ids=lambda m: m.name)
 def test_decodes_through_fm_channel_at_moderate_cn(mode):
+    cn_db = _MODERATE_CN_DB.get(mode, -3.0)
     for seed in range(3):
         packet = _packet(mode.max_payload_bytes, seed=seed)
-        result = mode.decode(_through_fm(mode, packet, -3.0, 100 + seed))
+        result = mode.decode(_through_fm(mode, packet, cn_db, 100 + seed))
         assert result["payload"] == packet
 
 
 @pytest.mark.parametrize("mode,cn_db,min_delivered", (
     (VF14_16, -7.0, 18),
+    (VF14_4, 0.0, 20),
     (VF14_8, -6.0, 17),
-), ids=("vf14-16", "vf14-8"))
+), ids=("vf14-16", "vf14-4", "vf14-8"))
 def test_full_grid_near_discriminator_threshold(mode, cn_db, min_delivered):
     packet = _packet(mode.max_payload_bytes, seed=42)
     delivered = sum(

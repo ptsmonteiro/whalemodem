@@ -25,13 +25,17 @@ level at all.
 
 | Mode | Frequency span | Modulation geometry | Modulation order | FEC rate | FEC technique | DATA payload/frame | Frame duration | Net/frame | Pure SNR passed | Radio tested |
 | --- | --- | --- | ---: | ---: | --- | ---: | ---: | ---: | --- | --- |
-| 300baud | 1,200-1,800 Hz | 2-tone CPFSK | 2 (2-FSK) | none | none | 88 B | 3.717 s | 189 bit/s | not retained as pure SNR | not measured |
-| 600baud | 1,200-1,800 Hz | 2-tone CPFSK | 2 (2-FSK) | none | none | 193 B | 3.865 s | 399 bit/s | not retained as pure SNR | not measured |
 | vf13 | 600-3,000 Hz | 16-tone combinatorial noncoherent MFSK (6-of-16 per symbol) | 4,096 (of C(16,6)=8,008) | 7/8 | punctured K=7 convolutional, interleaved, max-log LLR noncoherent energy detection | 1,437 B | 7.99 s | 1,438.8 bit/s | not measured | 2026-09-14, IC-705<->Wouxun KG-UV9D Plus FM, drive 0.077, 150/150 exact-payload frames (90/90 HT->IC-705, 60/60 IC-705->HT). Pre-FEC SER max 0.73%, median worst-tone SNR 8.4 dB (HT->IC-705) / 12.3 dB (IC-705->HT). SNR not calibrated this session |
 
-vf14-16 (FM control): 78.0 net application bit/s per full-capacity DATA
-frame. Simulated pure-SNR pass point: not measured. Calibrated radio-test SNR
-pass point: not measured.
+vf14-16 (FM experimental): 78.0 net application bit/s per full-capacity DATA
+frame. Simulated flat_nbfm RF C/N pass point: -7 dB (20/20 full-capacity
+frames); -8 dB did not pass (0/20). Calibrated radio-test SNR pass point:
+not measured.
+
+vf14-4 (FM control, mode 23): 628.6 net application bit/s per full-capacity
+DATA frame. Simulated flat_nbfm RF C/N pass point: 0 dB (20/20 full-capacity
+frames); -1 dB did not pass (14/20). Calibrated radio-test SNR pass point:
+not measured.
 
 vf14-8 (FM experimental): 107.2 net application bit/s per full-capacity DATA
 frame. Simulated pure-SNR pass point: not measured. Calibrated radio-test SNR

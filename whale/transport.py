@@ -97,18 +97,19 @@ if abs(_KEYING_OVERHEAD - afsk.KEYING_OVERHEAD_SECONDS) > 0.005:
         f"keying overhead drifted: transport says {_KEYING_OVERHEAD:.3f}s "
         f"(STREAM_FILL {STREAM_FILL}) "
         f"but afsk.KEYING_OVERHEAD_SECONDS is {afsk.KEYING_OVERHEAD_SECONDS:.3f}s; "
-        "the profiles' chunk_size was derived from the latter")
+        "afsk.MAX_USEFUL_FRAME_SECONDS's keying-length budget was reasoned "
+        "against the latter")
 
 # How much recent audio the receiver keeps around for the decoder to search.
-# Generous relative to one frame's ~7s worst case (255-byte payload at 300
-# baud) so a frame straddling two decode attempts is never lost.
+# Generous relative to the slowest shipped FM mode's worst-case frame
+# duration so a frame straddling two decode attempts is never lost.
 #
 # Note this is the *cap*, not the working size -- whale/link.py's decode
 # loop prunes audio it has already searched and found nothing in, so the
 # buffer only approaches this length while a frame is actually arriving.
 # That matters because demodulate() costs time proportional to buffer
-# length (currently about 3 ms per second for each CPFSK candidate on the
-# development machine; scripts/benchmark_rx.py keeps this reproducible).
+# length per mode candidate (scripts/benchmark_rx.py keeps this
+# reproducible).
 RX_BUFFER_SECONDS = 10.0
 
 

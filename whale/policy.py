@@ -126,20 +126,18 @@ class ChannelPolicy:
 
     # -- keying length ---------------------------------------------------
     #
-    # Sync-through-CRC audio is capped in duration, and every CPFSK profile's
-    # chunk_size is whatever fits inside that cap. The outer head pad and
-    # transport startup do not consume this useful-frame budget.
-    #
-    # See afsk.MAX_USEFUL_FRAME_SECONDS for the full reasoning behind the
-    # VHF figure -- retransmit granularity, half-duplex responsiveness, and
-    # the clock tolerance a rigid symbol grid imposes. All three are
+    # Sync-through-CRC audio is meant to stay under this cap. See
+    # afsk.MAX_USEFUL_FRAME_SECONDS for the full reasoning behind the VHF
+    # figure -- retransmit granularity, half-duplex responsiveness, and the
+    # clock tolerance a rigid symbol grid imposes. All three are
     # channel-shaped rather than protocol-shaped, which is why the budget is
     # policy: a receiver is happy to decode any frame it is told the length
     # of, so nothing about the on-air format changes when this does.
     #
-    # Threaded into CPFSK profile construction via afsk.default_registry's
-    # `budget` (see Link.__init__), so the number is not restated anywhere.
-    # Fixed-frame modes derive payload capacity from their frame structure.
+    # No shipped FM mode currently sizes its payload from this budget --
+    # every FM waveform (whale/modes/vf12.py, vf13.py, vf14.py, vf16.py) is
+    # fixed-geometry and derives payload capacity from its own frame
+    # structure, as the HF modes already do.
     max_useful_frame_seconds: float
 
     # -- listen before transmit ------------------------------------------
@@ -172,7 +170,7 @@ class ChannelPolicy:
     # rungs selected.
     #
     # It lives here rather than at each call site because the pairing is not
-    # free to vary: the CPFSK profiles carry no carrier-frequency estimate,
+    # free to vary: the FM waveforms carry no carrier-frequency estimate,
     # so running the VHF ladder against HF's timeouts is not a slower
     # link but a broken one, and the reverse wastes the FM bench's whole
     # speed ladder. Keeping the two together makes that impossible to get
