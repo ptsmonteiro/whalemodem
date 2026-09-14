@@ -9,9 +9,10 @@ reference. Everything downstream of the tone magnitudes is `whale.dsp`:
 whitening, terminated K=7 rate-1/2 soft Viterbi) and a multiplicative
 interleaver spanning the whole codeword.
 
-Two profiles, two mode IDs (an ID is one immutable waveform):
+Three profiles, three mode IDs (an ID is one immutable waveform):
 
   vf14-16  16 tones, 62.5 Hz spacing, 16 ms symbols, 562.5-1,500 Hz
+  vf14-4    4 tones, 600 Hz spacing, 1.667 ms symbols, 600-2,400 Hz
   vf14-8    8 tones, 125 Hz spacing,   8 ms symbols, 625-1,500 Hz
 
 FM audio carries no carrier offset (the sound-card clocks are ~5 ppm apart,
@@ -21,6 +22,9 @@ Each profile has short, medium and full payload grids sharing one preamble.
 The short grid carries ACK/DISC/FLOOR traffic; the medium grid carries typical
 CONNECT exchanges; the full grid carries DATA and long control packets.
 CRC32 selects the decoded grid.
+
+Simulated flat_nbfm C/N floor: vf14-16 not measured; vf14-4 0 dB (20/20
+full-capacity frames, -1 dB did not pass at 14/20); vf14-8 not measured.
 """
 
 from __future__ import annotations
@@ -39,6 +43,7 @@ RX_SAMPLE_RATE = rx_audio.DECODE_SAMPLE_RATE
 DECIMATION = TX_SAMPLE_RATE // RX_SAMPLE_RATE
 
 VF14_16_MODE_ID = 20
+VF14_4_MODE_ID = 23
 VF14_8_MODE_ID = 21
 
 #: Peak (= sine) amplitude of every tone. The 0.6 CPFSK uses
@@ -375,19 +380,27 @@ def _tone_snr_db(magnitudes: np.ndarray) -> float:
     return float(10.0 * np.log10(np.mean(best) / max(np.mean(rest), 1e-30)))
 
 
-#: Sync and threshold, measured on flat_nbfm (`ComplexFmChannel`): the
-#: loudest false peak over 5 s buffers of FM discriminator noise at -10, 0
-#: and 20 dB C/N and of white noise scored 0.075 (24 symbols, 16 tones) and
-#: 0.106 (48 symbols, 8 tones). A genuine preamble at -8 dB C/N, 1-1.5 dB
-#: below where either payload stops, scored at least 0.145 and 0.167, with
-#: timing correct in 20/20. The 8-tone correlation's noise floor is higher,
-#: hence twice the symbols -- the same 384 ms as the 16-tone preamble.
+#: Keep mode 20's control waveform unchanged for connections with old peers.
 VF14_16 = Vf14Mode(
     name="vf14-16", mode_id=VF14_16_MODE_ID, tone_count=16,
     symbol_samples=768, first_bin=9,
     sync_symbols=24, payload_symbols=283, short_payload_symbols=71,
     medium_payload_symbols=171,
     confidence_threshold=0.12)
+
+#: Faster DATA waveform: 274 packet bytes (264 application bytes) in 3.36 s.
+#: At 600 Bd a VF14_8-length (48-symbol, 80 ms) preamble is too short to hold
+#: down the noise-correlation floor; 96 symbols cleared the noise-floor test
+#: and reached 40/40 full-capacity frames at 0 dB in isolation, but missed
+#: 20/20 against this file's own fixed-seed discriminator-threshold draw
+#: (19/20). 144 symbols (240 ms) is the shortest tried that holds 20/20 on
+#: both that draw and 40/40 across two fresh 20-trial seed sets.
+VF14_4 = Vf14Mode(
+    name="vf14-4", mode_id=VF14_4_MODE_ID, tone_count=4,
+    symbol_samples=80, first_bin=1,
+    sync_symbols=144, payload_symbols=1500, short_payload_symbols=144,
+    medium_payload_symbols=400, fec_rate="3/4",
+    confidence_threshold=0.145)
 
 VF14_8 = Vf14Mode(
     name="vf14-8", mode_id=VF14_8_MODE_ID, tone_count=8,
@@ -396,4 +409,4 @@ VF14_8 = Vf14Mode(
     medium_payload_symbols=228,
     confidence_threshold=0.14)
 
-PROFILES = {"16": VF14_16, "8": VF14_8}
+PROFILES = {"16": VF14_16, "4": VF14_4, "8": VF14_8}

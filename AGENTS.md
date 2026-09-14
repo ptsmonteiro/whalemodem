@@ -11,3 +11,6 @@
 - Use `not measured` when evidence is absent or is not an SNR measurement.
 - Cross-check code and `docs/MODES.md` before changing a documented value.
   Update only the affected entry.
+- Every FM mode module's docstring keeps one line stating its simulated flat
+  FM C/N floor (`not measured` if absent), matching the value in
+  `docs/MODES.md`. Update it whenever the simulated or radio result changes.

@@ -1,4 +1,7 @@
-"""Configurable 50 Hz OFDM with an 8-PSK constellation for analog FM."""
+"""Configurable 50 Hz OFDM with an 8-PSK constellation for analog FM.
+
+Simulated flat_nbfm C/N floor: not measured.
+"""
 from __future__ import annotations
 
 from dataclasses import dataclass

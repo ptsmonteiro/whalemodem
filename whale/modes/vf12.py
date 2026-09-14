@@ -1,4 +1,7 @@
-"""Configurable 50 Hz OFDM with HF7 constellations for analog FM."""
+"""Configurable 50 Hz OFDM with HF7 constellations for analog FM.
+
+Simulated flat_nbfm C/N floor: not measured.
+"""
 from __future__ import annotations
 
 import binascii
@@ -41,7 +44,8 @@ class Vf12Mode:
     lead_in_seconds: float = 0.5
     target_airtime_seconds: float = 5.0
     n_codewords: int | None = None
-    drive_scale: float = 0.077  # peak DAC amplitude
+    #drive_scale: float = 0.077  # peak DAC amplitude
+    drive_scale: float = 1  # peak DAC amplitude
     confidence_threshold: float = 0.7
     pilot_comb_stride: int = 8  # 0 disables comb pilots (today's static-header path)
     pilot_time_span: int = 3  # moving-average window, in symbols, for tracking; 1 disables

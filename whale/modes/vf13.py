@@ -22,6 +22,8 @@ convolutional rate 7/8 (`whale.dsp.fec.PUNCTURE_PATTERNS`), interleaved, an
 Measured on radios (IC-705 <-> Wouxun KG-UV9D Plus FM, drive 0.077,
 2026-09-14): 150/150 exact-payload frames (90/90 ht->ic705, 60/60
 ic705->ht). Installed as DEFAULT below the faster OFDM data rungs.
+
+Simulated flat_nbfm C/N floor: not measured.
 """
 
 from __future__ import annotations

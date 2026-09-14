@@ -51,6 +51,13 @@ python scripts/benchmark_simulated_channels.py --model fm --policy fm \
 
 [MODES.md](MODES.md) is the maintained summary of shipped-mode results.
 
+For a new or changed FM mode, the two baseline checks are a bench radio test
+(`scripts/hw_smoke_single_frame.py` or `scripts/hw_smoke_link.py` over a real
+FM pair) and a simulated flat FM C/N sweep with
+`scripts/benchmark_simulated_channels.py --model fm --policy fm
+--fm-profile flat_nbfm`. Record the resulting C/N floor as a comment in the
+mode's module docstring, alongside the MODES.md entry.
+
 ## Capture replay
 
 Committed recordings preserve behavior that clean synthesis cannot exercise:
