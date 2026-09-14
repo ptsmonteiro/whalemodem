@@ -30,6 +30,10 @@ level at all.
 | vf13 | 600-3,000 Hz | 16-tone combinatorial noncoherent MFSK (6-of-16 per symbol) | 4,096 (of C(16,6)=8,008) | 7/8 | punctured K=7 convolutional, interleaved, max-log LLR noncoherent energy detection | 1,437 B | 7.99 s | 1,438.8 bit/s | not measured | 2026-09-14, IC-705<->Wouxun KG-UV9D Plus FM, drive 0.077, 150/150 exact-payload frames (90/90 HT->IC-705, 60/60 IC-705->HT). Pre-FEC SER max 0.73%, median worst-tone SNR 8.4 dB (HT->IC-705) / 12.3 dB (IC-705->HT). SNR not calibrated this session |
 | vf3 | 468.75-3,140.625 Hz | 58-carrier differential-QPSK OFDM | 4 (QPSK) | 1/2 | terminated K=7 convolutional, interleaved, soft-decision Viterbi | 1,426 B | 6.155 s | 1,853 bit/s | — | 2026-09-13, IC-705<->Wouxun KG-UV9D Plus FM, 19/20 (10/10 IC-705->HT, 9/10 HT->IC-705); IC-705<->Baofeng UV-B5 FM, 11/20 (10/10 IC-705->HT, 1/10 HT->IC-705). SNR not calibrated either session |
 
+vf16 (FM): 3,118 net application bit/s per full-capacity DATA frame.
+Simulated pure-SNR pass point: not measured. Calibrated radio-test SNR pass
+point: not measured.
+
 vf12 (FM): 4,690 net application bit/s per full-capacity DATA frame.
 Simulated pure-SNR pass points: not measured. Calibrated radio-test SNR
 pass points: 2026-09-13, IC-705<->Baofeng UV-B5 FM, 19/20 exact-payload

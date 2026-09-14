@@ -57,6 +57,10 @@ MANIFEST = (
     # drive 0.077, 150/150 exact-payload frames (90/90 ht->ic705, 60/60
     # ic705->ht). Default is availability, not qualification.
     QualificationEntry("fm", 19, QualificationLevel.DEFAULT),
+    # VF16 is VF12's 8-PSK, rate-2/3 LDPC sibling. The conservative FM C/N
+    # simulator delivered 50/50 at +5 dB where VF12 delivered 0/50; the
+    # same waveform passed 10/10 in each radio direction at drive 1.
+    QualificationEntry("fm", 22, QualificationLevel.DEFAULT),
     # VF12 is the HF7-geometry FM data rung: 51-carrier 50 Hz OFDM, 16-QAM,
     # rate-3/4 LDPC with comb-pilot channel tracking, 4,690 bit/s. Installed
     # as DEFAULT on 2026-09-13 by owner decision, on two-direction hardware
@@ -120,12 +124,14 @@ def registry(policy: str, level: QualificationLevel | str =
         from .modes.vf3_mode import VF3
         from .modes.vf12 import VF12
         from .modes.vf13 import VF13
+        from .modes.vf16 import VF16
         base = afsk.default_registry() if budget is None else afsk.default_registry(budget)
         # Rate order, which is the order _maybe_adapt climbs: VF13's 1,438.8
         # bit/s sits between the CPFSK profiles and VF3 (1,853 bit/s); VF12's
         # 4,690 bit/s sits above VF3.
+        # VF16 sits between VF3 and VF12 by net DATA rate.
         candidates, control = (tuple(base.modes)
-                               + (VF13, VF3, VF12)), base.control
+                               + (VF13, VF3, VF16, VF12)), base.control
     elif policy == "hf":
         from .modes.hr0_mode import HR0
         from .modes.hc0_mode import HC0
