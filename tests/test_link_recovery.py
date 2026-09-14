@@ -326,7 +326,7 @@ def test_a_connect_ack_for_an_earlier_session_is_ignored():
     try:
         assert a.connect("STA2", retries=1) is False, "a stale ack was taken as an answer"
         assert a.state == "IDLE", a.state
-        assert a.tx_profile is afsk.CONTROL_PROFILE, a.tx_profile
+        assert a.tx_profile is a.modes.control, a.tx_profile
     finally:
         link._new_session_id = saved
     print("test_a_connect_ack_for_an_earlier_session_is_ignored OK")

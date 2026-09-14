@@ -8,27 +8,9 @@ not know which modulation is underneath.
 
 
 def default_registry(budget=None):
-    """The station's negotiable mode ladder: CPFSK, VF13, VF16, VF12.
+    """The FM ladder with vf14-16 control, ordered by DATA rate.
 
-    This -- not `afsk.default_registry()` -- is what a Link uses when it is
-    not handed a registry.  `afsk.default_registry()` remains the CPFSK-only
-    ladder, which is what tests that care about the two-tone profiles in
-    isolation want; composing the two here rather than in `whale/afsk.py`
-    keeps the CPFSK module unaware of the waveforms stacked on top of it.
-
-    VF12 sits at the top because it is the fastest and least robust rung:
-    the ladder is ordered by rate, and `_maybe_adapt` compares decayed
-    delivery statistics and expected goodput, so a link that cannot hold
-    VF12 falls back through VF16 and VF13 to the 600-baud rung on its own.
-    Negotiation is
-    per-station -- a peer that does not advertise mode 18 simply never has
-    it selected.
-
-    `budget` is the useful-frame budget in seconds (see
-    whale/policy.py's `max_useful_frame_seconds`), which sizes the CPFSK
-    rungs' chunks; None means afsk's own default. VF16 and VF12 are
-    unaffected -- their payload is fixed by their OFDM frame structure,
-    not by a time budget.
+    `budget` sizes the CPFSK frames; the VF frames have fixed capacities.
     """
     from ..mode_qualification import registry
     return registry("fm", "default", budget)

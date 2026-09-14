@@ -8,9 +8,13 @@ directly instead of through the VARA status-line layer.
 
 Run: python scripts/hw_smoke_link.py
        python scripts/hw_smoke_link.py --profile 600baud
+       python scripts/hw_smoke_link.py --control vf14-16
+
+--control runs the whole session (CONNECT, DATA, ACKs, DISC) on one VF14
+profile as the only mode, instead of the default FM ladder.
 
 --profile seeds both sides' mode_history so connect() proposes/negotiates
-straight into that profile instead of starting at CONTROL_PROFILE (300baud)
+straight into that profile instead of starting at the FM control mode.
 and stepping up -- lets you bench a specific speed mode directly, including
 the pre-TX turnaround and waveform-embedded head settling that has to
 hold up at that profile's shorter frame timing. Printed timings
@@ -27,6 +31,8 @@ import time
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(name)s: %(message)s")
 
 from whale import afsk, link as link_mod, mode_history
+from whale.modes import vf14
+from whale.waveform import ModeRegistry
 from whale.link import Link
 from whale.transport import RadioTransport
 
@@ -40,7 +46,20 @@ def main():
     ap.add_argument("--profile", default=None, choices=profile_names,
                      help="seed mode_history so both sides connect straight into this profile "
                           "(default: start at the control profile, as a normal connect would)")
+    ap.add_argument("--control", default=None, choices=sorted(m.name for m in vf14.PROFILES.values()),
+                    help="use this VF14 profile as the control and only mode")
     args = ap.parse_args()
+    if args.control and args.profile:
+        ap.error("--control and --profile are exclusive")
+    registry = None
+    connect_timeout, disc_timeout = 6, 10
+    if args.control:
+        mode = next(m for m in vf14.PROFILES.values() if m.name == args.control)
+        registry = ModeRegistry((mode,), mode)
+        # Allow for the largest control frames and radio turnaround.
+        connect_timeout = 2 * mode.airtime(mode.max_payload_bytes) + 4
+        disc_timeout = 2 * mode.airtime(0) + 4
+        print(f"control and only mode: {mode.describe()}")
 
     print(f"opening radios... (TX_TURNAROUND_DELAY={link_mod.TX_TURNAROUND_DELAY}s; "
           "radio settling is carried by each mode's native preamble)")
@@ -69,8 +88,10 @@ def main():
                 print(f"[{station} event] {name} {kw}")
         return on_event
 
-    link1 = Link(t1, "STA1", on_event=_make_ptt_logger("STA1"), mode_history_store=history_a)
-    link2 = Link(t2, "STA2", on_event=_make_ptt_logger("STA2"), mode_history_store=history_b)
+    link1 = Link(t1, "STA1", on_event=_make_ptt_logger("STA1"), mode_history_store=history_a,
+                 mode_registry=registry)
+    link2 = Link(t2, "STA2", on_event=_make_ptt_logger("STA2"), mode_history_store=history_b,
+                 mode_registry=registry)
 
     ok = {}
     try:
@@ -80,15 +101,15 @@ def main():
         time.sleep(3)
 
         def do_listen():
-            ok["listen"] = link2.listen_once(timeout=30)
+            ok["listen"] = link2.listen_once(timeout=30 + 3 * connect_timeout)
 
         th = threading.Thread(target=do_listen, daemon=True)
         th.start()
         time.sleep(1.0)
 
         print("STA1 connecting to STA2...")
-        ok["connect"] = link1.connect("STA2", timeout_per_try=6, retries=3)
-        th.join(timeout=30)
+        ok["connect"] = link1.connect("STA2", timeout_per_try=connect_timeout, retries=3)
+        th.join(timeout=30 + 3 * connect_timeout)
         print("connect result:", ok.get("connect"), "listen result:", ok.get("listen"))
         if not ok.get("connect") or not ok.get("listen"):
             print("CONNECT FAILED, aborting")
@@ -107,7 +128,7 @@ def main():
 
         th1 = threading.Thread(target=send1, daemon=True)
         th1.start()
-        got_ab = link2.recv_message(timeout=60)
+        got_ab = link2.recv_message(timeout=120)
         th1.join(timeout=10)
         print("send ok:", sent1.get("ok"), "received:", got_ab == MSG_AB, f"({len(got_ab or b'')} bytes)")
 
@@ -124,7 +145,7 @@ def main():
 
         th2 = threading.Thread(target=send2, daemon=True)
         th2.start()
-        got_ba = link1.recv_message(timeout=60)
+        got_ba = link1.recv_message(timeout=120)
         th2.join(timeout=10)
         print("send ok:", sent2.get("ok"), "received:", got_ba == MSG_BA, f"({len(got_ba or b'')} bytes)")
 
@@ -147,7 +168,7 @@ def main():
         disc_thread = threading.Thread(target=service_peer_during_disconnect, daemon=True)
         disc_thread.start()
         try:
-            disc_ok = link1.disconnect(timeout=10, retries=3)
+            disc_ok = link1.disconnect(timeout=disc_timeout, retries=3)
         finally:
             disconnect_done.set()
             disc_thread.join(timeout=2)

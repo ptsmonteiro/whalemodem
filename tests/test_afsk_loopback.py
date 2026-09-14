@@ -897,7 +897,7 @@ def test_spare_ack_for_an_earlier_chunk_does_not_provoke_a_retransmit():
     # Waiting on 0x07. First the spare ack for 0x06 -- which names 0x07 as
     # what the peer wants next, exactly the value the frame in flight would
     # be acked with -- then the real answer.
-    mode = afsk.CONTROL_PROFILE.mode_id
+    mode = modes.default_registry().control.mode_id
     a, keyings = _arq_sender([bytes([0x06, 0x07, mode]),
                               bytes([0x07, 0x08, mode])])
     assert a._send_chunk_with_arq(0x07, b"aaaa", False) == 1
@@ -909,7 +909,7 @@ def test_ack_for_a_duplicate_still_advances_the_sender():
     """The other half of the same format: when the sender retransmits after
     a lost ACK, the peer's answer is about a frame it has already taken and
     moved past. That must still count as acked, or the transfer stalls."""
-    a, keyings = _arq_sender([bytes([0x07, 0x08, afsk.CONTROL_PROFILE.mode_id])])
+    a, keyings = _arq_sender([bytes([0x07, 0x08, modes.default_registry().control.mode_id])])
     assert a._send_chunk_with_arq(0x07, b"aaaa", True) == 1
     print("test_ack_for_a_duplicate_still_advances_the_sender OK")
 
@@ -1051,9 +1051,9 @@ def test_link_negotiation_and_mode_step():
         assert ok, "connect() failed"
         assert listen_result["peer"] == "STA1", listen_result
         assert a.tx_profile.mode_id == afsk.PROFILE_600.mode_id, a.tx_profile
-        assert a.rx_profile.mode_id == afsk.CONTROL_PROFILE.mode_id, a.rx_profile
+        assert a.rx_profile is a.modes.control, a.rx_profile
         assert b.rx_profile.mode_id == afsk.PROFILE_600.mode_id, b.rx_profile
-        assert b.tx_profile.mode_id == afsk.CONTROL_PROFILE.mode_id, b.tx_profile
+        assert b.tx_profile is b.modes.control, b.tx_profile
         # The whole default ladder, including data modes -- not just the CPFSK
         # profiles: what each end advertises is its registry, and stations
         # run whale.modes.default_registry().
@@ -1076,7 +1076,7 @@ def test_link_negotiation_and_mode_step():
 
         assert a.tx_profile.mode_id == afsk.PROFILE_300.mode_id, a.tx_profile
         assert b.rx_profile.mode_id == afsk.PROFILE_300.mode_id, b.rx_profile
-        assert b.tx_profile.mode_id == afsk.CONTROL_PROFILE.mode_id, b.tx_profile
+        assert b.tx_profile is b.modes.control, b.tx_profile
         print("test_link_negotiation_and_mode_step OK")
     finally:
         a.stop()

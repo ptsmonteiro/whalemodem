@@ -46,6 +46,10 @@ MANIFEST = (
     QualificationEntry("fm", 1, QualificationLevel.DEFAULT),
     # VF13 is the 1,438.8 bit/s combinatorial MFSK rung below VF16 and VF12.
     QualificationEntry("fm", 19, QualificationLevel.DEFAULT),
+    # VF14-16 is the FM control and lowest data rung. VF14-8 remains an
+    # experimental faster fallback with less margin near FM threshold.
+    QualificationEntry("fm", 20, QualificationLevel.DEFAULT),
+    QualificationEntry("fm", 21, QualificationLevel.EXPERIMENTAL),
     # VF16 is VF12's 8-PSK, rate-2/3 LDPC sibling. The conservative FM C/N
     # simulator delivered 50/50 at +5 dB where VF12 delivered 0/50; the
     # same waveform passed 10/10 in each radio direction at drive 1.
@@ -112,11 +116,13 @@ def registry(policy: str, level: QualificationLevel | str =
         from . import afsk
         from .modes.vf12 import VF12
         from .modes.vf13 import VF13
+        from .modes.vf14 import VF14_16, VF14_8
         from .modes.vf16 import VF16
         base = afsk.default_registry() if budget is None else afsk.default_registry(budget)
-        # Rate order is the order _maybe_adapt climbs.
-        candidates, control = (tuple(base.modes)
-                               + (VF13, VF16, VF12)), base.control
+        # Rate order is the order _maybe_adapt climbs. VF14's two profiles
+        # are the slowest rungs, below the CPFSK ones.
+        candidates, control = ((VF14_16, VF14_8) + tuple(base.modes)
+                               + (VF13, VF16, VF12)), VF14_16
     elif policy == "hf":
         from .modes.hr0_mode import HR0
         from .modes.hc0_mode import HC0
