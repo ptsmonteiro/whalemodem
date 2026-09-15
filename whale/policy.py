@@ -43,11 +43,14 @@ class ChannelPolicy:
 
     # -- turnaround ------------------------------------------------------
     #
-    # Kept as a compatibility name for diagnostics/tests. On FM no fixed
-    # dead-air delay is applied: replies begin after the checked frame ends,
-    # and calibrated head audio absorbs the effective direction-change loss.
-    # A channel whose radios need real settling time before the reply is
-    # believable sets this rather than widening the head pad.
+    # Dead air between the end of the peer's frame and our reply keying,
+    # measured from where that frame ended in our receive audio (see
+    # Link._await_turnaround). It covers the peer un-keying and its receiver
+    # recovering. On the VHF bench the frame end seen by the receiver leads
+    # the handheld's logged un-key by up to ~0.35 s, and IC-705 replies
+    # keyed with 0.0 or 0.3 s of delay regularly lost their head at the
+    # handheld (4 of 9, then 6 of 17 replies). The reverse direction lost
+    # none.
     tx_turnaround_delay: float
 
     # -- how long a silent peer is tolerated -----------------------------
@@ -201,12 +204,12 @@ class ChannelPolicy:
 #: identically to the pre-policy code.
 FM = ChannelPolicy(
     name="FM",
-    tx_turnaround_delay=0.0,
+    tx_turnaround_delay=0.8,
     inactivity_timeout=150.0,
     max_retries=6,
     ack_timeout_slack=3.0,
-    step_down_after_attempts=3,
-    adaptation_cooldown_seconds=5.0,
+    # Speed adaptation is deliberately the same as HF's.
+    step_down_after_attempts=2,
     max_useful_frame_seconds=afsk.MAX_USEFUL_FRAME_SECONDS,
     require_clear_channel=False,
     track_frequency_offset=False,

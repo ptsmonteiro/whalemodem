@@ -304,9 +304,7 @@ def _new_session_id():
 # _channel_value below for what this name still does here.
 INACTIVITY_TIMEOUT = FM.inactivity_timeout
 
-# Kept as a compatibility name for diagnostics/tests. No fixed dead-air delay
-# is applied on FM: replies begin after the checked frame ends, and
-# calibrated head audio absorbs the effective direction-change loss. Now
+# Dead air before a reply, measured from the end of the peer's frame. Now
 # ChannelPolicy.tx_turnaround_delay -- see _channel_value below.
 TX_TURNAROUND_DELAY = FM.tx_turnaround_delay
 
@@ -1127,6 +1125,8 @@ class Link:
         remaining = anchor + delay - now
         if remaining > 0:
             time.sleep(remaining)
+        logger.debug("[%s] keying %.0f ms after the peer's frame ended", self.mycall,
+                     (time.monotonic() - anchor) * 1000.0)
 
     def _tx_packet(self, ptype: int, body: bytes):
         """Keys one complete packet in its control or negotiated waveform."""

@@ -68,8 +68,12 @@ def test_seq_ahead_wraps():
 
 
 def test_await_turnaround_applies_the_channel_policy(monkeypatch):
-    """HF waits after a decoded frame; VHF's zero-delay policy does not."""
-    from whale.policy import HF
+    """FM now waits a fixed span after a decoded frame before replying: a
+    zero-delay reply keyed within ~50ms of the peer's un-key lost 4 of 9
+    control-mode DATA_ACKs on the VHF bench (see policy.FM's
+    tx_turnaround_delay note). Read the delay from policy.FM rather than
+    hard-coding it -- it has already moved once as bench data came in."""
+    from whale.policy import FM
 
     a = link.Link(_FakeTransport(), "STA1")
     sleeps = []
@@ -78,21 +82,16 @@ def test_await_turnaround_applies_the_channel_policy(monkeypatch):
 
     a._peer_unkeyed_at = 99.9
     a._await_turnaround()
-    assert sleeps == []
+    assert abs(sleeps.pop() - (FM.tx_turnaround_delay - 0.1)) < 1e-9
     assert a._peer_unkeyed_at is None
-
-    a.policy = HF
-    a._peer_unkeyed_at = 99.9
-    a._await_turnaround()
-    assert abs(sleeps.pop() - 0.2) < 1e-9
 
     a._peer_unkeyed_at = None
     a._await_turnaround()
-    assert abs(sleeps.pop() - 0.3) < 1e-9
+    assert abs(sleeps.pop() - FM.tx_turnaround_delay) < 1e-9
 
     a._peer_unkeyed_at = 90.0
     a._await_turnaround()
-    assert abs(sleeps.pop() - 0.3) < 1e-9
+    assert abs(sleeps.pop() - FM.tx_turnaround_delay) < 1e-9
 
 
 def test_link_multi_chunk_message_roundtrip():
