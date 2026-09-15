@@ -23,7 +23,8 @@ from whale.modes.vf14 import VF14_4
 # The two-Link-in-one-process harness these tests share with
 # tests/test_link_recovery.py.
 from link_harness import (FakeTransport as _FakeTransport, connected_pair as _connected_pair,
-                          silence_once as _silence_once, transfer as _transfer)
+                          drop_next as _drop_next, silence_once as _silence_once,
+                          transfer as _transfer)
 
 
 def test_connect_body_roundtrip():
@@ -217,6 +218,63 @@ def test_unanswered_chunk_gives_up_after_max_retries():
     print("test_unanswered_chunk_gives_up_after_max_retries OK")
 
 
+def test_floor_req_while_data_unacked_retransmits_without_waiting_out_the_timeout():
+    """A DATA_ACK wait that sees PT_FLOOR_REQ instead breaks immediately and
+    retransmits, rather than sitting out the full data_ack_timeout -- the
+    bug seen on the bench: B ACKed A's final chunk, A missed the ACK, and B
+    (with a reply already queued) sent FLOOR_REQ before A's long timeout
+    ever fired. See Link._send_chunk_with_arq's PT_FLOOR_REQ branch."""
+    a = link.Link(_FakeTransport(), "STA1")
+    a.state = "CONNECTED"
+    a.data_ack_timeout = 5.0  # old code would have to sit this whole thing out
+    keyings = []
+    a._tx_packet = lambda ptype, body: keyings.append(body)
+    a._await_turnaround = lambda: None
+    mode = modes.default_registry().control.mode_id
+    queue_ = [(link.PT_FLOOR_REQ, b""),
+             (link.PT_DATA_ACK, bytes([0x07, 0x08, mode]))]
+    a._wait_packet = lambda types, timeout: queue_.pop(0) if queue_ else None
+
+    start = time.monotonic()
+    attempts = a._send_chunk_with_arq(0x07, b"aaaa", False)
+    elapsed = time.monotonic() - start
+
+    assert attempts == 2, f"expected one retransmit after the floor request, got {attempts}"
+    assert len(keyings) == 2, f"{len(keyings)} keying(s) -- FLOOR_REQ should have provoked a retransmit"
+    assert elapsed < 1.0, f"took {elapsed:.2f}s -- looks like it waited out data_ack_timeout"
+    print("test_floor_req_while_data_unacked_retransmits_without_waiting_out_the_timeout OK")
+
+
+def test_irs_does_not_request_the_floor_while_reassembly_is_in_progress():
+    """The IRS half of the same rule: while _partial_rx_buf is non-empty the
+    peer is still mid-message, so nothing asks for the floor -- it would key
+    over the peer's next chunk. Once the message completes the buffer empties
+    and the request goes out normally. See Link._acquire_floor."""
+    a = link.Link(_FakeTransport(), "STA1")
+    a.role = "IRS"
+    a.control_ack_timeout = 1.0
+    a._rx_expect_seq = 5
+    a._partial_rx_buf = bytearray(b"half a message")
+
+    tx_types = []
+    a._tx_packet = lambda ptype, body: tx_types.append(ptype)
+    a._await_turnaround = lambda: None
+
+    # First wait answers with the peer's still-in-flight final (EOF) chunk,
+    # which completes reassembly and empties _partial_rx_buf. Only then may
+    # a FLOOR_REQ go out; the second wait grants it.
+    queue_ = [(link.PT_DATA, bytes([5 | link.EOF_BIT]) + b"tail"),
+             (link.PT_FLOOR_GRANT, b"")]
+    a._wait_packet = lambda types, timeout: queue_.pop(0) if queue_ else None
+
+    assert a._acquire_floor() is True
+    assert tx_types == [link.PT_DATA_ACK, link.PT_FLOOR_REQ], \
+        f"floor was requested before reassembly finished: {tx_types}"
+    assert a.role == "ISS", a.role
+    assert not a._partial_rx_buf
+    print("test_irs_does_not_request_the_floor_while_reassembly_is_in_progress OK")
+
+
 def test_roles_assigned_at_connect():
     """The connecting station starts holding the floor (ISS); the listener
     starts waiting for it (IRS) -- mirroring how PACTOR/VARA/WINMOR-style ARQ
@@ -245,6 +303,56 @@ def test_irs_can_request_and_use_the_floor():
         assert got == data, (len(got or b""), len(data))
         assert b.role == "ISS" and a.role == "IRS", (a.role, b.role)
         print("test_irs_can_request_and_use_the_floor OK")
+    finally:
+        a.stop()
+        b.stop()
+
+
+def test_floor_request_after_a_lost_final_ack_does_not_stall_either_link():
+    """End-to-end reproduction of the bench bug: A (ISS) sends a multi-chunk
+    message; B decodes and ACKs the final chunk but the ACK is lost. B's
+    app has a reply ready the instant recv_message() returns and asks for
+    the floor immediately -- while A is still waiting on that very ACK.
+    data_ack_timeout is set far larger than the whole test's time budget, so
+    if recovery only happened via A's timeout this test would time out
+    rather than fail fast."""
+    a, b, ta, tb = _connected_pair()
+    try:
+        a.data_ack_timeout = 60.0
+        chunk_size = a.tx_profile.chunk_size
+        data_ab = bytes((i * 19 + 4) % 256 for i in range(chunk_size * 2 + 50))
+        data_ba = bytes((i * 23 + 6) % 256 for i in range(40))
+        chunks = -(-len(data_ab) // chunk_size)  # ceil division
+        assert chunks >= 3, f"test needs a genuinely multi-chunk message, got {chunks}"
+        _drop_next(b, "DATA_ACK", occurrences=(chunks,))  # B's ack for the final chunk
+
+        a_result, b_result = {}, {}
+
+        def run_b():
+            b_result["msg"] = b.recv_message(timeout=90)
+            if b_result["msg"] is not None:
+                b.send_message(data_ba)  # queued the instant the message is in
+
+        def run_a():
+            a.send_message(data_ab)
+            a_result["msg"] = a.recv_message(timeout=90)
+
+        thread_b = threading.Thread(target=run_b)
+        thread_a = threading.Thread(target=run_a)
+        start = time.monotonic()
+        thread_b.start()
+        thread_a.start()
+        thread_a.join(timeout=90)
+        thread_b.join(timeout=90)
+        elapsed = time.monotonic() - start
+
+        assert b_result.get("msg") == data_ab, "B never reassembled A's message intact"
+        assert a_result.get("msg") == data_ba, "A never received B's reply intact"
+        assert a.state == "CONNECTED" and b.state == "CONNECTED", (a.state, b.state)
+        assert elapsed < 20.0, \
+            f"took {elapsed:.1f}s -- looks like recovery waited out data_ack_timeout"
+        print("test_floor_request_after_a_lost_final_ack_does_not_stall_either_link OK "
+              f"({elapsed:.2f}s)")
     finally:
         a.stop()
         b.stop()
@@ -379,8 +487,11 @@ if __name__ == "__main__":
     test_negotiate_mode()
     test_data_ack_carries_received_mode()
     test_seq_ahead_wraps()
+    test_floor_req_while_data_unacked_retransmits_without_waiting_out_the_timeout()
+    test_irs_does_not_request_the_floor_while_reassembly_is_in_progress()
     test_roles_assigned_at_connect()
     test_irs_can_request_and_use_the_floor()
+    test_floor_request_after_a_lost_final_ack_does_not_stall_either_link()
     test_concurrent_send_attempts_do_not_collide()
     test_spare_ack_for_an_earlier_chunk_does_not_provoke_a_retransmit()
     test_ack_for_a_duplicate_still_advances_the_sender()

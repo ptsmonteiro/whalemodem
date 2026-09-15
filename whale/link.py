@@ -1422,40 +1422,76 @@ class Link:
         lands while the peer is busy sending its own message is silently
         dropped by its _wait_packet.
         The retry after this attempt's timeout is what gets through once the
-        peer goes back to polling for incoming work."""
+        peer goes back to polling for incoming work.
+
+        Two rules keep the request from keying over the peer. While a
+        message is part-way in, nothing is requested: the ISS would drop it
+        and would be keying its next chunk at the same moment. And each
+        request waits long enough to hear a whole DATA retransmission, since
+        that is how the ISS answers a request that arrives while one of its
+        chunks is unacknowledged (see _send_chunk_with_arq). Any DATA from
+        the peer restarts the attempt count: it is still sending, not gone."""
         if self.role == "ISS":
             return True
         retries = self._channel("max_retries") if retries is None else retries
-        for attempt in range(1, retries + 1):
+        attempt = 0
+        while attempt < retries:
+            if self._partial_rx_buf:
+                if self._peer_is_stale():
+                    self._abandon_stale_session()
+                    raise LinkError("peer went silent mid-message while we waited for the floor")
+                if self._take_peer_data_for_floor(self.control_ack_timeout) is True:
+                    return True
+                continue
+            attempt += 1
             logger.info("[%s] requesting the floor (attempt %d/%d)", self.mycall, attempt, retries)
             self.on_event("PTT", on=True)
             self._tx_packet(PT_FLOOR_REQ, b"")
             self.on_event("PTT", off=True)
-            deadline = time.monotonic() + self.control_ack_timeout
-            while True:
-                remaining = deadline - time.monotonic()
-                if remaining <= 0:
-                    break
-                got = self._wait_packet(
-                    {PT_FLOOR_GRANT, PT_DATA, PT_DISC}, remaining)
-                if got is None:
-                    break
-                ptype, body = got
-                if ptype == PT_DISC:
-                    self._handle_peer_disc()
-                    raise LinkError("peer disconnected while we were requesting the floor")
-                if ptype == PT_DATA:
-                    # The peer still owns the floor and was already sending.
-                    # Keep its ARQ moving instead of deadlocking with both
-                    # application pumps blocked in send_message().
-                    message = self._handle_data(body)
-                    if message is not None:
-                        self._pending_messages.put(message)
-                    continue
-                self.role = "ISS"
-                logger.info("[%s] floor granted, now ISS", self.mycall)
+            # Jitter so a request cannot lock step with the peer's own retry
+            # period and land on every one of its retransmissions.
+            wait = self._floor_grant_timeout() + random.uniform(
+                0.0, self.modes.control.airtime(_AIR_HEADER_LEN))
+            granted = self._take_peer_data_for_floor(wait)
+            if granted is True:
                 return True
+            if granted == "data":
+                attempt = 0
         return False
+
+    def _take_peer_data_for_floor(self, timeout):
+        """Waits up to `timeout` for FLOOR_GRANT, DATA or DISC while asking
+        for the floor. Returns True once granted, "data" after answering one
+        DATA frame, or None on timeout."""
+        got = self._wait_packet({PT_FLOOR_GRANT, PT_DATA, PT_DISC}, timeout)
+        if got is None:
+            return None
+        ptype, body = got
+        if ptype == PT_DISC:
+            self._handle_peer_disc()
+            raise LinkError("peer disconnected while we were requesting the floor")
+        if ptype == PT_DATA:
+            # The peer still owns the floor and was already sending.
+            # Keep its ARQ moving instead of deadlocking with both
+            # application pumps blocked in send_message().
+            message = self._handle_data(body)
+            if message is not None:
+                self._pending_messages.put(message)
+            return "data"
+        self.role = "ISS"
+        logger.info("[%s] floor granted, now ISS", self.mycall)
+        return True
+
+    def _floor_grant_timeout(self):
+        """How long one FLOOR_REQ waits: a grant, or the longest DATA frame
+        the ISS may retransmit in answer, plus the usual turnaround and
+        slack."""
+        longest_data = max((p.airtime(_AIR_HEADER_LEN + p.chunk_size)
+                            for p in self.modes.modes
+                            if p.mode_id in self.peer_supported_modes), default=0.0)
+        return max(self.control_ack_timeout,
+                   longest_data + self._channel("tx_turnaround_delay")
+                   + self.policy.ack_timeout_slack)
 
     def _handle_floor_req(self):
         """The peer (currently IRS) wants to become ISS. We only ever see
@@ -1546,13 +1582,21 @@ class Link:
                 remaining = deadline - time.monotonic()
                 if remaining <= 0:
                     break
-                got = self._wait_packet({PT_DATA_ACK, PT_DISC}, remaining)
+                got = self._wait_packet({PT_DATA_ACK, PT_DISC, PT_FLOOR_REQ}, remaining)
                 if got is None:
                     break
                 ptype, body_in = got
                 if ptype == PT_DISC:
                     self._handle_peer_disc()
                     raise LinkError("peer disconnected mid-transfer")
+                if ptype == PT_FLOOR_REQ:
+                    # The IRS asks only when no message of ours is part-way
+                    # in and it is listening now, so this frame or its ACK was
+                    # lost. Waiting out the timeout would only let its next
+                    # request key over our retransmission.
+                    logger.info("[%s] floor requested while DATA seq=0x%02x is unacknowledged "
+                                "-- retransmitting now", self.mycall, seq)
+                    break
                 if len(body_in) != 3:
                     logger.info("[%s] ignoring malformed DATA_ACK for seq=0x%02x (%d bytes)",
                                 self.mycall, seq, len(body_in))
