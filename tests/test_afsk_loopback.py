@@ -81,17 +81,28 @@ def test_await_turnaround_applies_the_channel_policy(monkeypatch):
     monkeypatch.setattr(link.time, "monotonic", lambda: 100.0)
 
     a._peer_unkeyed_at = 99.9
+    a._peer_unkeyed_observed_at = 99.9
     a._await_turnaround()
     assert abs(sleeps.pop() - (FM.tx_turnaround_delay - 0.1)) < 1e-9
     assert a._peer_unkeyed_at is None
 
     a._peer_unkeyed_at = None
+    a._peer_unkeyed_observed_at = None
     a._await_turnaround()
     assert abs(sleeps.pop() - FM.tx_turnaround_delay) < 1e-9
 
     a._peer_unkeyed_at = 90.0
+    a._peer_unkeyed_observed_at = 90.0
     a._await_turnaround()
     assert abs(sleeps.pop() - FM.tx_turnaround_delay) < 1e-9
+
+    # A costly decoder may only establish an old audio-end anchor now. It is
+    # fresh evidence that the full turnaround delay has already elapsed,
+    # not a reason to sleep that delay again.
+    a._peer_unkeyed_at = 90.0
+    a._peer_unkeyed_observed_at = 100.0
+    a._await_turnaround()
+    assert not sleeps
 
 
 def test_link_multi_chunk_message_roundtrip():

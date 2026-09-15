@@ -50,7 +50,11 @@ class ChannelPolicy:
     # the handheld's logged un-key by up to ~0.35 s, and IC-705 replies
     # keyed with 0.0 or 0.3 s of delay regularly lost their head at the
     # handheld (4 of 9, then 6 of 17 replies). The reverse direction lost
-    # none.
+    # none. Boundary runs on 2026-09-15 lost the first CONNECT_ACK at 0.35 s
+    # and lost DATA_ACKs at exact, decode-compensated 0.4 s and 0.45 s.
+    # 0.5 s leaves 150 ms beyond the worst observed 0.35 s
+    # audio-end-to-unkey lag while avoiding the 0.8 s setting's needless
+    # extra dead air on every half-duplex handoff.
     tx_turnaround_delay: float
 
     # -- how long a silent peer is tolerated -----------------------------
@@ -204,7 +208,7 @@ class ChannelPolicy:
 #: identically to the pre-policy code.
 FM = ChannelPolicy(
     name="FM",
-    tx_turnaround_delay=0.8,
+    tx_turnaround_delay=0.5,
     inactivity_timeout=150.0,
     max_retries=6,
     ack_timeout_slack=3.0,

@@ -199,7 +199,7 @@ def test_live_decode_loop_drains_two_frames_without_new_audio(monkeypatch):
     receiver.peer_supported_modes = {HC0.mode_id, HF9.mode_id}
     delivered = []
 
-    def finish(ptype, body, profile, snap, end, result):
+    def finish(ptype, body, profile, snap, end, result, snap_observed_at):
         delivered.append((ptype, body, profile))
         if len(delivered) == 2:
             receiver._stop.set()

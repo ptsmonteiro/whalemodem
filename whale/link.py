@@ -618,6 +618,9 @@ class Link:
         # Set by the decode thread to when the peer's audio ended, in
         # time.monotonic() terms; consumed by _await_turnaround.
         self._peer_unkeyed_at = None
+        # When the anchor above was established. A costly decode can make
+        # the audio-end timestamp old without making the observation stale.
+        self._peer_unkeyed_observed_at = None
         self._stop = threading.Event()
         # profile name -> _DecodeCost, written and read only by the decode
         # thread (and by stop(), after it has been asked to finish).
@@ -879,6 +882,11 @@ class Link:
         its own threshold) but hasn't seen enough samples yet for a verdict,
         this poll holds off consuming anything and just waits for more
         audio, rather than letting a different candidate's near-miss win."""
+        # Date the newest sample before any decoder runs. Some full-frame
+        # FEC decodes cost hundreds of milliseconds; using the completion
+        # time would accidentally add that CPU time to the radio turnaround
+        # delay even though the peer's audio ended before decoding began.
+        snap_observed_at = time.monotonic()
         profiles = self._candidate_decode_profiles(snap)
         results = []
 
@@ -906,7 +914,7 @@ class Link:
             end = result.get("end_index", len(snap))
             self._consume_rx(end)
             self._finish_air_packet(ptype, inline + remainder, profile, snap, end,
-                                    result)
+                                    result, snap_observed_at)
             return True
 
         # Control traffic is always on the robust control waveform, including
@@ -988,9 +996,12 @@ class Link:
                 plan.append(profile)
         return plan
 
-    def _finish_air_packet(self, ptype, body, profile, snap, end, decode_result):
+    def _finish_air_packet(self, ptype, body, profile, snap, end, decode_result,
+                           snap_observed_at):
         trailing = max(0, len(snap) - end)
-        self._peer_unkeyed_at = time.monotonic() - trailing / profile.rx_sample_rate
+        self._peer_unkeyed_at = (snap_observed_at
+                                 - trailing / profile.rx_sample_rate)
+        self._peer_unkeyed_observed_at = time.monotonic()
         cost = self._decode_cost.get(profile.name)
         if cost is not None:
             cost.frames += 1
@@ -1115,11 +1126,16 @@ class Link:
         channel is free. See ANCHOR_AGE_SLACK."""
         delay = self._channel("tx_turnaround_delay")
         anchor = self._peer_unkeyed_at
+        observed_at = self._peer_unkeyed_observed_at
         self._peer_unkeyed_at = None
+        self._peer_unkeyed_observed_at = None
         if delay <= 0:
             return
         now = time.monotonic()
-        if anchor is None or now - anchor > delay + ANCHOR_AGE_SLACK:
+        observation_is_fresh = (observed_at is not None
+                                and now - observed_at <= delay + ANCHOR_AGE_SLACK)
+        if anchor is None or (now - anchor > delay + ANCHOR_AGE_SLACK
+                              and not observation_is_fresh):
             time.sleep(delay)
             return
         remaining = anchor + delay - now

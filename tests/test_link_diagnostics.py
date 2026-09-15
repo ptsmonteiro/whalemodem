@@ -109,6 +109,18 @@ def _fill(transport, seconds):
     transport._buf = np.zeros(int(seconds * RX_RATE), dtype=np.float32)
 
 
+def test_frame_end_anchor_excludes_decode_cpu_time():
+    """Turnaround is measured from the captured frame end, not decode end."""
+    mode = _StubMode("mode", 1, _StubCodec())
+    a_link, _ = _stub_link(mode)
+    snap = np.zeros(1_200, dtype=np.float32)
+
+    a_link._finish_air_packet(
+        link.PT_DISC, b"", mode, snap, 600, {}, snap_observed_at=100.0)
+
+    assert a_link._peer_unkeyed_at == 99.95
+
+
 def test_hf_frequency_hint_is_shared_across_modes_and_session_scoped():
     first = _StubMode("first", 1, _StubCodec())
     second = _StubMode("second", 2, _StubCodec(result={"payload": b"ok"}),
