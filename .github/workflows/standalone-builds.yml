@@ -66,13 +66,15 @@ jobs:
       # libraries the earlier local Docker validation found were needed on
       # the *smoke-test* side even with PortAudio itself vendored (PortAudio
       # still dlopen's ALSA/JACK at run time; see whale/hw/audio_io.py's
-      # frozen-mode preload comment).
+      # frozen-mode preload comment). libpython3-dev pulls in
+      # libpython3.X.so.1.0, which PyInstaller must bundle; Debian's python3
+      # binary is statically linked and doesn't ship it by default.
       - name: Install system packages
         run: |
           apt-get update
           apt-get install -y --no-install-recommends \
             git ca-certificates binutils \
-            python3 python3-venv python3-pip \
+            python3 python3-venv python3-pip libpython3-dev \
             libasound2t64 libjack-jackd2-0
       - uses: actions/checkout@v7
       - name: Install project + build deps
@@ -147,10 +149,12 @@ jobs:
               # for this arch and pip falls back to building from source under
               # emulation -- slow, but this is CI, not a Raspberry Pi doing its
               # own build. (python3-dev is what meson needs to find the python3
-              # dependency for Cython extensions.)
+              # dependency for Cython extensions.) libpython3-dev is listed
+              # explicitly because PyInstaller needs libpython3.X.so.1.0 to
+              # bundle, and the Debian python3 binary does not link to it.
               apt-get install -y --no-install-recommends \
                 ca-certificates \
-                python3 python3-venv python3-pip python3-dev pkg-config \
+                python3 python3-venv python3-pip python3-dev libpython3-dev pkg-config \
                 build-essential gfortran libopenblas-dev \
                 libasound2t64 libjack-jackd2-0
               if [ "$SYSTEM_NUMPY" = "1" ]; then
