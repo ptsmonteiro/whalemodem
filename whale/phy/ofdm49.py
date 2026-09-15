@@ -225,6 +225,22 @@ def _soft_bit_llrs(rx_syms: np.ndarray, bps: int, noise_var) -> np.ndarray:
     return llrs.reshape(-1)
 
 
+@dataclass
+class _ChannelEstimate:
+    """Training-derived state shared by the receive pipeline stages."""
+
+    preamble_bins: list[np.ndarray]
+    initial_gain: np.ndarray
+    phase_slope: float | None
+    anchor_indices: np.ndarray
+    anchor_gains: np.ndarray
+    pending_data: list[tuple[int, int, int]]
+    noise_powers: list[float]
+    signal_powers: list[float]
+    bin_noise_powers: list[np.ndarray]
+    bin_signal_powers: list[np.ndarray]
+
+
 @dataclass(frozen=True)
 class OFDM49Mode:
     fft_size: int
@@ -614,215 +630,256 @@ class OFDM49Mode:
         total_symbols = self.total_ofdm_symbols()
         symlen = self.symbol_len
         span = x[start:start + total_symbols * symlen + symlen]
-
-        def _corrected(offset_hz: float) -> np.ndarray:
-            return _freq_shift_real(span, -offset_hz, DESIGN_RATE)
-
-        corrected = _corrected(freq_offset)
-
-        def _symbol_bins(idx: int, sig: np.ndarray) -> np.ndarray:
-            s = idx * symlen + self.cp_len
-            seg = sig[s:s + self.fft_size]
-            if len(seg) < self.fft_size:
-                seg = np.concatenate([seg, np.zeros(self.fft_size - len(seg))])
-            return self._fft_bins(seg)
-
+        corrected, freq_offset = self._refine_frequency(span, freq_offset)
         if self.n_preamble_symbols >= 2:
-            pre_bins_seq = [_symbol_bins(i, corrected) for i in range(self.n_preamble_symbols)]
-            dt = symlen / DESIGN_RATE
-            rotations = []
-            for i in range(1, self.n_preamble_symbols):
-                ratio = pre_bins_seq[i] * np.conj(pre_bins_seq[i - 1])
-                rotations.append(np.angle(np.sum(ratio)))
-            mean_rot = float(np.mean(rotations))
-            refine_hz = mean_rot / (2 * np.pi * dt)
-            freq_offset += refine_hz
             result["freq_offset_hz"] = float(freq_offset)
-            corrected = _corrected(freq_offset)
 
-        pre_bins_seq = [_symbol_bins(i, corrected) for i in range(self.n_preamble_symbols)]
-        pre_avg = np.mean(pre_bins_seq, axis=0)
-        gain0 = pre_avg / self._preamble_bin_symbols
-        if np.any(np.abs(gain0) < 1e-9):
+        channel = self._estimate_channel(corrected, gain_smoothing, result)
+        if channel is None:
             return result
+
+        equalized_data, data_gain = self._equalize_data(corrected, channel)
+        bin_noise_var, raw_variance = self._record_channel_diagnostics(
+            result, channel, noise_estimator)
+        return self._recover_packet(
+            result, equalized_data, data_gain, channel, bin_noise_var,
+            raw_variance, diagnostics, noise_estimator, ldpc_max_iterations,
+            refine_iterations)
+
+    def _symbol_bins(self, signal: np.ndarray, index: int) -> np.ndarray:
+        """Extract the active FFT bins from one cyclic-prefix OFDM symbol."""
+        start = index * self.symbol_len + self.cp_len
+        segment = signal[start:start + self.fft_size]
+        if len(segment) < self.fft_size:
+            segment = np.concatenate(
+                [segment, np.zeros(self.fft_size - len(segment))])
+        return self._fft_bins(segment)
+
+    def _refine_frequency(self, span: np.ndarray,
+                          freq_offset: float) -> tuple[np.ndarray, float]:
+        """Apply acquisition CFO and refine it from repeated preambles."""
+        corrected = _freq_shift_real(span, -freq_offset, DESIGN_RATE)
+        if self.n_preamble_symbols < 2:
+            return corrected, freq_offset
+
+        preamble_bins = [self._symbol_bins(corrected, i)
+                         for i in range(self.n_preamble_symbols)]
+        rotations = []
+        for i in range(1, self.n_preamble_symbols):
+            ratio = preamble_bins[i] * np.conj(preamble_bins[i - 1])
+            rotations.append(np.angle(np.sum(ratio)))
+        mean_rotation = float(np.mean(rotations))
+        symbol_seconds = self.symbol_len / DESIGN_RATE
+        freq_offset += mean_rotation / (2 * np.pi * symbol_seconds)
+        return (_freq_shift_real(span, -freq_offset, DESIGN_RATE), freq_offset)
+
+    def _estimate_channel(self, corrected: np.ndarray, gain_smoothing: int,
+                          result: dict) -> _ChannelEstimate | None:
+        """Estimate channel anchors and known-symbol residual powers."""
+        preamble_bins = [self._symbol_bins(corrected, i)
+                         for i in range(self.n_preamble_symbols)]
+        preamble_average = np.mean(preamble_bins, axis=0)
+        initial_gain = preamble_average / self._preamble_bin_symbols
+        if np.any(np.abs(initial_gain) < 1e-9):
+            return None
 
         phase_slope = None
         if self.equalizer == "phase_slope":
-            gain0, phase_slope = self._apply_phase_slope(gain0)
+            initial_gain, phase_slope = self._apply_phase_slope(initial_gain)
             result["phase_slope_rad_per_bin"] = phase_slope
 
         noise_powers = []
-        sig_powers = []
-        bin_noise_list = []  # per-bin residual power, for the LLR demapper
-        bin_sig_list = []    # per-bin reference power, for per_bin_snr_db only
-        for pb in pre_bins_seq:
-            eq = pb / gain0
-            resid = np.abs(eq - self._preamble_bin_symbols) ** 2
-            noise_powers.append(np.mean(resid))
-            sig_powers.append(np.mean(np.abs(self._preamble_bin_symbols) ** 2))
-            bin_noise_list.append(resid)
-            bin_sig_list.append(np.abs(self._preamble_bin_symbols) ** 2)
+        signal_powers = []
+        bin_noise_powers = []
+        bin_signal_powers = []
+        for bins in preamble_bins:
+            equalized = bins / initial_gain
+            residual = np.abs(equalized - self._preamble_bin_symbols) ** 2
+            noise_powers.append(np.mean(residual))
+            signal_powers.append(
+                np.mean(np.abs(self._preamble_bin_symbols) ** 2))
+            bin_noise_powers.append(residual)
+            bin_signal_powers.append(np.abs(self._preamble_bin_symbols) ** 2)
 
-        anchors_idx = [self.n_preamble_symbols / 2.0 - 0.5]
-        anchors_gain = [gain0]
-
-        layout = self._layout()
-        eq_data = np.empty((self.n_data_ofdm_symbols, self.n_active), dtype=np.complex128)
-        data_gain = np.empty_like(eq_data)
+        anchor_indices = [self.n_preamble_symbols / 2.0 - 0.5]
+        anchor_gains = [initial_gain]
         cursor = self.n_preamble_symbols
         data_cursor = 0
-        pending: list[tuple[int, int, int]] = []
-        for kind, count in layout:
+        pending_data: list[tuple[int, int, int]] = []
+        for kind, count in self._layout():
             if kind == "data":
-                pending.append((cursor, data_cursor, count))
+                pending_data.append((cursor, data_cursor, count))
                 data_cursor += count
             else:
-                pilot_bins = _symbol_bins(cursor, corrected)
+                pilot_bins = self._symbol_bins(corrected, cursor)
                 gain = pilot_bins / self._pilot_bin_symbols
                 if self.equalizer == "phase_slope":
                     gain, _ = self._apply_phase_slope(gain)
                 if np.any(np.abs(gain) < 1e-9):
-                    return result
-                anchors_idx.append(float(cursor))
-                anchors_gain.append(gain)
-                eq_pilot = pilot_bins / gain
-                pilot_resid = np.abs(eq_pilot - self._pilot_bin_symbols) ** 2
-                noise_powers.append(np.mean(pilot_resid))
-                sig_powers.append(np.mean(np.abs(self._pilot_bin_symbols) ** 2))
-                bin_noise_list.append(pilot_resid)
-                bin_sig_list.append(np.abs(self._pilot_bin_symbols) ** 2)
+                    return None
+                anchor_indices.append(float(cursor))
+                anchor_gains.append(gain)
+                equalized_pilot = pilot_bins / gain
+                residual = np.abs(
+                    equalized_pilot - self._pilot_bin_symbols) ** 2
+                noise_powers.append(np.mean(residual))
+                signal_powers.append(
+                    np.mean(np.abs(self._pilot_bin_symbols) ** 2))
+                bin_noise_powers.append(residual)
+                bin_signal_powers.append(np.abs(self._pilot_bin_symbols) ** 2)
             cursor += count
 
-        anchors_idx = np.array(anchors_idx)
-        anchors_gain = np.array(anchors_gain)
+        anchor_indices = np.array(anchor_indices)
+        anchor_gains = np.array(anchor_gains)
         if gain_smoothing > 1:
-            # Local complex-gain average after removing the dominant delay
-            # ramp. Uses training symbols only, never transmitted data.
-            positions = np.asarray(self.active_bins, dtype=float)
-            radius = int(gain_smoothing) // 2
-            for row in range(len(anchors_gain)):
-                g = anchors_gain[row]
-                slope = np.polyfit(positions, np.unwrap(np.angle(g)), 1)[0]
-                flat = g * np.exp(-1j * slope * positions)
-                smooth = np.array([np.mean(flat[max(0,b-radius):b+radius+1])
-                                   for b in range(self.n_active)])
-                anchors_gain[row] = smooth * np.exp(1j * slope * positions)
+            self._smooth_anchor_gains(anchor_gains, gain_smoothing)
+        return _ChannelEstimate(
+            preamble_bins, initial_gain, phase_slope, anchor_indices,
+            anchor_gains, pending_data, noise_powers, signal_powers,
+            bin_noise_powers, bin_signal_powers)
 
-        for start_sym, start_eq, count in pending:
-            idx = start_sym + np.arange(count)
-            gain_trace = np.empty((count, self.n_active), dtype=np.complex128)
-            for b in range(self.n_active):
-                re = np.interp(idx, anchors_idx, anchors_gain[:, b].real)
-                im = np.interp(idx, anchors_idx, anchors_gain[:, b].imag)
-                gain_trace[:, b] = re + 1j * im
-            for i in range(count):
-                bins = _symbol_bins(start_sym + i, corrected)
-                gt = gain_trace[i]
-                if self.n_comb() > 0 and self.comb_tracking in ("common", "confidence", "residual"):
-                    ci = self._comb_idx
-                    # TX multiplies the whole grid by phase_schedule/taper,
-                    # including comb symbols which already contain that phase.
-                    reference = (self._comb_bin_symbols[ci]
-                                 * np.exp(1j*self._phase_schedule[ci])
-                                 * self._amp_taper[ci])
-                    predicted = gt[ci] * reference
-                    common = np.vdot(predicted, bins[ci]) / max(
-                        float(np.vdot(predicted, predicted).real), 1e-18)
-                    if self.comb_tracking == "confidence":
-                        # Pilot disagreement estimates uncertainty in the common
-                        # complex correction. Shrink insignificant corrections
-                        # toward unity (the block-training channel estimate).
-                        error = bins[ci] - common * predicted
-                        variance = float(np.vdot(error,error).real) / max(len(ci)-1,1)
-                        variance /= max(float(np.vdot(predicted,predicted).real),1e-18)
-                        change = abs(common-1)**2
-                        trust = max(0.0, 1.0-variance/max(change,1e-18))
-                        gt = gt * (1 + trust*(common-1))
-                    elif self.comb_tracking == "common":
-                        gt = gt * common
-                    else:
-                        residual = bins[ci] / predicted
-                        positions = np.asarray(self.active_bins)
-                        corr = (np.interp(positions, positions[ci], residual.real)
-                                + 1j*np.interp(positions, positions[ci], residual.imag))
-                        gt = gt * corr
-                elif self.n_comb() > 0 and self.comb_tracking == "legacy":
-                    # comb-pilot refinement: re-estimate gain at comb bin
-                    # positions from this symbol's own known comb symbols,
-                    # and blend/interpolate across frequency onto the data
-                    # bins -- gives an extra per-symbol frequency-domain
-                    # correction beyond the time-only interpolation above.
-                    comb_gain_now = bins[self._comb_idx] / self._comb_bin_symbols[self._comb_idx]
-                    comb_pos = self._comb_idx.astype(np.float64)
-                    all_pos = np.arange(self.n_active, dtype=np.float64)
-                    re_i = np.interp(all_pos, comb_pos, comb_gain_now.real)
-                    im_i = np.interp(all_pos, comb_pos, comb_gain_now.imag)
-                    comb_interp = re_i + 1j * im_i
-                    # blend: trust comb (this symbol, this freq) 50/50 with
-                    # the time-interpolated anchor gain
-                    gt = 0.5 * gt + 0.5 * comb_interp
-                eq_data[start_eq + i] = bins / gt
-                data_gain[start_eq + i] = gt
+    def _smooth_anchor_gains(self, anchor_gains: np.ndarray,
+                             width: int) -> None:
+        """Smooth training gains after removing their dominant delay ramp."""
+        positions = np.asarray(self.active_bins, dtype=float)
+        radius = int(width) // 2
+        for row in range(len(anchor_gains)):
+            gain = anchor_gains[row]
+            slope = np.polyfit(
+                positions, np.unwrap(np.angle(gain)), 1)[0]
+            flat = gain * np.exp(-1j * slope * positions)
+            smooth = np.array([
+                np.mean(flat[max(0, b - radius):b + radius + 1])
+                for b in range(self.n_active)
+            ])
+            anchor_gains[row] = smooth * np.exp(1j * slope * positions)
 
-        snr_db = 10 * np.log10(np.mean(sig_powers) / (np.mean(noise_powers) + 1e-15))
+    def _equalize_data(self, corrected: np.ndarray,
+                       channel: _ChannelEstimate
+                       ) -> tuple[np.ndarray, np.ndarray]:
+        """Interpolate channel anchors and equalize all payload symbols."""
+        equalized = np.empty(
+            (self.n_data_ofdm_symbols, self.n_active), dtype=np.complex128)
+        data_gain = np.empty_like(equalized)
+        for start_sym, start_eq, count in channel.pending_data:
+            indices = start_sym + np.arange(count)
+            gain_trace = np.empty(
+                (count, self.n_active), dtype=np.complex128)
+            for bin_index in range(self.n_active):
+                real = np.interp(
+                    indices, channel.anchor_indices,
+                    channel.anchor_gains[:, bin_index].real)
+                imag = np.interp(
+                    indices, channel.anchor_indices,
+                    channel.anchor_gains[:, bin_index].imag)
+                gain_trace[:, bin_index] = real + 1j * imag
+            for offset in range(count):
+                bins = self._symbol_bins(corrected, start_sym + offset)
+                gain = self._track_comb_pilots(bins, gain_trace[offset])
+                equalized[start_eq + offset] = bins / gain
+                data_gain[start_eq + offset] = gain
+        return equalized, data_gain
+
+    def _track_comb_pilots(self, bins: np.ndarray,
+                           gain: np.ndarray) -> np.ndarray:
+        """Apply the configured per-symbol comb-pilot gain correction."""
+        if self.n_comb() > 0 and self.comb_tracking in (
+                "common", "confidence", "residual"):
+            comb_indices = self._comb_idx
+            reference = (self._comb_bin_symbols[comb_indices]
+                         * np.exp(1j * self._phase_schedule[comb_indices])
+                         * self._amp_taper[comb_indices])
+            predicted = gain[comb_indices] * reference
+            common = np.vdot(predicted, bins[comb_indices]) / max(
+                float(np.vdot(predicted, predicted).real), 1e-18)
+            if self.comb_tracking == "confidence":
+                error = bins[comb_indices] - common * predicted
+                variance = float(np.vdot(error, error).real) / max(
+                    len(comb_indices) - 1, 1)
+                variance /= max(
+                    float(np.vdot(predicted, predicted).real), 1e-18)
+                change = abs(common - 1) ** 2
+                trust = max(0.0, 1.0 - variance / max(change, 1e-18))
+                return gain * (1 + trust * (common - 1))
+            if self.comb_tracking == "common":
+                return gain * common
+            residual = bins[comb_indices] / predicted
+            positions = np.asarray(self.active_bins)
+            correction = (
+                np.interp(positions, positions[comb_indices], residual.real)
+                + 1j * np.interp(
+                    positions, positions[comb_indices], residual.imag))
+            return gain * correction
+        if self.n_comb() > 0 and self.comb_tracking == "legacy":
+            comb_gain = (bins[self._comb_idx]
+                         / self._comb_bin_symbols[self._comb_idx])
+            comb_positions = self._comb_idx.astype(np.float64)
+            all_positions = np.arange(self.n_active, dtype=np.float64)
+            real = np.interp(all_positions, comb_positions, comb_gain.real)
+            imag = np.interp(all_positions, comb_positions, comb_gain.imag)
+            return 0.5 * gain + 0.5 * (real + 1j * imag)
+        return gain
+
+    def _record_channel_diagnostics(
+            self, result: dict, channel: _ChannelEstimate,
+            noise_estimator: str) -> tuple[np.ndarray, np.ndarray | None]:
+        """Record SNR diagnostics and select per-carrier noise variance."""
+        snr_db = 10 * np.log10(
+            np.mean(channel.signal_powers)
+            / (np.mean(channel.noise_powers) + 1e-15))
         result["channel_snr_db"] = float(snr_db)
-        result["pilot_symbols"] = len(anchors_idx) - 1
+        result["pilot_symbols"] = len(channel.anchor_indices) - 1
 
-        bin_noise_var = np.mean(bin_noise_list, axis=0)  # (n_active,)
-        if noise_estimator == "repeat" and len(pre_bins_seq) >= 2:
-            # Difference independent repetitions; do not fit a pilot to itself.
-            differences = np.diff(np.asarray(pre_bins_seq), axis=0)
-            raw_variance = np.mean(np.abs(differences)**2, axis=0) / 2
-            raw_variance = np.array([np.mean(raw_variance[max(0,b-1):b+2])
-                                     for b in range(self.n_active)])
-            bin_noise_var = raw_variance / np.maximum(np.abs(gain0)**2, 1e-18)
+        bin_noise_var = np.mean(channel.bin_noise_powers, axis=0)
+        raw_variance = None
+        if noise_estimator == "repeat" and len(channel.preamble_bins) >= 2:
+            differences = np.diff(np.asarray(channel.preamble_bins), axis=0)
+            raw_variance = np.mean(np.abs(differences) ** 2, axis=0) / 2
+            raw_variance = np.array([
+                np.mean(raw_variance[max(0, b - 1):b + 2])
+                for b in range(self.n_active)
+            ])
+            bin_noise_var = raw_variance / np.maximum(
+                np.abs(channel.initial_gain) ** 2, 1e-18)
 
-        # Per-carrier post-equalization SNR, reported additively as a
-        # diagnostic (hf14's hardware phase). bin_noise_list holds, for
-        # every known-symbol OFDM symbol (preamble + time pilots), the
-        # per-bin squared error of that symbol AFTER dividing by the gain
-        # estimate, and bin_sig_list the matching per-bin reference power.
-        # The ratio is therefore the SNR each subcarrier actually presents
-        # to the slicer: a deeply faded bin shows up here because its gain
-        # estimate is itself noisy, which the scalar channel_snr_db above
-        # averages away. Nothing below consumes this -- channel_snr_db and
-        # every decode path are unchanged.
-        bin_sig_power = np.mean(bin_sig_list, axis=0)  # (n_active,)
-        per_bin_snr_db = 10 * np.log10(bin_sig_power / (bin_noise_var + 1e-15))
+        bin_signal_power = np.mean(channel.bin_signal_powers, axis=0)
+        per_bin_snr_db = 10 * np.log10(
+            bin_signal_power / (bin_noise_var + 1e-15))
         result["per_bin_snr_db"] = [float(v) for v in per_bin_snr_db]
         result["per_bin_snr_db_min"] = float(np.min(per_bin_snr_db))
         result["per_bin_snr_db_median"] = float(np.median(per_bin_snr_db))
         result["per_bin_snr_db_max"] = float(np.max(per_bin_snr_db))
         result["noise_estimator"] = noise_estimator
+        return bin_noise_var, raw_variance
 
-        data_syms_full = (eq_data * np.exp(-1j * self._phase_schedule)[None, :])
+    def _recover_packet(self, result: dict, equalized_data: np.ndarray,
+                        data_gain: np.ndarray, channel: _ChannelEstimate,
+                        bin_noise_var: np.ndarray,
+                        raw_variance: np.ndarray | None, diagnostics: bool,
+                        noise_estimator: str, ldpc_max_iterations: int,
+                        refine_iterations: int) -> dict:
+        """Demap equalized symbols, decode FEC, and unpack the packet."""
+        data_syms_full = (
+            equalized_data * np.exp(-1j * self._phase_schedule)[None, :])
         data_syms_flat = data_syms_full[:, self._data_idx].reshape(-1)
         if diagnostics:
             result["equalized_symbols"] = data_syms_full[:, self._data_idx].copy()
-            result["anchor_gain"] = anchors_gain.copy()
-            result["anchor_index"] = anchors_idx.copy()
+            result["anchor_gain"] = channel.anchor_gains.copy()
+            result["anchor_index"] = channel.anchor_indices.copy()
 
-        # Hard-decision, pre-FEC bits in the coded-bit domain (== payload
-        # domain when fec_rate is None): this is v5's original path,
-        # preserved unconditionally so BER can always be reported even
-        # when LDPC decode fails outright.
         coded_hard = symbols_to_bits(data_syms_flat, self.bits_per_symbol)
-        coded_hard = coded_hard[: self.coded_bit_count] if len(coded_hard) > self.coded_bit_count else coded_hard
+        coded_hard = (coded_hard[:self.coded_bit_count]
+                      if len(coded_hard) > self.coded_bit_count
+                      else coded_hard)
         whitener_coded = _bits.pn_bits(len(coded_hard), WHITENER_SEED)
         pre_fec_bits = coded_hard ^ whitener_coded
         if self.interleave and len(pre_fec_bits) == self.coded_bit_count:
-            # back to transmit (codeword) order, so raw BER stays
-            # comparable with pack_and_encode_bits()' ground truth
             pre_fec_bits = pre_fec_bits[self._deinterleaver()]
         result["pre_fec_bits"] = pre_fec_bits.copy()
 
         if self.fec_rate:
-            if noise_estimator == "repeat" and len(pre_bins_seq) >= 2:
-                # The repeat estimator measures variance in raw FFT-bin units.
-                # Convert each value with the same final gain used to equalize
-                # that data symbol, including any per-symbol comb correction.
-                # Selecting data bins before row-major flattening preserves the
-                # exact symbol order used by data_syms_flat.
+            if (noise_estimator == "repeat"
+                    and len(channel.preamble_bins) >= 2):
                 variance = raw_variance[None, :] / np.maximum(
                     np.abs(data_gain) ** 2, 1e-18)
                 data_bin_noise = variance[:, self._data_idx].reshape(-1)
@@ -838,20 +895,19 @@ class OFDM49Mode:
                 result.update(refinement)
             result["ldpc_ok"] = bool(np.all(oks))
             result["ldpc_codeword_ok"] = np.atleast_1d(oks).astype(bool).tolist()
-            result["ldpc_iterations"] = [int(i) for i in np.atleast_1d(iterations)]
-            raw_bits = info.reshape(-1)[: self.data_bits]
+            result["ldpc_iterations"] = [
+                int(i) for i in np.atleast_1d(iterations)]
+            raw_bits = info.reshape(-1)[:self.data_bits]
         else:
-            raw_bits = pre_fec_bits[: self.data_bits] if len(pre_fec_bits) > self.data_bits else pre_fec_bits
+            raw_bits = (pre_fec_bits[:self.data_bits]
+                        if len(pre_fec_bits) > self.data_bits
+                        else pre_fec_bits)
 
         result["raw_packet_bits"] = raw_bits.copy()
         packet = np.packbits(raw_bits).tobytes()
         payload, meta = _unpack_packet(packet, self.max_payload_bytes)
         result.update(meta)
         result["payload"] = payload
-        # raw_bits exposed as the (post-FEC-decode, when applicable)
-        # payload-region bit array; harness re-slices with ground truth for
-        # BER anyway. pre_fec_bits carries the raw hard-decision, coded-
-        # domain bits for raw (uncoded) BER even when FEC is enabled.
         result["raw_bits"] = raw_bits
         return result
 

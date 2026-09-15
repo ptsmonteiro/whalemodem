@@ -81,15 +81,18 @@ import logging
 import os
 import queue
 import random
-import threading
 import time
-import math
-
-import numpy as np
 
 from whale import mode_history
-from whale.streaming import ReceiveStream
 from whale import link_protocol as protocol
+from whale.link_adaptation import _AdaptationMixin
+from whale.link_receiver import (
+    DECODE_POLL_BUDGET_FRACTION,
+    DECODE_POLL_INTERVAL,
+    _ReceiverMixin,
+    _decode_snr_summary,
+    net_bits_per_second,
+)
 from whale.policy import FM
 
 # Public compatibility aliases.  The wire-format implementation lives in
@@ -132,55 +135,6 @@ _decode_connect_ack = protocol.decode_connect_ack
 _negotiate_mode = protocol.negotiate_mode
 
 logger = logging.getLogger(__name__)
-
-
-def _decode_snr(result):
-    """Return this decode's receive SNR as ``(dB, kind)``, or ``(None, None)``.
-
-    HC0 measures the winning tone against the other tones. HC1W
-    estimate every carrier separately, for which the median is the stable
-    frame-level summary. CPFSK fits its confirmed sync tones and reports
-    their power against the unexplained residual.
-    """
-    tone_snr = result.get("tone_snr_db")
-    if tone_snr is not None and np.isfinite(tone_snr):
-        return float(tone_snr), "tone"
-
-    carrier_snr = result.get("carrier_snr_db")
-    if carrier_snr is not None:
-        finite = np.asarray(carrier_snr, dtype=float)
-        finite = finite[np.isfinite(finite)]
-        if finite.size:
-            return float(np.median(finite)), "median carrier"
-
-    snr = result.get("snr_db")
-    if snr is not None and np.isfinite(snr):
-        return float(snr), "effective sync"
-
-    return None, None
-
-
-def _decode_snr_summary(result):
-    """Return the mode's receive-SNR diagnostic in a common log format."""
-    snr_db, kind = _decode_snr(result)
-    if snr_db is None:
-        return "SNR unavailable"
-    return f"SNR {snr_db:.1f} dB ({kind})"
-
-
-def net_bits_per_second(mode):
-    """Net application bit/s this mode carries in a full-capacity DATA frame.
-
-    ``chunk_size`` is what one DATA frame delivers to the application after
-    the air header, and ``airtime`` is that frame's keyed duration, so their
-    ratio is the same net figure ``docs/MODES.md`` tabulates per mode. It is
-    a property of the mode, not a measurement of the current channel: whale
-    has no throughput estimator to report instead.
-    """
-    airtime = mode.airtime(mode.chunk_size)
-    if not airtime:
-        return 0.0
-    return mode.chunk_size * 8.0 / airtime
 
 
 # Which end may originate PT_DATA right now. Real half-duplex ARQ modems
@@ -256,27 +210,6 @@ MAX_RETRIES = FM.max_retries
 #: receiver depends on its size: the sender re-cuts it at the new mode's
 #: chunk_size and retries under the same sequence number.
 _RESIZE = object()
-DECODE_POLL_INTERVAL = 0.15
-
-#: Wall-clock share of the RX buffer's own recency window (_rx_keep_seconds)
-#: that one decode poll may spend. A poll re-searches the whole retained
-#: buffer, so as long as it finishes well inside that window, consecutive
-#: polls overlap and no audio goes unexamined; a poll that routinely runs
-#: longer than the window leaves gaps the receiver is deaf in. Half is the
-#: margin: the poll that finds a frame also has to hand it on and let the
-#: reply be sent.
-DECODE_POLL_BUDGET_FRACTION = 0.5
-
-#: The most of the decode thread any single over-budget candidate may take,
-#: as a fraction of wall time. A candidate too expensive to fit the budget is
-#: not dropped -- it still has to be able to acquire -- but it runs on a duty
-#: cycle instead of every poll, and only one such candidate runs per poll.
-DECODE_EXPENSIVE_DUTY = 0.2
-
-#: A profile that decoded a frame this recently is attempted every poll
-#: whatever it costs: it is carrying the session.
-DECODE_RECENT_SUCCESS_SECONDS = 60.0
-
 # The one byte of session identity in PT_CONNECT/PT_CONNECT_ACK. See the
 # module docstring for why it is on air at all. 0 is reserved for "not
 # stated" so a body that decoded short reads as unknown rather than as
@@ -461,69 +394,7 @@ class LinkError(Exception):
     pass
 
 
-#: How often the decode loop logs its running per-profile decode cost.
-DECODE_COST_REPORT_INTERVAL = 30.0
-
-
-class _DecodeCost:
-    """Per-profile CPU and wall time spent inside `profile.decode()`.
-
-    Worth measuring separately from wall time because the decode loop shares
-    a process with everything else: `time.thread_time()` is this thread's own
-    CPU, so a number close to its wall time means the decoder is genuinely
-    computing rather than waiting.
-
-    The cost that matters is not one frame.  `_decode_one` runs *every*
-    candidate profile against every snapshot, once per DECODE_POLL_INTERVAL,
-    whether or not anything is arriving -- so a mode's real burden is its
-    per-attempt cost times the poll rate, and `attempts` is here to make that
-    visible next to the far rarer `frames`.
-    """
-
-    __slots__ = ("attempts", "frames", "cpu", "wall", "max_cpu",
-                 "audio_seconds", "last_attempt_at", "last_frame_at")
-
-    def __init__(self):
-        self.attempts = self.frames = 0
-        self.cpu = self.wall = self.max_cpu = 0.0
-        # Attempt cost is very nearly proportional to how much audio the
-        # attempt searched (every candidate correlates its preamble over the
-        # whole snapshot), so cost *per second of audio* is the number that
-        # predicts what the next attempt on a differently-sized buffer will
-        # cost. A plain per-attempt mean does not, and the buffer's length
-        # varies by an order of magnitude within one session.
-        self.audio_seconds = 0.0
-        self.last_attempt_at = None
-        self.last_frame_at = None
-
-    def add(self, cpu, wall, audio_seconds=0.0, now=None):
-        self.attempts += 1
-        self.cpu += cpu
-        self.wall += wall
-        self.max_cpu = max(self.max_cpu, cpu)
-        self.audio_seconds += max(0.0, audio_seconds)
-        self.last_attempt_at = time.monotonic() if now is None else now
-
-    def estimate(self, audio_seconds):
-        """Predicted wall seconds for one attempt over `audio_seconds`.
-
-        None while nothing has been measured yet -- the caller must then run
-        the attempt, since that is the only way a measurement appears."""
-        if self.attempts == 0 or self.audio_seconds <= 0.0:
-            return None
-        return self.wall / self.audio_seconds * audio_seconds
-
-    def summary(self):
-        mean = (self.cpu / self.attempts * 1000.0) if self.attempts else 0.0
-        rate = ((self.wall / self.audio_seconds * 1000.0)
-                if self.audio_seconds > 0.0 else 0.0)
-        return (f"{self.attempts} attempt(s)/{self.frames} frame(s), "
-                f"cpu {self.cpu:.2f}s total, {mean:.1f} ms mean, "
-                f"{self.max_cpu * 1000.0:.1f} ms max, wall {self.wall:.2f}s, "
-                f"{rate:.1f} ms per audio second")
-
-
-class Link:
+class Link(_ReceiverMixin, _AdaptationMixin):
     """Owns one radio transport and one session's worth of protocol state.
 
     All of connect()/send()/disconnect() are blocking and meant to be called
@@ -556,10 +427,6 @@ class Link:
         self.role = None  # "ISS" or "IRS" once CONNECTED -- see the constants above
         self.on_event = on_event or (lambda name, **kw: None)
         self.mode_history = {} if mode_history_store is None else mode_history_store
-        self._mode_delivery_stats = {}
-        self._consecutive_tx_failures = 0
-        self._last_adaptive_mode_change_at = float("-inf")
-        self._last_mode_change_direction = 0
 
         # Control-plane frames always use the registry's control mode (see
         # _tx_packet), so this timeout is fixed for the life of the Link.
@@ -594,15 +461,7 @@ class Link:
         self._partial_rx_buf = None  # in-progress recv_message() reassembly, see recv_message()
         self._tx_seq = 0
         self._rx_expect_seq = 0
-        self._acked_chunks = 0
-        self._mode_delivery_stats.clear()
-        self._consecutive_tx_failures = 0
-        self._last_adaptive_mode_change_at = float("-inf")
-        self._last_mode_change_direction = 0
-        # Last validated carrier offset for this HF receive session. All HF
-        # modes hear the same peer oscillator/BFO error, so a control frame
-        # can seed a later OFDM mode. VHF policy leaves this unused.
-        self._rx_frequency_hint_hz = None
+        self._init_adaptation()
         # Qualification counters are observational and do not affect protocol state.
         self.qualification_metrics = {
             "data_attempts": 0, "retransmissions": 0,
@@ -612,35 +471,13 @@ class Link:
         # returned -- see _answer_duplicate_connect.
         self._session_id = SESSION_ID_NONE
         self._connect_ack_body = None
-        # When we last decoded anything from the peer, in time.monotonic()
-        # terms. Written by the decode thread, read by _peer_is_stale.
-        self._last_peer_frame_at = None
-        # Set by the decode thread to when the peer's audio ended, in
-        # time.monotonic() terms; consumed by _await_turnaround.
-        self._peer_unkeyed_at = None
-        # When the anchor above was established. A costly decode can make
-        # the audio-end timestamp old without making the observation stale.
-        self._peer_unkeyed_observed_at = None
-        self._stop = threading.Event()
-        # profile name -> _DecodeCost, written and read only by the decode
-        # thread (and by stop(), after it has been asked to finish).
-        self._decode_cost = {}
-        self._receive_stream = None
-        self._decode_cost_reported_at = None
-        self._decode_thread = threading.Thread(target=self._decode_loop, daemon=True)
+        self._init_receiver()
 
     def start(self):
-        self.transport.start_receiving()
-        self._decode_thread.start()
+        self._start_receiver()
 
     def stop(self):
-        self._stop.set()
-        self.transport.stop_receiving()
-        # After _stop is set, so the decode thread is on its way out and is
-        # not concurrently mutating the counters this reads.
-        if self._decode_thread.is_alive():
-            self._decode_thread.join(timeout=2 * DECODE_POLL_INTERVAL + 1.0)
-        self._report_decode_cost(final=True)
+        self._stop_receiver()
 
     def _reset_sequence_state(self):
         """Clears everything that is scoped to one session, at the moment a
@@ -738,371 +575,6 @@ class Link:
         # candidate profile could be part-way through is never cut in half.
         self._rx_keep_seconds = (max(
             p.airtime(_AIR_HEADER_LEN + p.chunk_size) for p in self.modes.modes) + 1.0)
-
-    def _candidate_decode_profiles(self, snap=None):
-        """Which WaveformMode(s) an incoming frame might be using right
-        now: control-plane traffic always uses the registry's control mode, and DATA
-        traffic uses whatever self.rx_profile currently is (the peer's own
-        tx_profile) -- try both since the decode loop can't otherwise tell
-        which is arriving next.
-
-        A sender may step down after silence, when it cannot notify us first.
-        Therefore every mutually advertised data mode remains a candidate;
-        the DATA frame itself is authoritative notification of a change."""
-        # Before the connection handshake completes, every legal inbound
-        # packet is on the robust control waveform. Do not spend seconds
-        # probing newly advertised data modes against connection frames; the
-        # negotiated DATA profile is not active yet.
-        if self.state in {"CONNECTING", "LISTENING"}:
-            return (self.modes.control,)
-        candidates = [self.modes.control]
-        data_profiles = [p for p in self.modes.modes
-                         if p.mode_id in self.peer_supported_modes]
-        for profile in (self.rx_profile, *data_profiles):
-            if profile is not None and profile not in candidates:
-                candidates.append(profile)
-        return tuple(candidates)
-
-    @staticmethod
-    def _offset_decode_result(result, offset):
-        """Translate a decoder result from a sliced capture to the RX buffer."""
-        for key in ("start_index", "sync_end_index", "end_index"):
-            if result.get(key) is not None:
-                result[key] += offset
-        return result
-
-    def _decode_attempt(self, profile, audio, offset=0):
-        cpu0, wall0 = time.thread_time(), time.perf_counter()
-        hint = (self._rx_frequency_hint_hz
-                if self.policy.track_frequency_offset else None)
-        stream_result = (self._receive_stream.decode(profile)
-                         if self._receive_stream is not None else None)
-        if stream_result is not None:
-            result = stream_result
-        elif hint is None or not getattr(profile, "supports_frequency_hint", False):
-            result = profile.decode(audio)
-        else:
-            result = profile.decode(audio, freq_hint_hz=hint)
-            # A promising acquisition is commonly just a frame still arriving.
-            # Wait for its full advertised airtime before paying for the broad
-            # search. Once complete, failure of the hinted decode immediately
-            # falls back to the normal full-range acquisition.
-            start = result.get("start_sample")
-            complete = (start is not None and
-                        start + int(np.ceil(profile.airtime(profile.chunk_size)
-                                            * profile.rx_sample_rate)) <= len(audio))
-            if (start is None or complete) and result.get("payload") is None:
-                result = profile.decode(audio)
-        cpu = time.thread_time() - cpu0
-        self._decode_cost.setdefault(profile.name, _DecodeCost()).add(
-            cpu, time.perf_counter() - wall0,
-            len(audio) / profile.rx_sample_rate)
-        result["decode_cpu_seconds"] = cpu
-        return self._offset_decode_result(result, offset)
-
-    # -- decode loop (background) ---------------------------------------
-
-    def _decode_loop(self):
-        retry = False
-        if hasattr(self.transport, "read_rx"):
-            from whale.transport import RX_BUFFER_SECONDS, RX_SAMPLE_RATE
-            self._receive_stream = ReceiveStream(int(RX_BUFFER_SECONDS * RX_SAMPLE_RATE))
-        while not self._stop.is_set():
-            if self.transport.is_transmitting():
-                # Don't touch the RX buffer mid-TX: transport.send() clears
-                # it before and after keying up specifically so our own
-                # leaked audio is never handed to the decoder, but this loop
-                # polls independently on its own timer, so without this check
-                # it can grab a snapshot *during* the TX and decode our own
-                # frame before send()'s post-TX clear ever runs.
-                time.sleep(DECODE_POLL_INTERVAL)
-                continue
-            if self._receive_stream is not None:
-                stream = self._receive_stream
-                generation, start, samples = self.transport.read_rx(stream.cursor)
-                changed = generation != stream.generation or start != stream.audio.end
-                stream.append(generation, start, samples)
-                if not len(samples) and not changed and not retry:
-                    self._report_decode_cost()
-                    time.sleep(DECODE_POLL_INTERVAL)
-                    continue
-                snap = stream.audio.read()
-            else:
-                snap = self.transport.snapshot_rx()
-            if len(snap) > 0:
-                if self._decode_one(snap):
-                    retry = True
-                    self._report_decode_cost()
-                    continue  # try again immediately in case another frame follows
-            retry = False
-            self._report_decode_cost()
-            time.sleep(DECODE_POLL_INTERVAL)
-
-    def _consume_rx(self, end):
-        if self._receive_stream is None:
-            self.transport.consume_rx(end)
-        else:
-            stream = self._receive_stream
-            end += stream.audio.start
-            self.transport.consume_rx_through(stream.generation, end)
-            stream.audio.discard(end)
-
-    def _report_decode_cost(self, final=False):
-        """Logs per-profile decode cost every DECODE_COST_REPORT_INTERVAL.
-
-        On the decode thread, so the timing it reports is its own. `final`
-        forces a report regardless of the interval and is what stop() uses,
-        so a short session still leaves one line per profile behind."""
-        now = time.monotonic()
-        if self._decode_cost_reported_at is None:
-            self._decode_cost_reported_at = now
-            if not final:
-                return
-        if not final and now - self._decode_cost_reported_at < DECODE_COST_REPORT_INTERVAL:
-            return
-        self._decode_cost_reported_at = now
-        for name, cost in sorted(self._decode_cost.items()):
-            logger.info("[%s] decode cost%s at %s: %s", self.mycall,
-                        " (session total)" if final else "", name, cost.summary())
-
-    def _decode_one(self, snap) -> bool:
-        """Tries every candidate profile against `snap`; handles/consumes
-        the first usable result. Returns True if it made progress (decoded
-        a frame or skipped a near-miss) so the caller should retry the
-        buffer immediately instead of sleeping.
-
-        With two candidate profiles (control + a faster negotiated data
-        profile), a lower-baud profile's correlator can pick up a spurious
-        sync lock on audio that's actually a still-arriving higher-baud
-        frame -- their tones can overlap enough for that -- and, once it
-        reads far enough to hit a garbage length field, report a near-miss
-        end_index of its own. Consuming on that would truncate the real
-        frame before the other candidate ever gets the full thing to look
-        at. So: if any candidate has a genuine sync lock (confidence over
-        its own threshold) but hasn't seen enough samples yet for a verdict,
-        this poll holds off consuming anything and just waits for more
-        audio, rather than letting a different candidate's near-miss win."""
-        # Date the newest sample before any decoder runs. Some full-frame
-        # FEC decodes cost hundreds of milliseconds; using the completion
-        # time would accidentally add that CPU time to the radio turnaround
-        # delay even though the peer's audio ended before decoding began.
-        snap_observed_at = time.monotonic()
-        profiles = self._candidate_decode_profiles(snap)
-        results = []
-
-        def accept_checked(profile, result):
-            payload = result.get("payload")
-            if payload is None:
-                return False
-            if (self._receive_stream is not None and
-                    self.transport.rx_generation != self._receive_stream.generation):
-                return False
-            decoded = _decode_air_header(payload[:_AIR_HEADER_LEN])
-            if decoded is None:
-                return False
-            ptype, mode_id, body_len, inline = decoded
-            body_profile = self.modes.by_id.get(mode_id)
-            remainder = payload[_AIR_HEADER_LEN:]
-            if (body_profile is not profile or len(remainder) != body_len
-                    or not _valid_air_shape(ptype, body_profile, body_len, inline,
-                                            self.modes.control.mode_id)):
-                return False
-            freq_offset = result.get("freq_offset_hz", result.get("cfo_hz"))
-            if (self.policy.track_frequency_offset and freq_offset is not None
-                    and np.isfinite(freq_offset)):
-                self._rx_frequency_hint_hz = float(freq_offset)
-            end = result.get("end_index", len(snap))
-            self._consume_rx(end)
-            self._finish_air_packet(ptype, inline + remainder, profile, snap, end,
-                                    result, snap_observed_at)
-            return True
-
-        # Control traffic is always on the robust control waveform, including
-        # DISC/DISC_ACK while a fast DATA profile is active. Decode it before
-        # probing any expensive data-mode lead candidates; a false HF lead
-        # correlation must not delay a control response long enough to look
-        # like a lost disconnect or timeout.
-        control = self.modes.control
-        control_result = self._decode_attempt(control, snap)
-        results.append((control, control_result))
-        if accept_checked(control, control_result):
-            return True
-
-        # Streaming modes retain acquisition and body-attempt state, sharing
-        # searches when their preambles match. Budgeting still bounds the
-        # remaining batch decoders and costly complete-frame FEC attempts.
-        data_profiles = tuple(profile for profile in profiles if profile is not control)
-        for profile in (self._budgeted_candidates(data_profiles, snap)
-                        if data_profiles else ()):
-            result = self._decode_attempt(profile, snap)
-            results.append((profile, result))
-            if accept_checked(profile, result):
-                return True
-        pending = [result for candidate, result in results
-                   if result.get("confidence", 0) >= candidate.confidence_threshold
-                   and "end_index" not in result]
-        if not pending:
-            near_misses = [result for _, result in results if "end_index" in result]
-            if near_misses:
-                result = min(near_misses,
-                             key=lambda item: item.get("sync_end_index",
-                                                       item["end_index"]))
-                skip = result.get("sync_end_index", result["end_index"])
-                self._capture_near_miss(snap, result.get("confidence", 0))
-                self._consume_rx(skip)
-                return True
-        # Unconditional, `pending` included. A candidate that reports a sync
-        # it can never resolve -- a false lock on noise, or a real frame whose
-        # CRC is never going to pass -- would otherwise hold the entire buffer
-        # for the rest of the session, and every later poll re-searches all of
-        # it. Pruning is safe here because it keeps a whole frame's worth of
-        # recent audio (_rx_keep_seconds): a frame that is genuinely still
-        # arriving is never cut into, and anything older than that has
-        # finished arriving and has already been searched and rejected.
-        self._prune_stale(len(snap))
-        return False
-
-    def _budgeted_candidates(self, profiles, snap):
-        """Run cheapest candidates first, within a fraction of retained airtime.
-
-        At most one overdue, over-budget candidate runs per poll. Recently
-        successful modes are exempt. Streaming reduces repeated acquisition
-        work, but complete-frame FEC and batch fallback still need a budget.
-        """
-        now = time.monotonic()
-        seconds = len(snap) / max(p.rx_sample_rate for p in profiles)
-        budget = DECODE_POLL_BUDGET_FRACTION * self._rx_keep_seconds
-
-        def estimate(profile):
-            cost = self._decode_cost.get(profile.name)
-            # Never measured: run it, because that is how it gets measured.
-            return 0.0 if cost is None else (cost.estimate(seconds) or 0.0)
-
-        plan, deferred, spent = [], [], 0.0
-        for profile in sorted(profiles, key=estimate):
-            cost = self._decode_cost.get(profile.name)
-            recent = (cost is not None and cost.last_frame_at is not None
-                      and now - cost.last_frame_at <= DECODE_RECENT_SUCCESS_SECONDS)
-            estimated = estimate(profile)
-            if recent or spent + estimated <= budget:
-                plan.append(profile)
-                spent += estimated
-                continue
-            since = now - (cost.last_attempt_at or 0.0)
-            deferred.append((since - estimated / DECODE_EXPENSIVE_DUTY, profile))
-        if deferred:
-            overdue, profile = max(deferred, key=lambda item: item[0])
-            if overdue >= 0.0:
-                plan.append(profile)
-        return plan
-
-    def _finish_air_packet(self, ptype, body, profile, snap, end, decode_result,
-                           snap_observed_at):
-        trailing = max(0, len(snap) - end)
-        self._peer_unkeyed_at = (snap_observed_at
-                                 - trailing / profile.rx_sample_rate)
-        self._peer_unkeyed_observed_at = time.monotonic()
-        cost = self._decode_cost.get(profile.name)
-        if cost is not None:
-            cost.frames += 1
-            cost.last_frame_at = time.monotonic()
-        cpu = decode_result.get("decode_cpu_seconds")
-        logger.info("[%s] decoded %s body at profile %s (%s; %s)", self.mycall,
-                    _ptype_name(ptype), profile.name,
-                    "decode cpu unmeasured" if cpu is None
-                    else f"decode cpu {cpu * 1000.0:.1f} ms",
-                    _decode_snr_summary(decode_result))
-        if ptype == PT_DATA:
-            # Report the burst before handling it, so a listener sees the
-            # SNR and mode of a data frame ahead of the delivery and the
-            # ACK keying that follow. Data-plane only: an ACK is a control
-            # frame in the control waveform and says nothing about the
-            # negotiated data rate.
-            snr_db, _ = _decode_snr(decode_result)
-            if snr_db is not None:
-                self.on_event("SNR", snr_db=snr_db)
-            self.on_event("BITRATE", direction="RX", mode_id=profile.mode_id,
-                          bits_per_second=net_bits_per_second(profile))
-        self._handle_raw(bytes([ptype]) + body, profile)
-
-    def _capture_near_miss(self, snap, confidence):
-        """Saves the audio a near-miss gave up on, if WHALE_CAPTURE_DIR is
-        set in the environment. Off by default.
-
-        For the failure that is hardest to reason about from logs alone: a
-        frame that syncs strongly and then fails CRC anyway. This is the only
-        way to see what the radio actually received rather than what the
-        decoder made of it, and that distinction is what such a case turns
-        on -- a high confidence score reads the first 5% of the frame, so it
-        says nothing about the 95% that failed.
-
-        Kept on the strength of a past investigation that took a long time
-        precisely because nothing about it reproduced in software:
-        progressive arrival, truncation at every offset from 0 to 800ms,
-        AWGN down to 15 dB and real off-air noise beds all decode fine. If a
-        near-miss shows up that software cannot reproduce, these captures
-        are the input to the analysis.
-        """
-        directory = os.environ.get("WHALE_CAPTURE_DIR")
-        if not directory:
-            return
-        try:
-            os.makedirs(directory, exist_ok=True)
-            name = f"nearmiss_{self.mycall}_{time.time():.3f}_c{confidence:.2f}_rx{self.rx_profile.name}.npy"
-            np.save(os.path.join(directory, name), np.asarray(snap, dtype=np.float32))
-        except Exception:
-            # A diagnostic must never be able to take the link down.
-            logger.exception("[%s] near-miss capture failed", self.mycall)
-
-    def _prune_stale(self, snap_len):
-        """Drops audio this poll searched and did not consume.
-
-        Without it the buffer grows to transport.RX_BUFFER_SECONDS through
-        any idle stretch and every later poll re-searches all of it.
-        Decode cost is proportional to buffer length.  At 12 kHz the current
-        VHF ladder still takes about 105 ms to search all four candidates in
-        a full 10-second buffer (see scripts/benchmark_rx.py), and that lands
-        directly on the turnaround because the reply cannot be sent until
-        the poll that decodes the frame finishes.  The HF ladder is far worse:
-        one hf7 or hf8 acquisition attempt on a full buffer costs seconds.
-        Keeping the most recent _rx_keep_seconds bounds the cost at about one
-        frame's worth while leaving any part-arrived frame intact.
-
-        _rx_keep_seconds is a whole frame plus a second, which is what makes
-        this safe to run on every poll that consumed nothing, including one
-        where a candidate claims a sync it has not resolved yet: audio older
-        than one frame cannot belong to a frame that is still arriving.  This
-        must stay unconditional.  When it was gated on every candidate scoring
-        below its confidence threshold, a single mode whose threshold sat
-        under its own noise floor was enough to pin the buffer at full length
-        for an entire session and take the receiver off the air."""
-        keep = int(self._rx_keep_seconds * max(
-            p.rx_sample_rate for p in self._candidate_decode_profiles()))
-        if snap_len > keep:
-            self._consume_rx(snap_len - keep)
-
-    def _handle_raw(self, raw: bytes, profile):
-        if len(raw) < 1:
-            return
-        ptype, body = raw[0], raw[1:]
-        if ptype in (PT_CONNECT, PT_CONNECT_ACK):
-            # A station can pick up the tail of its own just-finished TX as
-            # a decodable frame (RF self-reception on this rig -- the two
-            # radios sit close together). CONNECT/CONNECT_ACK carry the
-            # sender's callsign, so a frame whose "source" is us is
-            # unambiguously our own echo, not something a peer sent -- drop
-            # it before it can be mistaken for the peer's reply.
-            src, _ = _decode_call_pair(body)
-            if src == self.mycall:
-                logger.info("[%s] dropping self-echoed %s", self.mycall, _ptype_name(ptype))
-                return
-        # Anything that got this far came off the air from the peer, so it
-        # is proof of life whether or not whatever is waiting wants it.
-        self._last_peer_frame_at = time.monotonic()
-        if ptype in _DATA_PLANE_TYPES:
-            self._confirm_rx_profile(profile)
-        logger.info("[%s] RX %s at %s (%d body byte(s))", self.mycall, _ptype_name(ptype), profile.name, len(body))
-        self._rx_packets.put((ptype, body))
 
     def _await_turnaround(self):
         """Blocks until it is safe to key up over the peer.
@@ -1660,130 +1132,6 @@ class Link:
         return None
 
     # -- mid-session speed adaptation ---------------------------------------
-
-    def _maybe_adapt(self, attempts, allow_change=True):
-        """Record an ACK and choose the neighboring mode with best evidence.
-
-        Statistics are session-local and exponentially decay with a one-minute
-        default half-life.  A retransmission that eventually succeeds is a
-        failure plus a success, not an automatic downgrade.
-        """
-        self._acked_chunks += 1
-        self._record_mode_attempt(self.tx_profile, True)
-        self._consecutive_tx_failures = 0
-        if not allow_change:
-            return
-        scripted = self._mode_step_script.get(self._acked_chunks)
-        if scripted is not None:
-            # Test affordance only (WHALE_MODE_STEP_SCRIPT) -- see the note
-            # above _TxSuppressor for why a bench run needs to choose its
-            # own transitions rather than wait for the channel to produce
-            # them.
-            logger.warning("[%s] taking scripted mode step %+d after chunk %d -- "
-                           "WHALE_MODE_STEP_SCRIPT", self.mycall, scripted, self._acked_chunks)
-            self._step_tx_mode(scripted)
-            return
-        self._choose_statistical_mode()
-
-    def _decayed_mode_stats(self, profile, now=None):
-        """Return (successes, failures) decayed to ``now``."""
-        now = time.monotonic() if now is None else now
-        stats = self._mode_delivery_stats.get(profile.mode_id)
-        if stats is None:
-            return 0.0, 0.0
-        age = max(0.0, now - stats["updated_at"])
-        half_life = self.policy.adaptation_half_life_seconds
-        weight = 0.0 if half_life <= 0.0 else 2.0 ** (-age / half_life)
-        return stats["successes"] * weight, stats["failures"] * weight
-
-    def _record_mode_attempt(self, profile, succeeded, now=None):
-        now = time.monotonic() if now is None else now
-        successes, failures = self._decayed_mode_stats(profile, now)
-        if succeeded:
-            successes += 1.0
-        else:
-            failures += 1.0
-        self._mode_delivery_stats[profile.mode_id] = {
-            "successes": successes, "failures": failures, "updated_at": now}
-
-    def _mode_reliability(self, profile, bound="mean", now=None):
-        successes, failures = self._decayed_mode_stats(profile, now)
-        alpha = self.policy.adaptation_prior_successes + successes
-        beta = self.policy.adaptation_prior_failures + failures
-        total = alpha + beta
-        mean = alpha / total
-        if bound == "mean":
-            return mean
-        sigma = math.sqrt(alpha * beta / (total * total * (total + 1.0)))
-        if bound == "optimistic":
-            return min(1.0, mean + sigma)
-        if bound == "conservative":
-            return max(0.0, mean - sigma)
-        raise ValueError(f"unknown reliability bound {bound!r}")
-
-    def _mode_expected_goodput(self, profile, bound="mean", now=None):
-        """Expected delivered DATA payload bits/s for one ARQ attempt."""
-        probability = self._mode_reliability(profile, bound, now)
-        data_airtime = profile.airtime(_AIR_HEADER_LEN + profile.chunk_size)
-        ack_airtime = self.modes.control.airtime(_AIR_HEADER_LEN + 1)
-        turnaround = 2 * self._channel("tx_turnaround_delay")
-        timeout = data_airtime + ack_airtime + turnaround + self.policy.ack_timeout_slack
-        expected_seconds = (data_airtime
-                            + probability * (ack_airtime + turnaround)
-                            + (1.0 - probability) * timeout)
-        return profile.chunk_size * 8.0 * probability / expected_seconds
-
-    def _choose_statistical_mode(self):
-        now = time.monotonic()
-        faster = self.modes.step(self.tx_profile, +1)
-        if faster is not None and faster.mode_id in self.peer_supported_modes:
-            successes, failures = self._decayed_mode_stats(faster, now)
-            untested = successes + failures < 0.5
-            cooling_down = (now - self._last_adaptive_mode_change_at
-                            < self.policy.adaptation_cooldown_seconds)
-            current = self._mode_expected_goodput(self.tx_profile, "mean", now)
-            candidate = self._mode_expected_goodput(faster, "optimistic", now)
-            probe_allowed = not (cooling_down and self._last_mode_change_direction < 0)
-            if (untested and probe_allowed) or (not cooling_down and
-                            candidate > current * (1.0 + self.policy.adaptation_step_up_margin)):
-                self._adaptive_step(+1, "untested probe" if untested else "expected goodput")
-                return
-
-        if now - self._last_adaptive_mode_change_at < self.policy.adaptation_cooldown_seconds:
-            return
-
-        slower = self.modes.step(self.tx_profile, -1)
-        if slower is not None and slower.mode_id in self.peer_supported_modes:
-            current = self._mode_expected_goodput(self.tx_profile, "conservative", now)
-            candidate = self._mode_expected_goodput(slower, "mean", now)
-            if candidate > current:
-                self._adaptive_step(-1, "expected goodput")
-
-    def _adaptive_step(self, direction, reason):
-        before = self.tx_profile
-        self._step_tx_mode(direction)
-        if self.tx_profile is not before:
-            self._consecutive_tx_failures = 0
-            logger.info("[%s] adaptive %s to %s (%s)", self.mycall,
-                        "increase" if direction > 0 else "decrease",
-                        self.tx_profile.name, reason)
-
-    def _step_tx_mode(self, direction):
-        """Change this station's DATA mode without a control exchange.
-
-        The next DATA frame announces the change. Its DATA_ACK echoes the
-        mode actually decoded, while the reverse direction remains wholly
-        independent."""
-        candidate = self.modes.step(self.tx_profile, direction)
-        if candidate is None:
-            return
-        if candidate.mode_id not in self.peer_supported_modes:
-            return
-        self._apply_tx_profile(candidate)
-        self._last_adaptive_mode_change_at = time.monotonic()
-        self._last_mode_change_direction = direction
-        logger.info("[%s] switched tx profile to %s; awaiting DATA_ACK confirmation",
-                    self.mycall, self.tx_profile.name)
 
     def recv_message(self, timeout=None):
         """Blocks for the chunks of one message (as delimited by the EOF bit)

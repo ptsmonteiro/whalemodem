@@ -20,9 +20,10 @@ import curses
 import os
 import sys
 from dataclasses import dataclass
-from typing import Any, Callable, Generic, Mapping, Protocol, TypeVar
+from typing import Any, Callable, Generic, Protocol, TypeVar
 
 from whale.hw.radios import Radio, RadioInventory, load_radios, save_radios
+from whale.radio_config_form import FormRow, RadioForm
 
 DEFAULT_RADIO_CONFIG = "radios.toml"
 
@@ -440,98 +441,10 @@ class ListPickerView(Generic[T]):
 
 # --- Radio detail view (add/edit) ------------------------------------------
 
-@dataclass
-class _Row:
-    """One navigable row of a RadioDetailView form."""
-
-    key: str
-    label: str
-    kind: str  # "text" | "selector" | "backend_selector" | "bool" | "action" | "device"
-    picker: str | None = None  # None | "audio_input" | "audio_output" | "serial" | "serial_icom" | "hamlib"
+_Row = FormRow
 
 
-# Backend-specific rows, in the exact field order/requiredness the real
-# open() methods in whale/hw/ptt_backends.py expect -- see that module for
-# what each key does. Order here matches the wizard spec table.
-_BACKEND_ROWS: dict[str, list[_Row]] = {
-    "vox": [],
-    "serial-line": [
-        _Row("port", "Port", "text", picker="serial"),
-        _Row("line", "Line", "selector"),
-        _Row("baud", "Baud", "selector"),
-        _Row("active_high", "Active high", "bool"),
-    ],
-    "icom-civ": [
-        _Row("usb_id", "USB ID (VID:PID)", "text", picker="serial_icom"),
-        _Row("address", "Address", "text"),
-    ],
-    "hamlib": [
-        _Row("model", "Model", "text", picker="hamlib"),
-        _Row("device", "Device", "text", picker="serial"),
-        _Row("baud", "Baud", "selector"),
-        _Row("civaddr", "CI-V address", "text"),
-        _Row("timeout", "Timeout", "text"),
-        _Row("retry", "Retry", "text"),
-    ],
-}
-
-# Standard RS-232 baud rates up to 115200 -- the range virtually every
-# USB-serial adapter and radio CAT port actually supports. "" means "leave
-# unset" (each backend falls back to its own default -- see
-# _build_ptt_config): serial-line defaults an absent baud to 9600, hamlib
-# leaves it for libhamlib's own per-model default.
-_BAUD_OPTIONS = ["", "300", "1200", "2400", "4800", "9600", "19200", "38400", "57600", "115200"]
-
-# cycle_selector option lists, by row key -- shared across whichever backend
-# rows use that key ("line" is serial-line-only; "baud" is used by both
-# serial-line and hamlib).
-_SELECTOR_OPTIONS: dict[str, list[str]] = {
-    "line": ["rts", "dtr"],
-    "baud": _BAUD_OPTIONS,
-}
-
-
-def _default_backend_values(backend: str) -> dict[str, Any]:
-    """The blank-form starting values for one backend's extra rows."""
-    if backend == "serial-line":
-        return {"port": "", "line": "rts", "baud": "", "active_high": True}
-    if backend == "icom-civ":
-        return {"usb_id": "", "address": ""}
-    if backend == "hamlib":
-        return {"model": "", "device": "", "baud": "", "civaddr": "", "timeout": "", "retry": ""}
-    return {}  # vox has no extra rows
-
-
-def _values_from_config(backend: str, config: Mapping[str, Any]) -> dict[str, Any]:
-    """Turns a saved Radio.ptt_config back into editable text/selector/bool values.
-
-    Not required to round-trip byte-for-byte -- just enough to seed the form
-    with what was there before, same spirit as the rest of this wizard.
-    """
-    values = _default_backend_values(backend)
-    if backend == "serial-line":
-        if "port" in config:
-            values["port"] = str(config["port"])
-        if config.get("line") in ("rts", "dtr"):
-            values["line"] = config["line"]
-        if "baud" in config and str(config["baud"]) in _BAUD_OPTIONS:
-            values["baud"] = str(config["baud"])
-        if "active_high" in config:
-            values["active_high"] = bool(config["active_high"])
-    elif backend == "icom-civ":
-        for key in ("usb_id", "address"):
-            if key in config:
-                values[key] = str(config[key])
-    elif backend == "hamlib":
-        for key in ("model", "device", "civaddr", "timeout", "retry"):
-            if key in config:
-                values[key] = str(config[key])
-        if "baud" in config and str(config["baud"]) in _BAUD_OPTIONS:
-            values["baud"] = str(config["baud"])
-    return values
-
-
-class RadioDetailView:
+class RadioDetailView(RadioForm):
     """Add/edit form for one radio; pushed onto the stack by RadioListView.
 
     A fixed list of rows navigated top-to-bottom (the same up/down + j/k
@@ -542,31 +455,10 @@ class RadioDetailView:
     drawing calls happen anywhere in handle_key.
     """
 
-    BACKEND_ORDER = ["vox", "serial-line", "icom-civ", "hamlib"]
-    _TOP_LEVEL_FIELDS = {"name", "description", "audio_input_name", "audio_output_name",
-                          "channel_fm", "channel_hf"}
-
     def __init__(self, existing: tuple[str, Radio] | None, other_names: list[str],
                  on_done: Callable[[str | None, str, Radio], None] | None) -> None:
-        self.old_name = existing[0] if existing else None
-        self.other_names = list(other_names)
+        super().__init__(existing, other_names)
         self.on_done = on_done
-
-        radio = existing[1] if existing else None
-        self.name = radio.id if radio else ""
-        self.description = radio.name if radio else ""
-        self.audio_input_name = radio.audio_input_name if radio else ""
-        self.audio_output_name = radio.audio_output_name if radio else ""
-        self.tx_level_db = radio.tx_level_db if radio else 0.0
-        self.channel_fm = "fm" in radio.channels if radio else True
-        self.channel_hf = "hf" in radio.channels if radio else False
-        self.ptt_backend = radio.ptt_backend if (radio and radio.ptt_backend in self.BACKEND_ORDER) else "vox"
-
-        self.backend_config: dict[str, dict[str, Any]] = {
-            name: _default_backend_values(name) for name in self.BACKEND_ORDER
-        }
-        if radio is not None and radio.ptt_backend in self.backend_config:
-            self.backend_config[radio.ptt_backend] = _values_from_config(radio.ptt_backend, radio.ptt_config)
 
         self.selected = 0
         self.editing_field: str | None = None
@@ -574,36 +466,8 @@ class RadioDetailView:
         self.status = ""
         self._hamlib_models_by_id: dict[int, hamlib.RigModel] | None = None
 
-    def _rows(self) -> list[_Row]:
-        rows = [
-            _Row("name", "Name", "text"),
-            _Row("description", "Description", "text"),
-            _Row("audio_input_name", "Audio input", "device", picker="audio_input"),
-            _Row("audio_output_name", "Audio output", "device", picker="audio_output"),
-            _Row("channel_fm", "Channel: fm", "bool"),
-            _Row("channel_hf", "Channel: hf", "bool"),
-            _Row("ptt_backend", "PTT backend", "backend_selector"),
-        ]
-        rows.extend(_BACKEND_ROWS[self.ptt_backend])
-        rows.append(_Row("save", "Save", "action"))
-        rows.append(_Row("cancel", "Cancel", "action"))
-        return rows
-
     def _clamp_selection(self, rows: list[_Row]) -> None:
         self.selected = 0 if not rows else max(0, min(self.selected, len(rows) - 1))
-
-    def _get_value(self, key: str) -> Any:
-        if key == "ptt_backend":
-            return self.ptt_backend
-        if key in self._TOP_LEVEL_FIELDS:
-            return getattr(self, key)
-        return self.backend_config[self.ptt_backend][key]
-
-    def _set_value(self, key: str, value: Any) -> None:
-        if key in self._TOP_LEVEL_FIELDS:
-            setattr(self, key, value)
-        else:
-            self.backend_config[self.ptt_backend][key] = value
 
     # -- rendering --
 
@@ -843,21 +707,15 @@ class RadioDetailView:
 
     def _cycle_backend(self) -> None:
         self.status = ""
-        index = self.BACKEND_ORDER.index(self.ptt_backend)
-        self.ptt_backend = self.BACKEND_ORDER[(index + 1) % len(self.BACKEND_ORDER)]
+        self.cycle_backend()
 
     def _cycle_selector(self, key: str) -> None:
         self.status = ""
-        options = _SELECTOR_OPTIONS[key]
-        try:
-            index = options.index(self._get_value(key))
-        except ValueError:
-            index = -1
-        self._set_value(key, options[(index + 1) % len(options)])
+        self.cycle_selector(key)
 
     def _toggle_bool(self, key: str) -> None:
         self.status = ""
-        self._set_value(key, not self._get_value(key))
+        self.toggle_bool(key)
 
     # -- hardware pickers (each degrades to a status message, never crashes) --
 
@@ -946,113 +804,15 @@ class RadioDetailView:
     # -- validation + save --
 
     def _do_save(self) -> KeyResult:
-        errors: list[str] = []
-
-        name = self.name.strip()
-        if not name:
-            errors.append("name is required")
-        elif name in self.other_names:
-            errors.append(f"a radio named {name!r} already exists")
-
-        description = self.description.strip()
-        if not description:
-            errors.append("description is required")
-
-        audio_input_name = self.audio_input_name.strip()
-        if not audio_input_name:
-            errors.append("audio input is required")
-
-        audio_output_name = self.audio_output_name.strip()
-        if not audio_output_name:
-            errors.append("audio output is required")
-
-        channels = frozenset(channel for channel, selected in
-                             (("fm", self.channel_fm), ("hf", self.channel_hf))
-                             if selected)
-        if not channels:
-            errors.append("at least one channel (fm or hf) is required")
-
-        ptt_config = self._build_ptt_config(errors)
-
+        radio, errors = self.build_radio()
         if errors:
             self.status = "; ".join(errors)
             return NOTHING
 
-        radio = Radio(id=name, name=description, audio_input_name=audio_input_name,
-                      audio_output_name=audio_output_name, ptt_backend=self.ptt_backend,
-                      channels=channels, ptt_config=ptt_config, tx_level_db=self.tx_level_db)
+        assert radio is not None
         if self.on_done is not None:
-            self.on_done(self.old_name, name, radio)
+            self.on_done(self.old_name, radio.id, radio)
         return POP
-
-    def _build_ptt_config(self, errors: list[str]) -> dict[str, Any]:
-        """Builds ptt_config for the current backend, appending to `errors`.
-
-        Optional fields left blank are omitted entirely rather than written
-        as empty strings -- an absent key and an empty string are not the
-        same thing to whale/hw/ptt_backends.py (e.g. `"civaddr" in config`).
-        """
-        backend = self.ptt_backend
-        values = self.backend_config[backend]
-        config: dict[str, Any] = {}
-
-        if backend == "serial-line":
-            port = values["port"].strip()
-            if not port:
-                errors.append("port is required")
-            else:
-                config["port"] = port
-            config["line"] = values["line"]
-            baud_text = values["baud"]
-            config["baud"] = int(baud_text) if baud_text else 9600
-            config["active_high"] = bool(values["active_high"])
-
-        elif backend == "icom-civ":
-            usb_id = values["usb_id"].strip()
-            if not usb_id:
-                errors.append("usb_id is required")
-            else:
-                config["usb_id"] = usb_id
-            address_text = values["address"].strip()
-            if address_text:
-                try:
-                    config["address"] = int(address_text, 0)
-                except ValueError:
-                    errors.append("address must be an integer, e.g. 164 or 0xA4")
-
-        elif backend == "hamlib":
-            model_text = values["model"].strip()
-            if not model_text:
-                errors.append("model is required")
-            else:
-                try:
-                    config["model"] = int(model_text)
-                except ValueError:
-                    errors.append("model must be a whole number")
-            device = values["device"].strip()
-            if device:
-                config["device"] = device
-            baud_text = values["baud"]
-            if baud_text:
-                config["baud"] = int(baud_text)
-            civaddr = values["civaddr"].strip()
-            if civaddr:
-                config["civaddr"] = civaddr
-            timeout_text = values["timeout"].strip()
-            if timeout_text:
-                try:
-                    config["timeout"] = float(timeout_text)
-                except ValueError:
-                    errors.append("timeout must be a number")
-            retry_text = values["retry"].strip()
-            if retry_text:
-                try:
-                    config["retry"] = int(retry_text)
-                except ValueError:
-                    errors.append("retry must be a whole number")
-
-        # vox: no ptt_config keys at all.
-        return config
 
 
 # --- CLI entry point -----------------------------------------------------
