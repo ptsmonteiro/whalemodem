@@ -141,8 +141,14 @@ jobs:
             -v "${{ github.workspace }}:/workspace" -w /workspace \
             -e DEBIAN_FRONTEND=noninteractive \
             -e SYSTEM_NUMPY="${{ matrix.system_numpy }}" \
+            -e HOST_UID="$(id -u)" -e HOST_GID="$(id -g)" \
             debian:trixie bash -c '
               set -eux
+              # The container runs as root, so everything it writes into the
+              # bind-mounted workspace (dist/, build/, .venv, egg-info) would
+              # be root-owned and unwritable by later host steps (e.g. tar
+              # into dist/). Hand ownership back on exit, even on failure.
+              trap "chown -R \"\$HOST_UID:\$HOST_GID\" /workspace" EXIT
               apt-get update
               # build-essential/gfortran/libopenblas-dev/python3-dev/pkg-config
               # are a safety net in case some dependency has no prebuilt wheel
