@@ -91,10 +91,16 @@ sound-card ADC. Digital attenuation cannot repair an already clipped input.
 
 When no TX attenuation is configured, the tuner starts at -24 dB rather than
 full PC output. Press `+`/`-` to change it by 1 dB. Press `t` to key a
-1200/2200 Hz test tone for at most 15 seconds, and `t` again to stop. The
+repeatable 500--3000 Hz multicarrier probe on a 50 Hz grid for at most 60
+seconds, and `t` again to stop. Interleaved grid carriers are empty. The
 displayed TX peak is the PC's digital output level, not the level or
-distortion at the radio mic port. Without a radio deviation/monitor meter or
-another receiver, TX calibration remains provisional. Press `s` to store the chosen
+distortion at the radio mic port. Add `--receive-radio NAME` to take input
+from another configured transceiver. While the probe is received, the tuner
+shows occupied-carrier flatness, empty-carrier leakage, and EVM after removing
+clock error and smooth linear passband response. These describe the complete
+receiver, link, and sound-card path. The measurement starts
+enabled with `--receive-radio`, starts disabled otherwise, and `d` toggles it.
+Press `s` to store the chosen
 `audio.tx_level_db` (between -60 and 0 dB) in `radios.toml`; regular modem
 transmissions then use that attenuation. Saving rewrites the inventory using
 the same writer as `whale-configure`. `q` exits and unkeys any active test.
