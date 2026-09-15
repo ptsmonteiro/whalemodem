@@ -121,8 +121,14 @@ jobs:
         include:
           - tag: linux-aarch64
             docker_platform: linux/arm64
+            system_numpy: "0"
+          # numpy/scipy publish no armv7 wheels, and a source build of both
+          # under QEMU is fragile and can blow the timeout, so this leg uses
+          # Debian's prebuilt python3-numpy/python3-scipy via a venv with
+          # --system-site-packages instead.
           - tag: linux-armv7
             docker_platform: linux/arm/v7
+            system_numpy: "1"
     steps:
       - uses: actions/checkout@v7
       - uses: docker/setup-qemu-action@v4
@@ -132,19 +138,27 @@ jobs:
           docker run --rm --platform "${{ matrix.docker_platform }}" \
             -v "${{ github.workspace }}:/workspace" -w /workspace \
             -e DEBIAN_FRONTEND=noninteractive \
+            -e SYSTEM_NUMPY="${{ matrix.system_numpy }}" \
             debian:trixie bash -c '
               set -eux
               apt-get update
-              # build-essential/gfortran/libopenblas-dev are a safety net in
-              # case numpy/scipy have no prebuilt wheel for this arch and pip
-              # falls back to building from source under emulation -- slow,
-              # but this is CI, not a Raspberry Pi doing its own build.
+              # build-essential/gfortran/libopenblas-dev/python3-dev/pkg-config
+              # are a safety net in case some dependency has no prebuilt wheel
+              # for this arch and pip falls back to building from source under
+              # emulation -- slow, but this is CI, not a Raspberry Pi doing its
+              # own build. (python3-dev is what meson needs to find the python3
+              # dependency for Cython extensions.)
               apt-get install -y --no-install-recommends \
                 ca-certificates \
-                python3 python3-venv python3-pip \
+                python3 python3-venv python3-pip python3-dev pkg-config \
                 build-essential gfortran libopenblas-dev \
                 libasound2t64 libjack-jackd2-0
-              python3 -m venv .venv
+              if [ "$SYSTEM_NUMPY" = "1" ]; then
+                apt-get install -y --no-install-recommends python3-numpy python3-scipy
+                python3 -m venv --system-site-packages .venv
+              else
+                python3 -m venv .venv
+              fi
               . .venv/bin/activate
               pip install --upgrade pip
               pip install -e ".[test]"
