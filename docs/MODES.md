@@ -29,7 +29,7 @@ passed` is the simulated `flat_nbfm` RF C/N pass point.
 | Mode | Frequency span | Modulation geometry | Modulation order | FEC rate | FEC technique | DATA payload/frame | Frame duration | Net/frame | Sim C/N passed | Radio tested |
 | --- | --- | --- | ---: | ---: | --- | ---: | ---: | ---: | --- | --- |
 | vf14-4 | 600-2,400 Hz | 4-tone noncoherent FSK, 600 Bd | 4 (4-FSK) | 3/4 | punctured K=7 convolutional, interleaved, soft-decision Viterbi | 264 B | 3.360 s | 628.6 bit/s | 0 dB (20/20); not passed at -1 dB (14/20) | passed on bench radios; SNR not measured |
-| vf13 | 600-3,000 Hz | 16-tone combinatorial noncoherent MFSK, 6 of 16 tones per symbol, 150 Bd | 4,096 (of C(16,6)=8,008) | 7/8 | punctured K=7 convolutional, interleaved, soft-decision Viterbi | 1,427 B | 7.990 s | 1,428.8 bit/s | not measured | passed on bench radios; SNR not measured |
+| vf13 | 600-3,000 Hz | 16-tone combinatorial noncoherent MFSK, 6 of 16 tones per symbol, 150 Bd | 4,096 (of C(16,6)=8,008) | 7/8 | punctured K=7 convolutional, interleaved, soft-decision Viterbi | 1,427 B | 7.983 s | 1,430.0 bit/s | 2 dB (20/20); not passed at 1 dB (2/20) | passed on bench radios; SNR not measured |
 | vf16 | 500-3,000 Hz | 51-carrier 8PSK OFDM (43 data, 8 comb pilots) | 8 (8PSK) | 2/3 | IEEE 802.11n QC-LDPC, interleaved | 1,928 B | 4.947 s | 3,117.8 bit/s | not measured | passed on bench radios; SNR not measured |
 | vf12 | 500-3,000 Hz | 51-carrier 16-QAM OFDM (43 data, 8 comb pilots) | 16 (16-QAM) | 3/4 | IEEE 802.11n QC-LDPC, interleaved | 2,900 B | 4.947 s | 4,689.7 bit/s | not measured | passed on bench radios; SNR not measured |
 

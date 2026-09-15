@@ -16,13 +16,17 @@ approximation.
 Shipped configuration: 16 tones, 6 active per symbol (12 bits/symbol,
 C(16,6)=8008 truncated to a 4,096-entry codebook), 150 Bd (320 samples at
 48 kHz, 150 Hz spacing), tones from 600-3,000 Hz, punctured K=7
-convolutional rate 7/8 (`whale.dsp.fec.PUNCTURE_PATTERNS`), interleaved, an
-8 s fixed frame: 1,438.8 net application bit/s.
+convolutional rate 7/8 (`whale.dsp.fec.PUNCTURE_PATTERNS`), interleaved, a
+7.983 s fixed frame: 1,430.0 net application bit/s. The preamble's head and
+sync symbols are PN draws from the same codebook, so the whole frame has one
+level, crest factor and tone set.
 
-Measured on radios (IC-705 <-> Wouxun KG-UV9D Plus FM, 2026-09-14): 150/150 exact-payload frames (90/90 ht->ic705, 60/60
-ic705->ht). Installed as DEFAULT below the faster OFDM data rungs.
+Measured on radios (IC-705 <-> Wouxun KG-UV9D Plus FM, 2026-09-14): 60/60
+exact-payload frames (30/30 ic705->ht, 30/30 ht->ic705). Installed as
+DEFAULT below the faster OFDM data rungs.
 
-Simulated flat_nbfm C/N floor: not measured.
+Simulated flat_nbfm C/N floor: 2 dB (20/20 full-capacity frames, 1 dB did
+not pass at 2/20).
 """
 
 from __future__ import annotations
@@ -51,37 +55,13 @@ DEFAULT_AMPLITUDE = 0.5
 
 MAX_SAMPLE = 0.98
 
-OFFSET_SEARCH_HZ = 30.0
-OFFSET_STEP_DIVISOR = 3.0
-
-#: Same tone_count (16) sync bank as HC0's; HC0's own energy-detection
-#: acquisition threshold (`whale.modes.hc0.ACQUISITION_THRESHOLD`) is the
-#: reference point for this value, not measured independently.
-CONFIDENCE_THRESHOLD = 0.12
+#: In simulation the other FM modes' frames and noise score at most 0.14
+#: against this sync; this mode's own frames score 0.49 or more down to its
+#: payload cliff (flat_nbfm and both handheld presets). On the bench radios
+#: they scored 0.45-0.47 (ic705->ht) and 0.50 (ht->ic705).
+CONFIDENCE_THRESHOLD = 0.3
 
 VF13_MODE_ID = 19
-
-
-def _analytic(x: np.ndarray) -> np.ndarray:
-    n = len(x)
-    spec = np.fft.fft(x)
-    h = np.zeros(n)
-    h[0] = 1.0
-    if n % 2 == 0:
-        h[n // 2] = 1.0
-        h[1:n // 2] = 2.0
-    else:
-        h[1:(n + 1) // 2] = 2.0
-    return np.fft.ifft(spec * h)
-
-
-def shift_hz(audio: np.ndarray, hz: float, rate: float) -> np.ndarray:
-    """Move `audio` down by `hz`, staying real. See hf16_mfsk_lowsnr."""
-    if not hz:
-        return np.asarray(audio, dtype=np.float64)
-    z = _analytic(np.asarray(audio, dtype=np.float64))
-    n = np.arange(len(z))
-    return np.real(z * np.exp(-2j * np.pi * hz * n / rate))
 
 
 def _combinadic(c: int, k: int, n: int) -> tuple[int, ...]:
@@ -320,8 +300,7 @@ class Vf13Mode:
 
     @property
     def sync_symbols(self) -> int:
-        n = int(round(self.sync_seconds / self.symbol_seconds))
-        return max(8, n + (n & 1))
+        return max(8, int(round(self.sync_seconds / self.symbol_seconds)))
 
     @property
     def head_symbols(self) -> int:
@@ -379,18 +358,25 @@ class Vf13Mode:
         return self.max_payload_bytes - framing.AIR_HEADER_BYTES
 
     @cached_property
-    def sync_pattern(self) -> np.ndarray:
-        bank = self.tx_banks[0]
-        half = self.sync_symbols // 2
-        bits = dsp.bits.pn_bits(half * bank.bits_per_symbol, self.sync_seed)
-        return np.repeat(bank.symbols_from_bits(bits), 2)
+    def sync_grid(self) -> np.ndarray:
+        """PN symbols from the payload's own alphabet, so the preamble has
+        the payload's tones, level and crest factor. No repeated pairs: FM
+        audio has no carrier offset to estimate from them."""
+        return self._symbol_grid(dsp.bits.pn_bits(
+            self.sync_symbols * self.bits_per_symbol, self.sync_seed))
 
     @cached_property
-    def head_pattern(self) -> np.ndarray:
-        bank = self.tx_banks[0]
-        bits = dsp.bits.pn_bits(self.head_symbols * bank.bits_per_symbol,
-                                self.head_seed)
-        return bank.symbols_from_bits(bits)
+    def head_grid(self) -> np.ndarray:
+        return self._symbol_grid(dsp.bits.pn_bits(
+            self.head_symbols * self.bits_per_symbol, self.head_seed))
+
+    @cached_property
+    def sync_pattern(self) -> np.ndarray:
+        """The sync's tones in the first bank: (sync_symbols, k) indices."""
+        if self.mapping == "combinatorial":
+            masks = self.combination_masks[self.sync_grid[:, 0]]
+            return np.nonzero(masks)[1].reshape(len(masks), self.active_tones)
+        return self.sync_grid[:, 0]
 
     @property
     def total_symbols(self) -> int:
@@ -447,16 +433,20 @@ class Vf13Mode:
         """
         coded = self.codec.encode(payload)                 # codec_bits
         repeated = np.tile(coded, self.repeat)              # coded_bits
-        spread = self.outer_interleaver.spread(repeated)    # coded_bits
+        return self._symbol_grid(self.outer_interleaver.spread(repeated))
+
+    def _symbol_grid(self, bits: np.ndarray) -> np.ndarray:
+        """`bits_per_symbol` bits per symbol to (symbols, subbands) indices."""
         bps = self.bits_per_symbol // self.subbands
-        grouped = spread.reshape(self.payload_symbols, self.subbands, bps)
+        grouped = np.asarray(bits).reshape(-1, self.subbands, bps)
+        count = len(grouped)
         if self.mapping == "combinatorial":
             bits = grouped[:, 0, :]
-            idx = np.zeros(len(bits), dtype=np.int64)
+            idx = np.zeros(count, dtype=np.int64)
             for column in range(bps):
                 idx = (idx << 1) | bits[:, column]
-            return idx.reshape(self.payload_symbols, 1)
-        tones = np.empty((self.payload_symbols, self.subbands), dtype=np.int64)
+            return idx.reshape(count, 1)
+        tones = np.empty((count, self.subbands), dtype=np.int64)
         for j in range(self.subbands):
             tones[:, j] = self.tx_banks[j].symbols_from_bits(
                 grouped[:, j, :].reshape(-1))
@@ -470,15 +460,15 @@ class Vf13Mode:
 
     def _modulate_combinatorial(self, tones: np.ndarray, amp: float,
                                 weights: np.ndarray) -> np.ndarray:
-        """`tones` is the (payload_symbols, 1) combination-index grid;
-        each symbol sums the cosines of its k active bins directly (there
-        is no per-subband ToneBank one-hot decision to reuse)."""
+        """`tones` is a (symbols, 1) combination-index grid; each symbol
+        sums the cosines of its k active bins directly (there is no
+        per-subband ToneBank one-hot decision to reuse)."""
         bank = self.tx_banks[0]
         masks = self.combination_masks
         phase = 2.0 * np.pi * np.arange(self.symbol_samples) / self.symbol_samples
         table = np.cos(bank.bins[:, None] * phase[None, :])  # (N, symbol_samples)
-        body = np.zeros(self.payload_symbols * self.symbol_samples)
-        for s in range(self.payload_symbols):
+        body = np.zeros(len(tones) * self.symbol_samples)
+        for s in range(len(tones)):
             on = masks[int(tones[s, 0])]
             if np.any(on):
                 sig = (amp * weights[on])[:, None] * table[on]
@@ -486,25 +476,26 @@ class Vf13Mode:
                     sig.sum(axis=0))
         return body
 
-    def modulate(self, payload: bytes) -> np.ndarray:
-        tones = self._tone_grid(payload)
+    def _modulate_grid(self, tones: np.ndarray) -> np.ndarray:
         amp = self.per_tone_amplitude
         weights = self.preemph_weights
         if self.mapping == "combinatorial":
-            body = self._modulate_combinatorial(tones, amp, weights[0])
-        else:
-            body = np.zeros(self.payload_symbols * self.symbol_samples)
-            for j in range(self.subbands):
-                raw = _mfsk.modulate(self.tx_banks[j], tones[:, j], 1.0)
-                per_symbol = amp * weights[j][tones[:, j]]
-                body += (raw.reshape(self.payload_symbols, self.symbol_samples)
-                         * per_symbol[:, None]).reshape(-1)
+            return self._modulate_combinatorial(tones, amp, weights[0])
+        audio = np.zeros(len(tones) * self.symbol_samples)
+        for j in range(self.subbands):
+            raw = _mfsk.modulate(self.tx_banks[j], tones[:, j], 1.0)
+            per_symbol = amp * weights[j][tones[:, j]]
+            audio += (raw.reshape(len(tones), self.symbol_samples)
+                      * per_symbol[:, None]).reshape(-1)
+        return audio
+
+    def modulate(self, payload: bytes) -> np.ndarray:
+        body = self._modulate_grid(self._tone_grid(payload))
         if self.guard_tx_samples:
             grid = body.reshape(self.payload_symbols, self.symbol_samples)
             gap = np.zeros((self.payload_symbols, self.guard_tx_samples))
             body = np.concatenate((grid, gap), axis=1).reshape(-1)
-        preamble = np.concatenate((self.head_pattern, self.sync_pattern))
-        head = _mfsk.modulate(self.tx_banks[0], preamble, amp)
+        head = self._modulate_grid(np.concatenate((self.head_grid, self.sync_grid)))
         audio = np.concatenate((head, body))
         fade = min(len(audio), self.symbol_samples)
         audio = audio.copy()
@@ -520,35 +511,47 @@ class Vf13Mode:
 
     # -- receive ----------------------------------------------------------
 
-    def _offset_hypotheses(self) -> np.ndarray:
-        step = self.spacing_hz / OFFSET_STEP_DIVISOR
-        if step >= OFFSET_SEARCH_HZ:
-            return np.array([0.0])
-        n = int(np.ceil(OFFSET_SEARCH_HZ / step))
-        return np.arange(-n, n + 1) * step
+    def _quiet_spans(self, audio: np.ndarray, count: int, step: int) -> np.ndarray:
+        """True for each of `count` candidate starts whose sync span is
+        mostly quiet.
+
+        A span that runs off the end of another mode's frame into silence
+        is scored on its few loud symbols alone; with six tones per symbol
+        that reached 0.41 when over 90% of the span was silent, but stayed
+        at or below 0.105 up to 60% silent (VF14-4, VF16, VF12 frames).
+
+        A window is quiet below `RMS_FLOOR_FRACTION` of the loudest
+        sync-span average, not of the loudest window: a handheld's squelch
+        opening puts 6.7 ms clicks 20x the frame RMS and a ~0.1 s mute
+        inside the sync, which left 31-38% of real IC-705 -> KG-UV9D sync
+        spans quiet against the loudest window.
+        """
+        n = self.rx_symbol_samples
+        power = np.convolve(audio ** 2, np.ones(n) / n, mode="valid")[::step]
+        span = (self.sync_symbols - 1) * (n // step) + 1
+        level = np.max(np.convolve(power, np.ones(span) / span, mode="valid")
+                       if len(power) >= span else power)
+        quiet = power < level * _mfsk.RMS_FLOOR_FRACTION ** 2
+        runs = np.concatenate(([0], np.cumsum(quiet)))
+        starts = np.arange(count)
+        return runs[np.minimum(starts + span, len(quiet))] - runs[starts] > span / 2
 
     def acquire(self, audio_12k: np.ndarray) -> dict:
+        """Sync start and score. FM audio carries no carrier offset (the
+        sound-card clocks are ~5 ppm apart), so there is no offset search.
+        `correlate`'s own first-window floor is off: `_quiet_spans` covers
+        near-silence without keying on the loudest click in the buffer."""
         audio = np.asarray(audio_12k, dtype=np.float64)
         bank0 = self.rx_banks[0]
-        best = {"score": -1.0, "start": None, "coarse_hz": 0.0}
-        for hz in self._offset_hypotheses():
-            shifted = shift_hz(audio, hz, RX_SAMPLE_RATE)
-            scores, step = _mfsk.correlate(bank0, shifted, self.sync_pattern)
-            if not len(scores):
-                continue
-            peak = int(np.argmax(scores))
-            if scores[peak] > best["score"]:
-                best = {"score": float(scores[peak]), "start": peak * step,
-                        "coarse_hz": float(hz), "step": step}
-        if best["start"] is None:
-            return {"score": 0.0, "start": None, "offset_hz": 0.0}
-        shifted = shift_hz(audio, best["coarse_hz"], RX_SAMPLE_RATE)
-        start = _mfsk.refine(bank0, shifted, self.sync_pattern,
-                             best["start"], radius=best["step"], step=2)
-        fine = _mfsk.offset_hz(bank0, shifted, start, self.sync_pattern)
-        return {"score": best["score"], "start": int(start),
-                "coarse_hz": best["coarse_hz"], "fine_hz": float(fine),
-                "offset_hz": float(best["coarse_hz"] + fine)}
+        scores, step = _mfsk.correlate(bank0, audio, self.sync_pattern,
+                                       rms_floor_fraction=0.0)
+        if not len(scores):
+            return {"score": 0.0, "start": None}
+        scores = np.where(self._quiet_spans(audio, len(scores), step), 0.0, scores)
+        coarse = int(np.argmax(scores))
+        start = _mfsk.refine(bank0, audio, self.sync_pattern, coarse * step,
+                             radius=step, step=2)
+        return {"score": float(scores[coarse]), "start": int(start)}
 
     def _soft_bits(self, bank: _mfsk.ToneBank, magnitudes: np.ndarray) -> np.ndarray:
         metric = np.asarray(magnitudes, dtype=np.float64) ** 2
@@ -611,10 +614,9 @@ class Vf13Mode:
             rows.append(one[0])
         return np.stack(rows, axis=0)
 
-    def soft_payload_bits(self, audio_12k, start, offset_hz):
+    def soft_payload_bits(self, audio_12k, start):
         """Combined per-codec-bit soft metrics, and each subband's magnitudes."""
-        audio = shift_hz(np.asarray(audio_12k, dtype=np.float64),
-                         offset_hz, RX_SAMPLE_RATE)
+        audio = np.asarray(audio_12k, dtype=np.float64)
         payload_start = start + self.sync_symbols * self.rx_symbol_samples
         bps = self.bits_per_symbol // self.subbands
         per_subband_soft = []
@@ -636,7 +638,7 @@ class Vf13Mode:
 
     def demodulate(self, audio_12k: np.ndarray) -> dict:
         result = {"synced": False, "payload": None, "crc_ok": False,
-                  "sync_score": 0.0, "confidence": 0.0, "offset_hz": None,
+                  "sync_score": 0.0, "confidence": 0.0,
                   "start_index": None, "tone_snr_db": None, "meta": None}
         acq = self.acquire(audio_12k)
         result["sync_score"] = acq["score"]
@@ -644,10 +646,8 @@ class Vf13Mode:
         if acq["start"] is None:
             return result
         result["start_index"] = acq["start"]
-        result["offset_hz"] = acq["offset_hz"]
 
-        combined, magnitudes = self.soft_payload_bits(
-            audio_12k, acq["start"], acq["offset_hz"])
+        combined, magnitudes = self.soft_payload_bits(audio_12k, acq["start"])
         if combined is None:
             return result
         result["synced"] = True

@@ -54,7 +54,7 @@ DEFAULT_CONFIG = {
     "mapping": "combinatorial",
     "active_tones": 6,
     "symbol_samples": 320,
-    "frame_seconds": 8.0,
+    "frame_seconds": 7.99,
     "constraint": 7,
     "band_lo_hz": 600.0,
     "band_hi_hz": 3000.0,

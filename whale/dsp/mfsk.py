@@ -235,15 +235,22 @@ def _magnitude_grid(bank: ToneBank, audio: np.ndarray, step: int
     return magnitudes, rms
 
 
+def _active_tones(pattern: np.ndarray) -> np.ndarray:
+    """A pattern as (symbols, k) tone indices; one-tone patterns get k=1."""
+    pattern = np.asarray(pattern, dtype=np.int64)
+    return pattern[:, None] if pattern.ndim == 1 else pattern
+
+
 def correlate(bank: ToneBank, audio: np.ndarray, pattern: np.ndarray, *,
               step: int | None = None,
               rms_floor_fraction: float = RMS_FLOOR_FRACTION
               ) -> tuple[np.ndarray, int]:
     """Score every candidate start against a known tone `pattern`.
 
-    Returns (scores, step).  A score is the pattern's own tone energy as a
-    fraction of all the energy in the same windows, after the across-tone
-    mean is removed at each instant.
+    `pattern` is one tone index per symbol, or a (symbols, k) array of the
+    k tones on in each symbol.  Returns (scores, step).  A score is the
+    pattern's own tone energy as a fraction of all the energy in the same
+    windows, after the across-tone mean is removed at each instant.
 
     That subtraction is the whole trick, and it is the bug
     `experiments/mfsk` records paying for: tone magnitudes are
@@ -254,7 +261,7 @@ def correlate(bank: ToneBank, audio: np.ndarray, pattern: np.ndarray, *,
     """
     step = bank.symbol_samples // SEARCH_DIVISOR if step is None else step
     magnitudes, rms = _magnitude_grid(bank, audio, step)
-    pattern = np.asarray(pattern, dtype=np.int64)
+    pattern = _active_tones(pattern)
     per_symbol = bank.symbol_samples // step
     count = len(magnitudes) - (len(pattern) - 1) * per_symbol
     if count <= 0:
@@ -264,7 +271,7 @@ def correlate(bank: ToneBank, audio: np.ndarray, pattern: np.ndarray, *,
     total = np.zeros(count)
     for i, tone in enumerate(pattern):
         window = centred[i * per_symbol:i * per_symbol + count]
-        hit += window[:, tone]
+        hit += np.sum(window[:, tone], axis=1)
         total += np.sum(np.abs(window), axis=1)
     scores = hit / np.maximum(total, 1e-30)
     if len(rms) and np.max(rms) > 0.0:
@@ -279,8 +286,8 @@ def matched_energy(bank: ToneBank, audio: np.ndarray, pattern: np.ndarray,
     values = analyze(bank, audio, start, len(pattern))
     if values is None:
         return -np.inf
-    pattern = np.asarray(pattern, dtype=np.int64)
-    return float(np.sum(np.abs(values)[np.arange(len(pattern)), pattern]))
+    pattern = _active_tones(pattern)
+    return float(np.sum(np.abs(values)[np.arange(len(pattern))[:, None], pattern]))
 
 
 def pattern_score(bank: ToneBank, audio: np.ndarray, pattern: np.ndarray,
@@ -289,11 +296,11 @@ def pattern_score(bank: ToneBank, audio: np.ndarray, pattern: np.ndarray,
     values = analyze(bank, audio, start, len(pattern))
     if values is None:
         return 0.0
-    pattern = np.asarray(pattern, dtype=np.int64)
+    pattern = _active_tones(pattern)
     centred = np.abs(values)
     centred = centred - centred.mean(axis=1, keepdims=True)
     total = float(np.sum(np.abs(centred)))
-    return float(np.sum(centred[np.arange(len(pattern)), pattern])
+    return float(np.sum(centred[np.arange(len(pattern))[:, None], pattern])
                  / max(total, 1e-30))
 
 
