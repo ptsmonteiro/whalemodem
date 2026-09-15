@@ -152,13 +152,16 @@ jobs:
               # dependency for Cython extensions.) libpython3-dev is listed
               # explicitly because PyInstaller needs libpython3.X.so.1.0 to
               # bundle, and the Debian python3 binary does not link to it.
+              # libffi-dev covers a source build of cffi (via sounddevice),
+              # which has no armv7 wheel.
               apt-get install -y --no-install-recommends \
                 ca-certificates \
                 python3 python3-venv python3-pip python3-dev libpython3-dev pkg-config \
-                build-essential gfortran libopenblas-dev \
+                build-essential gfortran libopenblas-dev libffi-dev \
                 libasound2t64 libjack-jackd2-0
               if [ "$SYSTEM_NUMPY" = "1" ]; then
-                apt-get install -y --no-install-recommends python3-numpy python3-scipy
+                apt-get install -y --no-install-recommends \
+                  python3-numpy python3-scipy python3-cffi
                 python3 -m venv --system-site-packages .venv
               else
                 python3 -m venv .venv
