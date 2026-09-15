@@ -71,10 +71,10 @@ jobs:
         run: |
           apt-get update
           apt-get install -y --no-install-recommends \
-            git ca-certificates \
+            git ca-certificates binutils \
             python3 python3-venv python3-pip \
             libasound2t64 libjack-jackd2-0
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
       - name: Install project + build deps
         run: |
           python3 -m venv .venv
@@ -96,7 +96,7 @@ jobs:
         run: |
           cd dist
           tar czf "whale-${{ needs.compute-version.outputs.version }}-linux-x86_64.tar.gz" whale
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v7
         with:
           name: whale-linux-x86_64
           path: dist/whale-*-linux-x86_64.tar.gz
@@ -124,9 +124,9 @@ jobs:
           - tag: linux-armv7
             docker_platform: linux/arm/v7
     steps:
-      - uses: actions/checkout@v4
-      - uses: docker/setup-qemu-action@v3
-      - uses: docker/setup-buildx-action@v3
+      - uses: actions/checkout@v7
+      - uses: docker/setup-qemu-action@v4
+      - uses: docker/setup-buildx-action@v4
       - name: Build + smoke test inside emulated debian:trixie
         run: |
           docker run --rm --platform "${{ matrix.docker_platform }}" \
@@ -158,7 +158,7 @@ jobs:
         run: |
           cd dist
           tar czf "whale-${{ needs.compute-version.outputs.version }}-${{ matrix.tag }}.tar.gz" whale
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v7
         with:
           name: whale-${{ matrix.tag }}
           path: dist/whale-*-${{ matrix.tag }}.tar.gz
@@ -181,8 +181,8 @@ jobs:
           - os: macos-13
             tag: macos-x86_64
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-python@v5
+      - uses: actions/checkout@v7
+      - uses: actions/setup-python@v7
         with:
           python-version: "3.11"
       - name: Install project + build deps
@@ -201,7 +201,7 @@ jobs:
         run: |
           cd dist
           zip -r "whale-${{ needs.compute-version.outputs.version }}-${{ matrix.tag }}.zip" whale
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v7
         with:
           name: whale-${{ matrix.tag }}
           path: dist/whale-*-${{ matrix.tag }}.zip
@@ -215,8 +215,8 @@ jobs:
     needs: compute-version
     runs-on: windows-latest
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-python@v5
+      - uses: actions/checkout@v7
+      - uses: actions/setup-python@v7
         with:
           python-version: "3.11"
       - name: Install project + build deps
@@ -234,7 +234,7 @@ jobs:
       - name: Archive bundle
         run: |
           Compress-Archive -Path dist\whale -DestinationPath "dist\whale-${{ needs.compute-version.outputs.version }}-windows-x86_64.zip"
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v7
         with:
           name: whale-windows-x86_64
           path: dist/whale-*-windows-x86_64.zip
