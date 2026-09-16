@@ -14,7 +14,7 @@ Two TCP ports, same shape as VARA HF/FM's API:
     teardown and are written out on this same connection.
 
 Commands (each line, '\r' or '\n' terminated):
-    MYCALL <call>              set our callsign (also settable via --mycall)
+    MYCALL <call>              override the configured station callsign
     LISTEN ON                  accept an incoming CONNECT
     LISTEN OFF                 stop accepting incoming CONNECTs
     CONNECT <mycall> <dstcall> initiate a connection
@@ -65,7 +65,7 @@ import socket
 import threading
 
 from whale import policy
-from whale.hw.radios import get_radio
+from whale.config import app_config, get_radio
 from whale.service import ModemService
 
 logger = logging.getLogger(__name__)
@@ -429,11 +429,10 @@ class StationServer:
 
 def main():
     ap = argparse.ArgumentParser(description=__doc__)
-    ap.add_argument("--radio", required=True, help="radio name from the configured inventory")
-    ap.add_argument("--radio-config", help="TOML radio inventory (or set WHALE_RADIO_CONFIG)")
-    ap.add_argument("--mycall", required=True)
-    ap.add_argument("--cmd-port", type=int, default=8300)
-    ap.add_argument("--data-port", type=int, default=8301)
+    ap.add_argument("--radio", help="radio name (default: the configured channel default)")
+    ap.add_argument("--config", help="application configuration TOML (or set WHALE_CONFIG)")
+    ap.add_argument("--cmd-port", type=int, help="override the configured command port")
+    ap.add_argument("--data-port", type=int, help="override the configured data port")
     ap.add_argument("--host", default="127.0.0.1")
     ap.add_argument("--channel", default="fm", choices=sorted(policy.CHANNELS),
                     help="which channel this station is on: its timeouts, its "
@@ -445,28 +444,39 @@ def main():
     ap.add_argument("-v", "--verbose", action="store_true")
     ap.add_argument("--tui", action="store_true",
                     help="run a live curses status dashboard instead of logging to stderr")
-    ap.add_argument("--log-file", help="write logs here instead of stderr (used with --tui)")
+    ap.add_argument("--log-file", help="override the configured log file (default: stderr)")
     args = ap.parse_args()
+    try:
+        config = app_config(args.config)
+        radio = get_radio(args.radio, args.channel, args.config)
+    except (OSError, ValueError) as exc:
+        ap.error(str(exc))
+    radio_name = radio.id
+    mycall = config.station_callsign
+    cmd_port = args.cmd_port if args.cmd_port is not None else config.cmd_port
+    data_port = args.data_port if args.data_port is not None else config.data_port
+    log_file = args.log_file if args.log_file is not None else config.log_file
+    if not 1 <= cmd_port <= 65535 or not 1 <= data_port <= 65535:
+        ap.error("command and data ports must be between 1 and 65535")
+    if cmd_port == data_port:
+        ap.error("command and data ports must be different")
 
     if not args.tui:
         logging.basicConfig(level=logging.DEBUG if args.verbose else logging.INFO,
-                             format="%(asctime)s %(levelname)s %(name)s: %(message)s")
+                            format="%(asctime)s %(levelname)s %(name)s: %(message)s",
+                            filename=log_file)
 
         channel = policy.by_name(args.channel)
-        radio = get_radio(args.radio, args.radio_config)
-        if args.channel not in radio.channels:
-            ap.error(f"radio {args.radio!r} is not configured for channel {args.channel!r} "
-                     f"(radio channels: {sorted(radio.channels)})")
         from whale.mode_qualification import registry
         mode_registry = registry(args.channel, args.mode_level,
                                  channel.max_useful_frame_seconds)
         logger.info("channel: %s", channel.name)
         logger.info("mode qualification level: %s; IDs: %s",
                     args.mode_level, mode_registry.supported_ids)
-        service = ModemService.for_radio(args.radio, args.mycall,
-                                         radio_config=args.radio_config,
+        service = ModemService.for_radio(radio_name, mycall,
+                                         radio_config=args.config,
                                          policy=channel, mode_registry=mode_registry)
-        server = StationServer(service, args.mycall, args.cmd_port, args.data_port, args.host)
+        server = StationServer(service, mycall, cmd_port, data_port, args.host)
         server.serve_forever()
         return
 
@@ -479,18 +489,14 @@ def main():
     from whale import modem_tui
 
     channel = policy.by_name(args.channel)
-    radio = get_radio(args.radio, args.radio_config)
-    if args.channel not in radio.channels:
-        ap.error(f"radio {args.radio!r} is not configured for channel {args.channel!r} "
-                 f"(radio channels: {sorted(radio.channels)})")
     from whale.mode_qualification import registry
     mode_registry = registry(args.channel, args.mode_level,
                              channel.max_useful_frame_seconds)
 
-    state = modem_tui.TuiState(args.mycall, args.radio, args.channel, mode_registry=mode_registry)
+    state = modem_tui.TuiState(mycall, radio_name, args.channel, mode_registry=mode_registry)
     handlers = [modem_tui.LogTap(state)]
-    if args.log_file:
-        file_handler = logging.FileHandler(args.log_file)
+    if log_file:
+        file_handler = logging.FileHandler(log_file)
         file_handler.setFormatter(
             logging.Formatter("%(asctime)s %(levelname)s %(name)s: %(message)s"))
         handlers.append(file_handler)
@@ -500,10 +506,10 @@ def main():
     logger.info("mode qualification level: %s; IDs: %s",
                 args.mode_level, mode_registry.supported_ids)
 
-    service = ModemService.for_radio(args.radio, args.mycall,
-                                     radio_config=args.radio_config,
+    service = ModemService.for_radio(radio_name, mycall,
+                                     radio_config=args.config,
                                      policy=channel, mode_registry=mode_registry)
-    server = StationServer(service, args.mycall, args.cmd_port, args.data_port, args.host)
+    server = StationServer(service, mycall, cmd_port, data_port, args.host)
     unsubscribe = service.subscribe(state.on_event)
     server_thread = threading.Thread(target=server.serve_forever, name="vara-server", daemon=True)
     server_thread.start()

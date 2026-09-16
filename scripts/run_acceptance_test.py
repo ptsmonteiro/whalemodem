@@ -86,7 +86,7 @@ def _env_with(overrides):
     return env
 
 
-def _start_server(radio, mycall, cmd_port, data_port, host, log_path, name,
+def _start_server(radio, config, cmd_port, data_port, host, log_path, name,
                   env_overrides=(), channel="fm"):
     log_file = open(log_path, "w")
     if env_overrides:
@@ -96,7 +96,7 @@ def _start_server(radio, mycall, cmd_port, data_port, host, log_path, name,
         log_file.flush()
     proc = subprocess.Popen(
         [sys.executable, "-m", "whale.vara_server",
-         "--radio", radio, "--mycall", mycall,
+         "--radio", radio, "--config", config,
          "--cmd-port", str(cmd_port), "--data-port", str(data_port),
          "--host", host, "--channel", channel, "--verbose"],
         cwd=ROOT, stdout=subprocess.PIPE, stderr=subprocess.STDOUT,
@@ -127,6 +127,8 @@ def main():
     ap.add_argument("--b-radio", default="ht", help="radio name from whale/hw/radios.py for station B")
     ap.add_argument("--a-call", default="STA1")
     ap.add_argument("--b-call", default="STA2")
+    ap.add_argument("--a-config", required=True, help="station A config.toml")
+    ap.add_argument("--b-config", required=True, help="station B config.toml")
     ap.add_argument("--a-cmd", type=int, default=8300)
     ap.add_argument("--a-data", type=int, default=8301)
     ap.add_argument("--b-cmd", type=int, default=8310)
@@ -150,12 +152,12 @@ def main():
     print(f"channel: {args.channel}")
     print(f"starting station A ({args.a_radio}, {args.a_call}) on cmd={args.a_cmd} data={args.a_data}, "
           f"logging to {log_dir / 'sta1.log'}...")
-    proc_a, log_a, pump_a = _start_server(args.a_radio, args.a_call, args.a_cmd, args.a_data, args.host,
+    proc_a, log_a, pump_a = _start_server(args.a_radio, args.a_config, args.a_cmd, args.a_data, args.host,
                                            log_dir / "sta1.log", "A", args.a_env,
                                            channel=args.channel)
     print(f"starting station B ({args.b_radio}, {args.b_call}) on cmd={args.b_cmd} data={args.b_data}, "
           f"logging to {log_dir / 'sta2.log'}...")
-    proc_b, log_b, pump_b = _start_server(args.b_radio, args.b_call, args.b_cmd, args.b_data, args.host,
+    proc_b, log_b, pump_b = _start_server(args.b_radio, args.b_config, args.b_cmd, args.b_data, args.host,
                                            log_dir / "sta2.log", "B", args.b_env,
                                            channel=args.channel)
 

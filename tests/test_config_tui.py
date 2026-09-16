@@ -1,7 +1,7 @@
 import curses
 
 from whale.hw.radios import Radio, load_radios
-from whale.radio_config_tui import NOTHING, QUIT, RadioListView
+from whale.config_tui import NOTHING, QUIT, RadioListView
 
 
 def _radio(name, description="d", audio_input_name="AudioCard", audio_output_name="AudioCard",

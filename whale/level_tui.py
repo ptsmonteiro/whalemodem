@@ -12,10 +12,11 @@ import os
 import sys
 import threading
 import time
+from typing import Callable
 import numpy as np
 
 from whale.hw import audio_io, ptt as ptt_mod
-from whale.hw.radios import load_radios, save_radios
+from whale.config import app_config, save_config
 
 
 SAMPLE_RATE = audio_io.SAMPLE_RATE
@@ -355,25 +356,51 @@ def _rx_hint(peak: float, clipping: float, overflows: int) -> str:
     return "Input has headroom. Open-squelch noise is a rough check, not a data-signal test."
 
 
-def run(screen, radio, receive_radio, config_path: str, inventory,
-        tx_device: int, rx_device: int, distortion_enabled: bool = False) -> None:
-    sd = audio_io._load_sounddevice()
+def run_level_tuner(
+    screen,
+    transmit_radio,
+    receive_radio,
+    context: str,
+    tx_device: int,
+    rx_device: int | None,
+    on_apply: Callable[[float], None],
+    distortion_enabled: bool = False,
+    *,
+    apply_label: str = "Apply",
+    probe_analysis_available: bool = True,
+) -> None:
+    """Run the live tuner and pass accepted TX levels to ``on_apply``.
+
+    ``transmit_radio`` supplies the probe; ``receive_radio`` supplies the input
+    being measured.  They can be the same radio for a local measurement.
+    The callback owns persistence.  Embedded callers can update their working
+    configuration, while the standalone command supplies a callback that
+    writes the configuration file.
+    """
+    if receive_radio is None and rx_device is not None:
+        raise ValueError("rx_device requires a receiving radio")
+    if receive_radio is not None and rx_device is None:
+        raise ValueError("a receiving radio requires rx_device")
+    sd = audio_io._load_sounddevice() if receive_radio is not None else None
     meter = LevelMeter()
-    level_db = initial_tx_level_db(radio.tx_level_db)
-    tone = TestTone(radio, tx_device, level_db)
-    saved_db = radio.tx_level_db
-    message = ("TX starts at -24 dB; save only after choosing a level."
-               if radio.tx_level_db == 0 else "")
+    level_db = initial_tx_level_db(transmit_radio.tx_level_db)
+    tone = TestTone(transmit_radio, tx_device, level_db)
+    saved_db = transmit_radio.tx_level_db
+    action = apply_label.lower()
+    completed_action = "Saved" if action == "save" else "Applied"
+    message = (f"TX starts at -24 dB; {action} only after choosing a level."
+               if transmit_radio.tx_level_db == 0 else "")
     curses.curs_set(0)
     status_attrs = _init_colors()
     screen.timeout(100)
-    input_stream = sd.InputStream(
+    input_stream = None if receive_radio is None else sd.InputStream(
         device=rx_device, samplerate=SAMPLE_RATE, channels=1,
         dtype="float32", latency=0.1, callback=meter.callback,
     )
     try:
         with ExitStack() as stack:
-            stack.enter_context(input_stream)
+            if input_stream is not None:
+                stack.enter_context(input_stream)
             # Stop TX before the RX device closes, including on exceptions.
             stack.callback(tone.stop)
             while True:
@@ -381,22 +408,31 @@ def run(screen, radio, receive_radio, config_path: str, inventory,
                     tone.stop()
                     message = "Transmit stopped at the 60-second limit."
                 peak, rms, clipped, overflows = meter.snapshot()
-                distortion = meter.probe_snapshot() if distortion_enabled else None
+                distortion = (meter.probe_snapshot()
+                              if distortion_enabled and probe_analysis_available else None)
                 screen.erase()
-                _line(screen, 0, f"Whale levels: {radio.id}  |  {config_path}", curses.A_BOLD)
-                _line(screen, 2, f"RX peak  {_bar(peak)}  {dbfs(peak):6.1f} dBFS")
-                _line(screen, 3, f"RX RMS   {_bar(rms)}  {dbfs(rms):6.1f} dBFS")
-                _line(screen, 4, f"Clip samples: {clipped * 100:.2f}%   Input overflows: {overflows}")
-                _line(screen, 6, _rx_hint(peak, clipped, overflows))
+                receiver_label = receive_radio.id if receive_radio is not None else "none"
+                _line(screen, 0, f"Whale levels: transmitter {transmit_radio.id} -> receiver {receiver_label}  |  {context}",
+                      curses.A_BOLD)
+                if receive_radio is None:
+                    _line(screen, 2, "On-air feedback: disabled (no receiving radio selected).")
+                else:
+                    _line(screen, 2, f"RX peak  {_bar(peak)}  {dbfs(peak):6.1f} dBFS")
+                    _line(screen, 3, f"RX RMS   {_bar(rms)}  {dbfs(rms):6.1f} dBFS")
+                    _line(screen, 4, f"Clip samples: {clipped * 100:.2f}%   Input overflows: {overflows}")
+                    _line(screen, 6, _rx_hint(peak, clipped, overflows))
                 _line(screen, 8, f"TX attenuation: {level_db:+.0f} dB  ({10 ** (level_db / 20):.3f}x)"
-                      + ("  * unsaved" if level_db != saved_db else ""))
+                      + ("  * unapplied" if level_db != saved_db else ""))
                 state = "ON" if tone.active else "off"
                 _line(screen, 9, f"Test probe: {state}; {PROBE_LOW_HZ:g}-{PROBE_HIGH_HZ:g} Hz / "
                       f"{PROBE_SPACING_HZ:g} Hz grid; max 60 s")
                 _line(screen, 10, f"Output underflows this keying: {tone.underflows}")
                 _line(screen, 11, f"Probe PC digital peak: {dbfs(PROBE_PEAK * 10 ** (level_db / 20)):.1f} dBFS")
-                _line(screen, 12, "[+/-] TX level  [t] probe  [d] RX analysis  [s] save  [q] quit")
-                if distortion is None:
+                _line(screen, 12, f"[+/-] TX level  [t] probe  [d] RX analysis  "
+                      f"[s] {action}  [q] quit")
+                if not probe_analysis_available or receive_radio is None:
+                    _line(screen, 13, "RX probe analysis: unavailable without an over-air receiver")
+                elif distortion is None:
                     _line(screen, 13, "RX probe analysis: off (press d to enable)")
                 elif not distortion.available:
                     _line(screen, 13, "RX probe analysis: waiting for the multicarrier probe")
@@ -404,8 +440,9 @@ def run(screen, radio, receive_radio, config_path: str, inventory,
                     _line(screen, 13, "RX probe quality (full bar is better):", curses.A_BOLD)
                     for row, (gauge, status) in enumerate(_probe_lines(distortion), 14):
                         _line(screen, row, gauge, status_attrs[status])
-                _line(screen, 18, f"Receiver: {receive_radio.id} | whole audio path; includes noise")
-                _line(screen, 19, "Targets: flat <=8 dB | leakage <=-35 dBc | EVM <=-18 dB | clock <=100 ppm")
+                if receive_radio is not None:
+                    _line(screen, 18, f"Measurement receiver: {receive_radio.id} | whole audio path; includes noise")
+                    _line(screen, 19, "Targets: flat <=8 dB | leakage <=-35 dBc | EVM <=-18 dB | clock <=100 ppm")
                 _line(screen, 21, message)
                 screen.refresh()
                 key = screen.getch()
@@ -425,30 +462,53 @@ def run(screen, radio, receive_radio, config_path: str, inventory,
                         tone.start()
                         message = "Transmitting test probe; press t to stop."
                 elif key == ord("d"):
-                    distortion_enabled = not distortion_enabled
-                    message = f"RX probe analysis {'enabled' if distortion_enabled else 'disabled'}."
+                    if not probe_analysis_available or receive_radio is None:
+                        message = "RX probe analysis requires an over-air receiving radio."
+                    else:
+                        distortion_enabled = not distortion_enabled
+                        message = f"RX probe analysis {'enabled' if distortion_enabled else 'disabled'}."
                 elif key == ord("s"):
-                    updated = replace(radio, tx_level_db=level_db)
-                    inventory.radios[radio.id] = updated
-                    save_radios(config_path, inventory)
+                    on_apply(level_db)
                     saved_db = level_db
-                    message = f"Saved audio.tx_level_db = {level_db:g} to {config_path}."
+                    message = f"{completed_action} audio.tx_level_db = {level_db:g}."
     finally:
         tone.stop()
 
 
+def run(screen, radio, receive_radio, config_path: str, inventory,
+        tx_device: int, rx_device: int, distortion_enabled: bool = False) -> None:
+    """Run the standalone tuner, preserving its save-to-disk behavior."""
+    def save_level(level_db: float) -> None:
+        inventory.radios[radio.id] = replace(radio, tx_level_db=level_db)
+        save_config(config_path, inventory)
+
+    run_level_tuner(
+        screen,
+        radio,
+        receive_radio,
+        config_path,
+        tx_device,
+        rx_device,
+        save_level,
+        distortion_enabled,
+        apply_label="Save",
+    )
+
+
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description="Live Digirig/radio audio level tuner")
-    parser.add_argument("--radio-config", help="Radio inventory TOML (default: WHALE_RADIO_CONFIG or radios.toml)")
-    parser.add_argument("--radio", help="Radio inventory key (default: default_radio)")
+    parser.add_argument("--config", help="Application configuration TOML (default: WHALE_CONFIG or config.toml)")
+    parser.add_argument("--channel", choices=("fm", "hf"), default="fm",
+                        help="channel whose default radio to use")
+    parser.add_argument("--radio", help="Radio key (default: configured channel default)")
     parser.add_argument("--receive-radio", help="Optional receiving radio inventory key (default: --radio)")
     args = parser.parse_args(argv)
-    path = args.radio_config or os.environ.get("WHALE_RADIO_CONFIG") or "radios.toml"
+    path = args.config or os.environ.get("WHALE_CONFIG") or "config.toml"
     try:
-        inventory = load_radios(path)
-        name = args.radio or inventory.default
+        inventory = app_config(path)
+        name = args.radio or inventory.default_radio(args.channel)
         if name is None:
-            raise ValueError("choose a radio with --radio (no default_radio is configured)")
+            raise ValueError(f"choose a radio with --radio (no default_{args.channel}_radio is configured)")
         if name not in inventory.radios:
             raise ValueError(f"unknown radio {name!r}; have {sorted(inventory.radios)}")
         radio = inventory.radios[name]

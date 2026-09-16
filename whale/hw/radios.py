@@ -106,13 +106,11 @@ def load_radios(path: str | os.PathLike[str]) -> RadioInventory:
         default = next(iter(radios))
     return RadioInventory(radios, default)
 
-# Default inventory file, used when neither --radio-config nor
-# WHALE_RADIO_CONFIG names one -- same default as whale-configure, so
-# pointing both at a bare `radios.toml` in the current directory agrees.
-DEFAULT_RADIO_CONFIG = "radios.toml"
+# Low-level radio helpers read the radio tables from the app configuration.
+DEFAULT_RADIO_CONFIG = "config.toml"
 
 def radio_inventory(path: str | os.PathLike[str] | None = None) -> RadioInventory:
-    configured = path or os.environ.get("WHALE_RADIO_CONFIG") or DEFAULT_RADIO_CONFIG
+    configured = path or os.environ.get("WHALE_CONFIG") or DEFAULT_RADIO_CONFIG
     return load_radios(configured)
 
 def get_radio(name: str | None, path: str | os.PathLike[str] | None = None) -> Radio:

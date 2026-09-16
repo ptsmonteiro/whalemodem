@@ -5,6 +5,7 @@ import numpy as np
 import pytest
 
 from whale import transport
+from whale.config import Config
 from whale.hw import audio_io
 from whale.hw.radios import Radio, RadioInventory, load_radios, save_radios
 from whale import level_tui
@@ -196,9 +197,9 @@ def test_receive_radio_routes_its_input_and_enables_measurement(monkeypatch):
     tx = _radio()
     rx = Radio("monitor", "Monitor", "RX card", "unused", "vox",
                frozenset({"fm"}), {})
-    inventory = RadioInventory({"ht": tx, "monitor": rx}, "ht")
+    inventory = Config("N0CALL", None, {"ht": tx, "monitor": rx}, "ht")
     wrapper_calls = []
-    monkeypatch.setattr(level_tui, "load_radios", lambda path: inventory)
+    monkeypatch.setattr(level_tui, "app_config", lambda path: inventory)
     monkeypatch.setattr(Radio, "devices",
                         lambda self: (3, 4) if self.id == "ht" else (5, 6))
     monkeypatch.setattr(level_tui.curses, "wrapper",
@@ -206,5 +207,141 @@ def test_receive_radio_routes_its_input_and_enables_measurement(monkeypatch):
 
     assert level_tui.main(["--radio", "ht", "--receive-radio", "monitor"]) == 0
     args = wrapper_calls[0]
-    assert args[1:4] == (tx, rx, "radios.toml")
+    assert args[1:4] == (tx, rx, "config.toml")
     assert args[5:8] == (3, 6, True)
+
+
+class _TunerScreen:
+    def __init__(self, keys):
+        self.keys = iter(keys)
+
+    def timeout(self, _milliseconds):
+        pass
+
+    def erase(self):
+        pass
+
+    def getmaxyx(self):
+        return (24, 100)
+
+    def addnstr(self, *_args):
+        pass
+
+    def refresh(self):
+        pass
+
+    def getch(self):
+        key = next(self.keys)
+        if isinstance(key, Exception):
+            raise key
+        return key
+
+
+class _InputStream:
+    def __enter__(self):
+        return self
+
+    def __exit__(self, *_args):
+        pass
+
+
+class _TunerTone:
+    instances = []
+
+    def __init__(self, _radio, _device, level_db):
+        self.level_db = level_db
+        self.active = False
+        self.underflows = 0
+        self.stop_calls = 0
+        self.instances.append(self)
+
+    def expired(self):
+        return False
+
+    def stop(self):
+        self.active = False
+        self.stop_calls += 1
+
+    def start(self):
+        self.active = True
+
+
+def _stub_tuner_hardware(monkeypatch):
+    _TunerTone.instances.clear()
+    sounddevice = SimpleNamespace(InputStream=lambda **_kwargs: _InputStream())
+    monkeypatch.setattr(audio_io, "_load_sounddevice", lambda: sounddevice)
+    monkeypatch.setattr(level_tui, "TestTone", _TunerTone)
+    monkeypatch.setattr(level_tui.curses, "curs_set", lambda _value: None)
+    monkeypatch.setattr(level_tui, "_init_colors", lambda: {})
+
+
+def test_embedded_tuner_applies_adjusted_level_only_through_callback(monkeypatch):
+    _stub_tuner_hardware(monkeypatch)
+    applied = []
+
+    level_tui.run_level_tuner(
+        _TunerScreen([ord("+"), ord("s"), ord("q")]),
+        _radio(-12),
+        Radio("monitor", "Monitor", "RX", "unused", "vox", frozenset({"fm"}), {}),
+        "working configuration",
+        3,
+        6,
+        applied.append,
+    )
+
+    assert applied == [-11]
+    assert _TunerTone.instances[0].stop_calls >= 1
+
+
+def test_embedded_tuner_quit_cancels_unapplied_adjustment(monkeypatch):
+    _stub_tuner_hardware(monkeypatch)
+    applied = []
+
+    level_tui.run_level_tuner(
+        _TunerScreen([ord("-"), 27]), _radio(-12), _radio(), "config", 3, 6,
+        applied.append,
+    )
+
+    assert applied == []
+
+
+def test_local_tuner_keeps_the_selected_radio_input_open(monkeypatch):
+    _stub_tuner_hardware(monkeypatch)
+    streams = []
+    sounddevice = SimpleNamespace(
+        InputStream=lambda **kwargs: streams.append(kwargs) or _InputStream())
+    monkeypatch.setattr(audio_io, "_load_sounddevice", lambda: sounddevice)
+
+    radio = _radio()
+    level_tui.run_level_tuner(
+        _TunerScreen([ord("q")]), radio, radio, "config", 3, 4,
+        lambda _level: None,
+    )
+
+    assert streams[0]["device"] == 4
+
+
+def test_tuner_can_keep_input_metering_while_disabling_probe_analysis(monkeypatch):
+    _stub_tuner_hardware(monkeypatch)
+    monkeypatch.setattr(
+        LevelMeter, "probe_snapshot",
+        lambda _self: pytest.fail("probe analysis must be unavailable"),
+    )
+
+    radio = _radio()
+    level_tui.run_level_tuner(
+        _TunerScreen([ord("d"), ord("q")]), radio, radio, "config", 3, 4,
+        lambda _level: None, True, probe_analysis_available=False,
+    )
+
+
+def test_embedded_tuner_stops_transmit_when_ui_fails(monkeypatch):
+    _stub_tuner_hardware(monkeypatch)
+
+    with pytest.raises(RuntimeError, match="terminal failed"):
+        level_tui.run_level_tuner(
+            _TunerScreen([RuntimeError("terminal failed")]),
+            _radio(), _radio(), "config", 3, 6, lambda _level: None,
+        )
+
+    assert _TunerTone.instances[0].stop_calls >= 1

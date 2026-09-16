@@ -7,7 +7,7 @@ already exist on the transport/link. Nothing here changes decoder, link or
 service behavior; the accumulator (:class:`TuiState`) and its log handler
 (:class:`LogTap`) are designed to never raise into their callers.
 
-Split the same way as ``whale/radio_config_tui.py``: pure state (``TuiState``)
+Split the same way as ``whale/config_tui.py``: pure state (``TuiState``)
 and pure renderers (``render_header`` / ``render_link`` / ``render_log``)
 that return ``list[str]``, testable with no real terminal, plus a thin
 ``run()`` curses loop that copies the ``_line`` clipping / ``screen.timeout``

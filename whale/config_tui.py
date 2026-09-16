@@ -1,13 +1,14 @@
-"""Curses TUI for creating and editing a radio inventory TOML file.
+"""Curses TUI for creating and editing whale's application configuration.
 
 Navigation shell: a small view stack (``App.stack``), each view a plain
 object implementing the ``View`` protocol (``render`` + ``handle_key``).
 ``handle_key`` returns a ``KeyResult`` telling the app whether to do
-nothing, push a new view, pop the current one, or quit. Three concrete
-views: ``RadioListView`` (list/default/delete/save/quit), ``RadioDetailView``
-(add/edit one radio, pushed by the list view), and ``ListPickerView`` (a
-reusable browse-and-select list the detail view uses for its audio-device,
-serial-port, and hamlib-model fields).
+nothing, push a new view, pop the current one, launch level tuning, or quit.
+Three concrete
+views: ``ConfigView`` (station settings plus the radio list),
+``RadioDetailView`` (add/edit one radio), and ``ListPickerView`` (a reusable
+browse-and-select list for defaults, audio devices, serial ports, and hamlib
+models).
 
 None of these views call a curses drawing function from ``handle_key`` --
 all key handling only mutates plain Python state, so their logic is
@@ -19,14 +20,13 @@ import argparse
 import curses
 import os
 import sys
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from typing import Any, Callable, Generic, Protocol, TypeVar
 
-from whale.hw.radios import Radio, RadioInventory, load_radios, save_radios
+from whale.config import (Config, DEFAULT_CMD_PORT, DEFAULT_CONFIG,
+                          DEFAULT_DATA_PORT, load_config, save_config)
+from whale.hw.radios import Radio, RadioInventory, save_radios
 from whale.radio_config_form import FormRow, RadioForm
-
-DEFAULT_RADIO_CONFIG = "radios.toml"
-
 
 # --- Navigation shell -------------------------------------------------
 
@@ -49,17 +49,57 @@ class Nothing:
     """Nothing happened; keep running the active view."""
 
 
+@dataclass(frozen=True)
+class RunLevels:
+    """Temporarily hand the terminal to the live level tuner."""
+
+    owner: "ConfigView"
+    transmit_name: str
+    receive_name: str | None
+
+
 # Singletons for the no-payload results, so callers can just return them.
 POP = Pop()
 QUIT = Quit()
 NOTHING = Nothing()
 
-KeyResult = Push | Pop | Quit | Nothing
+KeyResult = Push | Pop | Quit | Nothing | RunLevels
 
 
 class View(Protocol):
     def render(self, stdscr) -> None: ...
     def handle_key(self, key: int) -> KeyResult: ...
+
+
+class TextInputView:
+    """Small single-value editor used for station settings."""
+
+    def __init__(self, title: str, value: str, on_save: Callable[[str], str | None]) -> None:
+        self.title = title
+        self.value = value
+        self.on_save = on_save
+        self.status = ""
+
+    def render(self, stdscr) -> None:
+        height, _ = stdscr.getmaxyx()
+        _safe_addnstr(stdscr, 0, 0, self.title, curses.A_BOLD)
+        _safe_addnstr(stdscr, 2, 0, self.value + "_", curses.A_REVERSE)
+        _safe_addnstr(stdscr, height - 1, 0, self.status or "[Enter] save  [Esc] cancel")
+
+    def handle_key(self, key: int) -> KeyResult:
+        if key == 27:
+            return POP
+        if key in (curses.KEY_ENTER, 10, 13):
+            error = self.on_save(self.value)
+            if error:
+                self.status = error
+                return NOTHING
+            return POP
+        if key in (curses.KEY_BACKSPACE, 127, 8):
+            self.value = self.value[:-1]
+        elif 32 <= key <= 126:
+            self.value += chr(key)
+        return NOTHING
 
 
 class App:
@@ -84,6 +124,46 @@ class App:
                 self.stack.pop()
             elif isinstance(result, Quit):
                 return
+            elif isinstance(result, RunLevels):
+                # A receiver picker is no longer useful after making its
+                # selection.  Remove it before handing the terminal over so
+                # the config home screen is restored when tuning finishes.
+                if self.stack[-1] is not result.owner:
+                    self.stack.pop()
+                self._run_levels(stdscr, result)
+
+    @staticmethod
+    def _run_levels(stdscr, request: RunLevels) -> None:
+        """Run hardware I/O outside view key handling and apply its result."""
+        from whale import level_tui
+
+        owner = request.owner
+        transmit_radio = owner.radios.get(request.transmit_name)
+        receive_radio = (transmit_radio if request.receive_name is None
+                         else owner.radios.get(request.receive_name))
+        if transmit_radio is None or receive_radio is None:
+            owner.status = "A selected level-tuning radio no longer exists."
+            return
+        try:
+            # The selected radio is always the transmitter being calibrated.
+            # Without a peer, still meter its own input for local checks.
+            tx_device, _ = transmit_radio.devices()
+            _, rx_device = receive_radio.devices()
+            level_tui.run_level_tuner(
+                stdscr, transmit_radio, receive_radio, owner.path,
+                tx_device, rx_device,
+                lambda level_db: owner._apply_tx_level(transmit_radio.id, level_db),
+                request.receive_name is not None,
+                apply_label="Apply",
+                probe_analysis_available=request.receive_name is not None,
+            )
+        except Exception as exc:
+            owner.status = f"Level tuner failed: {exc}"
+            return
+        finally:
+            # The tuner uses timed reads; restore the config shell's normal
+            # blocking input mode even when device setup or cleanup fails.
+            stdscr.timeout(-1)
 
     def main(self, stdscr) -> None:
         self.run(stdscr)
@@ -324,6 +404,289 @@ class RadioListView:
         return True
 
 
+@dataclass
+class ConfigView:
+    """App settings and radios together on the configuration home screen."""
+
+    path: str
+    callsign: str
+    ssid: int | None
+    radios: dict[str, Radio]
+    default_fm_radio: str | None = None
+    default_hf_radio: str | None = None
+    cmd_port: int = DEFAULT_CMD_PORT
+    data_port: int = DEFAULT_DATA_PORT
+    log_file: str | None = None
+    is_new_file: bool = False
+    selected: int = 0
+    pending: str | None = None
+    dirty: bool = False
+    status: str = ""
+
+    SETTING_COUNT = 7
+
+    def _names(self) -> list[str]:
+        return list(self.radios)
+
+    def _row_count(self) -> int:
+        return self.SETTING_COUNT + len(self.radios)
+
+    def _selected_radio(self) -> str | None:
+        index = self.selected - self.SETTING_COUNT
+        names = self._names()
+        return names[index] if 0 <= index < len(names) else None
+
+    @property
+    def station_callsign(self) -> str:
+        return self.callsign if self.ssid is None else f"{self.callsign}-{self.ssid}"
+
+    def render(self, stdscr) -> None:
+        height, _ = stdscr.getmaxyx()
+        if height < 14:
+            _safe_addnstr(stdscr, 0, 0, "terminal too small")
+            return
+        title = f"Whale Modem Configuration -- {self.path}"
+        if self.is_new_file:
+            title += " (new file)"
+        _safe_addnstr(stdscr, 0, 0, title, curses.A_BOLD)
+        _safe_addnstr(stdscr, 2, 0, "Station", curses.A_BOLD)
+        values = [
+            ("Callsign", self.callsign or "(not set)"),
+            ("SSID", "(none)" if self.ssid is None else str(self.ssid)),
+            ("Default FM radio", self.default_fm_radio or "(none)"),
+            ("Default HF radio", self.default_hf_radio or "(none)"),
+            ("Command port", str(self.cmd_port)),
+            ("Data port", str(self.data_port)),
+            ("Log file", self.log_file or "(stderr)"),
+        ]
+        for index, (label, value) in enumerate(values):
+            attr = curses.A_REVERSE if self.selected == index else 0
+            _safe_addnstr(stdscr, 3 + index, 2, f"{label:<18} {value}", attr)
+
+        radio_top = 3 + self.SETTING_COUNT + 1
+        _safe_addnstr(stdscr, radio_top, 0, "Radios", curses.A_BOLD)
+        names = self._names()
+        if not names:
+            _safe_addnstr(stdscr, radio_top + 1, 2, "No radios configured.")
+        else:
+            visible = max(0, height - radio_top - 3)
+            selected_radio_index = max(0, self.selected - self.SETTING_COUNT)
+            offset = _scroll_offset(selected_radio_index, len(names), visible)
+            row = radio_top + 1
+            for index in range(offset, len(names)):
+                if row >= height - 2:
+                    break
+                name = names[index]
+                radio = self.radios[name]
+                channels = ", ".join(channel.upper() for channel in sorted(radio.channels))
+                attr = curses.A_REVERSE if self.selected == self.SETTING_COUNT + index else 0
+                _safe_addnstr(stdscr, row, 2,
+                              f"{name:<14} {radio.name:<24} {channels:<8} "
+                              f"TX {radio.tx_level_db:+g} dB", attr)
+                row += 1
+        _safe_addnstr(stdscr, height - 2, 0,
+                      f"Effective station callsign: {self.station_callsign or '(not set)'}")
+        _safe_addnstr(stdscr, height - 1, 0, self._status_line())
+
+    def _status_line(self) -> str:
+        if self.pending == "delete":
+            return f"Delete {self._selected_radio()!r}? (y/n)"
+        if self.pending == "quit":
+            return "Save before quitting? (y/n), or Esc to cancel"
+        if self.status:
+            return self.status
+        dirty = " (unsaved changes)" if self.dirty else ""
+        levels = "  [l] levels" if self._selected_radio() is not None else ""
+        return ("[up/down] move  [Enter] edit  [a] add" + levels + "  "
+                f"[x] delete  [s] save  [q] quit{dirty}")
+
+    def handle_key(self, key: int) -> KeyResult:
+        if self.pending == "delete":
+            if key in (ord("y"), ord("Y")):
+                self.pending = None
+                self._delete_selected()
+            elif key in (ord("n"), ord("N"), 27):
+                self.pending = None
+            return NOTHING
+        if self.pending == "quit":
+            if key in (ord("y"), ord("Y")):
+                self.pending = None
+                return QUIT if self._save() else NOTHING
+            if key in (ord("n"), ord("N")):
+                return QUIT
+            if key == 27:
+                self.pending = None
+            return NOTHING
+
+        if key in (curses.KEY_UP, ord("k")):
+            self.selected = max(0, self.selected - 1)
+        elif key in (curses.KEY_DOWN, ord("j")):
+            self.selected = min(max(0, self._row_count() - 1), self.selected + 1)
+        elif key in (curses.KEY_ENTER, 10, 13):
+            return self._edit_selected()
+        elif key == ord("a"):
+            return Push(RadioDetailView(None, self._names(), self._apply_edit))
+        elif key == ord("l"):
+            return self._choose_level_receiver()
+        elif key in (ord("x"), curses.KEY_DC) and self._selected_radio() is not None:
+            self.pending = "delete"
+        elif key == ord("s"):
+            self._save()
+        elif key == ord("q"):
+            if self.dirty:
+                self.pending = "quit"
+            else:
+                return QUIT
+        return NOTHING
+
+    def _choose_level_receiver(self) -> KeyResult:
+        """Optionally choose a peer to receive the over-air test probe."""
+        transmit_name = self._selected_radio()
+        if transmit_name is None:
+            return NOTHING
+        receivers: list[str | None] = [None] + [name for name in self._names() if name != transmit_name]
+        self.status = ""
+        return Push(ListPickerView(
+            f"Optional over-air receiver for {transmit_name}", receivers,
+            lambda name: "None — single-radio levels only" if name is None
+            else f"{name} — receive probe from {transmit_name}",
+            lambda receive_name: RunLevels(self, transmit_name, receive_name)))
+
+    def _apply_tx_level(self, name: str, level_db: float) -> None:
+        """Apply a tuned level to the working copy; normal save owns disk I/O."""
+        radio = self.radios.get(name)
+        if radio is None:
+            self.status = f"Cannot apply level: radio {name!r} no longer exists."
+            return
+        self.radios[name] = replace(radio, tx_level_db=level_db)
+        self.dirty = True
+        self.status = f"Applied TX level {level_db:+g} dB to {name!r} (unsaved)."
+
+    def _edit_selected(self) -> KeyResult:
+        if self.selected == 0:
+            return Push(TextInputView("Station callsign", self.callsign, self._set_callsign))
+        if self.selected == 1:
+            value = "" if self.ssid is None else str(self.ssid)
+            return Push(TextInputView("SSID (blank for none)", value, self._set_ssid))
+        if self.selected in (2, 3):
+            channel = "fm" if self.selected == 2 else "hf"
+            choices = [None] + [name for name, radio in self.radios.items()
+                                if channel in radio.channels]
+            return Push(ListPickerView(
+                f"Default {channel.upper()} radio", choices,
+                lambda item: "(none)" if item is None else str(item),
+                lambda item: self._choose_default(channel, item)))
+        if self.selected == 4:
+            return Push(TextInputView("VARA API command port", str(self.cmd_port),
+                                      lambda value: self._set_port("cmd", value)))
+        if self.selected == 5:
+            return Push(TextInputView("VARA API data port", str(self.data_port),
+                                      lambda value: self._set_port("data", value)))
+        if self.selected == 6:
+            return Push(TextInputView("Log file (blank for stderr)", self.log_file or "",
+                                      self._set_log_file))
+        name = self._selected_radio()
+        if name is None:
+            return NOTHING
+        return Push(RadioDetailView((name, self.radios[name]),
+                                    [item for item in self._names() if item != name],
+                                    self._apply_edit))
+
+    def _set_callsign(self, value: str) -> str | None:
+        value = value.strip().upper()
+        if not value or not value.isascii() or not value.isalnum():
+            return "Callsign must contain only ASCII letters and digits."
+        effective = value if self.ssid is None else f"{value}-{self.ssid}"
+        if len(effective) > 15:
+            return "Callsign with SSID must be at most 15 characters."
+        self.callsign = value
+        self.dirty = True
+        return None
+
+    def _set_ssid(self, value: str) -> str | None:
+        value = value.strip()
+        if not value:
+            ssid = None
+        else:
+            try:
+                ssid = int(value)
+            except ValueError:
+                return "SSID must be an integer between 0 and 15."
+            if not 0 <= ssid <= 15:
+                return "SSID must be an integer between 0 and 15."
+        effective = self.callsign if ssid is None else f"{self.callsign}-{ssid}"
+        if len(effective) > 15:
+            return "Callsign with SSID must be at most 15 characters."
+        self.ssid = ssid
+        self.dirty = True
+        return None
+
+    def _choose_default(self, channel: str, name: str | None) -> None:
+        if channel == "fm":
+            self.default_fm_radio = name
+        else:
+            self.default_hf_radio = name
+        self.dirty = True
+
+    def _set_port(self, kind: str, value: str) -> str | None:
+        try:
+            port = int(value.strip())
+        except ValueError:
+            return "Port must be an integer between 1 and 65535."
+        if not 1 <= port <= 65535:
+            return "Port must be an integer between 1 and 65535."
+        other = self.data_port if kind == "cmd" else self.cmd_port
+        if port == other:
+            return "Command and data ports must be different."
+        if kind == "cmd":
+            self.cmd_port = port
+        else:
+            self.data_port = port
+        self.dirty = True
+        return None
+
+    def _set_log_file(self, value: str) -> str | None:
+        self.log_file = value.strip() or None
+        self.dirty = True
+        return None
+
+    def _delete_selected(self) -> None:
+        name = self._selected_radio()
+        if name is None:
+            return
+        del self.radios[name]
+        if self.default_fm_radio == name:
+            self.default_fm_radio = None
+        if self.default_hf_radio == name:
+            self.default_hf_radio = None
+        self.selected = min(self.selected, max(0, self._row_count() - 1))
+        self.dirty = True
+        self.status = f"Deleted {name!r}."
+
+    def _apply_edit(self, old_name: str | None, new_name: str, radio: Radio) -> None:
+        if old_name is not None and old_name != new_name:
+            del self.radios[old_name]
+            if self.default_fm_radio == old_name:
+                self.default_fm_radio = new_name
+            if self.default_hf_radio == old_name:
+                self.default_hf_radio = new_name
+        self.radios[new_name] = radio
+        self.dirty = True
+
+    def _save(self) -> bool:
+        try:
+            save_config(self.path, Config(self.callsign, self.ssid, dict(self.radios),
+                                          self.default_fm_radio, self.default_hf_radio,
+                                          self.cmd_port, self.data_port, self.log_file))
+        except (ValueError, OSError) as exc:
+            self.status = f"Cannot save: {exc}"
+            return False
+        self.dirty = False
+        self.is_new_file = False
+        self.status = f"Saved to {self.path}."
+        return True
+
+
 # --- Generic list picker --------------------------------------------------
 
 T = TypeVar("T")
@@ -335,7 +698,9 @@ class ListPickerView(Generic[T]):
     Reused for all three hardware pickers (audio devices, serial ports,
     hamlib rig models) -- they are the same shape: a list, an optional
     filter box, up/down + Enter/Esc. Selecting an item calls ``on_select``
-    and returns POP; Esc returns POP without calling it. Like the other
+    and normally returns POP; a callback may return another navigation
+    result for actions such as launching the level tuner. Esc returns POP
+    without calling it. Like the other
     views in this module, ``handle_key`` never touches curses.
 
     When ``search_key`` is given, arrow keys (not j/k -- those are needed as
@@ -348,7 +713,7 @@ class ListPickerView(Generic[T]):
     """
 
     def __init__(self, title: str, items: list[T], format_item: Callable[[T], str],
-                 on_select: Callable[[T], None],
+                 on_select: Callable[[T], KeyResult | None],
                  search_key: Callable[[T], str] | None = None) -> None:
         self.title = title
         self.items = items
@@ -409,8 +774,8 @@ class ListPickerView(Generic[T]):
             filtered = self._filtered()
             if not filtered:
                 return NOTHING
-            self.on_select(filtered[self.highlighted])
-            return POP
+            result = self.on_select(filtered[self.highlighted])
+            return POP if result is None else result
         if self.search_key is None:
             if key in (curses.KEY_UP, ord("k")):
                 self.highlighted = max(0, self.highlighted - 1)
@@ -818,20 +1183,20 @@ class RadioDetailView(RadioForm):
 # --- CLI entry point -----------------------------------------------------
 
 def _resolve_path(args: argparse.Namespace) -> str:
-    return args.radio_config or os.environ.get("WHALE_RADIO_CONFIG") or DEFAULT_RADIO_CONFIG
+    return args.config or os.environ.get("WHALE_CONFIG") or DEFAULT_CONFIG
 
 
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("--radio-config", help="TOML radio inventory (or set WHALE_RADIO_CONFIG); "
-                                                 f"defaults to {DEFAULT_RADIO_CONFIG!r} in the current directory")
+    parser.add_argument("--config", help="application configuration TOML (or set WHALE_CONFIG); "
+                                         f"defaults to {DEFAULT_CONFIG!r} in the current directory")
     args = parser.parse_args(argv)
     path = _resolve_path(args)
 
     try:
-        inventory = load_radios(path)
+        config = load_config(path)
     except FileNotFoundError:
-        inventory = RadioInventory({}, None)
+        config = Config("", None, {})
         is_new_file = True
     except ValueError as exc:
         print(f"error loading {path}: {exc}", file=sys.stderr)
@@ -839,8 +1204,13 @@ def main(argv: list[str] | None = None) -> int:
     else:
         is_new_file = False
 
-    view = RadioListView(path=path, radios=dict(inventory.radios), default=inventory.default,
-                          is_new_file=is_new_file)
+    view = ConfigView(path=path, callsign=config.callsign, ssid=config.ssid,
+                      radios=dict(config.radios),
+                      default_fm_radio=config.default_fm_radio,
+                      default_hf_radio=config.default_hf_radio,
+                      cmd_port=config.cmd_port, data_port=config.data_port,
+                      log_file=config.log_file,
+                      is_new_file=is_new_file)
     app = App(view)
     curses.wrapper(app.main)
     return 0

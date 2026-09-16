@@ -20,7 +20,7 @@ test = ["pytest"]
 
 [project.scripts]
 whale-server = "whale.vara_server:main"
-whale-configure = "whale.radio_config_tui:main"
+whale-configure = "whale.config_tui:main"
 whale-levels = "whale.level_tui:main"
 
 [tool.setuptools]

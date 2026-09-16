@@ -3,15 +3,23 @@
 This document covers real-radio operation. Start with the software-only tests
 in [TESTING.md](TESTING.md) before keying a transmitter.
 
-## Radio inventory
+## Application configuration
 
-Hardware is selected from a TOML inventory. Copy `radios.example.toml`, edit
-it for the local station, and pass it with `--radio-config PATH`, or set
-`WHALE_RADIO_CONFIG`. Each entry names an audio input device, an audio
+Copy `config.example.toml`, edit it for the local station, and pass it with
+`--config PATH`, or set `WHALE_CONFIG`. The top-level station settings and
+channel defaults precede the radio tables. Each radio names an audio input device, an audio
 output device, the `--channel` values it may be selected for, and one PTT
 backend with its backend-specific settings.
 
 ```toml
+callsign = "STA1"
+ssid = 2
+default_fm_radio = "station-a"
+default_hf_radio = "station-a"
+cmd_port = 8300
+data_port = 8301
+log_file = "whale.log"
+
 [radios.station-a]
 name = "Icom controlled over CI-V"
 audio.input = "IC-705"
@@ -27,34 +35,36 @@ ptt.address = 0xA4
 radio may support one or both. `--radio` (below) is refused at startup if
 the named radio's `channels` doesn't include the selected `--channel`.
 
-The server's `--radio` value is the inventory key (`station-a` above), not an
-audio-device name. When no inventory is selected, `--radio-config` and
-`WHALE_RADIO_CONFIG` both default to `radios.toml` in the current directory;
-the repo root's `radios.toml` holds the original bench's `ic705`, `ic7300`,
-and `ht` definitions.
-
-An optional top-level `default_radio = "station-a"` key, placed before any
-`[radios.*]` table, names the radio to use when none is given explicitly. A
-file with only one `[radios.*]` table defaults to it implicitly even
-without `default_radio`.
+The server's optional `--radio` value is the radio key (`station-a` above),
+not an audio-device name. Without it, `default_fm_radio` or
+`default_hf_radio` is selected according to `--channel`. `--config` and
+`WHALE_CONFIG` default to `config.toml` in the current directory.
+The API ports default to 8300 and 8301 when omitted. Logging defaults to
+stderr; set `log_file` to write logs to a file. The corresponding command-line
+options remain one-run overrides.
 
 ### `whale-configure`
 
 ```console
-whale-configure --radio-config radios.toml
+whale-configure --config config.toml
 ```
 
-A curses terminal UI for the inventory file: list, add, edit, set the
-default, and delete radios. Point it at `--radio-config PATH` or set
-`WHALE_RADIO_CONFIG`; with neither, it defaults to `radios.toml` in the
-current directory. Pointing it at a path that doesn't exist yet starts from
-an empty inventory (nothing is written until you save); pointing it at an
+A curses terminal UI for the application configuration: edit the station
+callsign, optional SSID, API ports, and log file; choose FM and HF defaults;
+and add, edit, or delete radios. Point it at `--config PATH` or set `WHALE_CONFIG`; with
+neither, it defaults to `config.toml` in the current directory. Pointing it
+at a path that doesn't exist yet starts from an empty configuration (nothing is written until you save); pointing it at an
 existing-but-malformed file exits with an error rather than overwriting it.
 
-List keys: `↑`/`↓` or `j`/`k` to move, `a` to add a radio, `Enter` to edit
-the selected one, `d` to set it as default, `x` (or Delete) to remove it
-(with a `y`/`n` confirmation), `s` to save, `q` to quit (prompting to save
-first if there are unsaved changes).
+Main-screen keys: `↑`/`↓` or `j`/`k` to move, `a` to add a radio, `Enter` to edit
+the selected setting or radio, `l` to tune the selected radio's transmit
+level. The optional second selection chooses another radio to receive the
+over-air test signal; choosing `None` keeps the selected radio's normal local
+input meter, while probe-quality analysis remains unavailable. Use `x` (or Delete) to remove
+the selected radio (with a `y`/`n` confirmation), `s` to save, and `q` to quit (prompting to save
+first if there are unsaved changes). A level applied by the embedded tuner
+updates the selected transmitter's working configuration and remains unsaved
+until `s` is pressed on the main screen.
 
 Add/edit form: `↑`/`↓` or `j`/`k` to move between fields, `Enter` to start
 editing a text field or cycle a selector/toggle field, `Space` also cycles
@@ -81,7 +91,7 @@ view), or
 ### `whale-levels`
 
 From the dev tree, run `python -m whale.level_tui --radio ht` (or add
-`--radio-config PATH`) with the modem server stopped. Only the configured
+`--config PATH`) with the modem server stopped. Only the configured
 Digirig and HT are needed. Open squelch on an unused channel and slowly raise
 the HT volume while watching the live two-second input peak/RMS meter. Keep
 clipped samples at zero and leave headroom below 0 dBFS. Open-squelch noise
@@ -101,7 +111,7 @@ clock error and smooth linear passband response. These describe the complete
 receiver, link, and sound-card path. The measurement starts
 enabled with `--receive-radio`, starts disabled otherwise, and `d` toggles it.
 Press `s` to store the chosen
-`audio.tx_level_db` (between -60 and 0 dB) in `radios.toml`; regular modem
+`audio.tx_level_db` (between -60 and 0 dB) in `config.toml`; regular modem
 transmissions then use that attenuation. Saving rewrites the inventory using
 the same writer as `whale-configure`. `q` exits and unkeys any active test.
 Verify the final setting with an actual fast-data exchange when possible.
@@ -203,11 +213,11 @@ replacing the folder. The same command-line flags shown under
 executable instead of `python -m whale.vara_server`:
 
 ```console
-whale/whale-server --radio-config radios.toml --radio station-a \
-  --mycall STA1 --cmd-port 8300 --data-port 8301
+whale/whale-server --config config.toml --channel fm \
+  --cmd-port 8300 --data-port 8301
 ```
 
-`whale/whale-configure` is the frozen radio-config TUI, in the same folder.
+`whale/whale-configure` is the frozen configuration TUI, in the same folder.
 
 Building one is covered in `packaging/pyinstaller/README.md`; that
 procedure, not this section, is the source of truth for the actual build
@@ -256,15 +266,15 @@ a bench trial.
 For FM:
 
 ```console
-python -m whale.vara_server --radio-config radios.toml --radio station-a \
-  --mycall STA1 --cmd-port 8300 --data-port 8301 --channel fm
+python -m whale.vara_server --config config.toml \
+  --cmd-port 8300 --data-port 8301 --channel fm
 ```
 
 For HF, both peers must select the HF policy:
 
 ```console
-python -m whale.vara_server --radio-config radios.toml --radio station-a \
-  --mycall STA1 --cmd-port 8300 --data-port 8301 --channel hf
+python -m whale.vara_server --config config.toml \
+  --cmd-port 8300 --data-port 8301 --channel hf
 ```
 
 The channel selects local timeouts, retry policy, useful-keying budget, and

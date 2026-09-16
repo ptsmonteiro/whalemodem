@@ -30,29 +30,28 @@ def main():
     ap.add_argument("--data-port-705", type=int, default=8301)
     ap.add_argument("--cmd-port-7300", type=int, default=8310)
     ap.add_argument("--data-port-7300", type=int, default=8311)
-    ap.add_argument("--radio-config", help="TOML radio inventory (or set WHALE_RADIO_CONFIG)")
+    ap.add_argument("--config-705", required=True, help="IC-705 station config.toml")
+    ap.add_argument("--config-7300", required=True, help="IC-7300 station config.toml")
     ap.add_argument("-v", "--verbose", action="store_true")
     args = ap.parse_args()
 
-    def build_cmd(radio, mycall, channel, cmd_port, data_port):
+    def build_cmd(radio, config, channel, cmd_port, data_port):
         cmd = [
             sys.executable, "-m", "whale.vara_server",
             "--radio", radio,
-            "--mycall", mycall,
+            "--config", config,
             "--channel", channel,
             "--cmd-port", str(cmd_port),
             "--data-port", str(data_port),
         ]
-        if args.radio_config:
-            cmd += ["--radio-config", args.radio_config]
         if args.verbose:
             cmd.append("-v")
         return cmd
 
     stations = [
-        ("ic705", build_cmd("ic705", args.call_705, args.channel_705,
+        ("ic705", build_cmd("ic705", args.config_705, args.channel_705,
                              args.cmd_port_705, args.data_port_705)),
-        ("ic7300", build_cmd("ic7300", args.call_7300, args.channel_7300,
+        ("ic7300", build_cmd("ic7300", args.config_7300, args.channel_7300,
                               args.cmd_port_7300, args.data_port_7300)),
     ]
 

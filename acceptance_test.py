@@ -7,8 +7,8 @@ station servers (see whale/vara_server.py):
     4. either station disconnects
 
 Usage:
-    python -m whale.vara_server --radio ic705 --mycall STA1 --cmd-port 8300 --data-port 8301
-    python -m whale.vara_server --radio ht    --mycall STA2 --cmd-port 8310 --data-port 8311
+    python -m whale.vara_server --config station-a.toml --radio ic705 --cmd-port 8300 --data-port 8301
+    python -m whale.vara_server --config station-b.toml --radio ht    --cmd-port 8310 --data-port 8311
     python acceptance_test.py --a-cmd 8300 --a-data 8301 --b-cmd 8310 --b-data 8311 \
         --a-call STA1 --b-call STA2
 """

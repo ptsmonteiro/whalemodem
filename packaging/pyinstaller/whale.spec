@@ -12,10 +12,10 @@
 # `_vendor_portaudio/libportaudio.so.2` path that whale/hw/audio_io.py's
 # frozen-mode preload hook expects.
 #
-# whale-configure (whale.radio_config_tui) never imports whale.dsp, so it
-# pulls in neither numpy nor scipy -- its own Analysis is far smaller than
-# whale-server's. The commands share the Python runtime and vendored
-# libraries; MERGE() and COLLECT place them in one dist/whale/ folder.
+# whale-configure includes the level tuner used from its radio list, so its
+# Analysis includes the tuner's audio and NumPy dependencies. The commands
+# share the Python runtime and vendored libraries; MERGE() and COLLECT place
+# them in one dist/whale/ folder.
 
 import os
 import sys

@@ -118,7 +118,8 @@ def main():
     ap.add_argument("--log", help="also append the capture to this file")
     ap.add_argument("--launch-stations", action="store_true",
                     help="launch two Whale HF stations and sniff through them")
-    ap.add_argument("--radio-config", help="TOML radio inventory for launched stations")
+    ap.add_argument("--station-a-config", help="station A config.toml")
+    ap.add_argument("--station-b-config", help="station B config.toml")
     ap.add_argument("--station-a-radio", default="ic705")
     ap.add_argument("--station-b-radio", default="ic7300")
     ap.add_argument("--station-a-call", default="STA1")
@@ -130,21 +131,21 @@ def main():
         if args.pair:
             ap.error("--pair cannot be combined with --launch-stations")
         root = Path(__file__).resolve().parent.parent
-        stations = [(args.station_a_radio, args.station_a_call, 8300, 8301),
-                    (args.station_b_radio, args.station_b_call, 8310, 8311)]
-        for radio, call, cmd_port, data_port in stations:
+        if not args.station_a_config or not args.station_b_config:
+            ap.error("--launch-stations requires --station-a-config and --station-b-config")
+        stations = [(args.station_a_radio, args.station_a_call, args.station_a_config, 8300, 8301),
+                    (args.station_b_radio, args.station_b_call, args.station_b_config, 8310, 8311)]
+        for radio, call, config, cmd_port, data_port in stations:
             cmd = [sys.executable, "-m", "whale.vara_server", "--radio", radio,
-                   "--mycall", call, "--cmd-port", str(cmd_port),
+                   "--config", config, "--cmd-port", str(cmd_port),
                    "--data-port", str(data_port), "--channel", "hf", "--verbose"]
-            if args.radio_config:
-                cmd += ["--radio-config", args.radio_config]
             print(f"launching station {call}: {' '.join(cmd)}", file=sys.stderr)
             station_procs.append(subprocess.Popen(cmd, cwd=root))
         # The data listener is bound at startup but Whale only accepts a data
         # connection after the radio link reaches CONNECTED.  Waiting for a
         # successful data-port connect here would therefore time out during
         # normal idle startup.
-        for _, _, cmd_port, data_port in stations:
+        for _, _, _, cmd_port, data_port in stations:
             if not _wait_for_port(cmd_port, station_procs):
                 for proc in station_procs:
                     if proc.poll() is None:

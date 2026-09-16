@@ -2,7 +2,7 @@ import curses
 
 from whale.hw import audio_io, hamlib, ptt
 from whale.hw.radios import Radio
-from whale.radio_config_tui import NOTHING, POP, RadioDetailView, RadioListView, ListPickerView
+from whale.config_tui import NOTHING, POP, RadioDetailView, RadioListView, ListPickerView
 
 
 class _FakeScreen:
@@ -494,7 +494,7 @@ def test_apply_edit_rename_of_current_default_carries_default_along():
 def test_a_pushes_blank_detail_view():
     view = _list_view(["a"])
     result = view.handle_key(ord("a"))
-    from whale.radio_config_tui import Push
+    from whale.config_tui import Push
     assert isinstance(result, Push)
     detail = result.view
     assert isinstance(detail, RadioDetailView)
@@ -505,7 +505,7 @@ def test_a_pushes_blank_detail_view():
 def test_enter_pushes_prepopulated_detail_view():
     view = _list_view(["a", "b"], selected=1)
     result = view.handle_key(curses.KEY_ENTER)
-    from whale.radio_config_tui import Push
+    from whale.config_tui import Push
     assert isinstance(result, Push)
     detail = result.view
     assert detail.old_name == "b"
@@ -521,7 +521,7 @@ def test_enter_on_empty_list_is_noop():
 
 def test_enter_alternate_keycodes_10_and_13_also_work():
     view = _list_view(["a"])
-    from whale.radio_config_tui import Push
+    from whale.config_tui import Push
     assert isinstance(view.handle_key(10), Push)
     assert isinstance(view.handle_key(13), Push)
 
@@ -616,7 +616,7 @@ def test_audio_input_picker_lists_only_input_devices_and_selects(monkeypatch):
     view = _new_view()
     _select_row(view, "audio_input_name")
     result = view.handle_key(ord("p"))
-    from whale.radio_config_tui import Push
+    from whale.config_tui import Push
     assert isinstance(result, Push)
     assert seen_kind == ["input"]
     picker = result.view
@@ -638,7 +638,7 @@ def test_audio_output_picker_lists_only_output_devices_and_selects(monkeypatch):
     view = _new_view()
     _select_row(view, "audio_output_name")
     result = view.handle_key(ord("p"))
-    from whale.radio_config_tui import Push
+    from whale.config_tui import Push
     assert isinstance(result, Push)
     assert seen_kind == ["output"]
     picker = result.view
@@ -682,7 +682,7 @@ def test_enter_and_p_on_audio_device_row_both_open_the_picker_not_text_edit(monk
     identically, both opening the picker directly."""
     monkeypatch.setattr(audio_io, "list_devices",
                          lambda kind=None: [_device(0, "USB Audio CODEC", max_input_channels=2)])
-    from whale.radio_config_tui import Push
+    from whale.config_tui import Push
 
     view = _new_view()
     _select_row(view, "audio_input_name")
@@ -834,7 +834,7 @@ def test_hamlib_picker_selects_model_and_autofills_blank_name(monkeypatch):
     _goto_backend(view, "hamlib")
     _select_row(view, "model")
     result = view.handle_key(ord("p"))
-    from whale.radio_config_tui import Push
+    from whale.config_tui import Push
     assert isinstance(result, Push)
     picker = result.view
 
@@ -1028,7 +1028,7 @@ def test_serial_picker_for_icom_leaves_usb_id_unchanged_when_port_has_no_usb_id(
     _goto_backend(view, "icom-civ")
     _select_row(view, "usb_id")
     result = view.handle_key(ord("p"))
-    from whale.radio_config_tui import Push
+    from whale.config_tui import Push
     assert isinstance(result, Push)
     picker = result.view
     picker.handle_key(curses.KEY_ENTER)

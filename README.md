@@ -35,23 +35,26 @@ python -m venv .venv
 python -m pip install -e ".[test]"
 ```
 
-**Set up your radio.** The terminal configuration tool writes `radios.toml`,
-browsing the audio devices, serial ports, and hamlib models it finds:
+**Configure Whale.** The terminal configuration tool writes `config.toml`,
+including the station callsign, channel defaults, and radios. It browses the
+audio devices, serial ports, and hamlib models it finds:
 
 ```console
 whale-configure
 ```
 
-Use `whale-levels --radio station-a` to check received level with open
-squelch and choose a conservative transmit attenuation; see
+Highlight a transmitting radio in `whale-configure` and press `l` to measure
+its input and tune its transmit level. `None` keeps the single-radio level
+meter; another radio can receive the optional over-air test signal. The standalone
+`whale-levels --radio station-a --receive-radio station-b` command provides
+the same tuner; see
 [radio audio setup](docs/HARDWARE.md#whale-levels).
 
 **Run.** Start one server per radio, then point your VARA-capable
 application at its command and data ports:
 
 ```console
-whale-server --radio-config radios.toml --radio station-a \
-    --mycall STA1 --cmd-port 8300 --data-port 8301
+whale-server --channel fm --cmd-port 8300 --data-port 8301
 ```
 
 Read the [hardware and safety guide](docs/HARDWARE.md) before transmitting.

@@ -1,13 +1,13 @@
-# Copy this file anywhere, edit it, and pass --radio-config PATH (or set
-# WHALE_RADIO_CONFIG). With neither, radios.toml in the current directory is
-# used -- see the repo root's radios.toml for the original bench's
-# ic705/ic7300/ht inventory.
+# Copy this file anywhere, edit it, and pass --config PATH (or set
+# WHALE_CONFIG). With neither, config.toml in the current directory is used.
 
-# Optional: the radio used when --radio is omitted. Must name one of the
-# [radios.*] tables below, and must come before any table header. A file
-# with only one [radios.*] table defaults to it implicitly even without
-# this key.
-# default_radio = "shack-icom"
+callsign = "N0CALL"
+# ssid = 1
+default_fm_radio = "shack-icom"
+default_hf_radio = "shack-icom"
+# cmd_port = 8300
+# data_port = 8301
+# log_file = "whale.log" # omit to log to stderr
 
 [radios.shack-icom]
 name = "Icom controlled over CI-V"
