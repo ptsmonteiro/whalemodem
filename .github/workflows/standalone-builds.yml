@@ -191,8 +191,8 @@ jobs:
           path: dist/whale-*-${{ matrix.tag }}.tar.gz
 
   # macos-arm64 / macos-x86_64: real, native Apple Silicon / Intel runners.
-  # No QEMU/Rosetta needed -- macos-13 is the last macOS runner generation
-  # GitHub publishes on Intel hardware, macos-14 is Apple Silicon. The mac
+  # No QEMU/Rosetta needed -- macos-15-intel is GitHub's oldest supported
+  # standard Intel image, while macos-14 is Apple Silicon. The mac
   # dylib relocation (install_name_tool + ad-hoc codesign) already happened
   # once, at vendor time, in scripts/vendor_hamlib.py; this build just
   # bundles the already-relocated .dylib as data, it doesn't redo that step.
@@ -205,7 +205,7 @@ jobs:
         include:
           - os: macos-14
             tag: macos-arm64
-          - os: macos-13
+          - os: macos-15-intel
             tag: macos-x86_64
     steps:
       - uses: actions/checkout@v7
