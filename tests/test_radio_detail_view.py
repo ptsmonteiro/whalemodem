@@ -67,7 +67,7 @@ def test_navigation_up_down_through_backend_specific_rows():
     assert view.ptt_backend == "serial-line"
     rows = view._rows()
     keys = [r.key for r in rows]
-    assert keys == ["name", "description", "audio_input_name", "audio_output_name",
+    assert keys == ["name", "audio_input_name", "audio_output_name",
                      "channel_fm", "channel_hf", "ptt_backend",
                      "port", "line", "baud", "active_high", "save", "cancel"]
 
@@ -107,7 +107,6 @@ def test_text_edit_type_backspace_commit():
 def test_text_edit_esc_reverts_only_that_field():
     view = _new_view()
     view.name = "original"
-    view.description = "kept"
     _select_row(view, "name")
     _enter(view)
     _clear_edit_buffer(view)
@@ -116,21 +115,14 @@ def test_text_edit_esc_reverts_only_that_field():
     assert result is NOTHING
     assert view.editing_field is None
     assert view.name == "original"  # reverted
-    assert view.description == "kept"  # untouched
 
 
-def test_adding_fresh_seeds_blank_description_from_name():
+def test_form_has_no_description_field():
     view = _new_view()
-    assert view.description == ""
-    _select_row(view, "name")
-    _enter(view)
-    _type(view, "ic705")
-    _enter(view)
-    assert view.name == "ic705"
-    assert view.description == "ic705"
+    assert "description" not in [row.key for row in view._rows()]
 
 
-def test_editing_existing_radio_name_does_not_overwrite_existing_description():
+def test_editing_existing_radio_uses_inventory_name():
     radio = Radio("old", "My IC-705", "IC-705", "IC-705", "vox", frozenset({"fm"}), {})
     view = _new_view(existing=("old", radio))
     _select_row(view, "name")
@@ -139,7 +131,6 @@ def test_editing_existing_radio_name_does_not_overwrite_existing_description():
     _type(view, "new")
     _enter(view)
     assert view.name == "new"
-    assert view.description == "My IC-705"  # untouched: old_name is not None
 
 
 # -- backend cycling --
@@ -147,7 +138,7 @@ def test_editing_existing_radio_name_does_not_overwrite_existing_description():
 def test_backend_cycling_changes_visible_rows():
     view = _new_view()
     assert view.ptt_backend == "vox"
-    assert [r.key for r in view._rows() if r.key not in ("name", "description", "audio_input_name",
+    assert [r.key for r in view._rows() if r.key not in ("name", "audio_input_name",
                                                            "audio_output_name", "channel_fm", "channel_hf",
                                                            "ptt_backend", "save", "cancel")] == []
 
@@ -253,7 +244,6 @@ def _fill_audio(view, name="Card"):
 
 def test_save_fails_on_empty_name():
     view = _new_view()
-    _fill_text(view, "description", "desc")
     _fill_audio(view, "Card")
     _select_row(view, "save")
     result = _enter(view)
@@ -264,7 +254,6 @@ def test_save_fails_on_empty_name():
 def test_save_fails_on_name_collision_with_other_names():
     view = _new_view(other_names=["taken"])
     _fill_text(view, "name", "taken")
-    _fill_text(view, "description", "desc")
     _fill_audio(view, "Card")
     _select_row(view, "save")
     result = _enter(view)
@@ -276,7 +265,6 @@ def test_save_fails_on_name_collision_with_other_names():
 def test_save_fails_when_no_channel_is_selected():
     view = _new_view()
     _fill_text(view, "name", "ht")
-    _fill_text(view, "description", "desc")
     _fill_audio(view, "Card")
     _select_row(view, "channel_fm")
     _enter(view)  # turn the default-on fm toggle off, leaving neither channel on
@@ -289,7 +277,6 @@ def test_save_fails_when_no_channel_is_selected():
 def test_save_fails_on_missing_serial_line_port():
     view = _new_view()
     _fill_text(view, "name", "ht")
-    _fill_text(view, "description", "desc")
     _fill_audio(view, "Card")
     _goto_backend(view, "serial-line")
     _select_row(view, "save")
@@ -301,7 +288,6 @@ def test_save_fails_on_missing_serial_line_port():
 def test_save_fails_on_missing_icom_civ_usb_id():
     view = _new_view()
     _fill_text(view, "name", "ic705")
-    _fill_text(view, "description", "desc")
     _fill_audio(view, "Card")
     _goto_backend(view, "icom-civ")
     _select_row(view, "save")
@@ -329,7 +315,6 @@ def test_full_valid_save_serial_line_with_selected_baud():
 
     view = _new_view(on_done=on_done)
     _fill_text(view, "name", "ht")
-    _fill_text(view, "description", "HT via Digirig")
     _fill_audio(view, "USB Audio")
     _goto_backend(view, "serial-line")
     _fill_text(view, "port", "COM5")
@@ -347,7 +332,6 @@ def test_full_valid_save_serial_line_with_selected_baud():
 def test_save_fails_on_bad_icom_address():
     view = _new_view()
     _fill_text(view, "name", "ic705")
-    _fill_text(view, "description", "desc")
     _fill_audio(view, "Card")
     _goto_backend(view, "icom-civ")
     _fill_text(view, "usb_id", "0C26:0036")
@@ -371,7 +355,6 @@ def test_full_valid_save_vox():
 
     view = _new_view(on_done=on_done)
     _fill_text(view, "name", "handheld")
-    _fill_text(view, "description", "Handheld VOX radio")
     _fill_audio(view, "USB Audio")
     _select_row(view, "save")
     result = _enter(view)
@@ -379,7 +362,7 @@ def test_full_valid_save_vox():
     assert result is POP
     assert captured["old_name"] is None
     assert captured["new_name"] == "handheld"
-    assert captured["radio"] == Radio("handheld", "Handheld VOX radio", "USB Audio", "USB Audio", "vox",
+    assert captured["radio"] == Radio("handheld", "handheld", "USB Audio", "USB Audio", "vox",
                                       frozenset({"fm"}), {})
 
 
@@ -391,7 +374,6 @@ def test_full_valid_save_icom_civ_hex_address():
 
     view = _new_view(on_done=on_done)
     _fill_text(view, "name", "ic705")
-    _fill_text(view, "description", "IC-705")
     _fill_audio(view, "IC-705")
     _goto_backend(view, "icom-civ")
     _fill_text(view, "usb_id", "0C26:0036")
@@ -404,7 +386,7 @@ def test_full_valid_save_icom_civ_hex_address():
     assert old_name is None
     assert new_name == "ic705"
     assert radio == Radio(
-        "ic705", "IC-705", "IC-705", "IC-705", "icom-civ", frozenset({"fm"}),
+        "ic705", "ic705", "IC-705", "IC-705", "icom-civ", frozenset({"fm"}),
         {"usb_id": "0C26:0036", "address": 164},
     )
     assert isinstance(radio.ptt_config["address"], int)
@@ -418,7 +400,6 @@ def test_full_valid_save_serial_line_defaults_baud_and_line():
 
     view = _new_view(on_done=on_done)
     _fill_text(view, "name", "ht")
-    _fill_text(view, "description", "HT via Digirig")
     _fill_audio(view, "USB Audio")
     _goto_backend(view, "serial-line")
     _fill_text(view, "port", "COM5")
@@ -438,7 +419,6 @@ def test_full_valid_save_hamlib_omits_blank_optional_fields():
 
     view = _new_view(on_done=on_done)
     _fill_text(view, "name", "ft991a")
-    _fill_text(view, "description", "FT-991A")
     _fill_audio(view, "USB Audio")
     _goto_backend(view, "hamlib")
     _fill_text(view, "model", "3081")
@@ -844,7 +824,7 @@ def test_serial_port_picker_degrades_on_exception(monkeypatch):
     assert "serial port list unavailable" in view.status
 
 
-def test_hamlib_picker_selects_model_and_autofills_blank_description(monkeypatch):
+def test_hamlib_picker_selects_model_and_autofills_blank_name(monkeypatch):
     RigModel = hamlib.RigModel
     models = [RigModel(model=3081, manufacturer="Icom", model_name="IC-7300",
                         version="1.0", status="Stable")]
@@ -860,7 +840,60 @@ def test_hamlib_picker_selects_model_and_autofills_blank_description(monkeypatch
 
     picker.handle_key(curses.KEY_ENTER)
     assert view.backend_config["hamlib"]["model"] == "3081"
-    assert view.description == "Icom IC-7300"
+    assert view.name == "Icom IC-7300"
+
+
+def test_hamlib_picker_updates_name_when_previous_name_was_automatic(monkeypatch):
+    models = [
+        hamlib.RigModel(model=3070, manufacturer="Icom", model_name="IC-705",
+                        version="1.0", status="Stable"),
+        hamlib.RigModel(model=3081, manufacturer="Icom", model_name="IC-7300",
+                        version="1.0", status="Stable"),
+    ]
+    monkeypatch.setattr(hamlib, "list_rig_models", lambda: models)
+
+    view = _new_view()
+    _goto_backend(view, "hamlib")
+    _select_row(view, "model")
+    first_picker = view.handle_key(ord("p")).view
+    first_picker.handle_key(curses.KEY_ENTER)
+    assert view.name == "Icom IC-705"
+
+    second_picker = view.handle_key(ord("p")).view
+    second_picker.handle_key(curses.KEY_DOWN)
+    second_picker.handle_key(curses.KEY_ENTER)
+    assert view.name == "Icom IC-7300"
+
+
+def test_hamlib_picker_does_not_replace_existing_name(monkeypatch):
+    models = [hamlib.RigModel(model=3081, manufacturer="Icom", model_name="IC-7300",
+                              version="1.0", status="Stable")]
+    monkeypatch.setattr(hamlib, "list_rig_models", lambda: models)
+
+    view = _new_view()
+    _fill_text(view, "name", "shack")
+    _goto_backend(view, "hamlib")
+    _select_row(view, "model")
+    picker = view.handle_key(ord("p")).view
+
+    picker.handle_key(curses.KEY_ENTER)
+    assert view.name == "shack"
+
+
+def test_hamlib_picker_autofills_name_after_user_clears_it(monkeypatch):
+    models = [hamlib.RigModel(model=3081, manufacturer="Icom", model_name="IC-7300",
+                              version="1.0", status="Stable")]
+    monkeypatch.setattr(hamlib, "list_rig_models", lambda: models)
+
+    view = _new_view()
+    _fill_text(view, "name", "shack")
+    _fill_text(view, "name", "")
+    _goto_backend(view, "hamlib")
+    _select_row(view, "model")
+    picker = view.handle_key(ord("p")).view
+
+    picker.handle_key(curses.KEY_ENTER)
+    assert view.name == "Icom IC-7300"
 
 
 # -- hamlib "Model" row display: shows "<manufacturer> <model_name> (id <id>)"

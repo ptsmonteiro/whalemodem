@@ -89,7 +89,7 @@ class RadioForm:
 
     BACKEND_ORDER = ["vox", "serial-line", "icom-civ", "hamlib"]
     _TOP_LEVEL_FIELDS = {
-        "name", "description", "audio_input_name", "audio_output_name",
+        "name", "audio_input_name", "audio_output_name",
         "channel_fm", "channel_hf",
     }
 
@@ -99,7 +99,6 @@ class RadioForm:
 
         radio = existing[1] if existing else None
         self.name = radio.id if radio else ""
-        self.description = radio.name if radio else ""
         self.audio_input_name = radio.audio_input_name if radio else ""
         self.audio_output_name = radio.audio_output_name if radio else ""
         self.tx_level_db = radio.tx_level_db if radio else 0.0
@@ -118,7 +117,6 @@ class RadioForm:
     def rows(self) -> list[FormRow]:
         rows = [
             FormRow("name", "Name", "text"),
-            FormRow("description", "Description", "text"),
             FormRow("audio_input_name", "Audio input", "device", picker="audio_input"),
             FormRow("audio_output_name", "Audio output", "device", picker="audio_output"),
             FormRow("channel_fm", "Channel: fm", "bool"),
@@ -176,9 +174,6 @@ class RadioForm:
         elif name in self.other_names:
             errors.append(f"a radio named {name!r} already exists")
 
-        description = self.description.strip()
-        if not description:
-            errors.append("description is required")
         audio_input_name = self.audio_input_name.strip()
         if not audio_input_name:
             errors.append("audio input is required")
@@ -198,7 +193,7 @@ class RadioForm:
             return None, errors
         return Radio(
             id=name,
-            name=description,
+            name=name,
             audio_input_name=audio_input_name,
             audio_output_name=audio_output_name,
             ptt_backend=self.ptt_backend,

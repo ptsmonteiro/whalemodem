@@ -5,7 +5,6 @@ from whale.radio_config_form import RadioForm
 def _valid_form() -> RadioForm:
     form = RadioForm(existing=None, other_names=[])
     form.name = "portable"
-    form.description = "Portable station"
     form.audio_input_name = "USB input"
     form.audio_output_name = "USB output"
     return form
@@ -56,7 +55,6 @@ def test_build_radio_validates_without_tui_state():
 
     assert radio is None
     assert "a radio named 'duplicate' already exists" in errors
-    assert "description is required" in errors
     assert "at least one channel (fm or hf) is required" in errors
 
 

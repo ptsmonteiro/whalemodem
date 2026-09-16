@@ -464,6 +464,9 @@ class RadioDetailView(RadioForm):
         self.editing_field: str | None = None
         self.edit_buffer = ""
         self.status = ""
+        # A fresh blank name may follow Hamlib model selections until the
+        # user supplies one. Existing configured names are always explicit.
+        self._name_was_user_entered = existing is not None
         self._hamlib_models_by_id: dict[int, hamlib.RigModel] | None = None
 
     def _clamp_selection(self, rows: list[_Row]) -> None:
@@ -697,11 +700,8 @@ class RadioDetailView(RadioForm):
     def _commit_edit(self) -> None:
         key = self.editing_field
         self._set_value(key, self.edit_buffer)
-        # Seed Description from Name on a fresh add, same spirit as
-        # radios.py._radio() defaulting an *absent* description to the name
-        # -- just surfaced here as an overwritable starting point.
-        if key == "name" and self.old_name is None and not self.description.strip():
-            self.description = self.edit_buffer
+        if key == "name" and self.edit_buffer.strip():
+            self._name_was_user_entered = True
         self.editing_field = None
         self.status = ""
 
@@ -795,8 +795,8 @@ class RadioDetailView(RadioForm):
 
         def on_select(model: hamlib.RigModel) -> None:
             self._set_value(key, str(model.model))
-            if not self.description.strip():
-                self.description = f"{model.manufacturer} {model.model_name}"
+            if not self.name.strip() or not self._name_was_user_entered:
+                self.name = f"{model.manufacturer} {model.model_name}"
 
         return Push(ListPickerView("Hamlib rig models", models, format_item, on_select,
                                     search_key=search_key))
