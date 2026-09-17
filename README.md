@@ -77,3 +77,11 @@ channel tests, and the numbers speak for themselves.
 See [GOALS.md](GOALS.md) for what the project is aiming at,
 [docs/TESTING.md](docs/TESTING.md) for the test workflows, and the
 [documentation index](docs/README.md) for everything else.
+
+## License
+
+Copyright © 2026 Pedro Monteiro.
+
+Whale is free software licensed under the GNU General Public License,
+version 3 or later. See [LICENSE](LICENSE). Third-party components retain
+their respective licenses and copyright notices.
