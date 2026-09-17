@@ -8,12 +8,9 @@
 # runners, but only the *container* is emulated (QEMU); inside that emulated
 # container the build is native to the target arch.
 #
-# Deliberately artifacts-only: this workflow uploads build outputs as
-# workflow artifacts and does NOT create or publish a GitHub Release.
-# Publishing a Release is a separate, more visible action to opt into later
-# -- once more than just linux-x86_64 has been hardware-validated (see
-# packaging/pyinstaller/README.md and the standalone-builds plan). Do not
-# add release-publishing steps here without re-reading that reasoning first.
+# Every build is retained as a workflow artifact. For a v* tag, once every
+# platform build succeeds, the archives are also published on the matching
+# public GitHub Release. Manual runs remain artifacts-only.
 
 name: Standalone builds
 
@@ -23,9 +20,7 @@ on:
     tags:
       - "v*"
 
-# Least-privilege default. In particular, publishing a GitHub Release would
-# need `contents: write` -- this workflow intentionally only ever needs read
-# access to check out the repo and upload workflow artifacts.
+# Least-privilege default. Only the release job below receives write access.
 permissions:
   contents: read
 
@@ -265,3 +260,30 @@ jobs:
         with:
           name: whale-windows-x86_64
           path: dist/whale-*-windows-x86_64.zip
+
+  publish-release:
+    if: github.ref_type == 'tag'
+    needs:
+      - build-linux-x86_64
+      - build-linux-cross
+      - build-macos
+      - build-windows-x86_64
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - name: Download all standalone bundles
+        uses: actions/download-artifact@v8
+        with:
+          path: release-assets
+          merge-multiple: true
+      - name: Create release and upload bundles
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release view "$GITHUB_REF_NAME" >/dev/null 2>&1 || \
+            gh release create "$GITHUB_REF_NAME" \
+              --verify-tag \
+              --title "$GITHUB_REF_NAME" \
+              --generate-notes
+          gh release upload "$GITHUB_REF_NAME" release-assets/* --clobber
