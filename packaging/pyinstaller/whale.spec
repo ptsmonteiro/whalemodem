@@ -1,5 +1,4 @@
-# PyInstaller spec for the standalone whale-server, whale-configure, and
-# whale-levels bundles.
+# PyInstaller spec for the standalone whale-server and whale-configure bundle.
 #
 # Built onedir (not onefile): whale-server runs as a long-lived server,
 # often on low-end hardware like a Raspberry Pi, so avoiding onefile's
@@ -96,29 +95,14 @@ a_configure = Analysis(
     noarchive=False,
 )
 
-a_levels = Analysis(
-    [os.path.join(REPO_ROOT, "packaging", "pyinstaller", "entrypoint_levels.py")],
-    pathex=[REPO_ROOT],
-    binaries=[],
-    datas=datas,
-    hiddenimports=hiddenimports,
-    hookspath=[],
-    hooksconfig={},
-    runtime_hooks=[],
-    excludes=[],
-    noarchive=False,
-)
-
-# Dedupes binaries and data shared between the three Analyses.
+# Dedupes binaries and data shared between the two Analyses.
 MERGE(
     (a_server, "whale-server", "whale-server"),
     (a_configure, "whale-configure", "whale-configure"),
-    (a_levels, "whale-levels", "whale-levels"),
 )
 
 pyz_server = PYZ(a_server.pure)
 pyz_configure = PYZ(a_configure.pure)
-pyz_levels = PYZ(a_levels.pure)
 
 exe_server = EXE(
     pyz_server,
@@ -156,27 +140,9 @@ exe_configure = EXE(
     entitlements_file=None,
 )
 
-exe_levels = EXE(
-    pyz_levels,
-    a_levels.scripts,
-    [],
-    exclude_binaries=True,
-    name="whale-levels",
-    debug=False,
-    bootloader_ignore_signals=False,
-    strip=False,
-    upx=True,
-    console=True,
-    disable_windowed_traceback=False,
-    argv_emulation=False,
-    target_arch=None,
-    codesign_identity=None,
-    entitlements_file=None,
-)
-
-# A single COLLECT call across all three EXEs realizes the
+# A single COLLECT call across both EXEs realizes the
 # MERGE() dedupe: it writes one shared `dist/whale/_internal/` (Python
-# runtime and vendored libraries) instead of duplicating it. All three
+# runtime and vendored libraries) instead of duplicating it. Both
 # executables land next to that shared _internal/, inside dist/whale/.
 coll = COLLECT(
     exe_server,
@@ -185,9 +151,6 @@ coll = COLLECT(
     exe_configure,
     a_configure.binaries,
     a_configure.datas,
-    exe_levels,
-    a_levels.binaries,
-    a_levels.datas,
     strip=False,
     upx=True,
     upx_exclude=[],

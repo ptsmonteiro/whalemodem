@@ -88,12 +88,13 @@ back into the in-memory inventory (still not on disk until `s` on the list
 view), or
 `Cancel` to discard the form.
 
-### `whale-levels`
+### Audio level tuning
 
-From the dev tree, run `python -m whale.level_tui --radio ht` (or add
-`--config PATH`) with the modem server stopped. Only the configured
-Digirig and HT are needed. Open squelch on an unused channel and slowly raise
-the HT volume while watching the live two-second input peak/RMS meter. Keep
+Run `whale-configure` with the modem server stopped, highlight the transmitting
+radio, and press `l`. Choose `None` for a local input measurement or another
+configured radio for an over-air measurement. Open squelch on an unused
+channel and slowly raise the receiving radio's volume while watching the live
+two-second input peak/RMS meter. Keep
 clipped samples at zero and leave headroom below 0 dBFS. Open-squelch noise
 is a rough input check; a received data signal can have a different level.
 If available, adjust the PC's recording gain only if it acts before the
@@ -104,16 +105,16 @@ full PC output. Press `+`/`-` to change it by 1 dB. Press `t` to key a
 repeatable 500--3000 Hz multicarrier probe on a 50 Hz grid for at most 60
 seconds, and `t` again to stop. Interleaved grid carriers are empty. The
 displayed TX peak is the PC's digital output level, not the level or
-distortion at the radio mic port. Add `--receive-radio NAME` to take input
-from another configured transceiver. While the probe is received, the tuner
+distortion at the radio mic port. When another configured transceiver is
+selected as the receiver, the tuner
 shows occupied-carrier flatness, empty-carrier leakage, and EVM after removing
 clock error and smooth linear passband response. These describe the complete
 receiver, link, and sound-card path. The measurement starts
-enabled with `--receive-radio`, starts disabled otherwise, and `d` toggles it.
-Press `s` to store the chosen
-`audio.tx_level_db` (between -60 and 0 dB) in `config.toml`; regular modem
-transmissions then use that attenuation. Saving rewrites the inventory using
-the same writer as `whale-configure`. `q` exits and unkeys any active test.
+enabled for an over-air measurement, unavailable for a local measurement, and
+`d` toggles it. Press `s` to apply the chosen `audio.tx_level_db` (between -60
+and 0 dB) to the working configuration. Back on the main screen, press `s` to
+save `config.toml`; regular modem transmissions then use that attenuation.
+`q` exits and unkeys any active test.
 Verify the final setting with an actual fast-data exchange when possible.
 
 ## Audio backend

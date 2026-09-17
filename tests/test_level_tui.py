@@ -5,7 +5,6 @@ import numpy as np
 import pytest
 
 from whale import transport
-from whale.config import Config
 from whale.hw import audio_io
 from whale.hw.radios import Radio, RadioInventory, load_radios, save_radios
 from whale import level_tui
@@ -191,24 +190,6 @@ def test_probe_gauges_have_an_amber_transition_band():
 def test_probe_gauges_accept_known_all_mode_radio_setting():
     gauges = _probe_lines(ProbeResult(True, 6.9, -51.8, -18.9, -10.0))
     assert [status for _, status in gauges] == ["GOOD"] * 4
-
-
-def test_receive_radio_routes_its_input_and_enables_measurement(monkeypatch):
-    tx = _radio()
-    rx = Radio("monitor", "Monitor", "RX card", "unused", "vox",
-               frozenset({"fm"}), {})
-    inventory = Config("N0CALL", None, {"ht": tx, "monitor": rx}, "ht")
-    wrapper_calls = []
-    monkeypatch.setattr(level_tui, "app_config", lambda path: inventory)
-    monkeypatch.setattr(Radio, "devices",
-                        lambda self: (3, 4) if self.id == "ht" else (5, 6))
-    monkeypatch.setattr(level_tui.curses, "wrapper",
-                        lambda *args: wrapper_calls.append(args))
-
-    assert level_tui.main(["--radio", "ht", "--receive-radio", "monitor"]) == 0
-    args = wrapper_calls[0]
-    assert args[1:4] == (tx, rx, "config.toml")
-    assert args[5:8] == (3, 6, True)
 
 
 class _TunerScreen:

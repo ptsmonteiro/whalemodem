@@ -2,21 +2,17 @@
 
 from __future__ import annotations
 
-import argparse
 from collections import deque
 from contextlib import ExitStack
 import curses
-from dataclasses import dataclass, replace
+from dataclasses import dataclass
 import math
-import os
-import sys
 import threading
 import time
 from typing import Callable
 import numpy as np
 
 from whale.hw import audio_io, ptt as ptt_mod
-from whale.config import app_config, save_config
 
 
 SAMPLE_RATE = audio_io.SAMPLE_RATE
@@ -373,9 +369,8 @@ def run_level_tuner(
 
     ``transmit_radio`` supplies the probe; ``receive_radio`` supplies the input
     being measured.  They can be the same radio for a local measurement.
-    The callback owns persistence.  Embedded callers can update their working
-    configuration, while the standalone command supplies a callback that
-    writes the configuration file.
+    The callback owns persistence; the configuration UI uses it to update its
+    working configuration.
     """
     if receive_radio is None and rx_device is not None:
         raise ValueError("rx_device requires a receiving radio")
@@ -473,58 +468,3 @@ def run_level_tuner(
                     message = f"{completed_action} audio.tx_level_db = {level_db:g}."
     finally:
         tone.stop()
-
-
-def run(screen, radio, receive_radio, config_path: str, inventory,
-        tx_device: int, rx_device: int, distortion_enabled: bool = False) -> None:
-    """Run the standalone tuner, preserving its save-to-disk behavior."""
-    def save_level(level_db: float) -> None:
-        inventory.radios[radio.id] = replace(radio, tx_level_db=level_db)
-        save_config(config_path, inventory)
-
-    run_level_tuner(
-        screen,
-        radio,
-        receive_radio,
-        config_path,
-        tx_device,
-        rx_device,
-        save_level,
-        distortion_enabled,
-        apply_label="Save",
-    )
-
-
-def main(argv: list[str] | None = None) -> int:
-    parser = argparse.ArgumentParser(description="Live Digirig/radio audio level tuner")
-    parser.add_argument("--config", help="Application configuration TOML (default: WHALE_CONFIG or config.toml)")
-    parser.add_argument("--channel", choices=("fm", "hf"), default="fm",
-                        help="channel whose default radio to use")
-    parser.add_argument("--radio", help="Radio key (default: configured channel default)")
-    parser.add_argument("--receive-radio", help="Optional receiving radio inventory key (default: --radio)")
-    args = parser.parse_args(argv)
-    path = args.config or os.environ.get("WHALE_CONFIG") or "config.toml"
-    try:
-        inventory = app_config(path)
-        name = args.radio or inventory.default_radio(args.channel)
-        if name is None:
-            raise ValueError(f"choose a radio with --radio (no default_{args.channel}_radio is configured)")
-        if name not in inventory.radios:
-            raise ValueError(f"unknown radio {name!r}; have {sorted(inventory.radios)}")
-        radio = inventory.radios[name]
-        receive_name = args.receive_radio or name
-        if receive_name not in inventory.radios:
-            raise ValueError(f"unknown receiving radio {receive_name!r}; have {sorted(inventory.radios)}")
-        receive_radio = inventory.radios[receive_name]
-        tx_device, _ = radio.devices()
-        _, rx_device = receive_radio.devices()
-        curses.wrapper(run, radio, receive_radio, path, inventory, tx_device, rx_device,
-                       args.receive_radio is not None)
-    except Exception as exc:
-        print(f"whale-levels: {exc}", file=sys.stderr)
-        return 1
-    return 0
-
-
-if __name__ == "__main__":
-    raise SystemExit(main())
