@@ -25,6 +25,24 @@ permissions:
   contents: read
 
 jobs:
+  # Publishing must be backed by the same complete test suite used for
+  # ordinary push/PR CI.  Keeping this job in the release workflow makes the
+  # dependency explicit and prevents a tag from publishing when tests fail.
+  test:
+    name: Full test suite
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-python@v7
+        with:
+          python-version: "3.11"
+      - name: Install project + test deps
+        run: |
+          python -m pip install --upgrade pip
+          pip install -e ".[test]"
+      - name: Run full test suite
+        run: python -m pytest -q
+
   # Single source of truth for the version string used in every archive
   # name, so a manual workflow_dispatch run and a `git push --tags` run both
   # produce sensibly named artifacts.
@@ -264,6 +282,7 @@ jobs:
   publish-release:
     if: github.ref_type == 'tag'
     needs:
+      - test
       - build-linux-x86_64
       - build-linux-cross
       - build-macos
