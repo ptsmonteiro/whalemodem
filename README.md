@@ -17,7 +17,7 @@ curl -fsSL https://raw.githubusercontent.com/ptsmonteiro/whalemodem/main/install
 
 On Windows, run `irm https://raw.githubusercontent.com/ptsmonteiro/whalemodem/main/install.ps1 | iex`
 in PowerShell. The installer verifies the release checksum, installs the latest
-standalone release, and leaves existing `config.toml` files unchanged. Run it
+release, and leaves existing `config.toml` files unchanged. Run it
 again to upgrade. A new terminal may be needed before `whale-server` and
 `whale-configure` are on `PATH`. Python is not required.
 
