@@ -20,6 +20,10 @@ VERSION_RE = re.compile(
     re.IGNORECASE,
 )
 PROJECT_VERSION_RE = re.compile(r'(?m)^version\s*=\s*"([^"]*)"\s*$')
+GITHUB_REPOSITORY_RE = re.compile(
+    r"(?:github\.com[/:])(?P<owner>[^/]+)/(?P<repo>[^/#]+?)(?:\.git)?$",
+    re.IGNORECASE,
+)
 
 
 def git(*args: str, capture: bool = False) -> str:
@@ -38,16 +42,80 @@ def fail(message: str) -> None:
     raise SystemExit(f"error: {message}")
 
 
+def project_version() -> str:
+    """Return the version declared by the working tree."""
+    match = PROJECT_VERSION_RE.search(PYPROJECT.read_text(encoding="utf-8"))
+    if match is None:
+        fail("could not find project.version in pyproject.toml")
+    return match.group(1)
+
+
+def github_repository() -> str | None:
+    """Return the GitHub owner/repository for origin, if it has one."""
+    origin = git("remote", "get-url", "origin", capture=True)
+    match = GITHUB_REPOSITORY_RE.search(origin)
+    return f"{match.group('owner')}/{match.group('repo')}" if match else None
+
+
+def github_release_tags() -> list[str]:
+    """Return release tags from origin, newest version first."""
+    output = git("ls-remote", "--tags", "--refs", "origin", capture=True)
+    tags = [
+        line.rsplit("/", 1)[-1]
+        for line in output.splitlines()
+        if "\trefs/tags/v" in line
+    ]
+    return sorted(tags, key=lambda tag: version_key(tag.removeprefix("v")), reverse=True)
+
+
+def version_key(version: str) -> tuple[int, ...]:
+    """Compare the numeric release component of supported release versions."""
+    match = re.match(r"^(\d+(?:\.\d+)*)", version)
+    if match is None:
+        return ()
+    return tuple(int(part) for part in match.group(1).split("."))
+
+
+def show_releases() -> None:
+    """Print GitHub release tags and note a newer local tree version."""
+    git("rev-parse", "--is-inside-work-tree", capture=True)
+    repository = github_repository()
+    if repository is None:
+        fail("origin is not a GitHub repository; cannot list GitHub releases")
+    releases = github_release_tags()
+    local_version = project_version()
+
+    print(f"Releases ({repository}):")
+    if releases:
+        latest_version = releases[0].removeprefix("v")
+        local_is_newer = version_key(local_version) > version_key(latest_version)
+        if local_is_newer:
+            print(f"  v{local_version}  (latest, local tree; newer than GitHub)")
+        for index, release in enumerate(releases):
+            label = "latest" if index == 0 and not local_is_newer else "previous"
+            print(f"  {release}  ({label}, GitHub)")
+    else:
+        print("  no GitHub release tags")
+        print(f"  v{local_version}  (latest, local tree)")
+
+
 def main() -> None:
     parser = argparse.ArgumentParser(
         description="Update project.version, commit it, and create a vVERSION tag."
     )
-    parser.add_argument("version", help="PEP 440 release version, without a leading v")
+    parser.add_argument(
+        "version", nargs="?", help="PEP 440 release version, without a leading v"
+    )
     parser.add_argument(
         "--push", action="store_true",
         help="push the release commit and its tag to origin after creating them",
     )
     args = parser.parse_args()
+    if args.version is None:
+        if args.push:
+            fail("--push requires a release version")
+        show_releases()
+        return
     version = args.version
     tag = f"v{version}"
 
