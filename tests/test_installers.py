@@ -55,6 +55,9 @@ def test_windows_platform_detection_and_url():
         pytest.skip("PowerShell unavailable")
     command = f'''. '{ROOT / "install.ps1"}'
 Get-WhalePlatformTag 'Microsoft Windows' X64
+$env:OS = 'Windows_NT'
+$env:PROCESSOR_ARCHITEW6432 = 'AMD64'
+Get-WhalePlatformTag
 $Repository='owner/repo'
 Get-WhaleReleaseUrl 'v1.2.3' 'whale-windows-x86_64.zip'
 try {{ Get-WhalePlatformTag 'Microsoft Windows' Arm64 }} catch {{ 'unsupported' }}
@@ -65,6 +68,7 @@ try {{ Get-WhalePlatformTag 'Microsoft Windows' Arm64 }} catch {{ 'unsupported' 
         env=env, capture_output=True, text=True,
     )
     assert result.stdout.splitlines() == [
+        "windows-x86_64",
         "windows-x86_64",
         "https://github.com/owner/repo/releases/download/v1.2.3/whale-windows-x86_64.zip",
         "unsupported",

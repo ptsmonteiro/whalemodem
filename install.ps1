@@ -5,9 +5,14 @@ $InstallRoot = if ($env:WHALE_INSTALL_ROOT) { $env:WHALE_INSTALL_ROOT } else { J
 $BinDir = if ($env:WHALE_BIN_DIR) { $env:WHALE_BIN_DIR } else { Join-Path $HOME '.local\bin' }
 
 function Get-WhalePlatformTag {
-    param([string]$OS = [System.Runtime.InteropServices.RuntimeInformation]::OSDescription,
-          [System.Runtime.InteropServices.Architecture]$Architecture = [System.Runtime.InteropServices.RuntimeInformation]::OSArchitecture)
-    if ($OS -notmatch 'Windows' -or $Architecture -ne [System.Runtime.InteropServices.Architecture]::X64) {
+    param([string]$OS,
+          [string]$Architecture)
+    if (!$OS) { $OS = $env:OS }
+    # PROCESSOR_ARCHITEW6432 reports the native architecture when this script
+    # runs under 32-bit PowerShell on 64-bit Windows.
+    if (!$Architecture) { $Architecture = $env:PROCESSOR_ARCHITEW6432 }
+    if (!$Architecture) { $Architecture = $env:PROCESSOR_ARCHITECTURE }
+    if ($OS -notmatch 'Windows' -or $Architecture -notmatch '^(AMD64|X64)$') {
         throw "Unsupported platform: $OS $Architecture (Whale supports Windows x86_64)"
     }
     'windows-x86_64'
