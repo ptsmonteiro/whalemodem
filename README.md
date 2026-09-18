@@ -9,12 +9,17 @@ interface. See [docs/MODES.md](docs/MODES.md) for the shipped modes and rates.
 
 ## Quick start
 
-**Install for station use.** Use the standalone bundle for your platform. It
-contains `whale-server` and `whale-configure` and does not
-require Python or a separate Whale installation. Extract the bundle and run
-the commands from its `whale/` directory. See the
-[standalone build guide](packaging/pyinstaller/README.md) for bundle details
-and platform availability.
+**Install for station use (Linux or macOS).**
+
+```console
+curl -fsSL https://raw.githubusercontent.com/ptsmonteiro/whalemodem/main/install.sh | bash
+```
+
+On Windows, run `irm https://raw.githubusercontent.com/ptsmonteiro/whalemodem/main/install.ps1 | iex`
+in PowerShell. The installer verifies the release checksum, installs the latest
+standalone release, and leaves existing `config.toml` files unchanged. Run it
+again to upgrade. A new terminal may be needed before `whale-server` and
+`whale-configure` are on `PATH`. Python is not required.
 
 **Configure Whale.** The terminal configuration tool writes `config.toml`,
 including the station callsign, channel defaults, and radios. It browses the
