@@ -302,9 +302,9 @@ jobs:
         run: |
           cd release-assets
           sha256sum whale-* > SHA256SUMS
-          gh release view "$GITHUB_REF_NAME" >/dev/null 2>&1 || \
-            gh release create "$GITHUB_REF_NAME" \
+          gh release view "$GITHUB_REF_NAME" --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1 || \
+            gh release create "$GITHUB_REF_NAME" --repo "$GITHUB_REPOSITORY" \
               --verify-tag \
               --title "$GITHUB_REF_NAME" \
               --generate-notes
-          gh release upload "$GITHUB_REF_NAME" * --clobber
+          gh release upload "$GITHUB_REF_NAME" * --clobber --repo "$GITHUB_REPOSITORY"
