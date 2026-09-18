@@ -2,7 +2,8 @@ import curses
 
 from whale.hw import audio_io, hamlib, ptt
 from whale.hw.radios import Radio
-from whale.config_tui import NOTHING, POP, RadioDetailView, RadioListView, ListPickerView
+from whale.config_tui import (NOTHING, POP, App, ListPickerView, RadioDetailView,
+                              RadioListView, RunPttTest)
 
 
 class _FakeScreen:
@@ -24,6 +25,9 @@ class _FakeScreen:
         return (self._height, self._width)
 
     def addnstr(self, y, x, text, n, attr=0):
+        pass
+
+    def refresh(self):
         pass
 
 
@@ -69,7 +73,8 @@ def test_navigation_up_down_through_backend_specific_rows():
     keys = [r.key for r in rows]
     assert keys == ["name", "audio_input_name", "audio_output_name",
                      "channel_fm", "channel_hf", "ptt_backend",
-                     "port", "line", "baud", "active_high", "save", "cancel"]
+                     "port", "line", "baud", "active_high", "test_ptt",
+                     "save", "cancel"]
 
     view.selected = 0
     for _ in range(len(rows) - 1):
@@ -1035,3 +1040,105 @@ def test_serial_picker_for_icom_leaves_usb_id_unchanged_when_port_has_no_usb_id(
 
     assert view.backend_config["icom-civ"]["usb_id"] == "unchanged"
     assert "no USB VID:PID" in view.status
+
+
+# -- PTT test action --
+
+class _FakeController:
+    """Records the key sequence a PTT test drives it through."""
+
+    key_state_unknown = False
+
+    def __init__(self, acknowledges=True):
+        self.acknowledges = acknowledges
+        self.keyings = []
+        self.closed = False
+
+    def key(self, on):
+        self.keyings.append(on)
+        return self.acknowledges
+
+    def close(self):
+        self.closed = True
+
+
+def _ptt_test_request(view):
+    row = _select_row(view, "test_ptt")
+    assert row.kind == "action"
+    return _enter(view)
+
+
+def test_vox_has_no_ptt_test_row():
+    view = _new_view()
+    assert view.ptt_backend == "vox"
+    assert "test_ptt" not in [row.key for row in view._rows()]
+
+
+def test_ptt_test_request_carries_the_unsaved_backend_config():
+    view = _new_view()
+    _select_row(view, "ptt_backend")
+    _enter(view)  # vox -> serial-line
+    _select_row(view, "port")
+    view._start_edit("port")
+    _clear_edit_buffer(view)
+    _type(view, "COM7")
+    _enter(view)
+
+    result = _ptt_test_request(view)
+    assert isinstance(result, RunPttTest)
+    assert result.backend == "serial-line"
+    assert result.config["port"] == "COM7"
+    assert result.owner is view
+
+
+def test_ptt_test_does_not_require_a_name_or_audio_devices():
+    view = _new_view()
+    _select_row(view, "ptt_backend")
+    _enter(view)
+    _select_row(view, "port")
+    view._start_edit("port")
+    _type(view, "COM7")
+    _enter(view)
+    assert view.name == "" and view.audio_input_name == ""
+    assert isinstance(_ptt_test_request(view), RunPttTest)
+
+
+def test_ptt_test_refuses_an_incomplete_backend_config():
+    view = _new_view()
+    _select_row(view, "ptt_backend")
+    _enter(view)  # serial-line with no port
+    assert _ptt_test_request(view) is NOTHING
+    assert "port is required" in view.status
+
+
+def test_run_ptt_test_keys_unkeys_and_closes(monkeypatch):
+    view = _new_view()
+    controller = _FakeController()
+    monkeypatch.setattr("whale.hw.ptt_backends.open_backend",
+                        lambda name, config: controller)
+    request = RunPttTest(view, "serial-line", {"port": "COM7"}, "HT", seconds=0.0)
+    App._run_ptt_test(_FakeScreen(), request)
+
+    assert controller.keyings == [True, False]
+    assert controller.closed
+    assert "passed" in view.status
+
+
+def test_run_ptt_test_reports_a_backend_that_cannot_be_opened(monkeypatch):
+    view = _new_view()
+
+    def boom(name, config):
+        raise OSError("could not open COM7")
+
+    monkeypatch.setattr("whale.hw.ptt_backends.open_backend", boom)
+    App._run_ptt_test(_FakeScreen(), RunPttTest(view, "serial-line", {}, "HT", 0.0))
+    assert "could not open COM7" in view.status
+
+
+def test_run_ptt_test_warns_when_un_keying_is_not_confirmed(monkeypatch):
+    view = _new_view()
+    controller = _FakeController(acknowledges=False)
+    monkeypatch.setattr("whale.hw.ptt_backends.open_backend",
+                        lambda name, config: controller)
+    App._run_ptt_test(_FakeScreen(), RunPttTest(view, "icom-civ", {}, "IC-705", 0.0))
+    assert "UN-KEY NOT CONFIRMED" in view.status

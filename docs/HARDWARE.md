@@ -83,7 +83,14 @@ port or hamlib model to offer -- no manual typing in that case either.
 Manual typing is only available as a fallback when the picker comes up
 empty or unavailable (no serial port currently connected, or no libhamlib
 on this machine), e.g. when pre-filling an inventory for a station you
-aren't physically sitting at. Select `Save` to validate and write the entry
+aren't physically sitting at. Under the `hamlib` backend, `ptt.civaddr`,
+`ptt.timeout` and `ptt.retry` have no field: hamlib's defaults suit every
+rig we have run (it knows each Icom's default CI-V address from the model
+number), and a value already in the file survives an edit untouched. With
+any backend but `vox`, a `Test PTT (key for 1 s)` action sits above `Save`:
+it opens the PTT settings currently in the form -- saved or not -- keys the
+radio for one second, un-keys it, and reports the result on the status
+line. Select `Save` to validate and write the entry
 back into the in-memory inventory (still not on disk until `s` on the list
 view), or
 `Cancel` to discard the form.

@@ -34,11 +34,20 @@ BACKEND_ROWS: dict[str, tuple[FormRow, ...]] = {
         FormRow("model", "Model", "text", picker="hamlib"),
         FormRow("device", "Device", "text", picker="serial"),
         FormRow("baud", "Baud", "selector"),
-        FormRow("civaddr", "CI-V address", "text"),
-        FormRow("timeout", "Timeout", "text"),
-        FormRow("retry", "Retry", "text"),
     ),
 }
+
+#: PTT settings honoured by the backend and preserved across an edit, but
+#: with no row of their own, because hamlib's default is right unless the
+#: rig has been changed away from it: the 2 s / 3 try transaction budget,
+#: and the CI-V address, which hamlib already knows per model -- it is worth
+#: setting only on an Icom moved off its factory address. "civaddr" is a
+#: token of hamlib's *Icom* backend rather than a frontend one, so a row for
+#: it was also an invitation to break a rig it does not apply to: hamlib
+#: raises "unknown config token" and the rig never opens. Hand-edit
+#: radios.toml on the rare link that needs any of them -- see
+#: docs/HARDWARE.md.
+HIDDEN_HAMLIB_KEYS = ("civaddr", "timeout", "retry")
 
 BAUD_OPTIONS = ("", "300", "1200", "2400", "4800", "9600", "19200", "38400", "57600", "115200")
 
@@ -106,6 +115,7 @@ class RadioForm:
         self.channel_hf = "hf" in radio.channels if radio else False
         self.ptt_backend = radio.ptt_backend if (radio and radio.ptt_backend in self.BACKEND_ORDER) else "vox"
 
+        self._hamlib_models_by_id: dict[int, Any] | None = None
         self.backend_config = {
             name: default_backend_values(name) for name in self.BACKEND_ORDER
         }
@@ -124,8 +134,30 @@ class RadioForm:
             FormRow("ptt_backend", "PTT backend", "backend_selector"),
         ]
         rows.extend(BACKEND_ROWS[self.ptt_backend])
+        if self.ptt_backend != "vox":
+            # VOX keys off the transmit audio itself, so there is nothing a
+            # test could assert here -- the level tuner already covers it.
+            rows.append(FormRow("test_ptt", "Test PTT (key for 1 s)", "action"))
         rows.extend((FormRow("save", "Save", "action"), FormRow("cancel", "Cancel", "action")))
         return rows
+
+    def hamlib_models_by_id(self) -> dict[int, Any]:
+        """hamlib's rig list keyed by model number, cached per form.
+
+        Consulted from the TUI's value rendering, i.e. potentially on every
+        keypress, while the rig list cannot change during the process's
+        lifetime. An unavailable libhamlib is not an error here -- it just
+        means a stored model number renders as itself.
+        """
+        if self._hamlib_models_by_id is None:
+            from whale.hw import hamlib
+
+            try:
+                models = hamlib.list_rig_models()
+            except Exception:
+                models = []
+            self._hamlib_models_by_id = {model.model: model for model in models}
+        return self._hamlib_models_by_id
 
     # Compatibility aliases used by the existing TUI and its callers.
     def _rows(self) -> list[FormRow]:
@@ -262,3 +294,15 @@ class RadioForm:
 
     def _build_ptt_config(self, errors: list[str]) -> dict[str, Any]:
         return self.build_ptt_config(errors)
+
+    def ptt_test_request(self) -> tuple[str, dict[str, Any], list[str]]:
+        """Backend name and config for a live PTT test of the *unsaved* form.
+
+        Only the PTT fields are validated: a radio being filled in may not
+        have a name or audio devices yet, and neither is needed to key it.
+        """
+        errors: list[str] = []
+        config = self.build_ptt_config(errors)
+        if self.ptt_backend == "icom-civ":
+            config["radio_name"] = self.name.strip() or "Icom"
+        return self.ptt_backend, config, errors

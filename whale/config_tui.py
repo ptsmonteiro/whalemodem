@@ -3,7 +3,8 @@
 Navigation shell: a small view stack (``App.stack``), each view a plain
 object implementing the ``View`` protocol (``render`` + ``handle_key``).
 ``handle_key`` returns a ``KeyResult`` telling the app whether to do
-nothing, push a new view, pop the current one, launch level tuning, or quit.
+nothing, push a new view, pop the current one, launch level tuning, key the
+radio for a PTT test, or quit.
 Three concrete
 views: ``ConfigView`` (station settings plus the radio list),
 ``RadioDetailView`` (add/edit one radio), and ``ListPickerView`` (a reusable
@@ -63,7 +64,18 @@ POP = Pop()
 QUIT = Quit()
 NOTHING = Nothing()
 
-KeyResult = Push | Pop | Quit | Nothing | RunLevels
+@dataclass(frozen=True)
+class RunPttTest:
+    """Key the radio described by ``config`` briefly, outside key handling."""
+
+    owner: "RadioDetailView"
+    backend: str
+    config: dict[str, Any]
+    label: str
+    seconds: float = 1.0
+
+
+KeyResult = Push | Pop | Quit | Nothing | RunLevels | RunPttTest
 
 
 class View(Protocol):
@@ -131,6 +143,8 @@ class App:
                 if self.stack[-1] is not result.owner:
                     self.stack.pop()
                 self._run_levels(stdscr, result)
+            elif isinstance(result, RunPttTest):
+                self._run_ptt_test(stdscr, result)
 
     @staticmethod
     def _run_levels(stdscr, request: RunLevels) -> None:
@@ -164,6 +178,59 @@ class App:
             # The tuner uses timed reads; restore the config shell's normal
             # blocking input mode even when device setup or cleanup fails.
             stdscr.timeout(-1)
+
+    @staticmethod
+    def _run_ptt_test(stdscr, request: RunPttTest) -> None:
+        """Key the configured PTT for a moment so the operator can see and
+        hear whether this backend really controls this radio.
+
+        Runs here rather than in ``handle_key`` for the same reason level
+        tuning does: it is blocking hardware I/O, and the keyed state has to
+        be visible on screen while it lasts. Un-keying goes through
+        ``ptt.unkey``, which never raises, so a backend that fails mid-test
+        still gets its transmitter dropped and its port closed.
+        """
+        import time
+
+        from whale.hw import ptt as ptt_mod
+        from whale.hw.ptt_backends import open_backend
+
+        owner = request.owner
+        height, width = stdscr.getmaxyx()
+
+        def banner(text: str, attr: int) -> None:
+            # Padded to the full width rather than cleared with clrtoeol so
+            # the shorter "opening" line cannot leave a tail of the previous
+            # status behind it.
+            _safe_addnstr(stdscr, height - 1, 0, text.ljust(max(0, width - 1)), attr)
+            stdscr.refresh()
+
+        controller = None
+        try:
+            banner(f"Opening {request.backend} ...", curses.A_BOLD)
+            controller = open_backend(request.backend, request.config)
+            banner(f"KEYED -- {request.label} transmitting for "
+                   f"{request.seconds:g} s", curses.A_REVERSE)
+            keyed = controller.key(True)
+            time.sleep(request.seconds)
+        except Exception as exc:
+            owner.status = f"PTT test failed: {type(exc).__name__}: {exc}"
+            return
+        finally:
+            if controller is not None:
+                unkeyed = ptt_mod.unkey(controller)
+                try:
+                    controller.close()
+                except Exception:
+                    pass
+        if not unkeyed:
+            owner.status = ("PTT test: UN-KEY NOT CONFIRMED -- check the radio "
+                            "is not still transmitting.")
+        elif keyed:
+            owner.status = f"PTT test passed: {request.backend} keyed and un-keyed."
+        else:
+            owner.status = (f"PTT test: {request.backend} keyed without "
+                            "acknowledgement; check the radio itself.")
 
     def main(self, stdscr) -> None:
         self.run(stdscr)
@@ -664,6 +731,13 @@ class ConfigView:
         self.status = f"Deleted {name!r}."
 
     def _apply_edit(self, old_name: str | None, new_name: str, radio: Radio) -> None:
+        """Store an added or edited radio and keep the per-channel defaults sane.
+
+        A rename carries a default along with it. Afterwards each channel the
+        saved radio supports adopts it when that channel has no default, and a
+        channel it no longer supports drops it -- save_config() rejects a
+        default that does not support its channel.
+        """
         if old_name is not None and old_name != new_name:
             del self.radios[old_name]
             if self.default_fm_radio == old_name:
@@ -672,6 +746,14 @@ class ConfigView:
                 self.default_hf_radio = new_name
         self.radios[new_name] = radio
         self.dirty = True
+        for channel in ("fm", "hf"):
+            attribute = f"default_{channel}_radio"
+            current = getattr(self, attribute)
+            if channel in radio.channels:
+                if current is None:
+                    setattr(self, attribute, new_name)
+            elif current == new_name:
+                setattr(self, attribute, None)
 
     def _save(self) -> bool:
         try:
@@ -832,7 +914,6 @@ class RadioDetailView(RadioForm):
         # A fresh blank name may follow Hamlib model selections until the
         # user supplies one. Existing configured names are always explicit.
         self._name_was_user_entered = existing is not None
-        self._hamlib_models_by_id: dict[int, hamlib.RigModel] | None = None
 
     def _clamp_selection(self, rows: list[_Row]) -> None:
         self.selected = 0 if not rows else max(0, min(self.selected, len(rows) - 1))
@@ -897,22 +978,8 @@ class RadioDetailView(RadioForm):
             model_id = int(raw)
         except ValueError:
             return raw
-        model = self._hamlib_models_by_id_map().get(model_id)
+        model = self.hamlib_models_by_id().get(model_id)
         return raw if model is None else f"{model.manufacturer} {model.model_name} (id {model.model})"
-
-    def _hamlib_models_by_id_map(self) -> dict[int, hamlib.RigModel]:
-        from whale.hw import hamlib
-
-        # Cached per-instance: list_rig_models() is called from _display_value
-        # on every render (potentially every keypress) while this form is
-        # open, and the rig list never changes during the process's lifetime.
-        if self._hamlib_models_by_id is None:
-            try:
-                models = hamlib.list_rig_models()
-            except OSError:
-                models = []
-            self._hamlib_models_by_id = {model.model: model for model in models}
-        return self._hamlib_models_by_id
 
     def _device_availability(self, row: _Row) -> str:
         """Plain-ASCII marker showing whether a stored device row's value is
@@ -993,9 +1060,25 @@ class RadioDetailView(RadioForm):
         if row.kind == "action":
             if row.key == "save":
                 return self._do_save()
+            if row.key == "test_ptt":
+                return self._test_ptt()
             if row.key == "cancel":
                 return POP
         return NOTHING
+
+    def _test_ptt(self) -> KeyResult:
+        """Hand the current PTT settings to the app for a live keying test.
+
+        Deliberately independent of Save: the whole point is to try a port,
+        a CI-V address or a hamlib model *before* committing it, and the
+        rest of the form (name, audio devices) has no bearing on keying.
+        """
+        backend, config, errors = self.ptt_test_request()
+        if errors:
+            self.status = "Cannot test PTT: " + "; ".join(errors)
+            return NOTHING
+        self.status = ""
+        return RunPttTest(self, backend, config, self.name.strip() or "radio")
 
     def _handle_space(self, row: _Row) -> KeyResult:
         if row.kind == "backend_selector":

@@ -179,3 +179,60 @@ def test_toggle_bool_and_cycle_selector():
     assert form.get_value("line") == "dtr"
     form.cycle_selector("line")
     assert form.get_value("line") == "rts"
+
+
+# -- conditional hamlib rows --
+
+class _Model:
+    def __init__(self, model, manufacturer):
+        self.model = model
+        self.manufacturer = manufacturer
+        self.model_name = "rig"
+
+
+def _hamlib_form(model="", models=()):
+    form = _valid_form()
+    form.ptt_backend = "hamlib"
+    form.backend_config["hamlib"]["model"] = model
+    form._hamlib_models_by_id = {m.model: m for m in models}
+    return form
+
+
+def _hamlib_row_keys(form):
+    return [row.key for row in form.rows()]
+
+
+def test_hamlib_rows_omit_timeout_and_retry():
+    keys = _hamlib_row_keys(_hamlib_form())
+    assert "timeout" not in keys and "retry" not in keys
+
+
+def test_hidden_hamlib_keys_survive_an_edit_untouched():
+    """The rows are gone; a hand-edited radios.toml value must not be."""
+    radio = Radio(id="rigctl", name="rigctl", audio_input_name="in",
+                  audio_output_name="out", ptt_backend="hamlib",
+                  channels=frozenset({"hf"}),
+                  ptt_config={"model": 3085, "civaddr": "0x94",
+                              "timeout": 4.0, "retry": 7})
+    form = RadioForm(existing=("rigctl", radio), other_names=[])
+
+    rebuilt, errors = form.build_radio()
+
+    assert errors == []
+    assert rebuilt.ptt_config["civaddr"] == "0x94"
+    assert rebuilt.ptt_config["timeout"] == 4.0
+    assert rebuilt.ptt_config["retry"] == 7
+
+
+def test_hamlib_rows_omit_the_civ_address():
+    """hamlib knows each Icom's default address from the model number, and
+    the token is one its Icom backend alone accepts."""
+    assert "civaddr" not in _hamlib_row_keys(_hamlib_form("3085", [_Model(3085, "Icom")]))
+
+
+def test_hamlib_model_lookup_survives_a_missing_libhamlib(monkeypatch):
+    import whale.hw.hamlib as hamlib_mod
+
+    monkeypatch.setattr(hamlib_mod, "list_rig_models",
+                        lambda: (_ for _ in ()).throw(OSError("no libhamlib")))
+    assert _valid_form().hamlib_models_by_id() == {}
