@@ -76,18 +76,20 @@ MAX_SAMPLE = 0.95
 #: payload stops.
 ACQUISITION_THRESHOLD = 0.12
 
-HEAD_BLOCK_SYMBOLS = 4
-HEAD_BLOCK_SAMPLES = HEAD_BLOCK_SYMBOLS * SYMBOL_SAMPLES
-LEAD_IN_FADE_SAMPLES = 240
+SETTLING_HEAD_BLOCK_SYMBOLS = 4
+SETTLING_HEAD_BLOCK_SAMPLES = SETTLING_HEAD_BLOCK_SYMBOLS * SYMBOL_SAMPLES
+SETTLING_HEAD_FADE_SAMPLES = 240
 TAIL_SAMPLES = 960
 RX_TAIL_SAMPLES = TAIL_SAMPLES // rx_audio.DECIMATION
 
-HEAD_SAMPLES = int(np.ceil(framing.HEAD_SECONDS * SAMPLE_RATE
-                           / HEAD_BLOCK_SAMPLES)) * HEAD_BLOCK_SAMPLES
+SETTLING_HEAD_SAMPLES = int(
+    np.ceil(framing.SETTLING_HEAD_SECONDS * SAMPLE_RATE
+            / SETTLING_HEAD_BLOCK_SAMPLES)) * SETTLING_HEAD_BLOCK_SAMPLES
 
 
 def frame_samples() -> int:
-    return HEAD_SAMPLES + TOTAL_SYMBOLS * SYMBOL_SAMPLES + TAIL_SAMPLES
+    return (SETTLING_HEAD_SAMPLES + TOTAL_SYMBOLS * SYMBOL_SAMPLES
+            + TAIL_SAMPLES)
 
 
 def frame_seconds() -> float:
@@ -113,8 +115,10 @@ FRAME_SECONDS = FRAME_SAMPLES / SAMPLE_RATE
 SYNC_PATTERN = np.repeat(
     BANK.symbols_from_bits(
         dsp.bits.pn_bits((SYNC_SYMBOLS // 2) * BITS_PER_SYMBOL, 0x0A73D)), 2)
-HEAD_PATTERN = BANK.symbols_from_bits(
-    dsp.bits.pn_bits(HEAD_BLOCK_SYMBOLS * BITS_PER_SYMBOL, 0x136E9))
+#: Its own PN, distinct from SYNC_PATTERN's, so the settling head never
+#: correlates as a sync preamble.
+SETTLING_HEAD_PATTERN = BANK.symbols_from_bits(
+    dsp.bits.pn_bits(SETTLING_HEAD_BLOCK_SYMBOLS * BITS_PER_SYMBOL, 0x136E9))
 
 CODEC = dsp.PacketCodec(
     payload_bits=PAYLOAD_BITS,
@@ -148,9 +152,9 @@ decode_payload_soft = CODEC.decode_soft
 
 # -- modulation -----------------------------------------------------------
 
-def head_block() -> np.ndarray:
-    """The repeating block the head is built from."""
-    return _mfsk.modulate(BANK, HEAD_PATTERN, TX_AMPLITUDE)
+def settling_head_block() -> np.ndarray:
+    """The repeating block the settling head is built from."""
+    return _mfsk.modulate(BANK, SETTLING_HEAD_PATTERN, TX_AMPLITUDE)
 
 
 def modulate(payload: bytes) -> np.ndarray:
@@ -159,10 +163,10 @@ def modulate(payload: bytes) -> np.ndarray:
         BANK.symbols_from_bits(encode_payload_bits(payload)),
     ))
     body = _mfsk.modulate(BANK, tones, TX_AMPLITUDE)
-    lead = np.resize(head_block(), HEAD_SAMPLES).copy()
-    fade = LEAD_IN_FADE_SAMPLES
-    lead[:fade] *= np.linspace(0.0, 1.0, fade, endpoint=True)
-    audio = np.concatenate((lead, body, np.zeros(TAIL_SAMPLES)))
+    head = np.resize(settling_head_block(), SETTLING_HEAD_SAMPLES).copy()
+    fade = SETTLING_HEAD_FADE_SAMPLES
+    head[:fade] *= np.linspace(0.0, 1.0, fade, endpoint=True)
+    audio = np.concatenate((head, body, np.zeros(TAIL_SAMPLES)))
     if len(audio) != frame_samples():
         raise AssertionError(f"internal frame length error: {len(audio)}")
     peak = float(np.max(np.abs(audio)))
@@ -326,7 +330,7 @@ def _check_constants() -> None:
     # bytes plus the trellis tail.  This is what picked 283 payload symbols.
     assert PACKET_BYTES == 107 and UNUSED_INFO_BITS == 2
     assert MAX_PAYLOAD_BYTES == 101
-    assert FRAME_SAMPLES == 283_584 and FRAME_SECONDS == 5.908
+    assert FRAME_SAMPLES == 265_152 and FRAME_SECONDS == 5.524
     # Every deliberate pair; a draw that happens to repeat a tone across
     # neighbouring pairs would give more, which is only more of the same
     # measurement.

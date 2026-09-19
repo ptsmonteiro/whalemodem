@@ -29,9 +29,10 @@ where they will be read:
   * **Air time, not frame time.** This bench spends a fixed ~155 ms per
     keying on PTT ramp and tail, which `frame_seconds()` excludes.  The frame
     below is sized so that overhead is amortized to ~3% rather than the ~5.5%
-    it costs at HF6's frame size; `airtime()` still reports the waveform
-    duration, per the `WaveformMode` contract and `SPEED_LADDERS.md`'s
-    definition of the throughput denominator.
+    it costs at HF6's frame size; `airtime()` reports the whole keyed
+    waveform -- `keying_seconds()`, the settling head plus the frame -- per
+    the `WaveformMode` contract and `SPEED_LADDERS.md`'s definition of the
+    throughput denominator.
 
 Default availability is a product decision, not a qualification claim: HF7's
 Level-4 operating-envelope evidence has not been run under
@@ -140,7 +141,8 @@ class Hf7Codec:
 
     def airtime(self, payload_len: int, mode: "Hf7Mode") -> float:
         del payload_len, mode
-        return max(5.0, HF7_PHY.frame_seconds())
+        # Air time is the whole keying: settling head plus frame.
+        return max(5.0, HF7_PHY.keying_seconds())
 
 
 HF7_CODEC = Hf7Codec()

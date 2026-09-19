@@ -45,7 +45,7 @@ class Hc1wCodec:
 
     def airtime(self, payload_len: int, mode: "Hc1wMode") -> float:
         del payload_len  # an HC1W frame is fixed length
-        return ((hc1w.LEAD_IN_SAMPLES
+        return ((hc1w.SETTLING_HEAD_SAMPLES
                  + hc1w.TOTAL_SYMBOLS * hc1w.SYMBOL_SAMPLES
                  + hc1w.TAIL_SAMPLES) / hc1w.SAMPLE_RATE)
 

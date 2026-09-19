@@ -44,7 +44,7 @@ class Hc0Codec:
 
     def airtime(self, payload_len: int, mode: "Hc0Mode") -> float:
         del payload_len  # an HC0 frame is the same length whatever it carries
-        return ((hc0.HEAD_SAMPLES
+        return ((hc0.SETTLING_HEAD_SAMPLES
                  + hc0.TOTAL_SYMBOLS * hc0.SYMBOL_SAMPLES
                  + hc0.TAIL_SAMPLES) / hc0.SAMPLE_RATE)
 

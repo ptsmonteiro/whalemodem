@@ -91,7 +91,7 @@ def test_short_frame_ends_before_following_full_frame():
     capture = _capture(np.concatenate((first, HR0.encode(full))))
     # Streaming RX sees the short body before the next preamble is complete.
     # Whole-buffer acquisition otherwise deliberately picks the strongest sync.
-    available = (len(first) + hr0.head_in_samples()) // rx_audio.DECIMATION
+    available = (len(first) + hr0.settling_head_samples()) // rx_audio.DECIMATION
     result = HR0.decode(capture[:available])
     assert result["payload"] == short
     assert result["end_index"] == pytest.approx(
@@ -116,8 +116,8 @@ def test_full_body_with_short_payload_still_decodes():
     payload = bytes(range(12))
     tones = np.concatenate((hr0.SYNC_PATTERN,
                             hr0.BANK.symbols_from_bits(hr0.CODEC.encode(payload))))
-    head = np.resize(mfsk.modulate(hr0.BANK, hr0.HEAD_PATTERN,
-                                   hr0.TX_AMPLITUDE), hr0.head_in_samples())
+    head = np.resize(mfsk.modulate(hr0.BANK, hr0.SETTLING_HEAD_PATTERN,
+                                   hr0.TX_AMPLITUDE), hr0.settling_head_samples())
     audio = np.concatenate((head,
                             mfsk.modulate(hr0.BANK, tones, hr0.TX_AMPLITUDE),
                             np.zeros(hr0.TAIL_SAMPLES)))
@@ -145,7 +145,7 @@ def test_short_ack_with_noise_and_frequency_offset(offset_hz):
 
 def test_truncated_and_corrupt_short_bodies_do_not_deliver_payloads():
     audio = HR0.encode(bytes(range(12)))
-    start = hr0.head_in_samples() + hr0.SYNC_SYMBOLS * hr0.SYMBOL_SAMPLES
+    start = hr0.settling_head_samples() + hr0.SYNC_SYMBOLS * hr0.SYMBOL_SAMPLES
     assert HR0.decode(_capture(audio[:start + hr0.SYMBOL_SAMPLES]))["payload"] is None
     audio[start:] = 0
     assert HR0.decode(_capture(audio))["payload"] is None
@@ -181,7 +181,7 @@ def test_previous_128_fsk_body_is_not_accepted_as_new_hr0():
 
 def test_complete_corrupt_body_reports_consumable_end():
     audio = HR0.encode(bytes(range(42)))
-    body_start = hr0.head_in_samples() + hr0.SYNC_SYMBOLS * hr0.SYMBOL_SAMPLES
+    body_start = hr0.settling_head_samples() + hr0.SYNC_SYMBOLS * hr0.SYMBOL_SAMPLES
     audio[body_start:] = 0
     result = HR0.decode(_capture(audio))
     assert result["payload"] is None

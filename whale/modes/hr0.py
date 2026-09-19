@@ -1,7 +1,8 @@
 """HR0 short/full 32-FSK control waveform, promoted from MARGIN32.
 
 The 2026-09-06 revision trades the previous 128-FSK margin for short ACK
-latency. The fixed native preamble is one second for consistent AGC settling.
+latency. A settling head of whale.framing.SETTLING_HEAD_SECONDS precedes
+the sync preamble, for consistent PTT ramp and AGC settling.
 This is wire-incompatible with the previous mode-10 body. Both peers must
 upgrade; the frozen old waveform lives only in the comparison experiment.
 """
@@ -33,14 +34,17 @@ TAIL_SAMPLES = 960
 RX_TAIL_SAMPLES = TAIL_SAMPLES // rx_audio.DECIMATION
 TX_AMPLITUDE = 0.13 * np.sqrt(2.0)
 ACQUISITION_THRESHOLD = 0.10
-HEAD_SECONDS = framing.HEAD_SECONDS
+SETTLING_HEAD_SECONDS = framing.SETTLING_HEAD_SECONDS
 
 SYNC_PATTERN = np.repeat(
     BANK.symbols_from_bits(dsp.bits.pn_bits((SYNC_SYMBOLS // 2) *
                                            BITS_PER_SYMBOL, 0x1D35B)), 2)
-HEAD_SYMBOLS = int(np.ceil(HEAD_SECONDS * SAMPLE_RATE / SYMBOL_SAMPLES))
-HEAD_PATTERN = BANK.symbols_from_bits(
-    dsp.bits.pn_bits(HEAD_SYMBOLS * BITS_PER_SYMBOL, 0x0B4A7))
+SETTLING_HEAD_SYMBOLS = int(np.ceil(SETTLING_HEAD_SECONDS * SAMPLE_RATE
+                                    / SYMBOL_SAMPLES))
+#: Its own PN, distinct from SYNC_PATTERN's, so the settling head never
+#: correlates as a sync preamble.
+SETTLING_HEAD_PATTERN = BANK.symbols_from_bits(
+    dsp.bits.pn_bits(SETTLING_HEAD_SYMBOLS * BITS_PER_SYMBOL, 0x0B4A7))
 CODEC = dsp.PacketCodec(
     payload_bits=PAYLOAD_BITS,
     interleaver=dsp.interleave.multiplicative(PAYLOAD_BITS, 301),
@@ -71,9 +75,9 @@ def payload_symbols(payload_len: int) -> int:
             else PAYLOAD_SYMBOLS)
 
 
-def head_in_samples() -> int:
-    symbols = int(np.ceil(HEAD_SECONDS * SAMPLE_RATE / SYMBOL_SAMPLES))
-    return symbols * SYMBOL_SAMPLES
+def settling_head_samples() -> int:
+    """Settling head length, rounded up to a whole symbol."""
+    return SETTLING_HEAD_SYMBOLS * SYMBOL_SAMPLES
 
 
 def modulate(payload: bytes) -> np.ndarray:
@@ -81,9 +85,10 @@ def modulate(payload: bytes) -> np.ndarray:
     codec = SHORT_CODEC if symbols == SHORT_PAYLOAD_SYMBOLS else CODEC
     tones = np.concatenate((SYNC_PATTERN, BANK.symbols_from_bits(codec.encode(payload))))
     body = mfsk.modulate(BANK, tones, TX_AMPLITUDE)
-    if HEAD_SECONDS:
-        head = np.resize(mfsk.modulate(BANK, HEAD_PATTERN, TX_AMPLITUDE),
-                         head_in_samples())
+    if SETTLING_HEAD_SECONDS:
+        head = np.resize(
+            mfsk.modulate(BANK, SETTLING_HEAD_PATTERN, TX_AMPLITUDE),
+            settling_head_samples())
         body = np.concatenate((head, body))
     return np.concatenate((body, np.zeros(TAIL_SAMPLES))).astype(np.float32)
 
@@ -160,7 +165,8 @@ def demodulate(audio: np.ndarray) -> dict:
 
 def frame_seconds(payload_len: int = MAX_PAYLOAD_BYTES) -> float:
     symbols = SYNC_SYMBOLS + payload_symbols(payload_len)
-    return (head_in_samples() + symbols * SYMBOL_SAMPLES + TAIL_SAMPLES) / SAMPLE_RATE
+    return ((settling_head_samples() + symbols * SYMBOL_SAMPLES
+             + TAIL_SAMPLES) / SAMPLE_RATE)
 
 
 assert BANK.bandwidth_hz <= 2_300.0

@@ -59,8 +59,8 @@ RX_GEOMETRY = _ofdm.Geometry(
     guard_samples=RX_GUARD_SAMPLES, carrier_bins=CARRIER_BINS,
 )
 
-HEAD_PHASE_SAMPLES = CORE_SAMPLES // 2
-LEAD_IN_FADE_SAMPLES = 240
+SETTLING_HEAD_PHASE_SAMPLES = CORE_SAMPLES // 2
+SETTLING_HEAD_FADE_SAMPLES = 240
 TAIL_SAMPLES = 960
 
 FFT_OFFSET = GUARD_SAMPLES
@@ -70,7 +70,7 @@ ACQUISITION_THRESHOLD = 0.70
 MIN_PRESENT_CARRIERS = 19
 CARRIER_FLOOR_DB = 35.0
 
-HEAD_SECONDS = framing.HEAD_SECONDS
+SETTLING_HEAD_SECONDS = framing.SETTLING_HEAD_SECONDS
 
 #: Unambiguous range of the two frequency estimators, as a fact about the
 #: geometry rather than a tunable: the cyclic-prefix angle wraps at half a
@@ -95,15 +95,24 @@ FINE_OFFSET_LIMIT_HZ = SAMPLE_RATE / (2.0 * SYMBOL_SAMPLES)
 # second pass over the whole capture.  See `_remove_residual_offset`.
 
 
-def lead_in_samples() -> int:
-    """HC1W's fixed native preamble length, aligned for acquisition."""
-    wanted = int(np.ceil(HEAD_SECONDS * SAMPLE_RATE))
-    cores = -((-(wanted - HEAD_PHASE_SAMPLES)) // CORE_SAMPLES)
-    return cores * CORE_SAMPLES + HEAD_PHASE_SAMPLES
+def settling_head_samples() -> int:
+    """HC1W's settling head length, aligned for acquisition.
+
+    This is *not* the sync preamble -- the five SYNC_SYMBOLS inside the
+    header are.  The settling head carries nothing and is never correlated
+    against; it only buys the PTT ramp and the receiver's AGC a stretch of
+    in-band signal.  Its length is rounded up to a whole number of sync
+    cores plus a half-core phase, which is what `sync_core()` requires to
+    keep it core-periodic rather than symbol-periodic.
+    """
+    wanted = int(np.ceil(SETTLING_HEAD_SECONDS * SAMPLE_RATE))
+    cores = -((-(wanted - SETTLING_HEAD_PHASE_SAMPLES)) // CORE_SAMPLES)
+    return cores * CORE_SAMPLES + SETTLING_HEAD_PHASE_SAMPLES
 
 
-LEAD_IN_SAMPLES = lead_in_samples()
-FRAME_SAMPLES = LEAD_IN_SAMPLES + TOTAL_SYMBOLS * SYMBOL_SAMPLES + TAIL_SAMPLES
+SETTLING_HEAD_SAMPLES = settling_head_samples()
+FRAME_SAMPLES = (SETTLING_HEAD_SAMPLES + TOTAL_SYMBOLS * SYMBOL_SAMPLES
+                 + TAIL_SAMPLES)
 FRAME_SECONDS = FRAME_SAMPLES / SAMPLE_RATE
 
 
@@ -164,14 +173,15 @@ def symbol_carriers(symbol_audio: np.ndarray,
 
 
 def sync_core() -> np.ndarray:
-    """The 512-sample periodic waveform the head and sync symbols share.
+    """The 512-sample periodic waveform the settling head and sync symbols share.
 
     Core-periodic and not symbol-periodic: acquisition
     correlates the capture against itself one whole symbol (640 samples)
-    apart, and a head built from repeated symbols would hold that
+    apart, and a settling head built from repeated symbols would hold that
     correlation high across the entire head and leave the candidate ranking
     one arbitrary offset inside a plateau to rank.  512 is not a factor of
-    640, so a core-periodic head is not autocorrelated at that lag at all.
+    640, so a core-periodic settling head is not autocorrelated at that lag
+    at all.
     """
     return build_symbol(SYNC_VALUES)[GUARD_SAMPLES:]
 
@@ -190,10 +200,10 @@ def frame_constellation(payload: bytes) -> np.ndarray:
 def modulate(payload: bytes) -> np.ndarray:
     values = frame_constellation(payload)
     symbols = np.concatenate([build_symbol(row) for row in values])
-    lead = np.resize(sync_core(), LEAD_IN_SAMPLES).copy()
-    fade = LEAD_IN_FADE_SAMPLES
-    lead[:fade] *= np.linspace(0.0, 1.0, fade, endpoint=True)
-    audio = np.concatenate((lead, symbols, np.zeros(TAIL_SAMPLES)))
+    head = np.resize(sync_core(), SETTLING_HEAD_SAMPLES).copy()
+    fade = SETTLING_HEAD_FADE_SAMPLES
+    head[:fade] *= np.linspace(0.0, 1.0, fade, endpoint=True)
+    audio = np.concatenate((head, symbols, np.zeros(TAIL_SAMPLES)))
     if len(audio) != frame_samples():
         raise AssertionError(f"internal frame length error: {len(audio)}")
     peak = float(np.max(np.abs(audio)))
@@ -400,8 +410,8 @@ def _check_constants() -> None:
     assert CARRIER_HZ[0] == 468.75 and CARRIER_HZ[-1] == 2531.25
     assert TOTAL_SYMBOLS == 365 and PAYLOAD_BITS == 16_192
     assert FEC_INPUT_BITS == 8_096
-    assert LEAD_IN_SAMPLES % CORE_SAMPLES == HEAD_PHASE_SAMPLES
-    assert FRAME_SAMPLES == 282_944
+    assert SETTLING_HEAD_SAMPLES % CORE_SAMPLES == SETTLING_HEAD_PHASE_SAMPLES
+    assert FRAME_SAMPLES == 263_488
     assert PACKET_BYTES == 1_011 and UNUSED_INFO_BITS == 0
     assert MAX_PAYLOAD_BYTES == 1_005
     assert COARSE_OFFSET_LIMIT_HZ == 46.875

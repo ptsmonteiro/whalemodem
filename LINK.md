@@ -121,8 +121,8 @@ existing link addressing policy after their encoding has been validated.
 The limits above bound all variable fields before allocation.
 
 The format version defines the complete handshake feature set. Version 5 uses
-each mode's fixed native preamble and has no calibration handshake or adaptive
-head feedback. Older versions are rejected rather than being accepted with a
+each mode's fixed native sync preamble and settling head, and has no
+calibration handshake or adaptive settling-head feedback. Older versions are rejected rather than being accepted with a
 reduced feature set.
 
 The session ID and the complete encoded CONNECT body identify an attempt. A
@@ -205,9 +205,10 @@ is authoritative: the receiver adopts that mode and returns it as
 silence at one speed by retransmitting the same sequence at a lower speed; the
 first successful ACK confirms both delivery and the new mode. DATA_ACK remains
 in the robust control mode and does not describe the reverse-direction mode.
-Each mode owns its fixed native preamble, so a mode change also changes the
-preamble waveform while preserving the common settling allowance. The
-receiver tries every mutually advertised mode when looking for DATA.
+Each mode owns its own sync preamble, so a mode change also changes the
+preamble waveform, while every mode prepends the same settling head
+allowance in front of it. The receiver tries every mutually advertised mode
+when looking for DATA.
 
 ### Disconnect
 

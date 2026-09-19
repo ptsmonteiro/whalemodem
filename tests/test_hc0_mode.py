@@ -93,7 +93,7 @@ def test_the_transmitted_waveform_is_constant_envelope():
     power to a lower-crest-factor waveform.
     """
     audio = np.asarray(HC0.encode(_packet()), np.float64)
-    body = audio[hc0.HEAD_SAMPLES:-hc0.TAIL_SAMPLES]
+    body = audio[hc0.SETTLING_HEAD_SAMPLES:-hc0.TAIL_SAMPLES]
     crest = np.max(np.abs(body)) / np.sqrt(np.mean(body ** 2))
     assert crest == pytest.approx(np.sqrt(2.0), abs=0.02)
 
@@ -129,7 +129,7 @@ def test_a_partial_frame_reports_a_lock_but_no_end_index():
     """Confidence over threshold with no end_index is how the link is told
     to keep waiting instead of consuming a half-arrived frame."""
     audio = HC0.encode(_packet())
-    arrived = hc0.HEAD_SAMPLES + 100 * hc0.SYMBOL_SAMPLES
+    arrived = hc0.SETTLING_HEAD_SAMPLES + 100 * hc0.SYMBOL_SAMPLES
     arrived_rx = ((4_000 + arrived) // rx_audio.DECIMATION
                   + rx_audio.FILTER_DELAY_DECODE_SAMPLES)
     result = HC0.decode(_snapshot(audio)[:arrived_rx])
@@ -145,7 +145,7 @@ def test_a_partial_current_frame_is_not_accepted_as_legacy():
     # Let the legacy grid be available, but stop before the current grid is
     # complete. Its CRC must not turn this partial current frame into a frame
     # the link consumes.
-    arrived = (hc0.HEAD_SAMPLES
+    arrived = (hc0.SETTLING_HEAD_SAMPLES
                + (hc0.SYNC_SYMBOLS + hc0.LEGACY_PAYLOAD_SYMBOLS + 1)
                * hc0.SYMBOL_SAMPLES)
     arrived_rx = ((4_000 + arrived) // rx_audio.DECIMATION
@@ -158,7 +158,7 @@ def test_a_partial_current_frame_is_not_accepted_as_legacy():
 
 def test_a_corrupted_frame_is_a_near_miss_the_link_can_skip_past():
     audio = np.asarray(HC0.encode(_packet()), np.float64)
-    start = hc0.HEAD_SAMPLES + hc0.SYNC_SYMBOLS * hc0.SYMBOL_SAMPLES
+    start = hc0.SETTLING_HEAD_SAMPLES + hc0.SYNC_SYMBOLS * hc0.SYMBOL_SAMPLES
     audio[start:] = RNG.normal(0.0, 0.2, len(audio) - start)
     result = HC0.decode(_snapshot(audio))
 
@@ -223,7 +223,7 @@ def test_the_offset_estimate_survives_a_timing_error():
 
     assert len(mfsk.repeated_pairs(hc0.SYNC_PATTERN)) == hc0.SYNC_SYMBOLS // 2
     audio = np.asarray(HC0.encode(_packet()), np.float64)
-    start = hc0.HEAD_SAMPLES
+    start = hc0.SETTLING_HEAD_SAMPLES
     for error in (-48, 0, 48):
         estimate = mfsk.offset_hz(hc0.BANK, audio, start + error,
                                   hc0.SYNC_PATTERN)

@@ -75,6 +75,7 @@ from functools import cached_property
 import numpy as np
 from scipy.signal import fftconvolve
 
+from whale import framing
 from whale.dsp import bits as _bits
 from whale.dsp import ldpc as _ldpc
 from whale.phy import sc as _sc
@@ -90,6 +91,27 @@ LENGTH_BYTES = _sc.LENGTH_BYTES
 CRC_BYTES = _sc.CRC_BYTES
 WHITENER_SEED = 0xBEEF17
 INTERLEAVER_SEED = 0x5EED1A
+
+#: The settling head prepended to every keying, in front of the sync
+#: preamble.  See whale/framing.py for what it is for.  It is built from
+#: OFDM symbols of this PHY's own geometry, each carrying its own draw of
+#: PN-BPSK across the active bins: unlike the preamble it is *not* one
+#: symbol repeated, so the head's cross-correlation against the preamble
+#: template averages down over the head instead of adding coherently, and
+#: acquisition cannot rank a position inside it above the real preamble.
+#: Measured over a whole head, the best in-head acquisition score is
+#: 0.10-0.13 on the four modes that use this PHY, against 0.99-1.06 for the
+#: real preamble and a 0.07-0.09 pure-noise floor over the same search
+#: volume. That is the floor, not a tuning: a 40-seed scan moved it only
+#: between 0.11 and 0.15, because it is the order statistic of a
+#: same-spectrum random signal against a 3,696-sample template. It sits
+#: beside streaming.py's 0.12 candidate threshold, so a head may cost one
+#: failed decode attempt per keying; it is ~8x below the real preamble, so
+#: it never outranks it. `settling_head_seed` below is the best of that scan.
+SETTLING_HEAD_SECONDS = framing.SETTLING_HEAD_SECONDS
+#: Ramp the head up over this many 48 kHz samples rather than keying a
+#: hard edge, matching hc0 and hc1w.
+SETTLING_HEAD_FADE_SAMPLES = 240
 
 SYNC_SEARCH_HZ = 20.0
 SYNC_SEARCH_STEP_HZ = 1.0
@@ -253,6 +275,7 @@ class OFDM49Mode:
     drive_scale: float = 0.5
     preamble_seed: int = 0x33
     pilot_seed: int = 0x51
+    settling_head_seed: int = 0x3C9C8
     equalizer: str = "gain"           # "gain" | "phase_slope"
     pilot_comb_stride: int = 0        # 0 disables; else every Nth active bin (by
                                        # position in sorted active_bins) is a
@@ -319,6 +342,22 @@ class OFDM49Mode:
                             (pilot_bpsk * np.exp(1j * phases) * amp).astype(np.complex128))
         object.__setattr__(self, "_phase_schedule", phases)
 
+        symbol_len = self.fft_size + self.cp_len
+        n_head = int(np.ceil(SETTLING_HEAD_SECONDS * DESIGN_RATE / symbol_len))
+        # whale.dsp.bits.pn_bits, not the 6-bit _pn_chips the preamble and
+        # pilots use: the head needs n_head * n_active chips without the
+        # short LFSR's 63-chip period, which would make the head symbols
+        # near-repeats of each other and let the preamble template
+        # correlate coherently across the whole head.
+        head_bits = _bits.pn_bits(n_head * n_active, self.settling_head_seed)
+        head_bpsk = (1.0 - 2.0 * head_bits.astype(np.float64)).reshape(
+            n_head, n_active)
+        object.__setattr__(self, "_n_settling_head_symbols", n_head)
+        object.__setattr__(
+            self, "_settling_head_bin_symbols",
+            (head_bpsk * (np.exp(1j * phases) * amp)[None, :]
+             ).astype(np.complex128))
+
     @property
     def n_active(self) -> int:
         return len(self.active_bins)
@@ -383,10 +422,29 @@ class OFDM49Mode:
         return segments
 
     def total_ofdm_symbols(self) -> int:
+        """Symbols the receiver decodes: sync preamble through last pilot.
+
+        The settling head is deliberately *not* counted: acquisition lands
+        on the sync preamble, and the streaming receiver sizes its decode
+        window from this.
+        """
         return self.n_preamble_symbols + self.n_data_ofdm_symbols + self.n_pilot_symbols
 
+    @property
+    def n_settling_head_symbols(self) -> int:
+        return self._n_settling_head_symbols
+
+    def settling_head_seconds(self) -> float:
+        """The settling head's duration, rounded up to a whole symbol."""
+        return self.n_settling_head_symbols * self.symbol_len / DESIGN_RATE
+
     def frame_seconds(self) -> float:
+        """Sync preamble through the last pilot, excluding the settling head."""
         return self.total_ofdm_symbols() * self.symbol_len / DESIGN_RATE
+
+    def keying_seconds(self) -> float:
+        """Everything transmitted for one frame: settling head plus frame."""
+        return self.settling_head_seconds() + self.frame_seconds()
 
     def crest_factor_db(self) -> float:
         rng = np.random.default_rng(1234)
@@ -500,6 +558,16 @@ class OFDM49Mode:
         passband = passband / (np.max(np.abs(passband)) + 1e-12)
         passband = passband * self.drive_scale
 
+        # The settling head is scaled to the same peak on its own rather
+        # than being folded into the frame's normalization, so prepending
+        # it cannot move the frame's drive level -- which is bench
+        # calibration on HF7 and HF8, not a free parameter.
+        head = np.concatenate(
+            [self._add_cp(self._ifft_symbol(row))
+             for row in self._settling_head_bin_symbols])
+        head = head / (np.max(np.abs(head)) + 1e-12) * self.drive_scale
+        passband = np.concatenate([head, passband])
+
         up = 4
         stuffed = np.zeros(len(passband) * up, dtype=np.float64)
         stuffed[::up] = passband
@@ -509,6 +577,8 @@ class OFDM49Mode:
         # percent.  Normalize the actual DAC waveform so drive_scale=1.0 is
         # genuinely full-scale without asking the audio backend to clip.
         tx = tx / (np.max(np.abs(tx)) + 1e-12) * self.drive_scale
+        fade = min(SETTLING_HEAD_FADE_SAMPLES, len(tx))
+        tx[:fade] *= np.linspace(0.0, 1.0, fade, endpoint=True)
         return tx.astype(np.float32)
 
     # -- RX -------------------------------------------------------------------

@@ -13,9 +13,12 @@ def test_hc1w_geometry_and_capacity():
     assert hc1w.CARRIER_HZ[[0, -1]].tolist() == [468.75, 2531.25]
     assert hc1w.CODEC.code is hc1w.dsp.K9
     assert HC1W.chunk_size == 995
-    assert HC1W.airtime(HC1W.chunk_size) == pytest.approx(5.8946667)
+    # Airtime is the whole keying: the settling head plus the frame.
+    assert hc1w.SETTLING_HEAD_SAMPLES / hc1w.SAMPLE_RATE == pytest.approx(
+        0.6027, abs=1e-4)
+    assert HC1W.airtime(HC1W.chunk_size) == pytest.approx(5.4893333)
     assert HC1W.chunk_size * 8 / HC1W.airtime(HC1W.chunk_size) == pytest.approx(
-        1350.3732
+        1450.0850
     )
 
 

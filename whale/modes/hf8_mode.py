@@ -191,7 +191,8 @@ class Hf8Codec:
 
     def airtime(self, payload_len: int, mode: "Hf8Mode") -> float:
         del payload_len, mode
-        return HF8_PHY.frame_seconds()
+        # Air time is the whole keying: settling head plus frame.
+        return HF8_PHY.keying_seconds()
 
 
 HF8_CODEC = Hf8Codec()

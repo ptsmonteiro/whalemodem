@@ -64,7 +64,8 @@ class Hf6Codec:
 
     def airtime(self, payload_len: int, mode: "Hf6Mode") -> float:
         del payload_len, mode
-        return HF6_PHY.frame_seconds()
+        # Air time is the whole keying: settling head plus frame.
+        return HF6_PHY.keying_seconds()
 
 
 HF6_CODEC = Hf6Codec()

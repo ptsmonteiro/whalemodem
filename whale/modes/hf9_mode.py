@@ -67,7 +67,8 @@ class Hf9Codec:
 
     def airtime(self, payload_len: int, mode: "Hf9Mode") -> float:
         del payload_len, mode
-        return HF9_PHY.frame_seconds()
+        # Air time is the whole keying: settling head plus frame.
+        return HF9_PHY.keying_seconds()
 
 
 HF9_CODEC = Hf9Codec()

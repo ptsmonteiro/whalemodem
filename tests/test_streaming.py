@@ -52,7 +52,11 @@ def test_full_frames_across_chunk_and_search_boundaries(mode, chunk_size, prefix
     audio = np.concatenate((np.zeros(prefix), audio, np.zeros(600)))
     stream, results = receive(mode, audio, chunk_size)
     assert [r["payload"] for r in results] == [payload]
-    assert abs(results[0]["start_index"] - prefix - rx_audio.FILTER_DELAY_DECODE_SAMPLES) <= 2
+    # Acquisition lands on the sync preamble, which the settling head
+    # precedes: the reported start is that far into the keying.
+    head = mode.codec.streaming_phy.n_settling_head_symbols *         mode.codec.streaming_phy.symbol_len
+    assert abs(results[0]["start_index"] - prefix - head
+               - rx_audio.FILTER_DELAY_DECODE_SAMPLES) <= 2
     receiver = stream.receivers[mode.name]
     attempted, windows = set(receiver.attempted), receiver.search.windows
     for _ in range(5):
