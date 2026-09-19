@@ -236,3 +236,38 @@ def test_tx_clear_during_decode_invalidates_its_result(monkeypatch):
     # completed frame from the invalidated capture must never be delivered.
     receiver._decode_one(receiver._receive_stream.audio.read())
     assert not delivered
+
+
+def test_a_burst_survives_a_receiver_clock_that_runs_fast():
+    """Frames in one keying are found even when each lands slightly early.
+
+    The two ends of a path do not share a sample clock, so a frame arrives a
+    little shorter or longer than the nominal length the decoder consumes.
+    When it is shorter, the next frame's preamble begins *before* the point
+    the search resumes from -- and since the preamble is one symbol repeated,
+    the best alignment still in reach is a whole symbol out: it correlates
+    almost as well, decodes nothing, and is never retried. On the air that
+    cost one frame of every five-frame hf7 and hf8 burst, counted as never
+    seen rather than as a near miss. One sample over a whole burst is enough.
+    """
+    rng = np.random.default_rng(5)
+    payloads = [rng.integers(0, 256, HF9.chunk_size, dtype=np.uint8).tobytes()
+                for _ in range(3)]
+    tx = np.concatenate([HF9.encode(payload) for payload in payloads])
+    burst = rx_audio.downsample(np.concatenate(
+        (tx, np.zeros(rx_audio.FILTER_DELAY_CAPTURE_SAMPLES))))
+    fast = np.interp(np.linspace(0.0, len(burst) - 1.0, len(burst) - 1),
+                     np.arange(len(burst)), burst)
+    audio = np.concatenate((fast, np.zeros(600)))
+
+    stream, decoded = ReceiveStream(120000), []
+    for start in range(0, len(audio), 1200):
+        stream.append(0, start, audio[start:start + 1200])
+        while True:
+            result = stream.decode(HF9)
+            if result.get("payload") is None:
+                break
+            decoded.append(bytes(result["payload"]))
+            # What whale/link_receiver.py's _consume_rx does with end_index.
+            stream.audio.discard(stream.audio.start + result["end_index"])
+    assert decoded == payloads

@@ -104,7 +104,20 @@ class OfdmReceiver:
             result["start_sample"] = start - audio.start
             if result.get("payload") is not None:
                 result["start_index"] = start - audio.start
-                result["end_index"] = end - audio.start
+                # Stop one guard short of the frame's last sample. Frames in
+                # a single keying run back to back, so the next preamble
+                # begins exactly where this frame ends -- and acquisition has
+                # no tolerance to its left. A peak that lands one sample late
+                # (measured on the air: routinely) leaves the next frame's
+                # true start behind the resumed cursor, and because the
+                # preamble is one symbol repeated, the best alignment still
+                # in reach is a whole symbol out. It correlates almost as
+                # well, decodes nothing, is remembered as attempted and never
+                # retried, and publishes no end_index -- so the frame is not
+                # even counted as a near miss, it is simply never seen.
+                # Holding back the search's own envelope guard costs one
+                # already-captured 20 ms of audio and no air time at all.
+                result["end_index"] = end - self.search.guard - audio.start
                 return result
         pending = [c for c in self.search.candidates
                    if c[1] + self.frame_samples > audio.end]
