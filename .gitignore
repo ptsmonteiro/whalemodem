@@ -1,6 +1,13 @@
 __pycache__/
-/radios.toml
-/config.toml
+# Local TOML at the project root is station-specific scratch (config.toml,
+# radios.toml, and any hand-made variant). The two TOMLs the repo does ship
+# are re-included below.
+/*.toml
+/*.toml[0-9]
+!/pyproject.toml
+!/config.example.toml
+# Reports whale-test writes into the directory it was run from.
+whale-report-*.txt
 .pytest_cache/
 .tmp_pytest*/
 *.pyc
