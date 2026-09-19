@@ -23,12 +23,15 @@ caller stops and its finally still un-keys. Keying OFF may not, because at
 that point it is the only thing that can put the transmitter down.
 """
 
+import atexit
 import threading
 import types
 
 import numpy as np
 import serial
 
+import link_harness
+from whale import link as link_mod
 from whale import transport
 from whale.hw import audio_io
 from whale.hw import ptt
@@ -211,6 +214,7 @@ def _fake_transport(ptt_obj, out_device=7):
     t.in_device = None
     t.ptt = ptt_obj
     t.receive_only = False
+    t._closed = False
     t._chunks = __import__("collections").deque()
     t._chunks_len = 0
     t._buf_lock = threading.Lock()
@@ -566,6 +570,59 @@ def test_transport_close_survives_a_ptt_that_cannot_unkey():
     print("test_transport_close_survives_a_ptt_that_cannot_unkey OK")
 
 
+# -- who actually calls close() ----------------------------------------
+#
+# The second bench incident, and the reason the tests above were not
+# enough: every un-key here works, and nothing in production called any of
+# it. A run that ended on a timeout stopped the decode loop and left PTT
+# exactly as it found it. These pin down the two paths that now reach it.
+
+
+def test_link_stop_closes_the_transport():
+    """Stopping the link is what un-keys; it owns the transport."""
+    closed = []
+    t = link_harness.FakeTransport()
+    t.close = lambda: closed.append(True)
+
+    one = link_mod.Link(t, "STA1")
+    one.start()
+    one.stop()
+    assert closed == [True], "Link.stop() left the transmitter where it was"
+    print("test_link_stop_closes_the_transport OK")
+
+
+def test_an_unclosed_transport_unkeys_at_process_exit():
+    """The backstop, for the run that never reaches an orderly teardown.
+
+    The modem worker is a daemon thread, so a process that exits while it is
+    still transmitting never runs its teardown. atexit does still run.
+    """
+    pttobj = FakePtt()
+    t = _fake_transport(pttobj)
+    atexit.register(t._unkey_at_exit)
+    try:
+        t._unkey_at_exit()
+        assert pttobj.calls == [False], "the exit hook did not un-key"
+    finally:
+        atexit.unregister(t._unkey_at_exit)
+    print("test_an_unclosed_transport_unkeys_at_process_exit OK")
+
+
+def test_closing_twice_unkeys_once_and_raises_no_alarm():
+    """Both paths can fire on the same teardown.
+
+    The second un-key would key(False) down a port the first one closed, and
+    that failure reads as THE TRANSMITTER MAY STILL BE KEYED -- an alarm for
+    the one case that is entirely normal.
+    """
+    pttobj = FakePtt()
+    t = _fake_transport(pttobj)
+    t.close()
+    t.close()
+    assert pttobj.calls == [False], "the transmitter was un-keyed twice"
+    print("test_closing_twice_unkeys_once_and_raises_no_alarm OK")
+
+
 # -- receive-only transports -------------------------------------------
 #
 # The other direction of the same concern: not "did the un-key happen" but
@@ -615,6 +672,9 @@ if __name__ == "__main__":
     test_send_reresolves_a_moved_output_device_between_attempts()
     test_reresolving_a_vanished_device_keeps_the_old_index()
     test_transport_close_survives_a_ptt_that_cannot_unkey()
+    test_link_stop_closes_the_transport()
+    test_an_unclosed_transport_unkeys_at_process_exit()
+    test_closing_twice_unkeys_once_and_raises_no_alarm()
     test_a_receive_only_transport_refuses_to_send()
     test_a_receive_only_transport_closes_without_a_ptt()
     print("all PTT safety tests OK")

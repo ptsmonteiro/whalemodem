@@ -477,7 +477,16 @@ class Link(_ReceiverMixin, _AdaptationMixin):
         self._start_receiver()
 
     def stop(self):
+        """End the link and put the radio down.
+
+        Stopping the receiver is only half of going off the air: the link
+        owns the transport, so it is the link that closes it, and closing is
+        what un-keys. Before, every shutdown path stopped the decode loop and
+        left PTT exactly as it found it -- which, on a teardown that happened
+        mid-transmission, was keyed.
+        """
         self._stop_receiver()
+        self.transport.close()
 
     def _reset_sequence_state(self):
         """Clears everything that is scoped to one session, at the moment a

@@ -931,3 +931,41 @@ def test_vara_adapter_delivers_inbound_between_ptt_on_and_ptt_off():
         assert service.read(timeout=0.3) is None
     finally:
         service.stop()
+
+
+# -- going off the air vs. leaving politely ----------------------------
+#
+# The parting DISC is a courtesy: it saves the far end waiting out its own
+# inactivity timeout. But sending one means keying the transmitter once
+# more, and a teardown that is already failing -- a timeout, or an operator
+# holding Ctrl-C -- wants the radio down, not one last transmission.
+
+
+class _DisconnectRecordingLink(FakeLink):
+    def disconnect(self, retries=3):
+        self.calls.append("disconnect")
+        super().disconnect(retries=retries)
+
+
+def _connected_service():
+    link = _DisconnectRecordingLink()
+    service = ModemService(link)
+    service.start()
+    service.connect("STA2")
+    wait_until(lambda: link.state == "CONNECTED")
+    return service, link
+
+
+def test_an_orderly_stop_says_goodbye():
+    service, link = _connected_service()
+    service.stop()
+    assert "disconnect" in link.calls, "the peer was left to time the session out"
+    assert "stop" in link.calls
+
+
+def test_a_failing_stop_goes_off_the_air_without_a_parting_disc():
+    service, link = _connected_service()
+    service.stop(graceful=False)
+    assert "disconnect" not in link.calls, (
+        "a failing teardown keyed the transmitter to say goodbye")
+    assert "stop" in link.calls, "the link was left running"

@@ -14,6 +14,7 @@ that isn't. So RX just stays open, and half duplex is enforced by discarding
 whatever it captured immediately before/during/after our own TX instead.
 """
 
+import atexit
 import collections
 import contextlib
 import ctypes
@@ -132,6 +133,18 @@ class RadioTransport:
         # required before the audio device can be used.
         self.receive_only = bool(receive_only)
         self.ptt = None if self.receive_only else self.radio.ptt()
+        # Last resort, for the exit nobody arranged: close() is the orderly
+        # un-key and unregisters this, but a run that ends while the modem
+        # worker is still mid-transmit never reaches it. That worker is a
+        # daemon thread, so the interpreter does not wait for it -- it runs
+        # atexit handlers with the transmission still going. Keying is
+        # serialized (IcomCivPtt._lock, and hamlib's own rig handle), so the
+        # un-key arriving from this thread is safe rather than interleaved.
+        # It cannot help an os._exit(), a SIGKILL or a power cut; for those
+        # the radio's own TX timeout is the only backstop.
+        self._closed = False
+        if self.ptt is not None:
+            atexit.register(self._unkey_at_exit)
 
         # The realtime callback appends chunks. The decode thread reads only
         # new samples into its ring; snapshots remain available to batch callers.
@@ -412,10 +425,34 @@ class RadioTransport:
                 self.radio.id, self.out_device, index)
             self.out_device = index
 
-    def close(self):
-        self.stop_receiving()
+    def _unkey_at_exit(self):
+        """The atexit backstop: un-key, and say so if it had to.
+
+        Reaching this means no shutdown path closed the transport, so it is
+        worth a line in the log either way -- silent success here would hide
+        the very teardown gap it exists to cover.
+        """
         if self.ptt is None:
             return
+        logging.getLogger(__name__).warning(
+            "%s: un-keying at process exit -- the transport was never closed",
+            self.radio.id)
+        self.close()
+
+    def close(self):
+        """Stop the capture and put the transmitter down. Idempotent.
+
+        Teardown reaches this from more than one direction now -- the link
+        stopping, and the atexit backstop behind it -- and a second un-key
+        would key(False) down an already-closed port, whose failure reads as
+        the alarm below. Closing twice is the normal case, not the alarming
+        one, so it returns instead.
+        """
+        self.stop_receiving()
+        if self.ptt is None or self._closed:
+            return
+        self._closed = True
+        atexit.unregister(self._unkey_at_exit)
         try:
             # ptt.close() un-keys first, and IcomCivPtt.key(False) no longer
             # raises -- but this is the last un-key of the process, so a

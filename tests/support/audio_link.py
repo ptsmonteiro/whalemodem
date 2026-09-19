@@ -59,6 +59,10 @@ class PairedAudioTransport:
     def stop_receiving(self):
         pass
 
+    def close(self):
+        # No radio to un-key; Link.stop() calls this on every transport.
+        pass
+
     def is_transmitting(self):
         return self._transmitting.is_set()
 

@@ -65,6 +65,8 @@ class ModemService:
         # outbound CONNECT or an explicit LISTEN OFF should disable that.
         self._listening = True
         self._link.on_event = self._on_link_event
+        # Until stop() says otherwise, an ending session is an orderly one.
+        self._graceful_stop = True
 
     @classmethod
     def for_radio(cls, radio_name: str, mycall: str, radio_config=None,
@@ -124,12 +126,33 @@ class ModemService:
         self._worker.start()
         self._started.wait()
 
-    def stop(self) -> None:
+    def stop(self, *, graceful: bool = True, timeout: float | None = None) -> bool:
+        """Stop the worker, and say whether it actually finished.
+
+        ``graceful`` is whether the session is ending politely. A DISC frame
+        is a courtesy to the far end -- it saves the peer waiting out its own
+        inactivity timeout -- but sending one means keying the transmitter
+        one more time. On a teardown that is already failing, or one the
+        operator asked for with Ctrl-C, what is wanted is the radio off the
+        air, not one last transmission; pass ``graceful=False`` there and the
+        peer times the session out instead.
+
+        ``timeout`` is how long to wait for the worker to finish. The
+        default is the short join this has always used -- long enough for an
+        idle worker to notice the flag. A caller that asked for a graceful
+        stop and means to wait for the parting DISC to actually go out needs
+        a real budget instead, and needs to know whether it was enough:
+        False means the worker is still on the air, and the caller is the
+        one who decides what to do about that.
+        """
         if self._worker is None:
-            return
+            return True
+        self._graceful_stop = graceful
         self._stopping.set()
         self._commands.put(("stop", None))
-        self._worker.join(timeout=max(2.0, self._poll_interval * 4))
+        self._worker.join(timeout=max(2.0, self._poll_interval * 4)
+                          if timeout is None else timeout)
+        return not self._worker.is_alive()
 
     def set_callsign(self, callsign: str) -> None:
         self._commands.put(("callsign", callsign))
@@ -290,7 +313,7 @@ class ModemService:
                     if self._link.state == "CONNECTED":
                         self._link.disconnect(retries=1)
         finally:
-            if self._link.state == "CONNECTED":
+            if self._link.state == "CONNECTED" and self._graceful_stop:
                 self._link.disconnect(retries=1)
             self._link.stop()
             self._started.clear()

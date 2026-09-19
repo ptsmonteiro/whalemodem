@@ -61,6 +61,7 @@ we're driving real VARA software.
 
 import argparse
 import logging
+import signal
 import socket
 import threading
 
@@ -69,6 +70,11 @@ from whale.config import app_config, get_radio
 from whale.service import ModemService
 
 logger = logging.getLogger(__name__)
+
+#: How long a signalled stop waits for the session to end politely before
+#: giving up on the courtesy. Matches whale-test's own grace period: it is
+#: the same operator, pressing the same key, wanting the same thing.
+STOP_GRACE = 30.0
 
 PUMP_RECV_TIMEOUT = 0.5
 
@@ -356,7 +362,7 @@ class StationServer:
 
     # -- server bootstrap ---------------------------------------------------
 
-    def stop(self):
+    def stop(self, *, graceful: bool = True, timeout: float | None = None):
         """Stop accepting clients and release the service and TCP sockets.
 
         Production normally ends this server by terminating its process, but
@@ -383,7 +389,7 @@ class StationServer:
                     listener.close()
                 except OSError:
                     pass
-        self.service.stop()
+        return self.service.stop(graceful=graceful, timeout=timeout)
 
     def serve_forever(self):
         self.service.start()
@@ -424,7 +430,86 @@ class StationServer:
                 self._cmd_conn_loop(conn)
         finally:
             self.ready.clear()
-            self.service.stop()
+            if not self._stopping.is_set():
+                # Only when the loop ended on its own. stop() has already
+                # stopped the service, and may have stopped it with
+                # graceful=False; a second, defaulted stop() here would set
+                # the graceful flag back to True under a worker that is
+                # still finishing a burst, and so put the DISC that was
+                # explicitly not wanted back on the air.
+                self.service.stop()
+
+
+def stop_on_signals(server, grace: float = STOP_GRACE):
+    """Stop `server` -- unkeyed -- when this process is asked to end.
+
+    Terminating the process is how this server is normally stopped, by an
+    operator's Ctrl-C and by whale-test, which runs it as a child. Left to
+    the default handlers, SIGTERM ends the interpreter outright: PTT is
+    never taken down, the radio is never closed, and a transmitter that was
+    keyed at that moment stays keyed. Running stop() instead does both.
+
+    The stop escalates, the same way whale-test's own teardown does, because
+    the two things an operator can mean by Ctrl-C are different and only
+    they know which one it is:
+
+      1. The first signal asks for a graceful stop and waits `grace`
+         seconds for it. A session still up is ended with a parting DISC --
+         one more keying, but it saves the far end waiting out its own
+         inactivity timeout.
+      2. A second signal, or a first that ran out its grace, stops the
+         service without the courtesy: off the air now, peer times out.
+      3. The handlers are then put back the way they were found, so a third
+         signal ends the interpreter outright. That is still not a keyed
+         radio left behind: RadioTransport registers an atexit un-key for
+         exactly this, and a KeyboardInterrupt unwinds through it.
+
+    SIGINT is included because the KeyboardInterrupt it raises by default
+    unwinds through serve_forever's finally, which stops the service without
+    ever passing through this ladder. SIGBREAK is Windows' equivalent of a
+    signal a parent can send, and is how whale-test stops its child.
+
+    The interrupt is re-raised after each stop so that the signal is not
+    swallowed if it lands before the accept loop has begun -- during the
+    seconds the radio takes to open, say, where a stop that only set the
+    stopping flag would be cleared again by serve_forever a moment later.
+    """
+    installed = {}
+    asked = []
+
+    def restore():
+        for number, handler in installed.items():
+            try:
+                signal.signal(number, handler)
+            except (OSError, ValueError):
+                pass
+
+    def stop(signum, frame):
+        if asked:
+            # Pressed again while the first stop was still being polite.
+            # Nothing more is owed the far end, and nothing more is owed
+            # this handler either: put the defaults back so the operator
+            # cannot be made to ask a third time.
+            logger.info("signal %s again: stopping now", signum)
+            restore()
+            server.stop(graceful=False)
+            raise KeyboardInterrupt
+        asked.append(signum)
+        logger.info("signal %s: stopping", signum)
+        if not server.stop(graceful=True, timeout=grace):
+            logger.warning("the session did not end within %.0fs -- stopping now", grace)
+            restore()
+            server.stop(graceful=False)
+        raise KeyboardInterrupt
+
+    for name in ("SIGTERM", "SIGINT", "SIGBREAK"):
+        number = getattr(signal, name, None)
+        if number is None:
+            continue
+        try:
+            installed[number] = signal.signal(number, stop)
+        except (OSError, ValueError):  # not the main thread, or not supported
+            logger.debug("no %s handler installed", name, exc_info=True)
 
 
 def main():
@@ -477,7 +562,13 @@ def main():
                                          radio_config=args.config,
                                          policy=channel, mode_registry=mode_registry)
         server = StationServer(service, mycall, cmd_port, data_port, args.host)
-        server.serve_forever()
+        stop_on_signals(server)
+        try:
+            server.serve_forever()
+        except KeyboardInterrupt:
+            # The handler above has already stopped the server, unkeyed; all
+            # that is left is to exit quietly rather than on a traceback.
+            logger.info("stopped")
         return
 
     # --tui: an additive branch. It builds the same channel/radio/mode

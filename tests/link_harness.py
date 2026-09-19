@@ -51,6 +51,10 @@ class FakeTransport:
     def stop_receiving(self):
         pass
 
+    def close(self):
+        # No radio to un-key; Link.stop() calls this on every transport.
+        pass
+
     def is_transmitting(self):
         # send() below writes straight into the peer's buffer synchronously,
         # so there's no "mid-transmit" window for the decode loop to race.
