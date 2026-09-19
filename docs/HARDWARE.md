@@ -211,7 +211,7 @@ instead of CAT, etc).
 For an end user who doesn't want to set up Python, a venv, or `pip install`
 at all, Whale can be frozen into a standalone, no-Python-required
 onedir bundle with PyInstaller -- a folder containing the
-`whale-server` and `whale-configure` executables plus their shared Python
+`whale-server`, `whale-configure` and `whale-test` executables plus their shared Python
 runtime, numpy/scipy, and (vendored the same way `hamlib` is vendored
 above) hamlib and, on Linux, PortAudio. It is a folder you download and
 run directly, not yet an installer, system package, or service -- nothing
@@ -225,7 +225,8 @@ whale/whale-server --config config.toml --channel fm \
   --cmd-port 8300 --data-port 8301
 ```
 
-`whale/whale-configure` is the frozen configuration TUI, in the same folder.
+`whale/whale-configure` is the frozen configuration TUI and
+`whale/whale-test` the frozen on-air check, in the same folder.
 
 Building one is covered in `packaging/pyinstaller/README.md`; that
 procedure, not this section, is the source of truth for the actual build
@@ -254,7 +255,9 @@ already bundles PortAudio itself on those platforms.
 **Validation status.** linux-x86_64 (inside Docker) and windows-x86_64
 (native, on a real Windows host) have actually been built and exercised so
 far, without real audio or rig hardware attached: `whale-server --help` and
-`whale-configure --help` (`.exe` on Windows) both running to completion,
+`whale-configure --help` (`.exe` on Windows) both running to completion, on
+windows-x86_64 also `whale-test --help` and a `whale-test` run that reached
+its preflight and exited 2 on a missing configuration,
 plus native import/load checks for `whale.hw.hamlib` and
 `whale.hw.audio_io`, not a full radio session. The other four platforms
 (linux-aarch64, linux-armv7,

@@ -1,4 +1,5 @@
-# PyInstaller spec for the standalone whale-server and whale-configure bundle.
+# PyInstaller spec for the standalone whale-server, whale-configure and
+# whale-test bundle.
 #
 # Built onedir (not onefile): whale-server runs as a long-lived server,
 # often on low-end hardware like a Raspberry Pi, so avoiding onefile's
@@ -12,9 +13,12 @@
 # frozen-mode preload hook expects.
 #
 # whale-configure includes the level tuner used from its radio list, so its
-# Analysis includes the tuner's audio and NumPy dependencies. The commands
-# share the Python runtime and vendored libraries; MERGE() and COLLECT place
-# them in one dist/whale/ folder.
+# Analysis includes the tuner's audio and NumPy dependencies. whale-test runs
+# whale-server as a child process, finding it next to itself in this bundle,
+# and needs the repo-root `acceptance_test` module it shares the exercise
+# with (found through pathex=[REPO_ROOT]). The commands share the
+# Python runtime and vendored libraries; MERGE() and COLLECT place them in
+# one dist/whale/ folder.
 
 import os
 import sys
@@ -95,14 +99,29 @@ a_configure = Analysis(
     noarchive=False,
 )
 
-# Dedupes binaries and data shared between the two Analyses.
+a_test = Analysis(
+    [os.path.join(REPO_ROOT, "packaging", "pyinstaller", "entrypoint_test.py")],
+    pathex=[REPO_ROOT],
+    binaries=[],
+    datas=datas,
+    hiddenimports=hiddenimports,
+    hookspath=[],
+    hooksconfig={},
+    runtime_hooks=[],
+    excludes=[],
+    noarchive=False,
+)
+
+# Dedupes binaries and data shared between the three Analyses.
 MERGE(
     (a_server, "whale-server", "whale-server"),
     (a_configure, "whale-configure", "whale-configure"),
+    (a_test, "whale-test", "whale-test"),
 )
 
 pyz_server = PYZ(a_server.pure)
 pyz_configure = PYZ(a_configure.pure)
+pyz_test = PYZ(a_test.pure)
 
 exe_server = EXE(
     pyz_server,
@@ -140,9 +159,27 @@ exe_configure = EXE(
     entitlements_file=None,
 )
 
-# A single COLLECT call across both EXEs realizes the
+exe_test = EXE(
+    pyz_test,
+    a_test.scripts,
+    [],
+    exclude_binaries=True,
+    name="whale-test",
+    debug=False,
+    bootloader_ignore_signals=False,
+    strip=False,
+    upx=True,
+    console=True,
+    disable_windowed_traceback=False,
+    argv_emulation=False,
+    target_arch=None,
+    codesign_identity=None,
+    entitlements_file=None,
+)
+
+# A single COLLECT call across all three EXEs realizes the
 # MERGE() dedupe: it writes one shared `dist/whale/_internal/` (Python
-# runtime and vendored libraries) instead of duplicating it. Both
+# runtime and vendored libraries) instead of duplicating it. All three
 # executables land next to that shared _internal/, inside dist/whale/.
 coll = COLLECT(
     exe_server,
@@ -151,6 +188,9 @@ coll = COLLECT(
     exe_configure,
     a_configure.binaries,
     a_configure.datas,
+    exe_test,
+    a_test.binaries,
+    a_test.datas,
     strip=False,
     upx=True,
     upx_exclude=[],

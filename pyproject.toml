@@ -26,6 +26,7 @@ test = ["pytest"]
 [project.scripts]
 whale-server = "whale.vara_server:main"
 whale-configure = "whale.config_tui:main"
+whale-test = "whale.test_cli:main"
 
 [tool.setuptools]
 packages = ["whale", "whale.dsp", "whale.hw", "whale.modes", "whale.phy"]

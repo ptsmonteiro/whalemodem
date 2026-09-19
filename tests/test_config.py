@@ -85,3 +85,20 @@ def test_config_view_validates_ports_and_allows_stderr():
     view.log_file = "old.log"
     assert view._set_log_file("  ") is None
     assert view.log_file is None
+
+
+def test_added_radio_becomes_default_for_its_unset_channels():
+    view = ConfigView("config.toml", "F4JAW", None, {"hf": _radio("hf", {"hf"})},
+                      default_hf_radio="hf")
+    view._apply_edit(None, "both", _radio("both", {"fm", "hf"}))
+    assert view.default_fm_radio == "both"
+    assert view.default_hf_radio == "hf"
+    assert view.status == ""
+
+
+def test_edited_radio_drops_a_default_for_a_channel_it_no_longer_supports():
+    view = ConfigView("config.toml", "F4JAW", None, {"both": _radio("both", {"fm", "hf"})},
+                      default_fm_radio="both", default_hf_radio="both")
+    view._apply_edit("both", "both", _radio("both", {"fm"}))
+    assert view.default_fm_radio == "both"
+    assert view.default_hf_radio is None

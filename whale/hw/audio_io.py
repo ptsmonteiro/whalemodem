@@ -147,6 +147,21 @@ def find_device(name_substr, kind):
     return matches[0]
 
 
+def check_device(device, kind, samplerate=SAMPLE_RATE):
+    """Raise if `device` cannot carry whale's mono float32 audio at `samplerate`.
+
+    This is Pa_IsFormatSupported, not an open: it establishes that the index
+    is a real device of the right direction on the selected host API and that
+    the format whale uses is acceptable to it. It does not reserve the card,
+    so it cannot tell a station whether another application is holding the
+    device exclusively -- only starting a stream would, and doing that behind
+    a preflight check would take the card away from whatever has it.
+    """
+    sd = _load_sounddevice()
+    check = sd.check_input_settings if kind == "input" else sd.check_output_settings
+    check(device=device, channels=1, dtype="float32", samplerate=samplerate)
+
+
 @dataclass(frozen=True)
 class AudioDevice:
     """One PortAudio device on the selected host API, for a wizard picker."""

@@ -105,6 +105,7 @@ jobs:
         run: |
           dist/whale/whale-server --help
           dist/whale/whale-configure --help
+          dist/whale/whale-test --help
           . .venv/bin/activate
           python3 -c "import whale.hw.hamlib, whale.hw.audio_io"
       - name: Archive bundle
@@ -192,6 +193,7 @@ jobs:
               pyinstaller packaging/pyinstaller/whale.spec
               dist/whale/whale-server --help
               dist/whale/whale-configure --help
+              dist/whale/whale-test --help
               python3 -c "import whale.hw.hamlib, whale.hw.audio_io"
             '
       - name: Archive bundle
@@ -236,6 +238,7 @@ jobs:
         run: |
           dist/whale/whale-server --help
           dist/whale/whale-configure --help
+          dist/whale/whale-test --help
           python3 -c "import whale.hw.hamlib, whale.hw.audio_io"
       - name: Archive bundle
         run: |
@@ -270,6 +273,7 @@ jobs:
         run: |
           dist\whale\whale-server.exe --help
           dist\whale\whale-configure.exe --help
+          dist\whale\whale-test.exe --help
           python -c "import whale.hw.hamlib, whale.hw.audio_io"
       - name: Archive bundle
         run: |

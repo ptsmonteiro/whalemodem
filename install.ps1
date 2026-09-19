@@ -59,7 +59,7 @@ try {
     if (!(Test-Path (Join-Path $destination 'whale\whale-server.exe'))) {
         $staging = Join-Path $InstallRoot (".install-$version-" + [guid]::NewGuid())
         Expand-Archive -LiteralPath $archive -DestinationPath $staging
-        if (!(Test-Path (Join-Path $staging 'whale\whale-server.exe')) -or !(Test-Path (Join-Path $staging 'whale\whale-configure.exe'))) {
+        if (!(Test-Path (Join-Path $staging 'whale\whale-server.exe')) -or !(Test-Path (Join-Path $staging 'whale\whale-configure.exe')) -or !(Test-Path (Join-Path $staging 'whale\whale-test.exe'))) {
             throw 'Release archive does not contain the expected Whale commands.'
         }
         Move-Item -LiteralPath $staging -Destination $destination
@@ -74,7 +74,7 @@ try {
         Remove-Item -LiteralPath $current -Force
     }
     New-Item -ItemType Junction -Path $current -Target $destination | Out-Null
-    foreach ($command in 'whale-server', 'whale-configure') {
+    foreach ($command in 'whale-server', 'whale-configure', 'whale-test') {
         $launcher = Join-Path $BinDir "$command.cmd"
         $content = "@echo off`r`n`"$current\whale\$command.exe`" %*`r`n"
         [IO.File]::WriteAllText($launcher, $content, [Text.Encoding]::ASCII)

@@ -18,8 +18,8 @@ curl -fsSL https://raw.githubusercontent.com/ptsmonteiro/whalemodem/main/install
 On Windows, run `irm https://raw.githubusercontent.com/ptsmonteiro/whalemodem/main/install.ps1 | iex`
 in PowerShell. The installer verifies the release checksum, installs the latest
 release, and leaves existing `config.toml` files unchanged. Run it
-again to upgrade. A new terminal may be needed before `whale-server` and
-`whale-configure` are on `PATH`. Python is not required.
+again to upgrade. A new terminal may be needed before `whale-server`,
+`whale-configure` and `whale-test` are on `PATH`. Python is not required.
 
 **Configure Whale.** The terminal configuration tool writes `config.toml`,
 including the station callsign, channel defaults, and radios. It browses the
@@ -42,6 +42,25 @@ whale-server --channel fm
 ```
 
 Read the [hardware and safety guide](docs/HARDWARE.md) before transmitting.
+
+**Check it on air.** `whale-test` runs a connect, a verified 4 KB transfer in
+each direction, and a disconnect against another Whale station, without
+either operator starting a server or picking a port. The answering station
+runs the first command, the calling station the second:
+
+```console
+whale-test
+whale-test CALLSIGN
+```
+
+Each side writes a `whale-report-...txt` file and prints its path. Ctrl-C
+stops a run, says goodbye to the far end and unkeys the radio; press it again
+to stop without the goodbye.
+
+Adding `--sweep` to both commands measures the path mode by mode instead --
+frames decoded, frames that synchronised and failed, frames never seen and
+the receive SNR for each waveform, in both directions -- and adds that table
+to the same report. See [docs/TESTING.md](docs/TESTING.md).
 
 ## Current status
 

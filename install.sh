@@ -89,7 +89,8 @@ main() {
             *.zip) command -v unzip >/dev/null 2>&1 || { echo "unzip is required." >&2; exit 1; }
                    unzip -q "$tmp/$asset" -d "$staging" ;;
         esac
-        [ -x "$staging/whale/whale-server" ] && [ -x "$staging/whale/whale-configure" ] || {
+        [ -x "$staging/whale/whale-server" ] && [ -x "$staging/whale/whale-configure" ] &&
+        [ -x "$staging/whale/whale-test" ] || {
             echo "Release archive does not contain the expected Whale commands." >&2; exit 1;
         }
         mv "$staging" "$destination"
@@ -102,6 +103,7 @@ main() {
     ln -sfn "$destination" "$INSTALL_ROOT/current"
     ln -sfn "$INSTALL_ROOT/current/whale/whale-server" "$BIN_DIR/whale-server"
     ln -sfn "$INSTALL_ROOT/current/whale/whale-configure" "$BIN_DIR/whale-configure"
+    ln -sfn "$INSTALL_ROOT/current/whale/whale-test" "$BIN_DIR/whale-test"
     add_path_to_profile
     echo "Whale $version installed. Existing config.toml files were left unchanged."
     echo "Open a new terminal (or reload your shell profile) before running whale-server."

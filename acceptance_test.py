@@ -22,6 +22,24 @@ import threading
 import time
 
 
+# The exercise's shape, shared with whale/test_cli.py so the two drivers
+# cannot drift apart: same payload bytes, same budgets. They stay defaults
+# here because this module's CLI has always exposed them as flags.
+PAYLOAD_SIZE = 4096
+CONNECT_TIMEOUT = 180.0
+TRANSFER_TIMEOUT = 300.0
+
+#: Tags the two directions' payloads are derived from.
+PAYLOAD_TAG_AB = b"whale-A-to-B"
+PAYLOAD_TAG_BA = b"whale-B-to-A"
+
+
+def payload(tag: bytes, size: int = PAYLOAD_SIZE) -> bytes:
+    """A deterministic `size`-byte payload: SHA-256 of `tag`, repeated."""
+    block = hashlib.sha256(tag).digest()
+    return (block * (size // len(block) + 1))[:size]
+
+
 def _transfer_summary(receiver: str, nbytes: int, elapsed: float) -> str:
     """Format elapsed time and net application-payload throughput."""
     net_bps = nbytes * 8 / elapsed
@@ -44,8 +62,16 @@ class StationClient:
     -- indistinguishable at a glance from a real problem at that moment.
     """
 
-    def __init__(self, name, host, cmd_port, data_port):
+    def __init__(self, name, host, cmd_port, data_port, on_status=None):
         self.name = name
+        # Optional observer of every status line, called on the reader
+        # thread as the line arrives. wait_for() consumes lines looking for
+        # one prefix and drops the rest, so a caller that wants to keep a
+        # tally of what the station reported -- whale-test's report does,
+        # now that the modem is a separate process it can only watch from
+        # here -- has nowhere else to see them. It must not raise: this
+        # thread is what keeps wait_for() fed.
+        self.on_status = on_status
         # The 10s bounds the *connect*, so that a station server which never
         # came up fails the run in seconds instead of hanging it. It is
         # dropped immediately afterwards: create_connection leaves the socket
@@ -94,6 +120,8 @@ class StationClient:
                 text = line.decode("ascii", "replace")
                 if text:
                     print(f"     [{self.name}] status: {text}")
+                    if self.on_status is not None:
+                        self.on_status(text)
                     self._lines.put(text)
 
     def send_cmd(self, line):
@@ -148,9 +176,9 @@ def main():
     ap.add_argument("--b-data", type=int, required=True)
     ap.add_argument("--a-call", default="STA1")
     ap.add_argument("--b-call", default="STA2")
-    ap.add_argument("--size", type=int, default=4096)
-    ap.add_argument("--connect-timeout", type=float, default=180.0)
-    ap.add_argument("--transfer-timeout", type=float, default=300.0)
+    ap.add_argument("--size", type=int, default=PAYLOAD_SIZE)
+    ap.add_argument("--connect-timeout", type=float, default=CONNECT_TIMEOUT)
+    ap.add_argument("--transfer-timeout", type=float, default=TRANSFER_TIMEOUT)
     args = ap.parse_args()
 
     print("== connecting to station servers ==")
@@ -171,10 +199,8 @@ def main():
     a.open_data()
     b.open_data()
 
-    payload_ab = hashlib.sha256(b"whale-A-to-B").digest() * (args.size // 32 + 1)
-    payload_ab = payload_ab[:args.size]
-    payload_ba = hashlib.sha256(b"whale-B-to-A").digest() * (args.size // 32 + 1)
-    payload_ba = payload_ba[:args.size]
+    payload_ab = payload(PAYLOAD_TAG_AB, args.size)
+    payload_ba = payload(PAYLOAD_TAG_BA, args.size)
 
     print(f"== A -> B: sending {len(payload_ab)} bytes ==")
     t0 = time.perf_counter()
