@@ -8,7 +8,7 @@ import numpy as np
 
 from whale.phy import ofdm49
 
-from .. import framing
+from .. import framing, waveform
 
 
 #: On-air identifier; mode IDs identify one immutable waveform globally.
@@ -75,7 +75,7 @@ HF9_CODEC = Hf9Codec()
 
 
 @dataclass(frozen=True)
-class Hf9Mode:
+class Hf9Mode(waveform.ModeDescription):
     name: str = "hf9"
     mode_id: int = HF9_MODE_ID
     chunk_size: int = CHUNK_SIZE
@@ -104,6 +104,14 @@ class Hf9Mode:
 
     def airtime(self, payload_len: int) -> float:
         return self.codec.airtime(payload_len, self)
+
+    @property
+    def band_hz(self) -> tuple[float, float]:
+        """Lowest to highest carrier/tone centre, in Hz."""
+        return HF9_PHY.band_hz
+
+    modulation = "49-carrier QPSK OFDM"
+    fec = "QC-LDPC 1/2"
 
 
 HF9 = Hf9Mode()

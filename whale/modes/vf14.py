@@ -36,7 +36,7 @@ from math import gcd
 
 import numpy as np
 
-from .. import dsp, framing, rx_audio
+from .. import dsp, framing, rx_audio, waveform
 from ..dsp import mfsk as _mfsk
 
 TX_SAMPLE_RATE = 48_000
@@ -70,7 +70,7 @@ def _interleaver_stride(size: int) -> int:
 
 
 @dataclass(frozen=True)
-class Vf14Mode:
+class Vf14Mode(waveform.ModeDescription):
     name: str
     mode_id: int
     tone_count: int
@@ -249,16 +249,19 @@ class Vf14Mode:
     def net_bit_rate(self) -> float:
         return self.chunk_size * 8 / self.frame_seconds()
 
-    def describe(self) -> str:
+    @property
+    def band_hz(self) -> tuple[float, float]:
         hz = self.tx_bank.tone_hz
-        return (f"{self.name}: {self.tone_count}-FSK {hz[0]:.1f}-{hz[-1]:.1f} Hz, "
-                f"{self.baud:g} Bd, sync {self.sync_symbols}, grids "
-                f"{self.short_payload_symbols}/{self.medium_payload_symbols}/"
-                f"{self.payload_symbols} symbols "
-                f"({self.short_max_payload_bytes}/{self.medium_max_payload_bytes}/"
-                f"{self.max_payload_bytes} B), "
-                f"frames {self.frame_seconds(0):.3f}/{self.frame_seconds():.3f} s, "
-                f"DATA net {self.net_bit_rate():.1f} bit/s")
+        return (float(hz[0]), float(hz[-1]))
+
+    @property
+    def modulation(self) -> str:
+        return (f"{self.tone_count}-tone noncoherent FSK, "
+                f"{self.baud:g} Bd")
+
+    @property
+    def fec(self) -> str:
+        return f"K=7 conv {self.fec_rate}"
 
     # -- transmit -----------------------------------------------------------
 

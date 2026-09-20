@@ -10,7 +10,7 @@ from dataclasses import dataclass, field
 
 import numpy as np
 
-from .. import framing
+from .. import framing, waveform
 from . import hc1w
 
 #: On-air identifier; mode IDs identify one immutable waveform globally.
@@ -54,7 +54,7 @@ HC1W_CODEC = Hc1wCodec()
 
 
 @dataclass(frozen=True)
-class Hc1wMode:
+class Hc1wMode(waveform.ModeDescription):
     """The default wideband HF differential-QPSK mode."""
 
     name: str = "hc1w"
@@ -84,6 +84,14 @@ class Hc1wMode:
 
     def airtime(self, payload_len: int) -> float:
         return self.codec.airtime(payload_len, self)
+
+    @property
+    def band_hz(self) -> tuple[float, float]:
+        """Lowest to highest carrier/tone centre, in Hz."""
+        return (float(hc1w.CARRIER_HZ[0]), float(hc1w.CARRIER_HZ[-1]))
+
+    modulation = "23-carrier differential-QPSK OFDM"
+    fec = "K=9 conv 1/2"
 
 
 HC1W = Hc1wMode()

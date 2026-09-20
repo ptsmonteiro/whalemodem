@@ -11,7 +11,7 @@ from dataclasses import dataclass, field
 
 import numpy as np
 
-from .. import framing
+from .. import framing, waveform
 from . import hc0
 
 #: On-air identifier; mode IDs identify one immutable waveform globally.
@@ -53,7 +53,7 @@ HC0_CODEC = Hc0Codec()
 
 
 @dataclass(frozen=True)
-class Hc0Mode:
+class Hc0Mode(waveform.ModeDescription):
     """One negotiable HC0 setting, shaped to the `WaveformMode` contract."""
 
     name: str = "hc0"
@@ -83,6 +83,14 @@ class Hc0Mode:
 
     def airtime(self, payload_len: int) -> float:
         return self.codec.airtime(payload_len, self)
+
+    @property
+    def band_hz(self) -> tuple[float, float]:
+        """Lowest to highest carrier/tone centre, in Hz."""
+        return (float(hc0.TONE_HZ[0]), float(hc0.TONE_HZ[-1]))
+
+    modulation = "16-tone noncoherent FSK"
+    fec = "K=7 conv 1/2"
 
 
 HC0 = Hc0Mode()

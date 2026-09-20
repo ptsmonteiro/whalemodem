@@ -11,7 +11,7 @@ from functools import cached_property
 import numpy as np
 from scipy.signal import correlate, hilbert
 
-from whale import framing
+from whale import framing, waveform
 from whale.dsp import bits, interleave, ldpc
 from whale.phy.ofdm49 import _constellation_table, _soft_bit_llrs
 
@@ -31,8 +31,13 @@ def _fit_channel(observed, reference):
     return channel, residual / power if power > 0 else np.inf
 
 
+#: Constellation names by bits per carrier, for `geometry`.
+_CONSTELLATION = {1: "BPSK", 2: "QPSK", 3: "8PSK", 4: "16-QAM",
+                  5: "32-QAM", 6: "64-QAM"}
+
+
 @dataclass(frozen=True)
-class Vf12Mode:
+class Vf12Mode(waveform.ModeDescription):
     name: str = "vf12"
     mode_id: int = MODE_ID
     bits_per_carrier: int = 4
@@ -303,8 +308,23 @@ class Vf12Mode:
                 "pilot_comb_stride": self.pilot_comb_stride, "pilot_time_span": self.pilot_time_span,
                 "net_bps": self.bits_per_second}
 
-    def describe(self):
-        return f"{self.n_carriers} carriers, {self.bits_per_carrier} bits/carrier, {self.bits_per_second:.0f} net bit/s"
+    @property
+    def band_hz(self) -> tuple[float, float]:
+        bins = self.active_bins
+        return (bins[0] * self.carrier_spacing_hz,
+                bins[-1] * self.carrier_spacing_hz)
+
+    @property
+    def modulation(self) -> str:
+        constellation = _CONSTELLATION.get(self.bits_per_carrier,
+                                           f"{2 ** self.bits_per_carrier}-ary")
+        return (f"{self.n_carriers}-carrier {constellation} OFDM "
+                f"({len(self.data_positions)} data, "
+                f"{len(self.pilot_positions)} comb pilots)")
+
+    @property
+    def fec(self) -> str:
+        return f"QC-LDPC {self.fec_rate}"
 
 
 def mode_for(**kwargs):

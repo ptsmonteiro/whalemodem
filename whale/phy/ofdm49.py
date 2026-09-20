@@ -367,6 +367,12 @@ class OFDM49Mode:
         return int(np.sum(~self._comb_mask))
 
     @property
+    def band_hz(self) -> tuple[float, float]:
+        """Lowest to highest active carrier centre, in Hz."""
+        spacing = DESIGN_RATE / self.fft_size
+        return (self.active_bins[0] * spacing, self.active_bins[-1] * spacing)
+
+    @property
     def symbol_len(self) -> int:
         return self.fft_size + self.cp_len
 

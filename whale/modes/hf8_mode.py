@@ -97,7 +97,7 @@ import numpy as np
 
 from whale.phy import ofdm49 as hf8
 
-from .. import framing
+from .. import framing, waveform
 
 
 HF8_MODE_ID = 15
@@ -199,7 +199,7 @@ HF8_CODEC = Hf8Codec()
 
 
 @dataclass(frozen=True)
-class Hf8Mode:
+class Hf8Mode(waveform.ModeDescription):
     name: str = "hf8"
     mode_id: int = HF8_MODE_ID
     chunk_size: int = CHUNK_SIZE
@@ -228,6 +228,14 @@ class Hf8Mode:
 
     def airtime(self, payload_len: int) -> float:
         return self.codec.airtime(payload_len, self)
+
+    @property
+    def band_hz(self) -> tuple[float, float]:
+        """Lowest to highest carrier/tone centre, in Hz."""
+        return HF8_PHY.band_hz
+
+    modulation = "49-carrier 8PSK OFDM"
+    fec = "QC-LDPC 2/3"
 
 
 HF8 = Hf8Mode()

@@ -142,4 +142,4 @@ class _AdaptationMixin:
         self._last_adaptive_mode_change_at = time.monotonic()
         self._last_mode_change_direction = direction
         logger.info("[%s] switched tx profile to %s; awaiting DATA_ACK confirmation",
-                    self.mycall, self.tx_profile.name)
+                    self.mycall, self.tx_profile.describe())

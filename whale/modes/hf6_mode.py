@@ -15,7 +15,7 @@ import numpy as np
 
 from whale.phy import ofdm49 as hf6
 
-from .. import framing
+from .. import framing, waveform
 
 
 HF6_MODE_ID = 13
@@ -72,7 +72,7 @@ HF6_CODEC = Hf6Codec()
 
 
 @dataclass(frozen=True)
-class Hf6Mode:
+class Hf6Mode(waveform.ModeDescription):
     name: str = "hf6"
     mode_id: int = HF6_MODE_ID
     chunk_size: int = CHUNK_SIZE
@@ -101,6 +101,14 @@ class Hf6Mode:
 
     def airtime(self, payload_len: int) -> float:
         return self.codec.airtime(payload_len, self)
+
+    @property
+    def band_hz(self) -> tuple[float, float]:
+        """Lowest to highest carrier/tone centre, in Hz."""
+        return HF6_PHY.band_hz
+
+    modulation = "49-carrier 64-QAM OFDM"
+    fec = "none"
 
 
 HF6 = Hf6Mode()

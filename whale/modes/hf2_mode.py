@@ -30,7 +30,7 @@ import numpy as np
 
 from whale.phy import hf2
 
-from .. import framing
+from .. import framing, waveform
 
 #: On-air identifier; mode IDs identify one immutable waveform globally.
 HF2_MODE_ID = 7
@@ -69,7 +69,7 @@ HF2_CODEC = Hf2Codec()
 
 
 @dataclass(frozen=True)
-class Hf2Mode:
+class Hf2Mode(waveform.ModeDescription):
     """One negotiable HF2 setting, shaped like `hc1w_mode.Hc1wMode`."""
 
     name: str = "hf2"
@@ -99,6 +99,14 @@ class Hf2Mode:
 
     def airtime(self, payload_len: int) -> float:
         return self.codec.airtime(payload_len, self)
+
+    @property
+    def band_hz(self) -> tuple[float, float]:
+        """Lowest to highest carrier/tone centre, in Hz."""
+        return (float(hf2.CARRIER_HZ[0]), float(hf2.CARRIER_HZ[-1]))
+
+    modulation = "19-carrier 16-QAM OFDM"
+    fec = "K=7 conv 1/2"
 
 
 HF2 = Hf2Mode()

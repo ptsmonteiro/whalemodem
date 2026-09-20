@@ -325,8 +325,11 @@ def _format_mode(mode_id: int | None, mode_name: str | None, bps: float | None) 
     if mode_id is None:
         return "-"
     bps_text = f"{bps:.0f} bps" if bps is not None else "? bps"
-    label = mode_name if mode_name else f"mode {mode_id}"
-    return f"{label} ({bps_text})"
+    # Name and ID together: the logs speak in IDs, so showing one or the
+    # other made the same event look like two.
+    if mode_name:
+        return f"{mode_name} ({mode_id}, {bps_text})"
+    return f"mode {mode_id} ({bps_text})"
 
 
 def render_header(snapshot: Snapshot, width: int) -> list[str]:

@@ -75,7 +75,7 @@ SETTLING_HEAD_SECONDS = framing.SETTLING_HEAD_SECONDS
 #: Unambiguous range of the two frequency estimators, as a fact about the
 #: geometry rather than a tunable: the cyclic-prefix angle wraps at half a
 #: carrier spacing, and the header's per-symbol phase step wraps at half the
-#: symbol rate.  Reported by `describe()` and asserted in
+#: symbol rate.  Asserted in
 #: `_check_constants`, because "how far off may the two radios be" is the
 #: first question anyone puts an HF mode on the air with.
 COARSE_OFFSET_LIMIT_HZ = SAMPLE_RATE / (2.0 * CORE_SAMPLES)
@@ -393,13 +393,6 @@ class FrameInfo:
 
 
 INFO = FrameInfo()
-
-
-def describe() -> str:
-    return (f"hc1w: {N_CARRIERS}x differential QPSK carriers "
-            f"{CARRIER_HZ[0]:.2f}-{CARRIER_HZ[-1]:.2f} Hz, {TOTAL_SYMBOLS} "
-            f"symbols, {MAX_PAYLOAD_BYTES} B + CRC32 in {FRAME_SECONDS:.3f} s, "
-            f"offset tolerance +-{COARSE_OFFSET_LIMIT_HZ:.1f} Hz")
 
 
 def _check_constants() -> None:

@@ -37,7 +37,7 @@ from math import comb, gcd
 
 import numpy as np
 
-from .. import framing, rx_audio
+from .. import framing, rx_audio, waveform
 from .. import dsp
 from ..dsp import mfsk as _mfsk
 
@@ -92,7 +92,7 @@ def _coprime_stride(size: int) -> int:
 
 
 @dataclass(frozen=True)
-class Vf13Mode:
+class Vf13Mode(waveform.ModeDescription):
     """One FM MFSK waveform: geometry, K subbands, framing, repetition.
 
     Defaults are the shipped VF13 configuration; `mode_for` (below) builds
@@ -410,17 +410,24 @@ class Vf13Mode:
             "max_payload_bytes": self.max_payload_bytes,
         }
 
-    def describe(self) -> str:
-        tag = (f"K={self.subbands}" if self.mapping == "subband"
-               else f"comb_k={self.active_tones}")
-        return (f"{self.name} M={self.tone_count} {tag} "
-                f"spacing={self.spacing_hz:.2f}Hz "
-                f"symbol={self.symbol_seconds * 1000:.2f}ms "
-                f"bw={self.occupied_bandwidth_hz:.0f}Hz "
-                f"code=K{self.constraint} repeat={self.repeat} "
-                f"bytes={self.max_payload_bytes} "
-                f"frame={self.frame_seconds():.2f}s "
-                f"net={self.net_bit_rate():.1f}bps")
+    @property
+    def band_hz(self) -> tuple[float, float]:
+        # Subband mappings carry several banks; span the whole set.
+        return (float(min(bank.tone_hz[0] for bank in self.tx_banks)),
+                float(max(bank.tone_hz[-1] for bank in self.tx_banks)))
+
+    @property
+    def modulation(self) -> str:
+        if self.mapping == "subband":
+            shape = f"{self.subbands} parallel one-hot subbands"
+        else:
+            shape = f"{self.active_tones} of {self.tone_count} tones per symbol"
+        return (f"{self.tone_count}-tone combinatorial noncoherent MFSK, "
+                f"{shape}, {self.spacing_hz:.0f} Bd")
+
+    @property
+    def fec(self) -> str:
+        return f"K={self.constraint} conv {self.fec_rate}"
 
     # -- transmit -------------------------------------------------------
 

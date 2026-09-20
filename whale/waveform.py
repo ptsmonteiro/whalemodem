@@ -19,6 +19,13 @@ class WaveformMode(Protocol):
     mode_id: int
     chunk_size: int
     confidence_threshold: float
+    # Lowest to highest carrier/tone centre frequency, in Hz.  Not the
+    # occupied bandwidth: that is a measurement and lives in docs/MODES.md.
+    band_hz: tuple[float, float]
+    # The two facts that cannot be derived from code, stated once here in the
+    # wording docs/MODES.md uses: "49-carrier 32-QAM OFDM", "QC-LDPC 3/4".
+    modulation: str
+    fec: str
     # Encoded arrays and receive-buffer indices deliberately use different
     # clocks: radio I/O/TX stays at 48 kHz while the shared RX front end
     # supplies every decoder at 12 kHz.
@@ -30,6 +37,8 @@ class WaveformMode(Protocol):
     def decode(self, audio: np.ndarray) -> dict: ...
 
     def airtime(self, payload_len: int) -> float: ...
+
+    def describe(self) -> str: ...
 
 
 @dataclass(frozen=True)
@@ -70,3 +79,45 @@ class ModeRegistry:
         if not 0 <= new_index < len(self.modes):
             return None
         return self.modes[new_index]
+
+
+def _policy_for(mode_id: int) -> str:
+    """The channel policy a mode is declared on, or "?" if undeclared.
+
+    Imported lazily: whale.mode_qualification imports ModeRegistry from here.
+    """
+    from .mode_qualification import MANIFEST
+    for entry in MANIFEST:
+        if entry.mode_id == mode_id:
+            return entry.policy
+    return "?"
+
+
+def format_mode(mode: WaveformMode) -> str:
+    """The one-line description every mode renders through.
+
+    Built here rather than per mode so the 13 modes cannot drift into 13
+    formats, which is what happened to the ad-hoc describe() functions this
+    replaces.
+    """
+    from .framing import AIR_HEADER_BYTES
+    # Derived here, from the same airtime() and chunk_size the encoder uses,
+    # so the figures cannot disagree with the waveform that produced them.
+    frame_seconds = mode.airtime(AIR_HEADER_BYTES + mode.chunk_size)
+    net_bps = 8 * mode.chunk_size / frame_seconds
+    lo, hi = mode.band_hz
+    band = f"{lo:.0f} Hz" if lo == hi else f"{lo:.0f}-{hi:.0f} Hz"
+    return (f"{mode.name} ({mode.mode_id}) {_policy_for(mode.mode_id)}  "
+            f"{band}  {mode.modulation}  {mode.fec}  "
+            f"{mode.chunk_size} B/{frame_seconds:.3f} s = {net_bps:.0f} bit/s")
+
+
+class ModeDescription:
+    """Mixin giving every mode the one shared `describe()`.
+
+    Deliberately holds nothing else: vf13 and vf14 already define their own
+    `frame_seconds`, so anything named here risks shadowing a mode's own.
+    """
+
+    def describe(self) -> str:
+        return format_mode(self)

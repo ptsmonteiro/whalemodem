@@ -16,8 +16,8 @@ from dataclasses import dataclass, field
 
 import numpy as np
 
-from whale.phy import sc_resilient as hf5
-from .. import framing
+from whale.phy import sc, sc_resilient as hf5
+from .. import framing, waveform
 
 HF5_MODE_ID = 12
 CHUNK_SIZE = hf5.max_payload_bytes() - framing.AIR_HEADER_BYTES
@@ -45,7 +45,7 @@ HF5_CODEC = Hf5Codec()
 
 
 @dataclass(frozen=True)
-class Hf5Mode:
+class Hf5Mode(waveform.ModeDescription):
     name: str = "hf5"
     mode_id: int = HF5_MODE_ID
     chunk_size: int = CHUNK_SIZE
@@ -73,6 +73,14 @@ class Hf5Mode:
 
     def airtime(self, payload_len: int) -> float:
         return self.codec.airtime(payload_len, self)
+
+    @property
+    def band_hz(self) -> tuple[float, float]:
+        """Lowest to highest carrier/tone centre, in Hz."""
+        return (sc.CARRIER_HZ, sc.CARRIER_HZ)
+
+    modulation = "single-carrier 8PSK, 1500 Bd"
+    fec = "K=7 conv 1/2"
 
 
 HF5 = Hf5Mode()

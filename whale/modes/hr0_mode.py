@@ -5,7 +5,7 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 import numpy as np
 
-from .. import framing
+from .. import framing, waveform
 from . import hr0
 
 HR0_MODE_ID = 10
@@ -35,7 +35,7 @@ HR0_CODEC = Hr0Codec()
 
 
 @dataclass(frozen=True)
-class Hr0Mode:
+class Hr0Mode(waveform.ModeDescription):
     name: str = "hr0"
     mode_id: int = HR0_MODE_ID
     chunk_size: int = CHUNK_SIZE
@@ -56,6 +56,14 @@ class Hr0Mode:
 
     def airtime(self, payload_len: int):
         return self.codec.airtime(payload_len, self)
+
+    @property
+    def band_hz(self) -> tuple[float, float]:
+        """Lowest to highest carrier/tone centre, in Hz."""
+        return (float(hr0.BANK.tone_hz[0]), float(hr0.BANK.tone_hz[-1]))
+
+    modulation = "32-tone noncoherent FSK"
+    fec = "K=9 conv 1/2"
 
 
 HR0 = Hr0Mode()

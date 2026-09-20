@@ -311,13 +311,6 @@ def demodulate_debug(audio: np.ndarray, reference_payload: bytes | None = None) 
     return result
 
 
-def describe() -> str:
-    return (f"hc0: {TONE_COUNT}-FSK {TONE_HZ[0]:.1f}-{TONE_HZ[-1]:.1f} Hz, "
-            f"{BANK.symbol_rate:.2f} baud, {TOTAL_SYMBOLS} symbols, "
-            f"{MAX_PAYLOAD_BYTES} B + CRC32 in {FRAME_SECONDS:.3f} s, "
-            f"offset tolerance +-{BANK.offset_limit_hz:.2f} Hz")
-
-
 def _check_constants() -> None:
     assert SYMBOL_SAMPLES == 512 and TONE_COUNT == 16
     assert BITS_PER_SYMBOL == 4
