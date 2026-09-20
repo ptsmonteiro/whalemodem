@@ -20,7 +20,7 @@ if str(EXPERIMENT_DIR) not in sys.path:
     sys.path.insert(0, str(EXPERIMENT_DIR))
 
 from whale import rx_audio
-from whale.modes import hc1w
+from whale.phy import hc1w
 from whale.modes.hc1w_mode import HC1W
 
 from waveform import (ARMS, N_CARRIERS, PAYLOAD_SYMBOLS, TOTAL_SYMBOLS,

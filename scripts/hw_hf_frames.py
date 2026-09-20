@@ -41,7 +41,7 @@ from pathlib import Path
 import numpy as np
 
 import bench
-from whale.modes import hc0, hc1w
+from whale.phy import hc0, hc1w
 
 MODES = {"hc0": hc0, "hc1w": hc1w}
 

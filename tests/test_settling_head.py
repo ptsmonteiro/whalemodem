@@ -14,7 +14,7 @@ import numpy as np
 import pytest
 
 from whale import framing
-from whale.modes import hc0, hc1w, hr0
+from whale.phy import hc0, hc1w, hr0
 from whale.modes.hc0_mode import HC0
 from whale.modes.hc1w_mode import HC1W
 from whale.modes.hf6_mode import HF6, HF6_PHY

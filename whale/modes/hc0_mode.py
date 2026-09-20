@@ -12,7 +12,7 @@ from dataclasses import dataclass, field
 import numpy as np
 
 from .. import framing, waveform
-from . import hc0
+from whale.phy import hc0
 
 #: On-air identifier; mode IDs identify one immutable waveform globally.
 HC0_MODE_ID = 5

@@ -6,7 +6,7 @@ from dataclasses import dataclass, field
 import numpy as np
 
 from .. import framing, waveform
-from . import hr0
+from whale.phy import hr0
 
 HR0_MODE_ID = 10
 CHUNK_SIZE = hr0.MAX_PAYLOAD_BYTES - framing.AIR_HEADER_BYTES

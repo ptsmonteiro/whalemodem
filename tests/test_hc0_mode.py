@@ -5,7 +5,7 @@ import pytest
 from scipy.signal import hilbert
 
 from whale import afsk, framing, rx_audio, waveform
-from whale.modes import hc0
+from whale.phy import hc0
 from whale.modes.hc0_mode import HC0, hf_registry
 from whale.modes.hc1w_mode import HC1W
 

@@ -10,7 +10,7 @@ import numpy as np
 import pytest
 
 from whale import rx_audio
-from whale.modes import hc0
+from whale.phy import hc0
 from whale.modes.hc0_mode import HC0
 
 CAPTURES = pathlib.Path(__file__).parent / "data" / "hc0_captures"

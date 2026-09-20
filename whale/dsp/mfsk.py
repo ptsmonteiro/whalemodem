@@ -17,7 +17,7 @@ spend 16 slots to send 4 bits -- and bandwidth is the one thing an HF
 control channel has to spare, because it is already spending seconds per
 frame.
 
-This module is the kernel; `whale/modes/hc0.py` is the mode that wires it
+This module is the kernel; `whale/phy/hc0.py` is the waveform that wires it
 up.  Everything downstream of the tone magnitudes -- interleaving, the
 convolutional code, the length/CRC32 packet -- is the same
 `whale.dsp.framing`/`fec`/`interleave` the OFDM modes use, unchanged.

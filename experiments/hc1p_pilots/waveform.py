@@ -4,7 +4,7 @@ Built to answer one question: does HC1W's Watterson envelope come from its
 5 s frame length, or from what it does *inside* the frame?
 
 HC1W fits its per-carrier channel once from the 13-symbol header
-(`whale/modes/hc1w.py`, `_eq.fit_header`) and then applies that single fit to
+(`whale/phy/hc1w.py`, `_eq.fit_header`) and then applies that single fit to
 all 352 payload symbols -- 4.8 s.  Two things ride on that fit and go stale
 together:
 
@@ -58,7 +58,7 @@ from scipy.signal import hilbert
 from whale import dsp, framing
 from whale.dsp import (differential as _diff, equalize as _eq, freq as _freq,
                        ofdm as _ofdm, timing as _timing)
-from whale.modes import hc1w
+from whale.phy import hc1w
 
 # -- HC1W's geometry, unchanged and shared by every arm -------------------
 

@@ -4,7 +4,7 @@ import numpy as np
 import pytest
 
 from whale import framing, modes, rx_audio
-from whale.modes import hr0
+from whale.phy import hr0
 from whale.modes.hc0_mode import HC0
 from whale.modes.hc1w_mode import HC1W
 from whale.modes.hr0_mode import HR0

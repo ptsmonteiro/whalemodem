@@ -17,11 +17,14 @@ Three layers sit between the link and the sound card:
                   `WaveformMode` (see `whale/waveform.py`) that the link
                   negotiates.
 
+  `hr0`           the 32-tone noncoherent FSK short/full control waveform
+  `hc0`           16-tone noncoherent FSK
+  `hc1w`          23-carrier differential-QPSK OFDM
   `hf2`           pilot-assisted coherent 16-QAM OFDM with carrier grouping
   `sc`            the parametric single-carrier PSK/QAM PHY
   `sc_fast`       `sc` with the fused-FFT acquisition search
   `sc_resilient`  `sc_fast` plus convolutional coding and interleaving
-  `ofdm49`        the parametric 49-carrier OFDM PHY (HF6, HF7, HF8)
+  `ofdm49`        the parametric 49-carrier OFDM PHY (HF6, HF7, HF8, HF9)
 
 Every module here was developed and qualified under `experiments/`; each
 module docstring names the experiment directory it came from and the

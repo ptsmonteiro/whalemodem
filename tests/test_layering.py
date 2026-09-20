@@ -96,3 +96,30 @@ def test_phy_never_imports_modes():
     assert not offenders, (
         "whale/phy/ must not import from whale/modes/ -- the mode adapters "
         "sit above the PHYs, not below them:\n  " + "\n  ".join(offenders))
+
+
+def test_modes_holds_only_link_facing_adapters():
+    """A PHY filed under whale/modes/ is invisible to the tests above.
+
+    They check the direction of imports, not where a module lives, so a
+    complete waveform dropped into the adapters package breaks none of them
+    -- which is how whale/modes/{hc0,hc1w,hr0}.py sat there. Every module
+    here presents a `WaveformMode`, so every module here imports the
+    contract; a module that does not is a PHY and belongs in whale/phy/.
+    """
+    offenders = []
+    for path in _python_files(WHALE / "modes"):
+        if path.name == "__init__.py":
+            continue
+        modules = [module for module, _ in _imported_modules(path)]
+        if any(_is_within(module, "whale.waveform") for module in modules):
+            continue
+        # A mode may instead subclass a sibling adapter, as vf16 does vf12.
+        if any(_is_within(module, "whale.modes") for module in modules):
+            continue
+        offenders.append(str(path))
+    assert not offenders, (
+        "every module in whale/modes/ is a link-facing WaveformMode adapter "
+        "and imports whale.waveform (or subclasses a sibling that does); "
+        "these import neither, so they are complete waveforms and belong in "
+        "whale/phy/:\n  " + "\n  ".join(offenders))

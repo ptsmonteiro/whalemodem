@@ -21,7 +21,7 @@ BOOTSTRAP_HEADER_BYTES = AIR_HEADER_BYTES
 # against and carries nothing -- it exists so the transmitter's PTT ramp and
 # the receiver's audio AGC both have in-band signal to settle on before the
 # sync preamble the acquisition actually needs. Shared across every HF
-# waveform family (see whale/modes/hr0.py, hc0.py, hc1w.py and
+# waveform family (see whale/phy/hr0.py, hc0.py, hc1w.py and
 # whale/phy/ofdm49.py) rather than picked per mode, so every mode budgets the
 # same leading-loss protection.
 #
