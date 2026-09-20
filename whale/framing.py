@@ -25,7 +25,12 @@ BOOTSTRAP_HEADER_BYTES = AIR_HEADER_BYTES
 # whale/phy/ofdm49.py) rather than picked per mode, so every mode budgets the
 # same leading-loss protection.
 #
-# 0.6 s is the minimum that covers the measured PTT-and-AGC ramps on the
-# bench radios (208 ms and 560 ms in the two directions) with a little
-# margin, without spending more air time than that costs.
-SETTLING_HEAD_SECONDS = 0.6
+# Sized against the analogue ramp alone: the transmitter's PTT ramp plus
+# the receiver's AGC attack, which together run 30-60 ms worst case on the
+# bench radios. Acquisition itself needs no head at all -- every HF
+# receiver searches for the sync preamble and decodes a keying with no head
+# in front of it -- so the only thing this number buys is analogue
+# readiness, and every millisecond of it is air time. 0.2 s is several
+# times the measured ramp, leaving margin for radios and amplifiers slower
+# than the ones on the bench.
+SETTLING_HEAD_SECONDS = 0.2

@@ -104,7 +104,7 @@ def test_hf8_frame_is_codeword_aligned_and_includes_its_native_preamble():
     """Codeword-aligned, with a sync preamble and a settling head in front."""
     assert HF8_PHY.n_codewords == 46
     assert HF8_PHY.n_preamble_symbols == 14
-    assert HF8_PHY.settling_head_seconds() == pytest.approx(0.616)
+    assert HF8_PHY.settling_head_seconds() == pytest.approx(0.22)
     assert HF8.airtime(HF8.chunk_size) == pytest.approx(
         HF8_PHY.keying_seconds())
 

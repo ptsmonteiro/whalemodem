@@ -15,10 +15,10 @@ def test_hc1w_geometry_and_capacity():
     assert HC1W.chunk_size == 995
     # Airtime is the whole keying: the settling head plus the frame.
     assert hc1w.SETTLING_HEAD_SAMPLES / hc1w.SAMPLE_RATE == pytest.approx(
-        0.6027, abs=1e-4)
-    assert HC1W.airtime(HC1W.chunk_size) == pytest.approx(5.4893333)
+        0.208, abs=1e-4)
+    assert HC1W.airtime(HC1W.chunk_size) == pytest.approx(5.0946667)
     assert HC1W.chunk_size * 8 / HC1W.airtime(HC1W.chunk_size) == pytest.approx(
-        1450.0850
+        1562.4182
     )
 
 

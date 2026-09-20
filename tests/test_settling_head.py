@@ -30,6 +30,9 @@ from whale.modes.hr0_mode import HR0
 
 #: Each waveform rounds the shared budget up to its own grid, so none is
 #: shorter than the budget and none overshoots by a whole extra symbol.
+#: The coarsest grids are hc0 and hr0 (4-symbol, 42.7 ms blocks) and the
+#: OFDM symbol (22 ms); at the 0.2 s budget the largest overshoot is 20 ms,
+#: so one tolerance still covers every mode.
 TOLERANCE = 0.05
 
 OFDM_MODES = ((HF6, HF6_PHY), (HF7, HF7_PHY), (HF8, HF8_PHY), (HF9, HF9_PHY))
@@ -48,8 +51,8 @@ def head_seconds(mode):
 ALL_MODES = (HR0, HC0, HC1W, HF6, HF7, HF8, HF9)
 
 
-def test_the_shared_budget_is_six_hundred_milliseconds():
-    assert framing.SETTLING_HEAD_SECONDS == 0.6
+def test_the_shared_budget_is_two_hundred_milliseconds():
+    assert framing.SETTLING_HEAD_SECONDS == 0.2
 
 
 @pytest.mark.parametrize("mode", ALL_MODES, ids=lambda m: m.name)
@@ -95,15 +98,14 @@ def test_ofdm_acquisition_lands_past_the_settling_head(mode, phy):
 
     confidence, start, _ = phy.acquire(design_rate)
     assert start == head
-    inside_head = phy.acquire(design_rate,
-                              search_slice=slice(0, head - preamble))[0]
-    # The best score anywhere inside the head sits at the noise floor --
-    # measured 0.10-0.13, against ~1.0 for the sync preamble. It is close
-    # enough to the streaming receiver's 0.12 raise threshold that a head
-    # may occasionally cost one failed decode attempt per keying; what must
-    # never happen is the head outranking the preamble, because acquisition
-    # would then align a whole head out.
-    assert inside_head < 0.25 * confidence
+    # At the shipped 0.2 s budget the head is shorter than the preamble on
+    # every OFDM mode, so there is no start offset at which a whole preamble
+    # template fits inside the head and the false-acquisition hazard is
+    # structurally absent. What must never happen -- whatever the budget --
+    # is the head outranking the preamble, because acquisition would then
+    # align a whole head out; see
+    # test_no_false_candidate_survives_inside_the_settling_head.
+    assert head <= preamble
 
 
 # -- the head as a swept parameter ----------------------------------------
@@ -171,3 +173,45 @@ def test_a_resized_head_still_round_trips(mode, seconds):
     acquired = result.get("start_index", result.get("start_sample"))
     assert acquired == pytest.approx(
         head / rx_audio.DECIMATION, abs=rx_symbol_samples(mode))
+
+
+#: whale/streaming.py raises an acquisition candidate at or above this
+#: score. It is a bare literal there; this copy is what the test below
+#: pins the head against.
+CANDIDATE_GATE = 0.12
+
+
+@pytest.mark.parametrize("mode,phy", OFDM_MODES, ids=lambda m: getattr(m, "name", ""))
+def test_no_false_candidate_survives_inside_the_settling_head(mode, phy):
+    """A head start that could outlive streaming.py's dedup must score low.
+
+    streaming.py keeps only the strongest candidate within one preamble of
+    any other, so a false start inside the head is only ever a wasted decode
+    attempt if a *whole* preamble template fits inside the head with no real
+    preamble sample under it. At the shipped budget the head is shorter than
+    the preamble on all four modes, so that region does not exist -- which is
+    what this test pins, and what makes the score moot.
+
+    A head long enough to reopen the region does reach the gate: at four
+    times the budget the best in-head score runs 0.10-0.13 (scripts/
+    head_score.py). It never comes near the real preamble's ~1.0, which is
+    the property that must hold whatever the budget, so that is what the
+    long-head half asserts.
+    """
+    payload = bytes((i * 37 + 11) & 0xFF
+                    for i in range(mode.chunk_size + framing.AIR_HEADER_BYTES))
+    head = phy.n_settling_head_symbols * phy.symbol_len
+    preamble = phy.n_preamble_symbols * phy.symbol_len
+    assert head <= preamble
+
+    long_head = replace(phy, head_seconds=4 * framing.SETTLING_HEAD_SECONDS)
+    head = long_head.n_settling_head_symbols * long_head.symbol_len
+    assert head > preamble
+    design_rate = long_head.modulate(payload)[::4].astype(np.float64)
+    rng = np.random.default_rng(20260921)
+    for snr_db in (5.0, 20.0):
+        x = design_rate + rng.standard_normal(len(design_rate)) * (
+            float(np.std(design_rate)) * 10.0 ** (-snr_db / 20.0))
+        score = long_head.acquire(x, search_slice=slice(0, head - preamble))[0]
+        real = long_head.acquire(x)[0]
+        assert score < 0.25 * real

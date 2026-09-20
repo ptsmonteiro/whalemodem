@@ -103,15 +103,15 @@ INTERLEAVER_SEED = 0x5EED1A
 #: symbol repeated, so the head's cross-correlation against the preamble
 #: template averages down over the head instead of adding coherently, and
 #: acquisition cannot rank a position inside it above the real preamble.
-#: Measured over a whole head, the best in-head acquisition score is
-#: 0.10-0.13 on the four modes that use this PHY, against 0.99-1.06 for the
-#: real preamble and a 0.07-0.09 pure-noise floor over the same search
-#: volume. That is the floor, not a tuning: a 40-seed scan moved it only
-#: between 0.11 and 0.15, because it is the order statistic of a
-#: same-spectrum random signal against a 3,696-sample template. It sits
-#: beside streaming.py's 0.12 candidate threshold, so a head may cost one
-#: failed decode attempt per keying; it is ~8x below the real preamble, so
-#: it never outranks it. `settling_head_seed` below is the best of that scan.
+#: At the shipped head length the head is shorter than the sync preamble,
+#: so no start offset exists at which a whole preamble template lies inside
+#: the head: every correlation peak before the real preamble overlaps it and
+#: streaming.py's candidate merge keeps the correctly aligned one. A head
+#: long enough to reopen that region scores 0.10-0.13 against ~1.0 for the
+#: real preamble -- beside streaming.py's 0.12 candidate threshold, so it
+#: would cost a failed decode attempt per keying, but never outrank the
+#: preamble. `settling_head_seed` below is the best of a 40-seed scan over
+#: that score.
 SETTLING_HEAD_SECONDS = framing.SETTLING_HEAD_SECONDS
 #: Ramp the head up over this many 48 kHz samples rather than keying a
 #: hard edge, matching hc0 and hc1w.

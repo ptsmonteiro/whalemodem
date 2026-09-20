@@ -333,7 +333,7 @@ def _check_constants() -> None:
     # bytes plus the trellis tail.  This is what picked 283 payload symbols.
     assert PACKET_BYTES == 107 and UNUSED_INFO_BITS == 2
     assert MAX_PAYLOAD_BYTES == 101
-    assert FRAME_SAMPLES == 265_152 and FRAME_SECONDS == 5.524
+    assert SETTLING_HEAD_SAMPLES == 10_240 and FRAME_SAMPLES == 244_672
     # Every deliberate pair; a draw that happens to repeat a tone across
     # neighbouring pairs would give more, which is only more of the same
     # measurement.
