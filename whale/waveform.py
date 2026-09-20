@@ -1,6 +1,7 @@
 """Stable contracts between the link protocol and physical-layer modes."""
 
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, replace
+from importlib import import_module
 from typing import Mapping, Protocol, Sequence, runtime_checkable
 
 import numpy as np
@@ -121,3 +122,78 @@ class ModeDescription:
 
     def describe(self) -> str:
         return format_mode(self)
+
+
+class _SettlingHeadVariant:
+    """One mode wearing a settling head of a length it was not shipped with.
+
+    A wrapper rather than a field on every mode: the head buys the PTT ramp
+    and the receiver's AGC their settling time and nothing on the air path
+    is allowed to depend on it, so the modes stay ignorant of it varying
+    and only a bench sweep ever asks for one of these.
+    """
+
+    def __init__(self, mode, encode, airtime, head_seconds):
+        self._mode = mode
+        self._encode = encode
+        self._airtime = airtime
+        self.head_seconds = head_seconds
+
+    def __getattr__(self, name):
+        return getattr(self._mode, name)
+
+    def __repr__(self) -> str:
+        return f"<{self._mode.name} head={self.head_seconds:g}s>"
+
+    def encode(self, payload: bytes) -> np.ndarray:
+        return self._encode(bytes(payload))
+
+    def decode(self, audio, **kwargs) -> dict:
+        return self._mode.decode(audio, **kwargs)
+
+    def airtime(self, payload_len: int) -> float:
+        return self._airtime(payload_len)
+
+    def describe(self) -> str:
+        return format_mode(self)
+
+
+#: `dataclasses.replace` on an OFDM49Mode re-runs a `__post_init__` that
+#: builds every reference constellation, so a sweep that re-encodes per
+#: frame must not pay for it per frame.
+_OFDM_VARIANTS: dict = {}
+
+
+def with_settling_head(mode: WaveformMode, head_seconds: float):
+    """`mode`, but keying a settling head of `head_seconds` instead of its own.
+
+    The single entry point a head-length sweep goes through: `encode()`
+    emits the new head and `airtime()` accounts for it, while acquisition,
+    decoding and every negotiated property stay exactly as shipped.  Only
+    the HF modes that have a head can be asked; the rest raise, because
+    silently returning a mode with no head would make a sweep's zero point
+    indistinguishable from a mode that was never in it.
+    """
+    from whale.phy import hc0, hc1w, hr0
+    phys = {"hr0": hr0, "hc0": hc0, "hc1w": hc1w}
+    if mode.name in phys:
+        phy = phys[mode.name]
+        delta = ((phy.settling_head_samples(head_seconds)
+                  - phy.settling_head_samples()) / phy.SAMPLE_RATE)
+        return _SettlingHeadVariant(
+            mode,
+            lambda payload: phy.modulate(payload, head_seconds),
+            lambda payload_len: mode.airtime(payload_len) + delta,
+            head_seconds)
+
+    if mode.name not in ("hf6", "hf7", "hf8", "hf9"):
+        raise ValueError(f"{mode.name} has no settling head to resize")
+    module = import_module(f"whale.modes.{mode.name}_mode")
+    base = getattr(module, f"{mode.name.upper()}_PHY")
+    key = (mode.name, float(head_seconds))
+    if key not in _OFDM_VARIANTS:
+        _OFDM_VARIANTS[key] = replace(base, head_seconds=head_seconds)
+    variant = _OFDM_VARIANTS[key]
+    return _SettlingHeadVariant(
+        mode, variant.modulate,
+        lambda payload_len: variant.keying_seconds(), head_seconds)

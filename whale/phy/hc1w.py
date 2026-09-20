@@ -95,7 +95,8 @@ FINE_OFFSET_LIMIT_HZ = SAMPLE_RATE / (2.0 * SYMBOL_SAMPLES)
 # second pass over the whole capture.  See `_remove_residual_offset`.
 
 
-def settling_head_samples() -> int:
+def settling_head_samples(
+        head_seconds: float = SETTLING_HEAD_SECONDS) -> int:
     """HC1W's settling head length, aligned for acquisition.
 
     This is *not* the sync preamble -- the five SYNC_SYMBOLS inside the
@@ -105,7 +106,9 @@ def settling_head_samples() -> int:
     cores plus a half-core phase, which is what `sync_core()` requires to
     keep it core-periodic rather than symbol-periodic.
     """
-    wanted = int(np.ceil(SETTLING_HEAD_SECONDS * SAMPLE_RATE))
+    if head_seconds <= 0.0:
+        return 0
+    wanted = int(np.ceil(head_seconds * SAMPLE_RATE))
     cores = -((-(wanted - SETTLING_HEAD_PHASE_SAMPLES)) // CORE_SAMPLES)
     return cores * CORE_SAMPLES + SETTLING_HEAD_PHASE_SAMPLES
 
@@ -116,8 +119,8 @@ FRAME_SAMPLES = (SETTLING_HEAD_SAMPLES + TOTAL_SYMBOLS * SYMBOL_SAMPLES
 FRAME_SECONDS = FRAME_SAMPLES / SAMPLE_RATE
 
 
-def frame_samples() -> int:
-    return FRAME_SAMPLES
+def frame_samples(head_samples: int = SETTLING_HEAD_SAMPLES) -> int:
+    return head_samples + TOTAL_SYMBOLS * SYMBOL_SAMPLES + TAIL_SAMPLES
 
 
 def frame_seconds() -> float:
@@ -197,14 +200,16 @@ def frame_constellation(payload: bytes) -> np.ndarray:
     return np.vstack((HEADER_VALUES, payload_values))
 
 
-def modulate(payload: bytes) -> np.ndarray:
+def modulate(payload: bytes,
+             head_seconds: float = SETTLING_HEAD_SECONDS) -> np.ndarray:
     values = frame_constellation(payload)
     symbols = np.concatenate([build_symbol(row) for row in values])
-    head = np.resize(sync_core(), SETTLING_HEAD_SAMPLES).copy()
-    fade = SETTLING_HEAD_FADE_SAMPLES
+    head_samples = settling_head_samples(head_seconds)
+    head = np.resize(sync_core(), head_samples).copy()
+    fade = min(SETTLING_HEAD_FADE_SAMPLES, head_samples)
     head[:fade] *= np.linspace(0.0, 1.0, fade, endpoint=True)
     audio = np.concatenate((head, symbols, np.zeros(TAIL_SAMPLES)))
-    if len(audio) != frame_samples():
+    if len(audio) != frame_samples(head_samples):
         raise AssertionError(f"internal frame length error: {len(audio)}")
     peak = float(np.max(np.abs(audio)))
     if peak > MAX_SAMPLE:

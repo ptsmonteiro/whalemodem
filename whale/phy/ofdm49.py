@@ -256,6 +256,11 @@ class OFDM49Mode:
 
     comb_tracking: str = "legacy"  # legacy | common | confidence | residual | off
 
+    #: Settling head length in seconds.  A field rather than the module
+    #: constant so a bench can sweep it; last in the field order because
+    #: every construction site passes the geometry positionally.
+    head_seconds: float = SETTLING_HEAD_SECONDS
+
     def __post_init__(self):
         if self.comb_tracking not in ("legacy", "common", "confidence", "residual", "off"):
             raise ValueError("unknown comb tracking method")
@@ -305,7 +310,7 @@ class OFDM49Mode:
         object.__setattr__(self, "_phase_schedule", phases)
 
         symbol_len = self.fft_size + self.cp_len
-        n_head = int(np.ceil(SETTLING_HEAD_SECONDS * DESIGN_RATE / symbol_len))
+        n_head = int(np.ceil(self.head_seconds * DESIGN_RATE / symbol_len))
         # whale.dsp.bits.pn_bits, not the 6-bit _pn_chips the preamble and
         # pilots use: the head needs n_head * n_active chips without the
         # short LFSR's 63-chip period, which would make the head symbols
@@ -530,11 +535,12 @@ class OFDM49Mode:
         # than being folded into the frame's normalization, so prepending
         # it cannot move the frame's drive level -- which is bench
         # calibration on HF7 and HF8, not a free parameter.
-        head = np.concatenate(
-            [self._add_cp(self._ifft_symbol(row))
-             for row in self._settling_head_bin_symbols])
-        head = head / (np.max(np.abs(head)) + 1e-12) * self.drive_scale
-        passband = np.concatenate([head, passband])
+        if self._n_settling_head_symbols:
+            head = np.concatenate(
+                [self._add_cp(self._ifft_symbol(row))
+                 for row in self._settling_head_bin_symbols])
+            head = head / (np.max(np.abs(head)) + 1e-12) * self.drive_scale
+            passband = np.concatenate([head, passband])
 
         up = 4
         stuffed = np.zeros(len(passband) * up, dtype=np.float64)

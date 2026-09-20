@@ -82,14 +82,22 @@ SETTLING_HEAD_FADE_SAMPLES = 240
 TAIL_SAMPLES = 960
 RX_TAIL_SAMPLES = TAIL_SAMPLES // rx_audio.DECIMATION
 
-SETTLING_HEAD_SAMPLES = int(
-    np.ceil(framing.SETTLING_HEAD_SECONDS * SAMPLE_RATE
-            / SETTLING_HEAD_BLOCK_SAMPLES)) * SETTLING_HEAD_BLOCK_SAMPLES
+SETTLING_HEAD_SECONDS = framing.SETTLING_HEAD_SECONDS
 
 
-def frame_samples() -> int:
-    return (SETTLING_HEAD_SAMPLES + TOTAL_SYMBOLS * SYMBOL_SAMPLES
-            + TAIL_SAMPLES)
+def settling_head_samples(
+        head_seconds: float = SETTLING_HEAD_SECONDS) -> int:
+    """Settling head length, rounded up to whole 4-symbol blocks."""
+    return int(np.ceil(head_seconds * SAMPLE_RATE
+                       / SETTLING_HEAD_BLOCK_SAMPLES)
+               ) * SETTLING_HEAD_BLOCK_SAMPLES
+
+
+SETTLING_HEAD_SAMPLES = settling_head_samples()
+
+
+def frame_samples(head_samples: int = SETTLING_HEAD_SAMPLES) -> int:
+    return head_samples + TOTAL_SYMBOLS * SYMBOL_SAMPLES + TAIL_SAMPLES
 
 
 def frame_seconds() -> float:
@@ -157,17 +165,19 @@ def settling_head_block() -> np.ndarray:
     return _mfsk.modulate(BANK, SETTLING_HEAD_PATTERN, TX_AMPLITUDE)
 
 
-def modulate(payload: bytes) -> np.ndarray:
+def modulate(payload: bytes,
+             head_seconds: float = SETTLING_HEAD_SECONDS) -> np.ndarray:
     tones = np.concatenate((
         SYNC_PATTERN,
         BANK.symbols_from_bits(encode_payload_bits(payload)),
     ))
     body = _mfsk.modulate(BANK, tones, TX_AMPLITUDE)
-    head = np.resize(settling_head_block(), SETTLING_HEAD_SAMPLES).copy()
-    fade = SETTLING_HEAD_FADE_SAMPLES
+    head_samples = settling_head_samples(head_seconds)
+    head = np.resize(settling_head_block(), head_samples).copy()
+    fade = min(SETTLING_HEAD_FADE_SAMPLES, head_samples)
     head[:fade] *= np.linspace(0.0, 1.0, fade, endpoint=True)
     audio = np.concatenate((head, body, np.zeros(TAIL_SAMPLES)))
-    if len(audio) != frame_samples():
+    if len(audio) != frame_samples(head_samples):
         raise AssertionError(f"internal frame length error: {len(audio)}")
     peak = float(np.max(np.abs(audio)))
     if peak > MAX_SAMPLE:

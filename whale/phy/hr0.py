@@ -39,12 +39,29 @@ SETTLING_HEAD_SECONDS = framing.SETTLING_HEAD_SECONDS
 SYNC_PATTERN = np.repeat(
     BANK.symbols_from_bits(dsp.bits.pn_bits((SYNC_SYMBOLS // 2) *
                                            BITS_PER_SYMBOL, 0x1D35B)), 2)
-SETTLING_HEAD_SYMBOLS = int(np.ceil(SETTLING_HEAD_SECONDS * SAMPLE_RATE
-                                    / SYMBOL_SAMPLES))
-#: Its own PN, distinct from SYNC_PATTERN's, so the settling head never
-#: correlates as a sync preamble.
-SETTLING_HEAD_PATTERN = BANK.symbols_from_bits(
-    dsp.bits.pn_bits(SETTLING_HEAD_SYMBOLS * BITS_PER_SYMBOL, 0x0B4A7))
+SETTLING_HEAD_SEED = 0x0B4A7
+
+
+def settling_head_symbols(
+        head_seconds: float = SETTLING_HEAD_SECONDS) -> int:
+    return int(np.ceil(head_seconds * SAMPLE_RATE / SYMBOL_SAMPLES))
+
+
+def settling_head_pattern(
+        head_seconds: float = SETTLING_HEAD_SECONDS) -> np.ndarray:
+    """The head's own tones, drawn from its own PN.
+
+    Its PN is distinct from SYNC_PATTERN's, so the settling head never
+    correlates as a sync preamble.  The draw is a prefix of one stream, so
+    a longer head extends this one rather than replacing it.
+    """
+    return BANK.symbols_from_bits(dsp.bits.pn_bits(
+        settling_head_symbols(head_seconds) * BITS_PER_SYMBOL,
+        SETTLING_HEAD_SEED))
+
+
+SETTLING_HEAD_SYMBOLS = settling_head_symbols()
+SETTLING_HEAD_PATTERN = settling_head_pattern()
 CODEC = dsp.PacketCodec(
     payload_bits=PAYLOAD_BITS,
     interleaver=dsp.interleave.multiplicative(PAYLOAD_BITS, 301),
@@ -75,20 +92,23 @@ def payload_symbols(payload_len: int) -> int:
             else PAYLOAD_SYMBOLS)
 
 
-def settling_head_samples() -> int:
+def settling_head_samples(
+        head_seconds: float = SETTLING_HEAD_SECONDS) -> int:
     """Settling head length, rounded up to a whole symbol."""
-    return SETTLING_HEAD_SYMBOLS * SYMBOL_SAMPLES
+    return settling_head_symbols(head_seconds) * SYMBOL_SAMPLES
 
 
-def modulate(payload: bytes) -> np.ndarray:
+def modulate(payload: bytes,
+             head_seconds: float = SETTLING_HEAD_SECONDS) -> np.ndarray:
     symbols = payload_symbols(len(payload))
     codec = SHORT_CODEC if symbols == SHORT_PAYLOAD_SYMBOLS else CODEC
     tones = np.concatenate((SYNC_PATTERN, BANK.symbols_from_bits(codec.encode(payload))))
     body = mfsk.modulate(BANK, tones, TX_AMPLITUDE)
-    if SETTLING_HEAD_SECONDS:
+    if head_seconds:
         head = np.resize(
-            mfsk.modulate(BANK, SETTLING_HEAD_PATTERN, TX_AMPLITUDE),
-            settling_head_samples())
+            mfsk.modulate(BANK, settling_head_pattern(head_seconds),
+                          TX_AMPLITUDE),
+            settling_head_samples(head_seconds))
         body = np.concatenate((head, body))
     return np.concatenate((body, np.zeros(TAIL_SAMPLES))).astype(np.float32)
 
@@ -163,9 +183,10 @@ def demodulate(audio: np.ndarray) -> dict:
         return result
 
 
-def frame_seconds(payload_len: int = MAX_PAYLOAD_BYTES) -> float:
+def frame_seconds(payload_len: int = MAX_PAYLOAD_BYTES,
+                  head_seconds: float = SETTLING_HEAD_SECONDS) -> float:
     symbols = SYNC_SYMBOLS + payload_symbols(payload_len)
-    return ((settling_head_samples() + symbols * SYMBOL_SAMPLES
+    return ((settling_head_samples(head_seconds) + symbols * SYMBOL_SAMPLES
              + TAIL_SAMPLES) / SAMPLE_RATE)
 
 
