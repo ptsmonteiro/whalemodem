@@ -15,7 +15,13 @@ Three layers sit between the link and the sound card:
   `whale/modes/`  the link-facing adapters.  Each `*_mode.py` picks one
                   configuration of one PHY and presents it as the
                   `WaveformMode` (see `whale/waveform.py`) that the link
-                  negotiates.
+                  negotiates. Exception: `vf12.py`, `vf13.py`, `vf14.py`
+                  and `vf16.py` are self-contained -- one parametric
+                  dataclass that is simultaneously the geometry, the
+                  modulation and the `WaveformMode` surface, with a
+                  `mode_for(**kwargs)` factory for variants -- so for
+                  those four there is no separate PHY to pick a
+                  configuration of.
 
   `hr0`           the 32-tone noncoherent FSK short/full control waveform
   `hc0`           16-tone noncoherent FSK

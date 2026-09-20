@@ -14,9 +14,10 @@ v6's job is to push further on TWO independent levers the project's own
 history flagged as unexploited:
 
   1. Higher-order modulation (16-QAM) reusing v5's already-4-bit-capable
-     `bits_to_symbols`/`symbols_to_bits` (from `whale/phy/sc.py`,
-     developed as hf5's sc.py) directly on the 49-bin structure, to
-     re-test (on THIS design) the project's repeatedly-confirmed
+     `bits_to_symbols`/`symbols_to_bits` (from `whale/dsp/constellation.py`,
+     developed as hf5's sc.py and later moved into whale/dsp/) directly on
+     the 49-bin structure, to re-test (on THIS design) the project's
+     repeatedly-confirmed
      real-hardware 16-QAM fragility (hf5, hf7),
      which was never reproduced in this project's own AWGN simulation --
      i.e. simulation cannot be trusted to predict this failure mode, so
@@ -34,11 +35,13 @@ history flagged as unexploited:
        genuine soft bit LLR per coded bit (generic max-log constellation
        demapper, not just v5's hard `symbols_to_bits`) and runs
        `ldpc.decode_batch` before CRC-checking.
-     - A generic `_soft_bit_llrs()` demapper works for any
-       `bits_per_symbol` (1-6) by brute-force max-log distance over the
-       constellation returned by `_constellation_table()`, built directly
-       from `sc.bits_to_symbols` so the mapping is guaranteed
-       consistent with the hard-decision path.
+     - A generic `whale.dsp.constellation.soft_bit_llrs()` demapper works
+       for any `bits_per_symbol` (1-6) by brute-force max-log distance
+       over the constellation returned by
+       `whale.dsp.constellation.constellation_table()`, built directly
+       from this module's own `bits_to_symbols` (passed in as that
+       function's `mapper`) so the mapping is guaranteed consistent with
+       the hard-decision path, 32-QAM included.
      - `raw_bits`/`raw_packet_bits` in the demod result are now the
        POST-FEC-DECODE bits when FEC is enabled (for CRC/payload
        purposes), while a new `pre_fec_bits` field carries the raw
@@ -77,6 +80,7 @@ from scipy.signal import fftconvolve
 
 from whale import framing
 from whale.dsp import bits as _bits
+from whale.dsp import constellation as _constellation
 from whale.dsp import ldpc as _ldpc
 from whale.phy import sc as _sc
 
@@ -141,7 +145,7 @@ _QAM32_SCALE = np.sqrt(26.0)   # mean(I^2)=21, mean(Q^2)=5 -> unit mean energy
 def bits_to_symbols(bits: np.ndarray, bps: int) -> np.ndarray:
     """hf5's mapper, plus 32-QAM at bps=5 (see _QAM32_* above)."""
     if bps != 5:
-        return _sc.bits_to_symbols(bits, bps)
+        return _constellation.bits_to_symbols(bits, bps)
     groups = np.asarray(bits, dtype=np.uint8).reshape(-1, 5)
     i_idx = (groups[:, 0] << 2) | (groups[:, 1] << 1) | groups[:, 2]
     q_idx = (groups[:, 3] << 1) | groups[:, 4]
@@ -153,7 +157,7 @@ def bits_to_symbols(bits: np.ndarray, bps: int) -> np.ndarray:
 def symbols_to_bits(symbols: np.ndarray, bps: int) -> np.ndarray:
     """Inverse of `bits_to_symbols`, including bps=5."""
     if bps != 5:
-        return _sc.symbols_to_bits(symbols, bps)
+        return _constellation.symbols_to_bits(symbols, bps)
     symbols = np.asarray(symbols)
     re = symbols.real * _QAM32_SCALE
     im = symbols.imag * _QAM32_SCALE
@@ -203,48 +207,6 @@ def _freq_shift_real(x: np.ndarray, hz: float, rate: float) -> np.ndarray:
     n = np.arange(len(x))
     shifted = analytic * np.exp(1j * 2 * np.pi * hz * n / rate)
     return shifted.real
-
-
-_CONSTELLATION_CACHE: dict[int, tuple[np.ndarray, np.ndarray]] = {}
-
-
-def _constellation_table(bps: int) -> tuple[np.ndarray, np.ndarray]:
-    """All 2**bps constellation points for `bits_to_symbols(., bps)`, built
-    by brute force from that same function so the table is guaranteed
-    consistent with the hard-decision mapping used elsewhere. Returns
-    (symbols[2**bps], bits[2**bps, bps]) with bits[:, j] the j-th bit
-    `bits_to_symbols` consumes for that point (column 0 = first/MSB bit)."""
-    cached = _CONSTELLATION_CACHE.get(bps)
-    if cached is not None:
-        return cached
-    m = 1 << bps
-    idx = np.arange(m)
-    bits = ((idx[:, None] >> np.arange(bps - 1, -1, -1)) & 1).astype(np.uint8)
-    syms = bits_to_symbols(bits.reshape(-1), bps)
-    _CONSTELLATION_CACHE[bps] = (syms, bits)
-    return syms, bits
-
-
-def _soft_bit_llrs(rx_syms: np.ndarray, bps: int, noise_var) -> np.ndarray:
-    """Generic max-log-MAP soft bit LLR demapper: LLR = (min dist^2 over
-    constellation points with bit=1) - (min dist^2 over points with bit=0),
-    scaled by per-symbol noise variance, matching qpsk29's LDPC
-    convention that a positive LLR means bit zero. Works for any
-    `bits_per_symbol` supported by `bits_to_symbols` (1-6 here) via
-    brute-force distance over the (<=16-point) constellation -- no
-    per-constellation closed form needed."""
-    rx_syms = np.asarray(rx_syms)
-    syms_table, bits_table = _constellation_table(bps)
-    nv = np.atleast_1d(np.asarray(noise_var, dtype=np.float64))
-    if nv.shape[0] == 1:
-        nv = np.full(rx_syms.shape[0], nv[0])
-    nv = np.maximum(nv, 1e-9)
-    d2 = np.abs(rx_syms[:, None] - syms_table[None, :]) ** 2 / nv[:, None]
-    llrs = np.empty((rx_syms.shape[0], bps), dtype=np.float64)
-    for j in range(bps):
-        is0 = bits_table[:, j] == 0
-        llrs[:, j] = np.min(d2[:, ~is0], axis=1) - np.min(d2[:, is0], axis=1)
-    return llrs.reshape(-1)
 
 
 @dataclass
@@ -1020,7 +982,8 @@ class OFDM49Mode:
 
     def _decode_blocks(self, syms_flat, bin_noise, max_iterations):
         """Symbols -> LLRs -> de-whiten -> de-interleave -> LDPC."""
-        llrs = _soft_bit_llrs(syms_flat, self.bits_per_symbol, bin_noise)
+        llrs = _constellation.soft_bit_llrs(syms_flat, self.bits_per_symbol,
+                                            bin_noise, mapper=bits_to_symbols)
         llrs = llrs[: self.coded_bit_count] if len(llrs) > self.coded_bit_count else llrs
         whitener_llr = _bits.pn_bits(len(llrs), WHITENER_SEED)
         # whitening is XOR with a known bit; flipping a bit flips the

@@ -13,14 +13,15 @@ from scipy.signal import correlate, hilbert
 
 from whale import framing, waveform
 from whale.dsp import bits, interleave, ldpc
-from whale.phy.ofdm49 import _constellation_table, _soft_bit_llrs
+from whale.dsp.constellation import constellation_table, soft_bit_llrs
+from whale.phy.ofdm49 import bits_to_symbols as _ofdm49_bits_to_symbols
 
 MODE_ID = 18
 CARRIER_SPACING_HZ = 50.0
 
 
 def _points(order):
-    return _constellation_table(order)[0]
+    return constellation_table(order, mapper=_ofdm49_bits_to_symbols)[0]
 
 
 def _fit_channel(observed, reference):
@@ -276,8 +277,9 @@ class Vf12Mode(waveform.ModeDescription):
             # Four independent training symbols: correct the fitted residual's 3/4 bias.
             noise = np.maximum(np.mean(np.abs(block[:4] / safe - self.header[4:]) ** 2,
                                        axis=0) * 4 / 3, 1e-5)
-        llr = _soft_bit_llrs(equalized.reshape(-1), self.bits_per_carrier,
-                             np.tile(noise, self.payload_symbols))[:self.coded_bits]
+        llr = soft_bit_llrs(equalized.reshape(-1), self.bits_per_carrier,
+                            np.tile(noise, self.payload_symbols),
+                            mapper=_ofdm49_bits_to_symbols)[:self.coded_bits]
         llr = self.interleaver.gather(llr * (1 - 2 * self.whitener.astype(float)))
         info, iterations, ok = ldpc.decode_batch(llr.reshape(self.n_codewords, ldpc.N), rate=self.fec_rate)
         packet = np.packbits(info.reshape(-1)[:self.packet_bytes * 8]).tobytes()

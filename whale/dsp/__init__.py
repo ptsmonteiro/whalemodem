@@ -8,6 +8,7 @@ than on a mode's module-level constants.  A mode becomes a choice of
 geometry and a wiring of these together.
 
   `bits`          PN sequences, QPSK mapping and slicing
+  `constellation` bits<->symbol mapping (BPSK..64-QAM) and soft-bit LLRs
   `ofdm`          the frame `Geometry`, symbol build/analyze, carrier banks
   `acquire`       preamble self-correlation and candidate ranking
   `timing`        cyclic-prefix symbol timing and sample-clock fit
@@ -28,8 +29,8 @@ These are on-air-compatible
 definitions, not a tidy-up: changing one changes what a station transmits.
 """
 
-from . import (acquire, bits, differential, equalize, fec, framing, freq,
-               interleave, ldpc, mfsk, ofdm, timing)
+from . import (acquire, bits, constellation, differential, equalize, fec,
+               framing, freq, interleave, ldpc, mfsk, ofdm, timing)
 from .fec import K7, K9, ConvolutionalCode
 from .framing import PacketCodec
 from .interleave import Interleaver
@@ -38,8 +39,8 @@ from .ofdm import Geometry
 from .timing import TimingFit
 
 __all__ = [
-    "acquire", "bits", "differential", "equalize", "fec", "framing", "freq",
-    "interleave", "ldpc", "mfsk", "ofdm", "timing",
+    "acquire", "bits", "constellation", "differential", "equalize", "fec",
+    "framing", "freq", "interleave", "ldpc", "mfsk", "ofdm", "timing",
     "ConvolutionalCode", "Geometry", "Interleaver", "K7", "K9", "PacketCodec",
     "TimingFit", "ToneBank",
 ]

@@ -5,9 +5,10 @@ Developed in the retired `experiments/hf5_8psk_4k/` and moved here
 unmodified when it became shipped product code; its qualification record is
 `experiments/hf5_8psk_4k/RESULTS.md`.
 
-Independent of whale/modes/*. Reuses only whale.dsp.bits (PN whitening) as
-a generic primitive. Everything else -- pulse shaping, sync, carrier
-mixing, symbol mapping, framing -- is written fresh here.
+Independent of whale/modes/*. Reuses whale.dsp.bits (PN whitening) and
+whale.dsp.constellation (bits_to_symbols/symbols_to_bits) as generic
+primitives. Everything else -- pulse shaping, sync, carrier mixing,
+framing -- is written fresh here.
 
 Design, built up in small, hardware-validated steps (see
 `experiments/hf5_8psk_4k/RESULTS.md`):
@@ -36,6 +37,7 @@ import numpy as np
 from scipy.signal import fftconvolve
 
 from whale.dsp import bits as _bits
+from whale.dsp.constellation import bits_to_symbols, symbols_to_bits
 
 # ---------------------------------------------------------------------------
 # Fixed channel constants
@@ -135,88 +137,12 @@ def rrc_taps(sps: int, span_symbols: int, beta: float) -> np.ndarray:
 
 
 # ---------------------------------------------------------------------------
-# Symbol mapping
+# Symbol mapping: bits_to_symbols/symbols_to_bits live in
+# whale.dsp.constellation (waveform-independent) and are imported above;
+# re-exported here as `sc.bits_to_symbols`/`sc.symbols_to_bits` for the
+# sibling modules that already reach them that way (sc_fast.py,
+# fast_sync.py).
 # ---------------------------------------------------------------------------
-
-def bits_to_symbols(bits: np.ndarray, bps: int) -> np.ndarray:
-    bits = np.asarray(bits, dtype=np.uint8)
-    if bps == 1:
-        return (1.0 - 2.0 * bits.astype(np.float64)).astype(np.complex128)
-    if bps == 2:
-        return _bits.qpsk_from_bits(bits)
-    if bps == 3:
-        groups = bits.reshape(-1, 3)
-        idx = (groups[:, 0] << 2) | (groups[:, 1] << 1) | groups[:, 2]
-        gray = np.array([0, 1, 3, 2, 6, 7, 5, 4])
-        phase = 2 * np.pi * gray[idx] / 8.0
-        return np.exp(1j * phase)
-    if bps == 4:
-        # 16-QAM, Gray-coded per axis, unit average energy.
-        groups = bits.reshape(-1, 4)
-        def axis(b0, b1):
-            # Gray: 00->-3 01->-1 11->+1 10->+3
-            level = np.where(b0 == 0,
-                              np.where(b1 == 0, -3.0, -1.0),
-                              np.where(b1 == 0, 3.0, 1.0))
-            return level
-        re = axis(groups[:, 0], groups[:, 1])
-        im = axis(groups[:, 2], groups[:, 3])
-        return (re + 1j * im) / np.sqrt(10.0)
-    if bps == 6:
-        # 64-QAM, Gray-coded independently on the I and Q axes.
-        # 000..100 map to -7,-5,-3,-1,+1,+3,+5,+7.
-        groups = bits.reshape(-1, 6)
-        levels = np.array([-7.0, -5.0, -3.0, -1.0,
-                           1.0, 3.0, 5.0, 7.0])
-        # Binary label -> physical level position.  This is the inverse of
-        # the Gray sequence: adjacent amplitudes differ by one bit.
-        binary_to_level = np.array([0, 1, 3, 2, 7, 6, 4, 5])
-        re = levels[binary_to_level[(groups[:, 0] << 2) | (groups[:, 1] << 1) | groups[:, 2]]]
-        im = levels[binary_to_level[(groups[:, 3] << 2) | (groups[:, 4] << 1) | groups[:, 5]]]
-        return (re + 1j * im) / np.sqrt(42.0)
-    raise ValueError(f"unsupported bits_per_symbol={bps}")
-
-
-def symbols_to_bits(symbols: np.ndarray, bps: int) -> np.ndarray:
-    symbols = np.asarray(symbols)
-    if bps == 1:
-        return (symbols.real < 0.0).astype(np.uint8)
-    if bps == 2:
-        return _bits.bits_from_qpsk(symbols)
-    if bps == 3:
-        phase = np.mod(np.angle(symbols), 2 * np.pi)
-        idx = np.round(phase / (2 * np.pi / 8)).astype(int) % 8
-        inv_gray = np.array([0, 1, 3, 2, 7, 6, 4, 5])  # inverse of gray table
-        val = inv_gray[idx]
-        b0 = (val >> 2) & 1
-        b1 = (val >> 1) & 1
-        b2 = val & 1
-        return np.stack((b0, b1, b2), axis=-1).astype(np.uint8).reshape(-1)
-    if bps == 4:
-        re = symbols.real * np.sqrt(10.0)
-        im = symbols.imag * np.sqrt(10.0)
-        def axis_bits(v):
-            b0 = (v >= 0.0).astype(np.uint8)
-            b1 = (np.abs(v) <= 2.0).astype(np.uint8)
-            return b0, b1
-        b0r, b1r = axis_bits(re)
-        b0i, b1i = axis_bits(im)
-        return np.stack((b0r, b1r, b0i, b1i), axis=-1).astype(np.uint8).reshape(-1)
-    if bps == 6:
-        # Nearest-neighbour decision followed by the inverse Gray map.
-        levels = np.array([-7.0, -5.0, -3.0, -1.0,
-                           1.0, 3.0, 5.0, 7.0])
-        level_to_binary = np.array([0, 1, 3, 2, 6, 7, 5, 4])
-        def axis_bits(v):
-            idx = np.argmin(np.abs(v[:, None] - levels[None, :]), axis=1)
-            val = level_to_binary[idx]
-            return ((val >> 2) & 1, (val >> 1) & 1, val & 1)
-        re = symbols.real * np.sqrt(42.0)
-        im = symbols.imag * np.sqrt(42.0)
-        br = axis_bits(re)
-        bi = axis_bits(im)
-        return np.stack((*br, *bi), axis=-1).astype(np.uint8).reshape(-1)
-    raise ValueError(f"unsupported bits_per_symbol={bps}")
 
 
 # ---------------------------------------------------------------------------

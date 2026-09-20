@@ -51,13 +51,13 @@ def test_repeat_noise_variance_uses_each_data_symbols_equalizer_gain(monkeypatch
     audio = rx_audio.downsample(np.pad(tx, (480, 480)))
 
     observed = {}
-    original = phy._soft_bit_llrs
+    original = phy._constellation.soft_bit_llrs
 
-    def capture(symbol_values, bits_per_symbol, noise_variance):
+    def capture(symbol_values, bits_per_symbol, noise_variance, **kwargs):
         observed['variance'] = np.asarray(noise_variance).copy()
-        return original(symbol_values, bits_per_symbol, noise_variance)
+        return original(symbol_values, bits_per_symbol, noise_variance, **kwargs)
 
-    monkeypatch.setattr(phy, '_soft_bit_llrs', capture)
+    monkeypatch.setattr(phy._constellation, 'soft_bit_llrs', capture)
     result = mode.demodulate(
         audio, diagnostics=True, noise_estimator='repeat')
     assert 'variance' in observed
