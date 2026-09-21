@@ -201,6 +201,63 @@ def soft_bits(bank: ToneBank, magnitudes: np.ndarray) -> np.ndarray:
     """
     metric = np.asarray(magnitudes, dtype=np.float64) ** 2
     metric = metric / np.maximum(np.mean(metric, axis=1, keepdims=True), 1e-30)
+    return _bit_metrics(bank, metric)
+
+
+def fitted_soft_bits(bank: ToneBank, magnitudes: np.ndarray) -> np.ndarray:
+    """`soft_bits`, but weighted by each tone's own noise power.
+
+    `soft_bits` normalizes every symbol by the mean across its tones, which
+    assumes the tones share a noise floor.  On a real FM path they do not:
+    measured on an IC-705 <-> digirig pair (20 captures, both directions),
+    the lowest tone's bin sat 9-15.5 dB above the quietest one, carrying
+    low-frequency energy that the de-emphasized discriminator output puts
+    there.  A permanently elevated bin wins symbols it was not sent in, and
+    what it beats is whichever tone is weakest -- the top of the bank, at
+    the edge of the radio's audio passband.  That showed up as a per-tone
+    error rate running 0.0 / 1.2 / 3.3 / 6.5 % from 600 to 2,400 Hz where a
+    shared noise floor would have made all four equal.
+
+    A single per-bin gain cannot repair that: dividing a bin by its noise
+    floor scales down its *signal* too, so it only trades the top tone's
+    errors for the bottom one's (measured: 19/20 either way).  What the
+    channel actually needs fitting is two numbers per tone, and the
+    non-coherent log-likelihood that bin `t` holds the tone wants both:
+
+        log I0(2*A_t*|y_t| / N_t) - A_t^2 / N_t
+
+    with `N_t` the bin's noise power and `A_t` its signal amplitude.  Above
+    a few dB, `log I0(x) -> x`, which leaves an affine function of the
+    magnitude and costs one multiply per tone; on the 20 captures the exact
+    Bessel form and this one decoded identically (mean tone error 0.117 %
+    against 0.110 %), so the approximation is the shipped one.
+
+    Both are estimated from the block itself, so nothing is signalled and
+    no AGC reference is needed.  Each bin is idle in 3 of every 4 symbols,
+    which is what makes the estimate possible from the received data alone:
+    a low quantile of a bin's energy is pure noise (for a central
+    chi-square with two degrees of freedom the median is `N*ln2`), and a
+    high one is its signal.
+
+    Measured against `soft_bits` on the same 20 captures: mean tone error
+    1.85 % -> 0.11 %, and 16 of the 20 frames decode with no tone error at
+    all.  The cost is that the fit needs a block to read, so this is worth
+    less the flatter the bank already is -- on the synthetic `flat_nbfm`,
+    whose tones share a noise floor by construction, it is slightly worse
+    below the pass point.
+    """
+    magnitudes = np.asarray(magnitudes, dtype=np.float64)
+    power = magnitudes ** 2
+    noise = np.maximum(np.quantile(power, 0.4, axis=0) / np.log(2.0), 1e-30)
+    amplitude = np.sqrt(np.maximum(
+        np.quantile(power, 0.875, axis=0) - noise, 1e-12))
+    metric = ((2.0 * amplitude[None, :] * magnitudes
+               - (amplitude ** 2)[None, :]) / noise[None, :])
+    return _bit_metrics(bank, metric)
+
+
+def _bit_metrics(bank: ToneBank, metric: np.ndarray) -> np.ndarray:
+    """Max-log bit reliabilities from a per-tone score; positive means zero."""
     labels = bank._gray
     out = np.empty((len(metric), bank.bits_per_symbol))
     for bit in range(bank.bits_per_symbol):

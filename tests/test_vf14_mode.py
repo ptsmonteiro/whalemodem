@@ -1,5 +1,7 @@
 """VF14 mode contract, loopback, FM-channel decode and sync calibration."""
 
+from dataclasses import replace
+
 import numpy as np
 import pytest
 
@@ -177,3 +179,62 @@ def test_sync_threshold_sits_above_noise(mode):
     scores, _ = mfsk.correlate(mode.rx_bank, noise, mode.sync_pattern)
     peaks.append(float(scores.max()))
     assert max(peaks) < 0.85 * mode.confidence_threshold
+
+
+def test_only_vf14_4_fits_its_tone_bank_per_bin():
+    """The 600-2,400 Hz bank is the one that straddles the audio response."""
+    assert VF14_4.soft_metric == "per_bin"
+    assert VF14_16.soft_metric == "symbol" and VF14_8.soft_metric == "symbol"
+
+
+def test_soft_metric_is_decoder_side_only():
+    """Fitting per bin must not move a sample of the transmitted waveform:
+    that is what lets mode 23 keep its ID."""
+    packet = _packet(VF14_4.max_payload_bytes)
+    assert np.array_equal(VF14_4.encode(packet),
+                          replace(VF14_4, soft_metric="symbol").encode(packet))
+
+
+def _tilted_noise_floor(mode, packet, cn_db, seed, tilt):
+    """`_through_fm`, plus narrowband noise sat on the *lowest* tone.
+
+    The measured FM defect: over 20 IC-705 <-> digirig captures the 600 Hz
+    bin ran 9-15.5 dB above the quietest one, so the tones do not share a
+    noise floor and a per-symbol normalizer mis-weights the whole bank.
+    """
+    audio = _through_fm(mode, packet, cn_db, seed)
+    rng = np.random.default_rng(seed + 7)
+    envelope = np.convolve(rng.normal(0.0, 1.0, len(audio)),
+                           np.ones(64) / 64, mode="same")
+    index = np.arange(len(audio)) / rx_audio.DECODE_SAMPLE_RATE
+    carrier = np.cos(2 * np.pi * mode.tx_bank.tone_hz[0] * index
+                     + rng.uniform(0.0, 2 * np.pi))
+    rms = np.sqrt(np.mean(np.asarray(audio, np.float64) ** 2))
+    return (audio + tilt * rms * envelope * carrier).astype(np.float32)
+
+
+def test_per_bin_fit_survives_a_noise_floor_tilted_onto_one_tone():
+    """A bin held 8x above the rest takes the per-symbol metric to zero and
+    leaves the per-bin fit untouched."""
+    symbol_metric = replace(VF14_4, soft_metric="symbol")
+    fitted = normalized = 0
+    for trial in range(12):
+        packet = _packet(VF14_4.max_payload_bytes, seed=500 + trial)
+        audio = _tilted_noise_floor(VF14_4, packet, 6, 500 + trial, 8.0)
+        fitted += VF14_4.demodulate(audio).get("payload") == packet
+        normalized += symbol_metric.demodulate(audio).get("payload") == packet
+    assert fitted == 12, f"per-bin fit delivered {fitted}/12 on a tilted floor"
+    assert normalized == 0, (
+        f"per-symbol normalizer delivered {normalized}/12; the tilt no "
+        "longer separates the two metrics, so this test has stopped testing "
+        "anything -- raise the tilt or re-derive it")
+
+
+def test_per_bin_fit_costs_nothing_on_an_untilted_floor():
+    """Same packets, no tilt: fitting must not be worse than not fitting."""
+    symbol_metric = replace(VF14_4, soft_metric="symbol")
+    for trial in range(6):
+        packet = _packet(VF14_4.max_payload_bytes, seed=500 + trial)
+        audio = _tilted_noise_floor(VF14_4, packet, 6, 500 + trial, 0.0)
+        assert VF14_4.demodulate(audio).get("payload") == packet
+        assert symbol_metric.demodulate(audio).get("payload") == packet

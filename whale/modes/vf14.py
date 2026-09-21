@@ -91,6 +91,13 @@ class Vf14Mode(waveform.ModeDescription):
     #: -`preemph_db` at the highest relative to the RMS-normalized set, the
     #: same knob as `Vf13Mode.preemph_db`.
     preemph_db: float = 0.0
+    #: Which soft metric the decoder reads the tone magnitudes with:
+    #: "symbol" for HC0's per-symbol normalizer, "per_bin" for
+    #: `dsp.mfsk.fitted_soft_bits`, which fits each tone's own noise power
+    #: and signal amplitude first.  Decoder-side only -- both read the same
+    #: transmitted waveform, so this is not a new waveform and does not
+    #: spend a mode ID.
+    soft_metric: str = "symbol"
     sync_seed: int = 0x0B91D
     head_seed: int = 0x13A57
     whitener_seed: int = 0x0E14A
@@ -102,6 +109,9 @@ class Vf14Mode(waveform.ModeDescription):
     def __post_init__(self):
         if self.symbol_samples % DECIMATION:
             raise ValueError(f"symbol_samples must be a multiple of {DECIMATION}")
+        if self.soft_metric not in ("symbol", "per_bin"):
+            raise ValueError(f"unknown soft_metric {self.soft_metric!r}; "
+                             f"have 'symbol' and 'per_bin'")
         if self.fec_rate not in dsp.fec.PUNCTURE_PATTERNS:
             raise ValueError(f"unknown fec_rate {self.fec_rate!r}; have "
                              f"{sorted(dsp.fec.PUNCTURE_PATTERNS)}")
@@ -301,7 +311,13 @@ class Vf14Mode(waveform.ModeDescription):
         energy is all in one tone. Measured on flat_nbfm at the payload
         cliff, a frame-wide normalizer, magnitude instead of energy, and a
         tighter clip at 4 all decoded within 2-3 frames of 30 of this one.
+
+        A profile whose tones do *not* share a noise floor sets
+        `soft_metric="per_bin"` and reads `_mfsk.fitted_soft_bits` instead;
+        VF14_4 does, and why is recorded there.
         """
+        if self.soft_metric == "per_bin":
+            return _mfsk.fitted_soft_bits(self.rx_bank, magnitudes)
         return _mfsk.soft_bits(self.rx_bank, magnitudes)
 
     def acquire(self, samples: np.ndarray) -> tuple[int | None, float]:
@@ -398,11 +414,21 @@ VF14_16 = Vf14Mode(
 #: 20/20 against this file's own fixed-seed discriminator-threshold draw
 #: (19/20). 144 symbols (240 ms) is the shortest tried that holds 20/20 on
 #: both that draw and 40/40 across two fresh 20-trial seed sets.
+#: Reads its tones with `dsp.mfsk.fitted_soft_bits`.  Alone among the
+#: profiles this one spans the whole FM audio band -- 600 to 2,400 Hz, four
+#: tones 600 Hz apart -- so its bank straddles both edges of a radio's audio
+#: response, and its bins do not share a noise floor: measured over 20
+#: IC-705 <-> digirig captures the 600 Hz bin ran 9-15.5 dB above the
+#: quietest, and the per-tone error rate climbed 0.0 / 1.2 / 3.3 / 6.5 %
+#: across the bank.  Fitting each bin took those 20 captures from 19/20 to
+#: 20/20 and the mean tone error from 1.85 % to 0.11 %.  Decoder-side only:
+#: the waveform, and so mode ID 23, is unchanged.
 VF14_4 = Vf14Mode(
     name="vf14-4", mode_id=VF14_4_MODE_ID, tone_count=4,
     symbol_samples=80, first_bin=1,
     sync_symbols=144, payload_symbols=1500, short_payload_symbols=144,
     medium_payload_symbols=400, fec_rate="3/4",
+    soft_metric="per_bin",
     confidence_threshold=0.145)
 
 VF14_8 = Vf14Mode(
