@@ -93,7 +93,7 @@ def _record(cell, **extra):
 def test_run_log_round_trips_and_reports_completed_cells(tmp_path):
     log = hb.RunLog(tmp_path / "run.jsonl")
     cells = hb.expand(scenarios=("single",), modes=("hc0",),
-                      directions=("ab",), heads=(0.6,), reps=1)
+                      directions=("ab",), heads=(0.0, 0.1, 0.2, 0.4), reps=1)
     for cell in cells[:2]:
         log.append(_record(cell))
     log.close()
@@ -117,7 +117,7 @@ def test_run_log_serialises_numpy_values(tmp_path):
 def test_resume_skips_recorded_cells_and_merges_cleanly(tmp_path):
     path = tmp_path / "run.jsonl"
     cells = hb.expand(scenarios=("single",), modes=("hc0",),
-                      directions=("ab",), heads=(0.6,), reps=1)
+                      directions=("ab",), heads=(0.0, 0.1, 0.2, 0.4), reps=1)
     log = hb.RunLog(path)
     for cell in cells[:3]:
         log.append(_record(cell))

@@ -179,23 +179,27 @@ KEEP_PASS_FRACTION = 0.1
 #: here is a name plus the axes that are meaningful for it, and the driver
 #: reads it. `gaps` is the idle time before the keying -- the AGC's memory of
 #: what came before is exactly what scenario means.
+#: TEMPORARY, for the 2026-09-21 head-length campaign (see logs/head/):
+#: gaps trimmed to one representative value per scenario so a head/mode/rep
+#: matrix fits an air-time budget -- gap is not an axis this campaign is
+#: sweeping. Revert to the historical tuples afterwards.
 PLAN = {
     # One frame per keying. The baseline, and the only cell the shipped
     # head length was ever reasoned against.
-    "single": {"gaps": (0.2, 0.5, 1.0, 2.0, 5.0, 30.0), "frames": 1},
+    "single": {"gaps": (1.0,), "frames": 1},
     # N frames inside ONE keying. If the head is per-keying rather than
     # per-frame, a burst amortises it away entirely and the right answer for
     # bulk transfer is "key once", not "shorten the head".
     "burst": {"gaps": (1.0,), "frames": 4},
     # A keys, B answers within `turnaround`. The ARQ-realistic case: a small
     # PTT-off gap, both AGCs still slammed by the frame that just ended.
-    "turnaround": {"gaps": (1.0,), "frames": 1, "turnaround": (0.2, 0.5)},
+    "turnaround": {"gaps": (1.0,), "frames": 1, "turnaround": (0.2,)},
     # Mode A then mode B, keying each. Different spectra mean a different
     # level and a receiver mode-search that has to re-find the waveform.
     "alternate": {"gaps": (0.5,), "frames": 1, "alternate": True},
     # Long silence then key: worst-case AGC slam. This sets the ceiling; no
     # head shorter than what `cold` needs is safe for a first keying.
-    "cold": {"gaps": (30.0, 60.0), "frames": 1},
+    "cold": {"gaps": (30.0,), "frames": 1},
 }
 
 #: Head lengths swept. 0.0 is in deliberately: it is the zero point that says
