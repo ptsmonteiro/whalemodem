@@ -609,6 +609,8 @@ class OFDM49Mode:
         total_symbols = self.total_ofdm_symbols()
         symlen = self.symbol_len
         needed = start + total_symbols * symlen
+        # TODO: 0.12 is repeated in streaming.py's OfdmSearch. Give the
+        # candidate gate a single named constant so the two cannot drift apart.
         if confidence < 0.12 or start < 0 or needed > len(x):
             return result
         result["synced"] = True

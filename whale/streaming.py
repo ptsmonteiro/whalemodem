@@ -66,6 +66,8 @@ class OfdmSearch:
                 search_slice=slice(self.cursor - low, self.cursor - low + self.block))
             at += low
             self.windows += 1
+            # TODO: 0.12 is repeated in ofdm49.demodulate. Give the candidate
+            # gate a single named constant so the two cannot drift apart.
             if confidence >= 0.12:
                 # Confidence uses each window's RMS. Compare unnormalized
                 # correlation across windows, otherwise a partial preamble

@@ -287,6 +287,12 @@ class _ReceiverMixin:
             results.append((profile, result))
             if accept_checked(profile, result):
                 return True
+        # TODO: only streaming.py's OfdmReceiver publishes end_index, so a
+        # non-streaming OFDM mode (hf6, hf5) whose CRC fails always lands in
+        # pending and is read as "frame still arriving" -- never consumed,
+        # never counted as a near miss. Its failures are invisible in
+        # acquisition_count. Have ofdm49 publish end_index/sync_end_index, or
+        # key this on the mode rather than on the field's presence.
         pending = [result for candidate, result in results
                    if result.get("confidence", 0) >= candidate.confidence_threshold
                    and "end_index" not in result]
