@@ -67,6 +67,29 @@ MANIFEST = (
     # 32-QAM delivers 0/16 there -- so this is the top FM rate that holds.
     # Default is availability, not qualification.
     QualificationEntry("fm", 18, QualificationLevel.DEFAULT),
+    # FMHT0 is rung 0 of the FM-handheld ladder: 400 Bd 4-FSK, rate 1/3,
+    # no equalizer -- the beacon/link-setup/ACK waveform. Experimental
+    # pending an on-air margin measurement.
+    QualificationEntry("fm", 30, QualificationLevel.EXPERIMENTAL),
+    # VFS2 is the workhorse rung of the FM SC-FDE family: coherent QPSK,
+    # rate-1/2 LDPC, 1,527 bit/s. Experimental pending an on-air margin.
+    QualificationEntry("fm", 25, QualificationLevel.EXPERIMENTAL),
+    # VFS3 is the high-rate coherent rung of the FM SC-FDE family: VFS2's
+    # waveform at rate-3/4 LDPC, 2,303 bit/s -- 1.5x VFS2's payload in
+    # exactly the same airtime, for a full-quieting signal. Experimental
+    # pending an on-air margin measurement.
+    QualificationEntry("fm", 26, QualificationLevel.EXPERIMENTAL),
+    # VFS1 is the robust rung of the FM SC-FDE family: differential BPSK,
+    # rate-1/2 LDPC, 748 bit/s. Differential detection costs ~2.3 dB against
+    # the coherent rungs above and buys tolerance of the phase disturbance a
+    # pocketed or moving handheld produces. Experimental pending an on-air
+    # margin measurement.
+    QualificationEntry("fm", 24, QualificationLevel.EXPERIMENTAL),
+    # FMHT4 is rung 4, the top of the FM-handheld ladder and the only
+    # OFDM rung in it: 64-carrier 31.25 Hz 8PSK OFDM, rate-3/4 LDPC,
+    # clip-and-filter peak limiting, 3,151 bit/s. Experimental pending
+    # an on-air margin measurement.
+    QualificationEntry("fm", 27, QualificationLevel.EXPERIMENTAL),
     QualificationEntry("hf", 5, QualificationLevel.DEFAULT),
     # Owner approved the 32-FSK HR0 replacement on 2026-09-06 despite its
     # unproven 3 dB measured margin; Default is availability, not qualification.
@@ -121,12 +144,17 @@ def registry(policy: str, level: QualificationLevel | str =
         from .modes.vf13 import VF13
         from .modes.vf14 import VF14_16, VF14_4, VF14_8
         from .modes.vf16 import VF16
+        from .modes.fmht0 import FMHT0
+        from .modes.vfs1 import VFS1
+        from .modes.vfs2 import VFS2
+        from .modes.vfs3 import VFS3
+        from .modes.fmht4 import FMHT4
         # VF14-4 is both the control mode and the lowest (most robust) rung
         # of the default ladder. `budget` is accepted for interface
         # symmetry with hf_registry but is unused: every FM waveform here is
         # fixed-geometry, none derives its payload from a keying budget.
         del budget
-        candidates, control = (VF14_16, VF14_8, VF14_4, VF13, VF16, VF12), VF14_4
+        candidates, control = (FMHT0, VF14_16, VF14_8, VF14_4, VF13, VFS1, VFS2, VFS3, VF16, VF12, FMHT4), VF14_4
     elif policy == "hf":
         from .modes.hr0_mode import HR0
         from .modes.hc0_mode import HC0

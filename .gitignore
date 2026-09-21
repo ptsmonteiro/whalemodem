@@ -70,3 +70,4 @@ experiments/**/hardware/**/.gitkeep
 !experiments/hf14_ofdm_bpsk_watterson/hardware/**
 !experiments/hf16_mfsk_lowsnr/hardware/**
 !experiments/hf16_mfsk_lowsnr/*_run1/*.npy
+.locks/
