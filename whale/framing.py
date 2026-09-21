@@ -26,11 +26,14 @@ BOOTSTRAP_HEADER_BYTES = AIR_HEADER_BYTES
 # same leading-loss protection.
 #
 # Sized against the analogue ramp alone: the transmitter's PTT ramp plus
-# the receiver's AGC attack, which together run 30-60 ms worst case on the
-# bench radios. Acquisition itself needs no head at all -- every HF
-# receiver searches for the sync preamble and decodes a keying with no head
-# in front of it -- so the only thing this number buys is analogue
-# readiness, and every millisecond of it is air time. 0.2 s is several
-# times the measured ramp, leaving margin for radios and amplifiers slower
-# than the ones on the bench.
-SETTLING_HEAD_SECONDS = 0.2
+# the receiver's AGC attack, which together measure 30-60 ms where they can
+# be read cleanly on the bench radios. Acquisition itself needs no head at
+# all -- every HF receiver searches for the sync preamble and decodes a
+# keying with no head in front of it -- so the only thing this number buys
+# is analogue readiness, and every millisecond of it is air time. On-air
+# A/B, IC-705 <-> IC-7300, 90 keyings over hf7/hf8/hc1w/hc0/hr0
+# (logs/head/2026-09-21_shipped_ab.jsonl and _ba.jsonl): 89 of 90 decoded,
+# and four of the five modes decoded 3/3 with no head at all; the one
+# failure was an hf7 keying at head 0. 0.1 s is still twice the measured
+# ramp, leaving margin for radios and amplifiers slower than the bench pair.
+SETTLING_HEAD_SECONDS = 0.1

@@ -38,10 +38,10 @@ def test_hf9_geometry_and_capacity_are_fixed():
     assert HF9_PHY.n_codewords == 3
     assert HF9_PHY.frame_seconds() == pytest.approx(0.836)
     # Airtime is the whole keying: the settling head plus the frame.
-    assert HF9_PHY.settling_head_seconds() == pytest.approx(0.22)
-    assert HF9.airtime(HF9.chunk_size) == pytest.approx(1.056)
+    assert HF9_PHY.settling_head_seconds() == pytest.approx(0.11)
+    assert HF9.airtime(HF9.chunk_size) == pytest.approx(0.946)
     assert 8 * HF9.chunk_size / HF9.airtime(HF9.chunk_size) == pytest.approx(
-            795.4545454545455)
+            887.9492600422833)
     assert HF9_PHY.active_bins == HF8_PHY.active_bins
     assert HF9_PHY.cp_len == HF8_PHY.cp_len
 

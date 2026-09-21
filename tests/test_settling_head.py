@@ -31,7 +31,7 @@ from whale.modes.hr0_mode import HR0
 #: Each waveform rounds the shared budget up to its own grid, so none is
 #: shorter than the budget and none overshoots by a whole extra symbol.
 #: The coarsest grids are hc0 and hr0 (4-symbol, 42.7 ms blocks) and the
-#: OFDM symbol (22 ms); at the 0.2 s budget the largest overshoot is 20 ms,
+#: OFDM symbol (22 ms); at the 0.1 s budget the largest overshoot is 28 ms,
 #: so one tolerance still covers every mode.
 TOLERANCE = 0.05
 
@@ -51,8 +51,8 @@ def head_seconds(mode):
 ALL_MODES = (HR0, HC0, HC1W, HF6, HF7, HF8, HF9)
 
 
-def test_the_shared_budget_is_two_hundred_milliseconds():
-    assert framing.SETTLING_HEAD_SECONDS == 0.2
+def test_the_shared_budget_is_one_hundred_milliseconds():
+    assert framing.SETTLING_HEAD_SECONDS == 0.1
 
 
 @pytest.mark.parametrize("mode", ALL_MODES, ids=lambda m: m.name)
@@ -98,7 +98,7 @@ def test_ofdm_acquisition_lands_past_the_settling_head(mode, phy):
 
     confidence, start, _ = phy.acquire(design_rate)
     assert start == head
-    # At the shipped 0.2 s budget the head is shorter than the preamble on
+    # At the shipped 0.1 s budget the head is shorter than the preamble on
     # every OFDM mode, so there is no start offset at which a whole preamble
     # template fits inside the head and the false-acquisition hazard is
     # structurally absent. What must never happen -- whatever the budget --
