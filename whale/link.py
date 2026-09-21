@@ -1037,6 +1037,8 @@ class Link(_ReceiverMixin, _AdaptationMixin):
             if attempts is None:
                 raise LinkError(f"no ACK for chunk {sent} ({offset}/{len(data)} bytes) "
                                 f"after {self._channel('max_retries')} tries")
+            logger.info("[%s] TX DATA (%d/%d B) to %s at %s", self.mycall,
+                        offset, len(data), self.peer_call, self.tx_profile.name)
             self._tx_seq = (self._tx_seq + 1) % SEQ_MODULO
             # Always retain the ACK as evidence for the mode that ultimately
             # delivered the chunk. If the retry loop already stepped down,
