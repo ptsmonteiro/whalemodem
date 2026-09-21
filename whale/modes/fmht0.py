@@ -21,9 +21,20 @@ buys robustness and none buys rate.
     again.  The receiver adds the repeat LLRs back into their originals
     before de-interleaving, so the repeat is soft-combined, and the two
     copies of a repeated bit are half a frame apart.
-  * 250 ms preamble shared with the rest of the family: a 100 ms PN energy
-    burst to open squelch and settle the receive AGC, then a 150 ms PN tone
-    sequence for timing.  FM discriminator audio has no carrier offset, so
+  * 800 ms preamble: a 500 ms PN energy burst to open squelch and settle
+    the receive AGC, then a 300 ms PN tone sequence for timing.  Both
+    lengths are measured, not nominal, and both are longer than the
+    family's 250 ms sketch because on radios that sketch does not hold:
+
+      - 150 ms of sync leaves a noise-correlation floor near 0.24 over four
+        tones at 400 Bd, close enough to a real peak that acquisition took
+        spurious ones; 300 ms puts the floor near 0.14, well under the 0.30
+        threshold.
+      - 200 ms of burst is not enough to hold the receiver's squelch open.
+        The receive envelope of a missed frame showed audio for 150 ms, a
+        collapse to a fifth of that from 250 to 450 ms as the squelch
+        re-closed, and full recovery after -- with the sync sequence inside
+        the hole.  A 500 ms burst puts the sync past it.  FM discriminator audio has no carrier offset, so
     there is no offset search -- only sound-card clock offset, which over a
     frame this short is under a sample.
   * Same `PacketCodec` framing, CRC32 grid selection and short/medium/full
@@ -35,7 +46,8 @@ Audio path: mic/speaker.  This mode assumes a compressed, pre-emphasized
 handheld audio path and is not the right waveform for a flat 9,600 baud
 data jack.
 
-Simulated flat_nbfm C/N floor: not measured.
+Simulated flat_nbfm C/N floor: -4 dB (20/20 full-capacity frames;
+-5 dB did not pass at 7/20).
 """
 
 from __future__ import annotations
@@ -164,12 +176,12 @@ class Fmht0Mode(Vf14Mode):
 FMHT0 = Fmht0Mode(
     name="fmht0", mode_id=FMHT0_MODE_ID, tone_count=4,
     symbol_samples=120, first_bin=2,
-    sync_symbols=60, payload_symbols=900, short_payload_symbols=216,
+    sync_symbols=120, payload_symbols=900, short_payload_symbols=216,
     medium_payload_symbols=420,
-    head_seconds=0.10,
+    head_seconds=0.50,
     soft_metric="per_bin",
     fec_rate="1/2",
     sync_seed=0x0FB30, head_seed=0x0FB31,
     whitener_seed=0x0FB32, short_whitener_seed=0x0FB33,
     medium_whitener_seed=0x0FB34,
-    confidence_threshold=0.145)
+    confidence_threshold=0.30)

@@ -35,13 +35,13 @@ def test_geometry():
     assert FMHT0.tone_count == 4 and FMHT0.baud == 400.0
     assert FMHT0.spacing_hz == 400.0
     assert FMHT0.band_hz == (800.0, 2000.0)
-    # 250 ms of shared preamble: energy burst then timing sequence.
-    assert (FMHT0.head_symbols + FMHT0.sync_symbols) * FMHT0.symbol_seconds \
-        == pytest.approx(0.25)
+    # 800 ms preamble: 500 ms energy burst then a 300 ms timing sequence.
+    assert FMHT0.head_symbols * FMHT0.symbol_seconds == pytest.approx(0.50)
+    assert FMHT0.sync_symbols * FMHT0.symbol_seconds == pytest.approx(0.30)
     assert FMHT0.short_max_payload_bytes == 11  # exactly a DATA_ACK
     assert FMHT0.max_payload_bytes == 68
     assert FMHT0.chunk_size == 68 - framing.AIR_HEADER_BYTES
-    assert FMHT0.net_bit_rate() == pytest.approx(184.1, abs=0.1)
+    assert FMHT0.net_bit_rate() == pytest.approx(151.1, abs=0.1)
 
 
 def test_overall_code_rate_is_one_third():
@@ -73,6 +73,15 @@ def test_decodes_at_the_simulated_fm_floor():
     packet = _packet(FMHT0.max_payload_bytes, seed=7)
     assert all(FMHT0.decode(_through_fm(packet, -4.0, 100 + seed))["payload"]
                == packet for seed in range(5))
+
+
+def test_noise_does_not_clear_the_acquisition_threshold():
+    """The sync sequence is long enough that noise scores well under it."""
+    from whale.dsp import mfsk
+    noise = np.random.default_rng(5).normal(0, 0.08, 60_000)
+    scores, _ = mfsk.correlate(FMHT0.rx_bank, noise, FMHT0.sync_pattern,
+                               step=FMHT0.search_step)
+    assert scores.max() < FMHT0.confidence_threshold - 0.1
 
 
 def test_registered_experimental_only():
