@@ -317,6 +317,10 @@ python scripts/run_acceptance_test.py --channel hf \
   --a-radio ic7300 --b-radio ic705 --size 1024
 ```
 
+`sweep_modes.py` uses the first two radios the configuration lists for the
+selected `--channel`, and refuses to start when fewer than two are
+configured for it. `--a` and `--b` name radios explicitly.
+
 The shared sweep method bypasses link ARQ and performs direct
 modulate → transmit → capture → demodulate trials. Characterization normally
 probes both directions. Qualification retains one declared direction per

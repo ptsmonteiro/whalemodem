@@ -5,6 +5,7 @@ from pathlib import Path
 import sys
 
 import numpy as np
+import pytest
 
 from whale.trials import TrialOutcome
 
@@ -14,6 +15,8 @@ sys.path.insert(0, str(SCRIPTS))
 SPEC = importlib.util.spec_from_file_location("sweep_modes", SCRIPTS / "sweep_modes.py")
 sweep_modes = importlib.util.module_from_spec(SPEC)
 SPEC.loader.exec_module(sweep_modes)
+
+import bench
 
 
 class FakeMode:
@@ -72,6 +75,70 @@ def test_channel_registries_drive_mode_selection():
         "hr0", "hc0", "hf9", "hc1w", "hf8", "hf5", "hf6", "hf7", "hf2"]
 
 
+RADIO_FIELDS = """audio.input = "in"
+audio.output = "out"
+ptt.backend = "vox"
+"""
+
+
+def _inventory(tmp_path, entries):
+    tmp_path.mkdir(parents=True, exist_ok=True)
+    path = tmp_path / "config.toml"
+    path.write_text("\n".join(
+        f'[radios."{id_}"]\n{RADIO_FIELDS}'
+        + "channels = [" + ", ".join(f'"{name}"' for name in channels) + "]\n"
+        for id_, channels in entries))
+    return path
+
+
+def test_bench_pair_comes_from_the_configured_inventory_in_file_order(tmp_path):
+    path = _inventory(tmp_path, [("hf-only", ["hf"]), ("first", ["fm", "hf"]),
+                                 ("second", ["fm"]), ("third", ["fm"])])
+    assert bench.channel_pair("fm", path) == ("first", "second")
+    assert bench.channel_pair("hf", path) == ("hf-only", "first")
+
+    lonely = _inventory(tmp_path / "lonely", [("only", ["fm"]), ("hf-only", ["hf"])])
+    with pytest.raises(ValueError, match="needs two configured radios"):
+        bench.channel_pair("fm", lonely)
+
+
+def test_default_radios_are_the_first_two_configured_for_the_channel():
+    inventory = {"one": ("fm", "hf"), "two": ("hf",), "three": ("fm",),
+                 "four": ("fm",)}
+    pair = lambda channel: tuple(
+        id_ for id_, channels in inventory.items() if channel in channels)[:2]
+    assert sweep_modes.resolve_radios("fm", None, None, pair=pair) == (
+        "one", "three")
+    assert sweep_modes.resolve_radios("fm", "given", None, pair=pair) == (
+        "given", "one")
+    # A radio named explicitly is not also chosen as the other station.
+    assert sweep_modes.resolve_radios("fm", "one", None, pair=pair) == (
+        "one", "three")
+    assert sweep_modes.resolve_radios("fm", None, "one", pair=pair) == (
+        "three", "one")
+    assert sweep_modes.resolve_radios("fm", "a", "b", pair=pair) == ("a", "b")
+
+
+def test_a_channel_without_two_radios_is_refused(tmp_path, monkeypatch):
+    def pair(channel):
+        raise ValueError(f"channel {channel!r} needs two configured radios")
+
+    with pytest.raises(ValueError):
+        sweep_modes.resolve_radios("fm", None, None, pair=pair)
+
+    class Registry:
+        modes = (FakeMode(),)
+        supported_ids = (9,)
+
+    monkeypatch.setattr(sweep_modes, "registry_for", lambda _channel, _level: Registry())
+    monkeypatch.setattr(sweep_modes.bench, "channel_pair", pair)
+    with pytest.raises(SystemExit) as refused:
+        sweep_modes.main(["--channel", "fm", "--output-dir", str(tmp_path)],
+                         pair_factory=fake_pair_factory)
+    assert refused.value.code == 2
+    assert not (tmp_path / "result.json").exists()
+
+
 def test_direct_trial_uses_full_link_packet_and_versioned_record(tmp_path):
     ta, tb = FakeTransport(), FakeTransport()
     ta.peer, tb.peer = tb, ta
@@ -94,6 +161,7 @@ def test_main_writes_strict_json_and_summary_without_real_hardware(tmp_path, mon
         supported_ids = (9,)
 
     monkeypatch.setattr(sweep_modes, "registry_for", lambda _channel, _level: Registry())
+    monkeypatch.setattr(sweep_modes.bench, "channel_pair", lambda _channel: ("a", "b"))
     exit_code = sweep_modes.main([
         "--channel", "fm", "--trials", "2", "--capture", "none",
         "--capture-tail", "0", "--inter-trial", "0",
@@ -117,6 +185,7 @@ def test_main_records_git_state_before_creating_output(tmp_path, monkeypatch):
 
     output_dir = tmp_path / "new-output"
     monkeypatch.setattr(sweep_modes, "registry_for", lambda _channel, _level: Registry())
+    monkeypatch.setattr(sweep_modes.bench, "channel_pair", lambda _channel: ("a", "b"))
     monkeypatch.setattr(sweep_modes, "_git_commit", lambda: "clean-start")
     monkeypatch.setattr(sweep_modes, "_git_dirty", output_dir.exists)
 

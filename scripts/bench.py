@@ -12,9 +12,12 @@ from contextlib import contextmanager
 
 import numpy as np
 
+from whale.hw import radios as radios_mod
 from whale.transport import RadioTransport, SAMPLE_RATE
 
-# The bench is two radios, always these two, always in this order.
+# The bench is two radios, always in this order. Scripts that know which
+# channel they are testing take the pair from the configured inventory with
+# channel_pair(); these names are the fallback for the ones that don't.
 STATION_A = "ic705"
 STATION_B = "ht"
 
@@ -66,6 +69,25 @@ def radio_pair(a=STATION_A, b=STATION_B, warmup=WARMUP_SECONDS, transport_cls=Ra
     finally:
         t_a.close()
         t_b.close()
+
+
+def channel_pair(channel, path=None):
+    """The first two radios the configured inventory offers for `channel`.
+
+    The bench pair is whatever the station has, in the order config.toml
+    lists it, rather than two fixed radio keys a given station may not use.
+    Fewer than two eligible radios is a configuration problem, not a run to
+    start: a sweep needs a transmitter and a separate receiver.
+    """
+    inventory = radios_mod.radio_inventory(path)
+    eligible = [id_ for id_, radio in inventory.radios.items()
+                if channel in radio.channels]
+    if len(eligible) < 2:
+        raise ValueError(
+            f"channel {channel!r} needs two configured radios; the inventory "
+            f"offers {eligible if eligible else 'none'} "
+            f"(radios: {sorted(inventory.radios)})")
+    return eligible[0], eligible[1]
 
 
 def noise_pad(seconds=PAD_SECONDS, amplitude=PAD_AMPLITUDE):

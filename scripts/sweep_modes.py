@@ -49,10 +49,6 @@ DEFAULT_INTER_TRIAL = 0.5
 # confirming it. The trials actually run are what gets recorded, so a mode
 # stopped at 0/3 is reported as 0/3 and not as 0/10.
 DEFAULT_ABORT_AFTER = 3
-DEFAULT_RADIOS = {
-    "fm": ("ic705", "ht"),
-    "hf": ("ic7300", "ic705"),
-}
 
 
 def registry_for(channel_name, mode_level="default"):
@@ -187,6 +183,27 @@ def summarize(records, data_chunk_bytes=None):
     return rows
 
 
+def resolve_radios(channel, a, b, pair=None):
+    """The pair to sweep: whatever --a/--b name, filled in from the inventory.
+
+    A radio named explicitly is never also chosen as the other station, so
+    `--a digirig` on an inventory that lists digirig first still picks a
+    different radio for B.
+    """
+    if a and b:
+        return a, b
+    pair = pair or bench.channel_pair
+    named = {value for value in (a, b) if value}
+    available = [radio for radio in pair(channel) if radio not in named]
+    resolved_a = a or available.pop(0)
+    resolved_b = b or next((radio for radio in available), None)
+    if resolved_b is None or resolved_a == resolved_b:
+        raise ValueError(
+            f"channel {channel!r} needs two different radios; "
+            f"resolved A={resolved_a!r}, B={resolved_b!r}")
+    return resolved_a, resolved_b
+
+
 def _git_commit():
     try:
         return subprocess.run(
@@ -217,8 +234,10 @@ def main(argv=None, *, pair_factory=bench.radio_pair):
     ap.add_argument("--mode-level", choices=("default", "optional", "experimental"),
                     default="default",
                     help="highest qualification registry to expose (default: default)")
-    ap.add_argument("--a", help="station A radio (channel-specific default)")
-    ap.add_argument("--b", help="station B radio (channel-specific default)")
+    ap.add_argument("--a", help="station A radio (default: the first radio "
+                                "configured for this channel)")
+    ap.add_argument("--b", help="station B radio (default: the next radio "
+                                "configured for this channel)")
     ap.add_argument("--modes", nargs="+", metavar="MODE",
                     help="mode names or IDs (default: complete channel ladder)")
     ap.add_argument("--trials", type=int, default=DEFAULT_TRIALS)
@@ -249,8 +268,10 @@ def main(argv=None, *, pair_factory=bench.radio_pair):
         selected = select_modes(registry, args.modes)
     except ValueError as exc:
         ap.error(str(exc))
-    default_a, default_b = DEFAULT_RADIOS[args.channel]
-    radio_a, radio_b = args.a or default_a, args.b or default_b
+    try:
+        radio_a, radio_b = resolve_radios(args.channel, args.a, args.b)
+    except ValueError as exc:
+        ap.error(str(exc))
     output_dir = args.output_dir or _default_output_dir()
 
     # Capture provenance before creating the output directory or writing any
