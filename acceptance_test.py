@@ -2,8 +2,8 @@
 station servers (see whale/vara_server.py):
 
     1. connect a session between station A and station B
-    2. A sends 4 KB to B (--size, default 4096 bytes)
-    3. roles switch: B sends 4 KB back to A
+    2. A sends 100 KB to B (--size, default 102400 bytes)
+    3. roles switch: B sends 100 KB back to A
     4. either station disconnects
 
 Usage:
@@ -25,9 +25,35 @@ import time
 # The exercise's shape, shared with whale/test_cli.py so the two drivers
 # cannot drift apart: same payload bytes, same budgets. They stay defaults
 # here because this module's CLI has always exposed them as flags.
-PAYLOAD_SIZE = 4096
+PAYLOAD_SIZE = 102400
 CONNECT_TIMEOUT = 180.0
-TRANSFER_TIMEOUT = 300.0
+
+#: Net application throughput of the slowest mode a session is expected to
+#: settle on in anger: hc0, 143 bit/s (docs/MODES.md). hr0 is slower still
+#: (65 bit/s), but a budget sized for it would be hours long and would stop
+#: bounding anything -- the 300 s this replaced did not cover hr0 for 4 KB
+#: either.
+SLOWEST_NET_BPS = 143.0
+
+#: Fixed part of the budget: the turnarounds and the mode-ladder climb at the
+#: start of a transfer, which do not get cheaper as the payload grows.
+TRANSFER_HEAD = 60.0
+
+
+def transfer_timeout(size: int = PAYLOAD_SIZE) -> float:
+    """How long `size` bytes are given to cross, one direction.
+
+    A budget has to be a function of the payload: the payload went from 4 KB
+    to 100 KB, 25x the data, and a fixed constant sized for the small one
+    fires long before the large one can finish on any HF mode. 4 KB comes out
+    of this at 289 s, which is the 300 s constant it replaces -- the old
+    number was this arithmetic, done once.
+    """
+    return TRANSFER_HEAD + size * 8 / SLOWEST_NET_BPS
+
+
+#: The default payload's budget, for callers with nothing to vary.
+TRANSFER_TIMEOUT = transfer_timeout(PAYLOAD_SIZE)
 
 #: Tags the two directions' payloads are derived from.
 PAYLOAD_TAG_AB = b"whale-A-to-B"
@@ -178,8 +204,12 @@ def main():
     ap.add_argument("--b-call", default="STA2")
     ap.add_argument("--size", type=int, default=PAYLOAD_SIZE)
     ap.add_argument("--connect-timeout", type=float, default=CONNECT_TIMEOUT)
-    ap.add_argument("--transfer-timeout", type=float, default=TRANSFER_TIMEOUT)
+    # Defaulted from --size rather than from the constant, so that asking
+    # for a smaller or larger payload asks for its budget too.
+    ap.add_argument("--transfer-timeout", type=float, default=None)
     args = ap.parse_args()
+    if args.transfer_timeout is None:
+        args.transfer_timeout = transfer_timeout(args.size)
 
     print("== connecting to station servers ==")
     a = StationClient("A", args.host, args.a_cmd, args.a_data)

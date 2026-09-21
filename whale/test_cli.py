@@ -30,7 +30,7 @@ it measures, what a failing mode means and what it exits with -- are in
     whale-test --sweep CALLSIGN     sweep that station
 
 The exercise is exactly the acceptance scenario in ``acceptance_test.py``:
-connect, 4 KB one way, 4 KB back, disconnect, both payloads verified
+connect, 100 KB one way, 100 KB back, disconnect, both payloads verified
 byte-for-byte. Its payload and its budgets are imported from there rather
 than restated, so the two drivers cannot drift apart.
 
@@ -146,9 +146,9 @@ class Transcript:
 
     Every step is printed as it happens and kept for the report file, which
     has to stand alone once it is mailed to someone who did not watch the
-    run. Modem events are summarised rather than transcribed: a 4 KB
-    transfer keys dozens of times, and a report full of PTT lines is harder
-    to read than a count of them.
+    run. Modem events are summarised rather than transcribed: a 100 KB
+    transfer keys hundreds of times, and a report full of PTT lines is
+    harder to read than a count of them.
     """
 
     started: float = field(default_factory=time.monotonic)
@@ -658,7 +658,7 @@ def run_exercise(client, mycall: str, peer: str | None, transcript: Transcript,
         _send(client, transcript, payload(PAYLOAD_TAG_BA))
         # _send only hands the bytes to the data socket; the transmission
         # itself is still ahead of us, and the caller will not send its
-        # DISCONNECT until the whole 4 KB has arrived. So the answering side
+        # DISCONNECT until the whole payload has arrived. So the answering side
         # is waiting out a full transfer here, not a teardown -- 30s was a
         # budget for the disconnect alone and expired mid-transmission.
         disconnect_timeout = transfer_timeout + DISCONNECT_TIMEOUT
