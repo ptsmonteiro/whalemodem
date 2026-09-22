@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "whale"
-version = "0.0.1rc5"
+version = "0.0.1rc6"
 description = "A VARA-API-shaped amateur radio data modem"
 readme = "README.md"
 license = "GPL-3.0-or-later"
