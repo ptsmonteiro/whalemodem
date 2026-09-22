@@ -96,6 +96,14 @@ class WaveformMode(Protocol):
     # supplies every decoder at 12 kHz.
     tx_sample_rate: int
     rx_sample_rate: int
+    # Declared capabilities, not duck-typed probes: link_receiver.py and
+    # streaming.py read these directly rather than getattr()-guessing
+    # through a mode's private structure. `ModeDescription` below defaults
+    # both to "no capability", so a new mode need only override the one it
+    # actually has.
+    supports_frequency_hint: bool
+    # None, or the OFDM PHY streaming.py's OfdmReceiver can run against.
+    streaming_phy: object | None
 
     def encode(self, payload: bytes) -> np.ndarray: ...
 
@@ -181,11 +189,20 @@ def format_mode(mode: WaveformMode) -> str:
 
 
 class ModeDescription:
-    """Mixin giving every mode the one shared `describe()`.
+    """Mixin giving every mode the shared `describe()` and capability defaults.
 
-    Deliberately holds nothing else: vf13 and vf14 already define their own
-    `frame_seconds`, so anything named here risks shadowing a mode's own.
+    Every shipped mode inherits this (directly, or through a family base
+    like `ScFdeMode` or a sibling mode like `Vf14Mode`), so these two class
+    attributes are the "no capability" default `WaveformMode` promises:
+    a mode that ignores them gets no frequency hint and no streaming
+    receiver rather than an AttributeError or a silent `getattr` default
+    duplicated at every call site. A mode that has the capability overrides
+    the attribute -- see hf6-hf9's `supports_frequency_hint` field and
+    hf7/hf8/hf9's `streaming_phy` property.
     """
+
+    supports_frequency_hint = False
+    streaming_phy = None
 
     def describe(self) -> str:
         return format_mode(self)

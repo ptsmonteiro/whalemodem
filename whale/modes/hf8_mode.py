@@ -217,6 +217,10 @@ class Hf8Mode(waveform.ModeDescription):
         return self.codec.rx_sample_rate
 
     @property
+    def streaming_phy(self):
+        return self.codec.streaming_phy
+
+    @property
     def baud(self) -> float:
         return hf8.DESIGN_RATE / HF8_PHY.symbol_len
 

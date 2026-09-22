@@ -131,6 +131,24 @@ def test_mode_satisfies_the_waveform_protocol(mode):
 
 
 @pytest.mark.parametrize("mode", MODES, ids=lambda m: m.name)
+def test_declares_the_frequency_hint_capability(mode):
+    # `supports_frequency_hint` is a declared attribute (defaulting to
+    # False via ModeDescription), not a getattr() probe -- a new mode that
+    # forgets it still gets a real bool rather than link_receiver.py
+    # silently assuming "no hint".
+    assert isinstance(mode.supports_frequency_hint, bool)
+
+
+@pytest.mark.parametrize("mode", MODES, ids=lambda m: m.name)
+def test_declares_the_streaming_phy_capability(mode):
+    # `streaming_phy` is None for every mode except hf6-hf9's OFDM cousins
+    # hf7/hf8/hf9, which return the PHY streaming.py runs the receiver
+    # search against. Never an AttributeError, and never reached through
+    # a mode's private `codec` attribute.
+    assert mode.streaming_phy is None or hasattr(mode.streaming_phy, "total_ofdm_symbols")
+
+
+@pytest.mark.parametrize("mode", MODES, ids=lambda m: m.name)
 def test_describe_is_a_nonempty_string(mode):
     description = mode.describe()
     assert isinstance(description, str) and description

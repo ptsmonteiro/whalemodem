@@ -88,7 +88,7 @@ class OfdmReceiver:
         self.search = search
         self.attempted = set()
         self.frame_samples = (search.phy.symbol_len
-                              * profile.codec.streaming_phy.total_ofdm_symbols())
+                              * profile.streaming_phy.total_ofdm_symbols())
 
     def decode(self, audio):
         self.search.update(audio)
@@ -146,7 +146,10 @@ class ReceiveStream:
         self.audio.append(start, samples)
 
     def decode(self, profile):
-        phy = getattr(getattr(profile, "codec", None), "streaming_phy", None)
+        # A declared capability, not a probe through the mode's private
+        # `codec` structure: `WaveformMode.streaming_phy` defaults to None
+        # for every mode and only hf7/hf8/hf9 override it.
+        phy = profile.streaming_phy
         if phy is None:
             return None
         if profile.name not in self.receivers:

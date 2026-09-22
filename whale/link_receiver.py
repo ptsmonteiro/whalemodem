@@ -168,7 +168,7 @@ class _ReceiverMixin:
                          if self._receive_stream is not None else None)
         if stream_result is not None:
             result = stream_result
-        elif hint is None or not getattr(profile, "supports_frequency_hint", False):
+        elif hint is None or not profile.supports_frequency_hint:
             result = profile.decode(audio)
         else:
             result = profile.decode(audio, freq_hint_hz=hint)
