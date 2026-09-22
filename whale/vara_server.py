@@ -68,7 +68,7 @@ import socket
 import threading
 
 from whale import mode_history, policy
-from whale.config import app_config, get_radio
+from whale.config import app_config, get_radio, resolve_channel
 from whale.paths import server_paths
 from whale.service import ModemService
 
@@ -531,10 +531,11 @@ def main(argv=None):
     ap.add_argument("--cmd-port", type=int, help="override the configured command port")
     ap.add_argument("--data-port", type=int, help="override the configured data port")
     ap.add_argument("--host", default="127.0.0.1")
-    ap.add_argument("--channel", default="fm", choices=sorted(policy.CHANNELS),
+    ap.add_argument("--channel", default=None, choices=sorted(policy.CHANNELS),
                     help="which channel this station is on: its timeouts, its "
                          "retry budget and the waveforms it offers "
-                         "(see whale/policy.py)")
+                         "(see whale/policy.py). Required unless the "
+                         "configured radios cover only one of fm/hf")
     ap.add_argument("--mode-level", choices=("default", "optional", "experimental"),
                     default="default", help="qualification registry to advertise; "
                     "optional/experimental require explicit operator selection")
@@ -546,7 +547,8 @@ def main(argv=None):
     effective_config, history_path = server_paths(args.config)
     try:
         config = app_config(effective_config)
-        radio = get_radio(args.radio, args.channel, effective_config)
+        channel_name = resolve_channel(args.channel, config)
+        radio = get_radio(args.radio, channel_name, effective_config)
     except (OSError, ValueError) as exc:
         ap.error(str(exc))
     radio_name = radio.id
@@ -565,12 +567,12 @@ def main(argv=None):
                             filename=log_file)
 
         logger.info("Whale %s", __version__)
-        channel = policy.by_name(args.channel)
+        channel = policy.by_name(channel_name)
         from whale.mode_qualification import registry
-        mode_registry = registry(args.channel, args.mode_level,
+        mode_registry = registry(channel_name, args.mode_level,
                                  channel.max_useful_frame_seconds)
         history = mode_history.ModeHistory(
-            history_path, namespace=f"{radio_name}:{args.channel}")
+            history_path, namespace=f"{radio_name}:{channel_name}")
         logger.info("channel: %s", channel.name)
         logger.info("mode qualification level: %s; IDs: %s",
                     args.mode_level, mode_registry.supported_ids)
@@ -596,14 +598,14 @@ def main(argv=None):
 
     from whale import modem_tui
 
-    channel = policy.by_name(args.channel)
+    channel = policy.by_name(channel_name)
     from whale.mode_qualification import registry
-    mode_registry = registry(args.channel, args.mode_level,
+    mode_registry = registry(channel_name, args.mode_level,
                              channel.max_useful_frame_seconds)
     history = mode_history.ModeHistory(
-        history_path, namespace=f"{radio_name}:{args.channel}")
+        history_path, namespace=f"{radio_name}:{channel_name}")
 
-    state = modem_tui.TuiState(mycall, radio_name, args.channel, mode_registry=mode_registry)
+    state = modem_tui.TuiState(mycall, radio_name, channel_name, mode_registry=mode_registry)
     handlers = [modem_tui.LogTap(state)]
     if log_file:
         file_handler = logging.FileHandler(log_file)

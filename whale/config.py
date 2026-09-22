@@ -42,6 +42,19 @@ class Config:
             return self.default_hf_radio
         raise ValueError(f"unknown channel {channel!r}")
 
+    @property
+    def available_channels(self) -> frozenset[str]:
+        """The channels at least one configured radio supports.
+
+        Used to default ``--channel`` on the command line: a station with
+        radios covering only one of fm/hf never has to name it, while one
+        covering both must always say which.
+        """
+        channels: frozenset[str] = frozenset()
+        for radio in self.radios.values():
+            channels |= radio.channels
+        return channels
+
 
 def _validate_station(callsign: Any, ssid: Any) -> tuple[str, int | None]:
     if not isinstance(callsign, str) or not callsign:
@@ -102,6 +115,24 @@ def load_config(path: str | os.PathLike[str]) -> Config:
 
 def app_config(path: str | os.PathLike[str] | None = None) -> Config:
     return load_config(config_path(path))
+
+
+def resolve_channel(channel: str | None, config: Config) -> str:
+    """Fill in ``--channel`` from the station's radios when it is unambiguous.
+
+    A station whose configured radios cover only fm or only hf never has to
+    name it. One covering both must always say which, since there is no
+    single sensible default.
+    """
+    if channel is not None:
+        return channel
+    available = sorted(config.available_channels)
+    if len(available) == 1:
+        return available[0]
+    if not available:
+        raise ValueError("no configured radio supports fm or hf; run whale-configure")
+    raise ValueError(
+        f"--channel is required: configured radios support {' and '.join(available)}")
 
 
 def get_radio(name: str | None, channel: str, path: str | os.PathLike[str] | None = None) -> Radio:

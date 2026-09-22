@@ -68,7 +68,7 @@ from acceptance_test import (CONNECT_TIMEOUT, PAYLOAD_TAG_AB, PAYLOAD_TAG_BA,
                              StationClient, _transfer_summary, payload,
                              transfer_timeout as payload_transfer_timeout)
 from whale import policy, sweep
-from whale.config import app_config, get_radio
+from whale.config import app_config, get_radio, resolve_channel
 from whale.hw import audio_io
 from whale.hw.ptt_backends import available_backends
 from whale.mode_qualification import registry
@@ -985,8 +985,9 @@ def build_parser() -> argparse.ArgumentParser:
     ap.add_argument("--sweep", action="store_true",
                     help="measure the path mode by mode instead of running a "
                          "session; both stations need it")
-    ap.add_argument("--channel", default="fm", choices=sorted(policy.CHANNELS),
-                    help="which channel this station is on (default: fm)")
+    ap.add_argument("--channel", default=None, choices=sorted(policy.CHANNELS),
+                    help="which channel this station is on; required unless "
+                         "the configured radios cover only one of fm/hf")
     ap.add_argument("--size", type=_payload_size, default=DEFAULT_PAYLOAD_SIZE,
                     metavar="BYTES",
                     help="payload bytes to send each way (default: 10240)")
@@ -1007,7 +1008,18 @@ def main(argv=None) -> int:
 
     peer = args.callsign.upper() if args.callsign else None
     try:
-        setup = preflight(args.config, args.channel)
+        config = app_config(args.config)
+    except (OSError, ValueError) as exc:
+        print(f"Configuration could not be loaded: {exc}. Run whale-configure.",
+              file=sys.stderr)
+        return 2
+    try:
+        channel_name = resolve_channel(args.channel, config)
+    except ValueError as exc:
+        print(str(exc), file=sys.stderr)
+        return 2
+    try:
+        setup = preflight(args.config, channel_name)
     except PreflightError as exc:
         for problem in exc.problems:
             print(problem, file=sys.stderr)

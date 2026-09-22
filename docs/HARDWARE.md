@@ -37,7 +37,10 @@ the named radio's `channels` doesn't include the selected `--channel`.
 
 The server's optional `--radio` value is the radio key (`station-a` above),
 not an audio-device name. Without it, `default_fm_radio` or
-`default_hf_radio` is selected according to `--channel`. `--config` and
+`default_hf_radio` is selected according to `--channel`. `--channel` itself
+is optional when the configured radios cover only one of fm/hf between them
+-- that one is used -- and mandatory once they cover both, since there is
+then no single sensible default. `--config` and
 `WHALE_CONFIG` are followed by `config.toml` in the current directory when it
 exists, then the platform default: `$XDG_CONFIG_HOME/whale/config.toml` on
 Linux (normally `~/.config/whale/config.toml`),

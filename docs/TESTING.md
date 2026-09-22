@@ -100,8 +100,9 @@ python acceptance_test.py \
 server to start and no ports to choose: the answering station runs
 `whale-test`, the calling station runs `whale-test CALLSIGN`. By default it
 sends 10 KiB in each direction; pass the same `--size BYTES` on both stations
-to test another payload size. It also takes `--channel` and `--config`. It
-starts `whale-server` itself,
+to test another payload size. It also takes `--config`, and `--channel` when
+the configured radios cover both fm and hf (a station with only one of the
+two never has to name it). It starts `whale-server` itself,
 as a separate process on loopback ports it picks, and drives it over TCP as
 any client application would; the report's keying, SNR and mode counts are
 the status lines that modem sent on its command port. Before transmitting --

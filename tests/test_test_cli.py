@@ -42,12 +42,14 @@ CALL = "F4JAW"
 
 
 def _config(tmp_path, **kwargs):
+    # A single fm-only radio, so main() without an explicit --channel resolves
+    # unambiguously (whale.config.resolve_channel) the same way it always has
+    # in these tests.
     path = tmp_path / "config.toml"
     radio = Radio("bench", "Bench Radio", "Mic In", "Speakers", "vox",
-                  frozenset({"fm", "hf"}))
+                  frozenset({"fm"}))
     save_config(path, Config(CALL, None, {"bench": radio},
-                             default_fm_radio="bench", default_hf_radio="bench",
-                             **kwargs))
+                             default_fm_radio="bench", **kwargs))
     return path
 
 
@@ -61,10 +63,12 @@ def _fake_devices(monkeypatch, *, find=None, check=None):
 
 # -- argument surface ------------------------------------------------------
 
-def test_defaults_wait_to_be_called_on_the_fm_channel():
+def test_defaults_wait_to_be_called_with_no_channel_selected():
+    # The channel is resolved later, from the configured radios (main() and
+    # resolve_channel() in whale.config), not hardcoded here.
     args = build_parser().parse_args([])
     assert args.callsign is None
-    assert args.channel == "fm"
+    assert args.channel is None
     assert args.config is None
     assert args.verbose is False
     assert args.size == 10 * 1024 == DEFAULT_PAYLOAD_SIZE
@@ -249,6 +253,21 @@ def test_a_preflight_failure_exits_2_before_transmitting(tmp_path, capsys, monke
         "confirmation was asked for after a failed preflight"))
     assert main(["--config", str(tmp_path / "absent.toml")]) == 2
     assert "whale-configure" in capsys.readouterr().err
+    assert not list(tmp_path.glob("whale-report-*.txt"))
+
+
+def test_an_ambiguous_channel_is_refused_before_transmitting(tmp_path, capsys, monkeypatch):
+    """A station with radios covering both fm and hf must be told which."""
+    monkeypatch.chdir(tmp_path)
+    monkeypatch.setattr("builtins.input", lambda prompt="": pytest.fail(
+        "confirmation was asked for before the channel was resolved"))
+    path = tmp_path / "config.toml"
+    radio = Radio("bench", "Bench Radio", "Mic In", "Speakers", "vox",
+                  frozenset({"fm", "hf"}))
+    save_config(path, Config(CALL, None, {"bench": radio},
+                             default_fm_radio="bench", default_hf_radio="bench"))
+    assert main(["--config", str(path)]) == 2
+    assert "--channel is required" in capsys.readouterr().err
     assert not list(tmp_path.glob("whale-report-*.txt"))
 
 

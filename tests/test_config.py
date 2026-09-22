@@ -2,7 +2,7 @@ from dataclasses import replace
 
 import pytest
 
-from whale.config import Config, get_radio, load_config, save_config
+from whale.config import Config, get_radio, load_config, resolve_channel, save_config
 from whale.hw.radios import Radio
 from whale.config_tui import ConfigView
 
@@ -38,6 +38,24 @@ def test_default_must_support_its_channel(tmp_path):
     config = Config("F4JAW", None, {"hf": _radio("hf", {"hf"})})
     with pytest.raises(ValueError, match="does not support 'fm'"):
         save_config(path, replace(config, default_fm_radio="hf"))
+
+
+def test_resolve_channel_defaults_when_the_station_covers_only_one():
+    config = Config("F4JAW", None, {"hf": _radio("hf", {"hf"})})
+    assert config.available_channels == {"hf"}
+    assert resolve_channel(None, config) == "hf"
+
+
+def test_resolve_channel_is_mandatory_when_the_station_covers_both():
+    config = Config("F4JAW", None, {"both": _radio("both", {"fm", "hf"})})
+    assert config.available_channels == {"fm", "hf"}
+    with pytest.raises(ValueError, match="--channel is required"):
+        resolve_channel(None, config)
+
+
+def test_resolve_channel_passes_through_an_explicit_choice():
+    config = Config("F4JAW", None, {"both": _radio("both", {"fm", "hf"})})
+    assert resolve_channel("fm", config) == "fm"
 
 
 @pytest.mark.parametrize("ssid", [-1, 16, True, "2"])
