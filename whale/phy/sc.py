@@ -38,6 +38,7 @@ from scipy.signal import fftconvolve
 
 from whale.dsp import bits as _bits
 from whale.dsp.constellation import bits_to_symbols, symbols_to_bits
+from whale.dsp.framing import PacketFrame
 
 # ---------------------------------------------------------------------------
 # Fixed channel constants
@@ -150,35 +151,11 @@ def rrc_taps(sps: int, span_symbols: int, beta: float) -> np.ndarray:
 # ---------------------------------------------------------------------------
 
 def _pack_packet(payload: bytes, packet_bytes: int) -> bytes:
-    if len(payload) > packet_bytes - LENGTH_BYTES - CRC_BYTES:
-        raise ValueError("payload too large for this frame")
-    import binascii
-    packet = bytearray(packet_bytes)
-    packet[0:LENGTH_BYTES] = len(payload).to_bytes(LENGTH_BYTES, "big")
-    packet[LENGTH_BYTES:LENGTH_BYTES + len(payload)] = payload
-    crc_at = LENGTH_BYTES + len(payload)
-    packet[crc_at:crc_at + CRC_BYTES] = (
-        binascii.crc32(payload) & 0xFFFFFFFF).to_bytes(CRC_BYTES, "big")
-    return bytes(packet)
+    return PacketFrame(packet_bytes).pack(payload)
 
 
 def _unpack_packet(packet: bytes, max_payload: int) -> tuple[bytes | None, dict]:
-    import binascii
-    length = int.from_bytes(packet[:LENGTH_BYTES], "big")
-    meta = {"decoded_length": length, "crc_ok": False}
-    if length > max_payload:
-        meta["failure"] = "invalid length"
-        return None, meta
-    payload = packet[LENGTH_BYTES:LENGTH_BYTES + length]
-    crc_at = LENGTH_BYTES + length
-    received_crc = int.from_bytes(packet[crc_at:crc_at + CRC_BYTES], "big")
-    computed_crc = binascii.crc32(payload) & 0xFFFFFFFF
-    meta.update(received_crc32=received_crc, computed_crc32=computed_crc,
-                crc_ok=received_crc == computed_crc)
-    if not meta["crc_ok"]:
-        meta["failure"] = "CRC mismatch"
-        return None, meta
-    return payload, meta
+    return PacketFrame(max_payload + LENGTH_BYTES + CRC_BYTES).unpack(packet)
 
 
 # ---------------------------------------------------------------------------

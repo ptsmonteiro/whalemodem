@@ -19,7 +19,7 @@ geometry and a wiring of these together.
   `mfsk`          non-coherent M-ary FSK: tone bank, Gray map, sync
   `fec`           rate-1/2 convolutional coding, hard and soft Viterbi
   `ldpc`          IEEE 802.11n length-648 QC-LDPC, normalized min-sum
-  `framing`       the length/CRC32/whitening/FEC payload codec
+  `framing`       the length/CRC32 wire format, plus the whitening/FEC codec
 
 Nothing here imports from `whale/phy/` or `whale/modes/`: these kernels are
 the bottom of the stack, and `tests/test_layering.py` holds them there.
@@ -32,7 +32,7 @@ definitions, not a tidy-up: changing one changes what a station transmits.
 from . import (acquire, bits, constellation, differential, equalize, fec,
                framing, freq, interleave, ldpc, mfsk, ofdm, timing)
 from .fec import K7, K9, ConvolutionalCode
-from .framing import PacketCodec
+from .framing import PacketCodec, PacketFrame
 from .interleave import Interleaver
 from .mfsk import ToneBank
 from .ofdm import Geometry
@@ -42,5 +42,5 @@ __all__ = [
     "acquire", "bits", "constellation", "differential", "equalize", "fec",
     "framing", "freq", "interleave", "ldpc", "mfsk", "ofdm", "timing",
     "ConvolutionalCode", "Geometry", "Interleaver", "K7", "K9", "PacketCodec",
-    "TimingFit", "ToneBank",
+    "PacketFrame", "TimingFit", "ToneBank",
 ]

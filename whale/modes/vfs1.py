@@ -26,7 +26,6 @@ Simulated flat_nbfm C/N floor: not measured.
 """
 from __future__ import annotations
 
-import binascii
 from dataclasses import dataclass, field
 
 import numpy as np
@@ -122,13 +121,9 @@ class Vfs1Mode(ScFdeMode):
         info, _, ok = ldpc.decode_batch(llr.reshape(self.n_codewords, ldpc.N),
                                         rate=self.fec_rate)
         packet = np.packbits(info.reshape(-1)[:self.packet_bytes * 8]).tobytes()
-        size = int.from_bytes(packet[:2], "big")
-        payload = packet[2:2 + size]
-        crc = int.from_bytes(packet[2 + size:6 + size], "big")
-        good = (size <= self.max_payload_bytes and len(payload) == size
-                and crc == (binascii.crc32(payload) & 0xffffffff))
-        result.update(payload=payload if good else None, crc_ok=good,
-                      decoded_length=size, codewords_ok=int(np.count_nonzero(ok)),
+        payload, frame_meta = self._frame.unpack(packet)
+        result.update(frame_meta)
+        result.update(payload=payload, codewords_ok=int(np.count_nonzero(ok)),
                       snr_db=float(10 * np.log10(np.mean(gain / (1 - gain + 1e-12)))),
                       end_index=start + self.total_blocks * self.symbol_samples)
         return result

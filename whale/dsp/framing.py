@@ -1,17 +1,17 @@
 """The payload codec: length, CRC32, whitening, FEC and interleaving.
 
-One object owns the whole path from payload bytes to the coded bits a
-mode puts on its carriers, and back.  It is parameterized on how many
-coded bits the frame has room for; everything else -- how many packet
-bytes that leaves, how much payload fits after the length and CRC fields
--- follows from that and from the code.
-
-The wire format is VF2's, unchanged:
+`PacketFrame` owns the wire format alone -- VF2's, unchanged:
 
     [2-byte big-endian length][payload][4-byte big-endian CRC32][zero fill]
 
-whitened against a PN sequence, convolutionally coded with a zero tail,
-then interleaved.
+parameterized on `packet_bytes` only, with no opinion on whitening, FEC or
+interleaving. `PacketCodec` composes it: one object owning the whole path
+from payload bytes to the coded bits a mode puts on its carriers, and back,
+parameterized on how many coded bits the frame has room for; everything
+else -- how many packet bytes that leaves, how much payload fits after the
+length and CRC fields -- follows from that and from the code. `PacketCodec`
+whitens against a PN sequence, convolutionally codes with a zero tail, then
+interleaves.
 """
 
 from __future__ import annotations
@@ -28,6 +28,57 @@ from .interleave import Interleaver
 
 LENGTH_BYTES = 2
 CRC_BYTES = 4
+
+
+@dataclass(frozen=True)
+class PacketFrame:
+    """The wire format itself: [length][payload][CRC32], zero-filled.
+
+        [2-byte big-endian length][payload]
+        [4-byte big-endian CRC32 of payload only][zero fill to packet_bytes]
+
+    Parameterized on `packet_bytes` alone -- no whitener, no FEC, no coder.
+    Every mode's packet sits inside this shape, but what wraps it (whitening
+    order, FEC family, or nothing at all) differs per mode, so those stay
+    with their own callers.
+    """
+
+    packet_bytes: int
+
+    @property
+    def max_payload_bytes(self) -> int:
+        return self.packet_bytes - LENGTH_BYTES - CRC_BYTES
+
+    def pack(self, payload: bytes) -> bytes:
+        payload = bytes(payload)
+        if len(payload) > self.max_payload_bytes:
+            raise ValueError(
+                f"payload is {len(payload)} bytes; the maximum is "
+                f"{self.max_payload_bytes}")
+        packet = bytearray(self.packet_bytes)
+        packet[0:LENGTH_BYTES] = len(payload).to_bytes(LENGTH_BYTES, "big")
+        packet[LENGTH_BYTES:LENGTH_BYTES + len(payload)] = payload
+        crc_at = LENGTH_BYTES + len(payload)
+        packet[crc_at:crc_at + CRC_BYTES] = (
+            binascii.crc32(payload) & 0xFFFFFFFF).to_bytes(CRC_BYTES, "big")
+        return bytes(packet)
+
+    def unpack(self, packet: bytes) -> tuple[bytes | None, dict]:
+        length = int.from_bytes(packet[:LENGTH_BYTES], "big")
+        meta = {"decoded_length": length, "crc_ok": False}
+        if length > self.max_payload_bytes:
+            meta["failure"] = "invalid length"
+            return None, meta
+        payload = packet[LENGTH_BYTES:LENGTH_BYTES + length]
+        crc_at = LENGTH_BYTES + length
+        received_crc = int.from_bytes(packet[crc_at:crc_at + CRC_BYTES], "big")
+        computed_crc = binascii.crc32(payload) & 0xFFFFFFFF
+        meta.update(received_crc32=received_crc, computed_crc32=computed_crc,
+                    crc_ok=received_crc == computed_crc)
+        if not meta["crc_ok"]:
+            meta["failure"] = "CRC mismatch"
+            return None, meta
+        return payload, meta
 
 
 @dataclass(frozen=True)
@@ -86,26 +137,20 @@ class PacketCodec:
         """Bits the packet cannot use because they do not fill a byte."""
         return (self.information_bits - self.code.tail_bits) % 8
 
+    @cached_property
+    def _frame(self) -> PacketFrame:
+        return PacketFrame(self.packet_bytes)
+
     @property
     def max_payload_bytes(self) -> int:
-        return self.packet_bytes - LENGTH_BYTES - CRC_BYTES
+        return self._frame.max_payload_bytes
 
     @cached_property
     def _whitener(self) -> np.ndarray:
         return _bits.pn_bits(self.packet_bytes * 8, self.whitener_seed)
 
     def encode(self, payload: bytes) -> np.ndarray:
-        payload = bytes(payload)
-        if len(payload) > self.max_payload_bytes:
-            raise ValueError(
-                f"payload is {len(payload)} bytes; the maximum is "
-                f"{self.max_payload_bytes}")
-        packet = bytearray(self.packet_bytes)
-        packet[0:LENGTH_BYTES] = len(payload).to_bytes(LENGTH_BYTES, "big")
-        packet[LENGTH_BYTES:LENGTH_BYTES + len(payload)] = payload
-        crc_at = LENGTH_BYTES + len(payload)
-        packet[crc_at:crc_at + CRC_BYTES] = (
-            binascii.crc32(payload) & 0xFFFFFFFF).to_bytes(CRC_BYTES, "big")
+        packet = self._frame.pack(payload)
         information = np.zeros(self.information_bits, dtype=np.uint8)
         information[:self.packet_bytes * 8] = (
             np.unpackbits(np.frombuffer(packet, dtype=np.uint8))
@@ -143,19 +188,6 @@ class PacketCodec:
         tail_ok = not np.any(information[-self.code.tail_bits:])
         packet = np.packbits(
             information[:self.packet_bytes * 8] ^ self._whitener).tobytes()
-        length = int.from_bytes(packet[:LENGTH_BYTES], "big")
-        meta = {"decoded_length": length, "crc_ok": False,
-                "fec_tail_ok": tail_ok}
-        if length > self.max_payload_bytes:
-            meta["failure"] = "invalid length"
-            return None, meta
-        payload = packet[LENGTH_BYTES:LENGTH_BYTES + length]
-        crc_at = LENGTH_BYTES + length
-        received_crc = int.from_bytes(packet[crc_at:crc_at + CRC_BYTES], "big")
-        computed_crc = binascii.crc32(payload) & 0xFFFFFFFF
-        meta.update(received_crc32=received_crc, computed_crc32=computed_crc,
-                    crc_ok=received_crc == computed_crc)
-        if not meta["crc_ok"]:
-            meta["failure"] = "CRC mismatch"
-            return None, meta
+        payload, meta = self._frame.unpack(packet)
+        meta["fec_tail_ok"] = tail_ok
         return payload, meta

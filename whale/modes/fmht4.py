@@ -27,7 +27,6 @@ Simulated flat_nbfm C/N floor: 2 dB.
 """
 from __future__ import annotations
 
-import binascii
 from dataclasses import dataclass, field
 from functools import cached_property
 
@@ -37,6 +36,7 @@ from scipy.signal import correlate, hilbert
 from whale import framing, waveform
 from whale.dsp import bits, interleave, ldpc
 from whale.dsp.constellation import constellation_table, soft_bit_llrs
+from whale.dsp.framing import PacketFrame
 from whale.phy.ofdm49 import bits_to_symbols as _ofdm49_bits_to_symbols
 
 MODE_ID = 27
@@ -293,12 +293,12 @@ class Fmht4Mode(waveform.ModeDescription):
             bodies = np.fft.irfft(keep, n=core, axis=1)
         return bodies
 
+    @cached_property
+    def _frame(self) -> PacketFrame:
+        return PacketFrame(self.packet_bytes)
+
     def _pack(self, payload):
-        if len(payload) > self.max_payload_bytes:
-            raise ValueError(f"payload too large for {self.name}: {len(payload)}")
-        packet = (len(payload).to_bytes(2, "big") + payload
-                  + (binascii.crc32(payload) & 0xffffffff).to_bytes(4, "big"))
-        return packet.ljust(self.packet_bytes, b"\0")
+        return self._frame.pack(payload)
 
     def _frame_values(self, payload):
         info = np.unpackbits(np.frombuffer(self._pack(payload), np.uint8))
@@ -407,12 +407,9 @@ class Fmht4Mode(waveform.ModeDescription):
         info, _, ok = ldpc.decode_batch(llr.reshape(self.n_codewords, ldpc.N),
                                         rate=self.fec_rate)
         packet = np.packbits(info.reshape(-1)[:self.packet_bytes * 8]).tobytes()
-        size = int.from_bytes(packet[:2], "big")
-        decoded = packet[2:2 + size]
-        crc = int.from_bytes(packet[2 + size:6 + size], "big")
-        good = size <= self.max_payload_bytes and crc == (binascii.crc32(decoded) & 0xffffffff)
-        result.update(payload=decoded if good else None, crc_ok=good, decoded_length=size,
-                      codewords_ok=int(np.count_nonzero(ok)),
+        payload, frame_meta = self._frame.unpack(packet)
+        result.update(frame_meta)
+        result.update(payload=payload, codewords_ok=int(np.count_nonzero(ok)),
                       snr_db=float(10 * np.log10(np.median(1 / noise))),
                       carrier_snr_db=10 * np.log10(1 / noise),
                       end_index=start + self.total_symbols * self.symbol_samples)
