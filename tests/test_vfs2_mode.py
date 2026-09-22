@@ -63,8 +63,8 @@ def test_pilot_and_cazac_sequences_are_constant_modulus():
 
 
 def test_frame_budget_and_net_rate():
-    assert VFS2.airtime(VFS2.max_payload_bytes) == pytest.approx(5.010, abs=0.002)
-    assert VFS2.bits_per_second == pytest.approx(1527, abs=5)
+    assert VFS2.airtime(VFS2.max_payload_bytes) == pytest.approx(5.460, abs=0.002)
+    assert VFS2.bits_per_second == pytest.approx(1401, abs=5)
 
 
 def test_papr_is_below_the_ofdm_rungs():

@@ -12,7 +12,7 @@ Geometry, common to every rung:
 * 12 kHz receive rate, 48 kHz transmit rate (the shared RX front end).
 * FFT 384 samples (32 ms), cyclic prefix 24 samples (2 ms), block 34 ms.
 * Bins 15..78 at 31.25 Hz, i.e. 468.75-2437.5 Hz: 64 bins, 1,882 symbol/s.
-* ~0.29 s preamble: a ramped constant-modulus burst that opens squelch and
+* ~0.74 s preamble: a ramped constant-modulus burst that opens squelch and
   settles receive AGC, then two CAZAC sync blocks and two CAZAC training
   blocks.
 * Scattered pilot blocks every `pilot_block_stride` data blocks, bracketed
@@ -111,7 +111,7 @@ class ScFdeMode(waveform.ModeDescription):
     fec_rate: str = "1/2"
     n_codewords: int = 24
     pilot_block_stride: int = 10
-    lead_in_seconds: float = 0.15
+    lead_in_seconds: float = framing.FM_SETTLING_HEAD_SECONDS
     tail_seconds: float = 0.1
     tilt_db: float = 6.0
     confidence_threshold: float = 0.55

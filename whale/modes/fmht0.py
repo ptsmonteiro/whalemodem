@@ -21,7 +21,7 @@ buys robustness and none buys rate.
     again.  The receiver adds the repeat LLRs back into their originals
     before de-interleaving, so the repeat is soft-combined, and the two
     copies of a repeated bit are half a frame apart.
-  * 800 ms preamble: a 500 ms PN energy burst to open squelch and settle
+  * 900 ms preamble: a 600 ms PN energy burst to open squelch and settle
     the receive AGC, then a 300 ms PN tone sequence for timing.  Both
     lengths are measured, not nominal, and both are longer than the
     family's 250 ms sketch because on radios that sketch does not hold:
@@ -34,7 +34,7 @@ buys robustness and none buys rate.
         The receive envelope of a missed frame showed audio for 150 ms, a
         collapse to a fifth of that from 250 to 450 ms as the squelch
         re-closed, and full recovery after -- with the sync sequence inside
-        the hole.  A 500 ms burst puts the sync past it.  FM discriminator audio has no carrier offset, so
+        the hole. A 600 ms burst puts the sync past it. FM discriminator audio has no carrier offset, so
     there is no offset search -- only sound-card clock offset, which over a
     frame this short is under a sample.
   * Same `PacketCodec` framing, CRC32 grid selection and short/medium/full
@@ -57,7 +57,7 @@ from functools import cached_property
 
 import numpy as np
 
-from .. import dsp, waveform
+from .. import dsp, framing, waveform
 from ..dsp import mfsk as _mfsk
 from ..phy.vf14 import Vf14Waveform, _interleaver_stride
 
@@ -178,7 +178,7 @@ FMHT0 = Fmht0Mode(
     symbol_samples=120, first_bin=2,
     sync_symbols=120, payload_symbols=900, short_payload_symbols=216,
     medium_payload_symbols=420,
-    head_seconds=0.50,
+    head_seconds=framing.FM_SETTLING_HEAD_SECONDS,
     soft_metric="per_bin",
     fec_rate="1/2",
     sync_seed=0x0FB30, head_seed=0x0FB31,

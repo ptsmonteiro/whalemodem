@@ -107,7 +107,7 @@ class Vf13Waveform(waveform.ModeDescription):
     repeat: int = 1
     constraint: int = 7                  # 7 or 9
     amplitude: float | None = None       # None => DEFAULT_AMPLITUDE/sqrt(k)
-    head_seconds: float = 0.10
+    head_seconds: float = framing.FM_SETTLING_HEAD_SECONDS
     tail_seconds: float = 0.05
     soft_metric: str = "normalized"      # "normalized" | "raw" | "snr"
     fec_rate: str = "7/8"                # "1/2","2/3","3/4","5/6","7/8"

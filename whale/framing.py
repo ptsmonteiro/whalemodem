@@ -37,3 +37,8 @@ BOOTSTRAP_HEADER_BYTES = AIR_HEADER_BYTES
 # failure was an hf7 keying at head 0. 0.1 s is still twice the measured
 # ramp, leaving margin for radios and amplifiers slower than the bench pair.
 SETTLING_HEAD_SECONDS = 0.1
+
+#: Configured settling head shared by every analog-FM waveform. The head
+#: carries each mode's own modulation so the transmitter, receiver squelch,
+#: and receive audio path settle before synchronization begins.
+FM_SETTLING_HEAD_SECONDS = 0.6

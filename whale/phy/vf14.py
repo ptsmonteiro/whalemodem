@@ -78,7 +78,7 @@ class Vf14Waveform(waveform.ModeDescription):
     short_payload_symbols: int
     medium_payload_symbols: int
     confidence_threshold: float
-    head_seconds: float = 0.6
+    head_seconds: float = framing.FM_SETTLING_HEAD_SECONDS
     tail_seconds: float = 0.02
     amplitude: float = DEFAULT_AMPLITUDE
     #: K=7 puncture rate (`whale.dsp.fec.PUNCTURE_PATTERNS`); "1/2" is the

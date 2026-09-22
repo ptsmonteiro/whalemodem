@@ -89,7 +89,7 @@ class Fmht4Mode(waveform.ModeDescription):
     fec_rate: str = "3/4"
     lo_bin: int = 15  # 468.75 Hz
     hi_bin: int = 78  # 2437.5 Hz
-    lead_in_seconds: float = 0.25
+    lead_in_seconds: float = framing.FM_SETTLING_HEAD_SECONDS
     #: Sync symbols ahead of the four channel-training symbols. Together with
     #: `lead_in_seconds` this is the preamble, and on a handheld it is a
     #: robustness parameter, not overhead to be minimised: see `encode`.

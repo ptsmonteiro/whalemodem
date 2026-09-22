@@ -36,9 +36,9 @@ def test_default_mode_contract_and_shipped_config_a():
 
 def test_net_bit_rate_matches_the_measured_config_a_figure():
     # C(16,6)=8008 truncated to 2**12=4096 codewords; 150 Bd; punctured
-    # rate-7/8 K=7 convolutional; 7.983 s fixed frame.
-    assert VF13.net_bit_rate() == pytest.approx(1440.0, abs=0.5)
-    assert VF13.frame_seconds() == pytest.approx(7.983, abs=0.001)
+    # rate-7/8 K=7 convolutional; 8.483 s fixed frame.
+    assert VF13.net_bit_rate() == pytest.approx(1355.1, abs=0.5)
+    assert VF13.frame_seconds() == pytest.approx(8.483, abs=0.001)
     assert VF13.spacing_hz == pytest.approx(150.0)
     assert VF13.occupied_bandwidth_hz == pytest.approx(2400.0)
     geometry = VF13.geometry()
@@ -122,7 +122,7 @@ def test_rejects_band_overflow():
 def test_mode_for_reproduces_the_shipped_geometry():
     built = mode_for(tone_count=16, subbands=1, mapping="combinatorial",
                      active_tones=6, symbol_samples=320, band_lo_hz=600.0,
-                     band_hi_hz=3000.0, frame_seconds=7.99, fec_rate="7/8",
+                     band_hi_hz=3000.0, frame_seconds=8.49, fec_rate="7/8",
                      constraint=7)
     assert built.payload_symbols == VF13.payload_symbols
     assert built.net_bit_rate() == pytest.approx(VF13.net_bit_rate())

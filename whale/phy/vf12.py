@@ -63,7 +63,7 @@ class Vf12Waveform(waveform.ModeDescription):
     band_hi_hz: float = 3000.0
     fft_size: int = 240
     cp_len: int = 36
-    lead_in_seconds: float = 0.5
+    lead_in_seconds: float = framing.FM_SETTLING_HEAD_SECONDS
     target_airtime_seconds: float = 5.0
     n_codewords: int | None = None
     confidence_threshold: float = 0.7

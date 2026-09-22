@@ -32,8 +32,8 @@ def test_geometry_is_the_shared_scfde_plan():
     assert VFS1.fec_rate == "1/2" and VFS1.bits_per_symbol_order == 1
     assert VFS1.max_payload_bytes == 405 - 6
     assert VFS1.chunk_size == VFS1.max_payload_bytes - framing.AIR_HEADER_BYTES
-    assert VFS1.airtime(VFS1.chunk_size) == pytest.approx(4.16, abs=0.01)
-    assert VFS1.bits_per_second == pytest.approx(748, abs=1)
+    assert VFS1.airtime(VFS1.chunk_size) == pytest.approx(4.61, abs=0.01)
+    assert VFS1.bits_per_second == pytest.approx(675, abs=1)
 
 
 def test_one_reference_symbol_per_block_carries_no_bit():
@@ -85,4 +85,4 @@ def test_registered_on_the_fm_ladder_in_rate_order():
              else 0 for mode in modes]
     assert VFS1.mode_id in {mode.mode_id for mode in modes}
     index = [mode.mode_id for mode in modes].index(VFS1.mode_id)
-    assert rates[index] == pytest.approx(748, abs=1)
+    assert rates[index] == pytest.approx(675, abs=1)

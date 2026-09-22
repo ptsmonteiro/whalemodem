@@ -35,13 +35,14 @@ def test_geometry():
     assert FMHT0.tone_count == 4 and FMHT0.baud == 400.0
     assert FMHT0.spacing_hz == 400.0
     assert FMHT0.band_hz == (800.0, 2000.0)
-    # 800 ms preamble: 500 ms energy burst then a 300 ms timing sequence.
-    assert FMHT0.head_symbols * FMHT0.symbol_seconds == pytest.approx(0.50)
+    # 900 ms preamble: 600 ms energy burst then a 300 ms timing sequence.
+    assert FMHT0.head_symbols * FMHT0.symbol_seconds == pytest.approx(
+        framing.FM_SETTLING_HEAD_SECONDS)
     assert FMHT0.sync_symbols * FMHT0.symbol_seconds == pytest.approx(0.30)
     assert FMHT0.short_max_payload_bytes == 11  # exactly a DATA_ACK
     assert FMHT0.max_payload_bytes == 68
     assert FMHT0.chunk_size == 68 - framing.AIR_HEADER_BYTES
-    assert FMHT0.net_bit_rate() == pytest.approx(151.1, abs=0.1)
+    assert FMHT0.net_bit_rate() == pytest.approx(146.4, abs=0.1)
 
 
 def test_overall_code_rate_is_one_third():

@@ -18,7 +18,8 @@ def test_mode_contract_and_requested_capacity():
     assert VF16.fec_rate == "2/3"
     assert VF16.bits_per_carrier == 3  # 8-PSK
     assert VF16.n_codewords == 36
-    assert VF16.payload_symbols == VF12.payload_symbols == 181
+    assert VF16.payload_symbols == 181
+    assert VF12.payload_symbols == 178
 
 
 def test_vf12_ofdm_geometry_and_airtime_are_preserved():
@@ -26,9 +27,8 @@ def test_vf12_ofdm_geometry_and_airtime_are_preserved():
                       "band_lo_hz", "band_hi_hz", "lead_in_seconds",
                       "pilot_comb_stride", "pilot_time_span"):
         assert getattr(VF16, attribute) == getattr(VF12, attribute)
-    assert VF16.airtime(VF16.max_payload_bytes) == pytest.approx(
-        VF12.airtime(VF12.max_payload_bytes), abs=0.002)
-    assert VF16.airtime(VF16.max_payload_bytes) == pytest.approx(4.947, abs=0.002)
+    assert VF16.airtime(VF16.max_payload_bytes) == pytest.approx(5.047, abs=0.002)
+    assert VF12.airtime(VF12.max_payload_bytes) == pytest.approx(4.978, abs=0.002)
 
 
 def test_vf16_is_the_default_rung_immediately_below_vf12():

@@ -14,9 +14,9 @@ def test_default_mode_contract_and_data_header_accounting():
     assert VF12.carrier_spacing_hz == 50
     assert VF12.n_carriers == 51
     assert VF12.bits_per_carrier == 4
-    assert VF12.lead_in_seconds == 0.5
+    assert VF12.lead_in_seconds == framing.FM_SETTLING_HEAD_SECONDS
     assert VF12.chunk_size + framing.AIR_HEADER_BYTES == VF12.max_payload_bytes
-    assert VF12.airtime(VF12.max_payload_bytes) == pytest.approx(4.947, abs=.002)
+    assert VF12.airtime(VF12.max_payload_bytes) == pytest.approx(4.978, abs=.002)
 
 
 def test_parameterized_geometries_are_independent():

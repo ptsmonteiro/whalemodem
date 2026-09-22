@@ -42,7 +42,7 @@ def test_differs_from_vfs2_only_in_code_rate():
         assert getattr(VFS3, attribute) == getattr(VFS2, attribute)
     assert VFS3.airtime(VFS3.max_payload_bytes) == pytest.approx(
         VFS2.airtime(VFS2.max_payload_bytes))
-    assert VFS3.airtime(VFS3.max_payload_bytes) == pytest.approx(5.010, abs=0.002)
+    assert VFS3.airtime(VFS3.max_payload_bytes) == pytest.approx(5.460, abs=0.002)
     assert VFS3.fec_rate == "3/4" and VFS2.fec_rate == "1/2"
     assert VFS3.max_payload_bytes == pytest.approx(1.5 * VFS2.max_payload_bytes, rel=0.01)
 

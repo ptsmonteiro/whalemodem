@@ -6,8 +6,8 @@ The waveform -- codebook, geometry, framing and demodulator -- lives in
 the FM passband. This module fixes the shipped configuration: 16 tones, 6
 active per symbol (12 bits/symbol, C(16,6)=8008 truncated to a 4,096-entry
 codebook), 150 Bd (320 samples at 48 kHz, 150 Hz spacing), tones from
-600-3,000 Hz, punctured K=7 convolutional rate 7/8, interleaved, a 7.983 s
-fixed frame: 1,430.0 net application bit/s.
+600-3,000 Hz, punctured K=7 convolutional rate 7/8, interleaved, an 8.483 s
+fixed frame: 1,345.7 net application bit/s.
 
 Measured on radios (IC-705 <-> Wouxun KG-UV9D Plus FM, 2026-09-14): 60/60
 exact-payload frames (30/30 ic705->ht, 30/30 ht->ic705). Installed as
@@ -71,7 +71,7 @@ def mode_for(tone_count=16, *, subbands=1, frame_seconds=None,
                     **kwargs)
 
 
-#: The shipped instance: config A (see module docstring), 1,438.8 net bit/s.
+#: The shipped instance: config A (see module docstring), 1,345.7 net application bit/s.
 VF13 = Vf13Mode()
 
 LADDER = (waveform.LadderEntry(VF13, "fm", rank=4),)
