@@ -520,8 +520,11 @@ def stop_on_signals(server, grace: float = STOP_GRACE):
             logger.debug("no %s handler installed", name, exc_info=True)
 
 
-def main():
+def main(argv=None):
+    from whale.version import __version__, add_version_argument
+
     ap = argparse.ArgumentParser(description=__doc__)
+    add_version_argument(ap)
     ap.add_argument("--radio", help="radio name (default: the configured channel default)")
     ap.add_argument("--config", help="application configuration TOML (or set WHALE_CONFIG)")
     ap.add_argument("--cmd-port", type=int, help="override the configured command port")
@@ -538,7 +541,7 @@ def main():
     ap.add_argument("--tui", action="store_true",
                     help="run a live curses status dashboard instead of logging to stderr")
     ap.add_argument("--log-file", help="override the configured log file (default: stderr)")
-    args = ap.parse_args()
+    args = ap.parse_args(argv)
     try:
         config = app_config(args.config)
         radio = get_radio(args.radio, args.channel, args.config)
@@ -559,6 +562,7 @@ def main():
                             format="%(asctime)s %(levelname)s %(name)s: %(message)s",
                             filename=log_file)
 
+        logger.info("Whale %s", __version__)
         channel = policy.by_name(args.channel)
         from whale.mode_qualification import registry
         mode_registry = registry(args.channel, args.mode_level,

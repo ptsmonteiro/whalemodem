@@ -191,6 +191,9 @@ jobs:
               pip install -e ".[test]"
               pip install pyinstaller
               pyinstaller packaging/pyinstaller/whale.spec
+              dist/whale/whale-server --version
+              dist/whale/whale-configure --version
+              dist/whale/whale-test --version
               dist/whale/whale-server --help
               dist/whale/whale-configure --help
               dist/whale/whale-test --help
@@ -236,6 +239,9 @@ jobs:
         run: pyinstaller packaging/pyinstaller/whale.spec
       - name: Smoke test
         run: |
+          dist/whale/whale-server --version
+          dist/whale/whale-configure --version
+          dist/whale/whale-test --version
           dist/whale/whale-server --help
           dist/whale/whale-configure --help
           dist/whale/whale-test --help
@@ -271,6 +277,9 @@ jobs:
         run: pyinstaller packaging/pyinstaller/whale.spec
       - name: Smoke test
         run: |
+          dist\whale\whale-server.exe --version
+          dist\whale\whale-configure.exe --version
+          dist\whale\whale-test.exe --version
           dist\whale\whale-server.exe --help
           dist\whale\whale-configure.exe --help
           dist\whale\whale-test.exe --help

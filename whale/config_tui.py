@@ -508,11 +508,13 @@ class ConfigView:
         return self.callsign if self.ssid is None else f"{self.callsign}-{self.ssid}"
 
     def render(self, stdscr) -> None:
+        from whale.version import __version__
+
         height, _ = stdscr.getmaxyx()
         if height < 14:
             _safe_addnstr(stdscr, 0, 0, "terminal too small")
             return
-        title = f"Whale Modem Configuration -- {self.path}"
+        title = f"Whale {__version__} Modem Configuration -- {self.path}"
         if self.is_new_file:
             title += " (new file)"
         _safe_addnstr(stdscr, 0, 0, title, curses.A_BOLD)
@@ -1270,7 +1272,10 @@ def _resolve_path(args: argparse.Namespace) -> str:
 
 
 def main(argv: list[str] | None = None) -> int:
+    from whale.version import add_version_argument
+
     parser = argparse.ArgumentParser(description=__doc__)
+    add_version_argument(parser)
     parser.add_argument("--config", help="application configuration TOML (or set WHALE_CONFIG); "
                                          f"defaults to {DEFAULT_CONFIG!r} in the current directory")
     args = parser.parse_args(argv)

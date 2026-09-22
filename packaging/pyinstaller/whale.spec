@@ -23,6 +23,8 @@
 import os
 import sys
 
+from PyInstaller.utils.hooks import copy_metadata
+
 # `SPEC` is injected into this file's globals by PyInstaller at spec-eval
 # time; it holds the path to this very .spec file.
 _spec_dir = os.path.dirname(os.path.abspath(SPEC))
@@ -57,7 +59,7 @@ def _vendor_datas(vendor_dir: str, dest_root: str) -> list[tuple[str, str]]:
     return entries
 
 
-datas = _vendor_datas(
+datas = copy_metadata("whale") + _vendor_datas(
     os.path.join(REPO_ROOT, "whale", "hw", "_vendor", "hamlib", TAG),
     os.path.join("whale", "hw", "_vendor", "hamlib", TAG),
 )

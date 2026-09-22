@@ -815,17 +815,10 @@ def run_listener(client, mycall: str, transcript: Transcript,
 # -- the report ------------------------------------------------------------
 
 def _whale_version() -> str:
-    """The installed version, or a sentence saying why it is not known.
+    """Return the version reported by every Whale command."""
+    from whale.version import __version__
 
-    A standalone bundle and a plain checkout both run without distribution
-    metadata, so no version here is normal and must never end the run.
-    """
-    from importlib.metadata import version
-
-    try:
-        return version("whale")
-    except Exception:
-        return "unknown (no package metadata: standalone build or checkout)"
+    return __version__
 
 
 def _role(peer: str | None, sweeping: bool) -> str:
@@ -980,10 +973,13 @@ def run_sweep(setup: Setup, peer: str | None, transcript: Transcript,
 # -- entry point -----------------------------------------------------------
 
 def build_parser() -> argparse.ArgumentParser:
+    from whale.version import add_version_argument
+
     ap = argparse.ArgumentParser(
         prog="whale-test",
         description="Run an over-the-air check against another Whale station. "
                     "With no callsign, wait to be called.")
+    add_version_argument(ap)
     ap.add_argument("callsign", nargs="?",
                     help="the station to call; omit to wait for a call")
     ap.add_argument("--sweep", action="store_true",
@@ -1001,6 +997,9 @@ def build_parser() -> argparse.ArgumentParser:
 
 def main(argv=None) -> int:
     args = build_parser().parse_args(argv)
+    from whale.version import __version__
+
+    print(f"Whale {__version__}", file=sys.stderr)
     logging.basicConfig(
         level=logging.DEBUG if args.verbose else logging.WARNING,
         format="%(asctime)s %(levelname)s %(name)s: %(message)s",

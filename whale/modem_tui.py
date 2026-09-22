@@ -333,8 +333,11 @@ def _format_mode(mode_id: int | None, mode_name: str | None, bps: float | None) 
 
 
 def render_header(snapshot: Snapshot, width: int) -> list[str]:
+    from whale.version import __version__
+
     state_desc = f"connected to {snapshot.peer}" if snapshot.connected else "listening"
     lines = [
+        f"Whale {__version__}",
         f"mycall {snapshot.mycall}  radio {snapshot.radio}  channel {snapshot.channel}  "
         f"state: {state_desc}",
     ]
