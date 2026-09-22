@@ -82,7 +82,10 @@ class Vfs1Mode(ScFdeMode):
                                 np.zeros(round(self.tail_seconds * self.tx_sample_rate))))
         return (audio / np.max(np.abs(audio))).astype(np.float32)
 
-    def decode(self, audio):
+    def decode(self, audio, **kwargs):
+        # See ScFdeMode.decode: nothing here understands freq_hint_hz or
+        # acquisition yet, but shared callers may pass them regardless.
+        del kwargs
         result = {"synced": False, "payload": None, "crc_ok": False, "confidence": 0.0}
         audio = np.asarray(audio, dtype=float)
         if audio.ndim != 1 or not np.all(np.isfinite(audio)):

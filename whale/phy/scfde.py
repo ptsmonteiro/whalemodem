@@ -397,7 +397,12 @@ class ScFdeMode(waveform.ModeDescription):
                 + 1j * np.interp(data, pilots, column.imag))
         return channel, max(noise, 1e-9)
 
-    def decode(self, audio):
+    def decode(self, audio, **kwargs):
+        # No option this family understands yet (no carrier frequency offset
+        # to hint at an FM discriminator's baseband output); accept and
+        # ignore whatever the shared callers pass, in the idiom every other
+        # mode's decode() wrapper already uses.
+        del kwargs
         result = {"synced": False, "payload": None, "crc_ok": False, "confidence": 0.0}
         audio = np.asarray(audio, dtype=float)
         if audio.ndim != 1 or not np.all(np.isfinite(audio)):

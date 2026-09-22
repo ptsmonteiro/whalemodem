@@ -80,7 +80,9 @@ class Hc1wMode(waveform.ModeDescription):
         return self.codec.encode(payload, self)
 
     def decode(self, audio, **kwargs):
-        return self.codec.decode(audio, self, **kwargs)
+        # Additive canonical snr_db/freq_offset_hz alias; the mode's
+        # own spelling (tone_snr_db/carrier_snr_db/cfo_hz/...) is kept.
+        return waveform.canonicalize_result(self.codec.decode(audio, self, **kwargs))
 
     def airtime(self, payload_len: int) -> float:
         return self.codec.airtime(payload_len, self)

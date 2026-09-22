@@ -385,7 +385,7 @@ class Vf14Mode(waveform.ModeDescription):
 
     def decode(self, audio, **kwargs) -> dict:
         del kwargs
-        return self.demodulate(audio)
+        return waveform.canonicalize_result(self.demodulate(audio))
 
 
 def _tone_snr_db(magnitudes: np.ndarray) -> float:

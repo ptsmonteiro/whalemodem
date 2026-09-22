@@ -2,9 +2,73 @@
 
 from dataclasses import dataclass, field, replace
 from importlib import import_module
-from typing import Mapping, Protocol, Sequence, runtime_checkable
+from typing import Mapping, Protocol, Sequence, TypedDict, runtime_checkable
 
 import numpy as np
+
+
+class DecodeResult(TypedDict, total=False):
+    """The canonical shape of a mode's `decode()` return value.
+
+    Every mode has grown its own dict by accretion, and three different
+    spellings of "receive SNR" (`snr_db`, `carrier_snr_db`, `tone_snr_db`)
+    and two of "frequency offset" (`freq_offset_hz`, `cfo_hz`) are in use by
+    shipped modes and read by shipped callers (link_receiver.py,
+    streaming.py, qualification.py). This TypedDict is documentation and a
+    mypy/IDE aid, not an enforced schema -- no mode is required to populate
+    every key, and no existing key has been renamed or removed to match it.
+
+    `snr_db` and `freq_offset_hz` are the canonical spellings going forward.
+    A mode that only had the older spelling keeps emitting it (callers still
+    read it) and, where `canonicalize_result` below is used, also gets the
+    canonical key as an additive alias.
+    """
+
+    payload: bytes | None
+    crc_ok: bool
+    confidence: float
+    decoded_length: int
+    start_index: int | None
+    end_index: int | None
+    sync_end_index: int | None
+    start_sample: int | None
+    snr_db: float  # canonical: receive SNR, however the mode estimates it
+    freq_offset_hz: float  # canonical: residual carrier/clock frequency offset
+    decode_cpu_seconds: float
+    failure: str
+    received_crc32: int
+    computed_crc32: int
+
+
+def canonicalize_result(result: dict) -> dict:
+    """Add the canonical `snr_db`/`freq_offset_hz` keys, in place, if absent.
+
+    Purely additive: never overwrites a key the mode already set, never
+    removes or renames anything, so every existing caller keeps reading
+    exactly what it read before. Modes call this at the outer decode()
+    boundary; it is not run automatically because not every mode's raw
+    result is a plain dict worth mutating (some diagnostics-only paths).
+    """
+    if "snr_db" not in result:
+        tone = result.get("tone_snr_db")
+        if tone is not None and np.isfinite(tone):
+            result["snr_db"] = float(tone)
+        else:
+            carrier = result.get("carrier_snr_db")
+            if carrier is not None:
+                finite = np.asarray(carrier, dtype=float)
+                finite = finite[np.isfinite(finite)]
+                if finite.size:
+                    result["snr_db"] = float(np.median(finite))
+            if "snr_db" not in result:
+                channel = result.get("channel_snr_db")
+                if channel is not None and np.isfinite(channel):
+                    result["snr_db"] = float(channel)
+    if "freq_offset_hz" not in result:
+        cfo = result.get("cfo_hz")
+        if cfo is not None and np.isfinite(cfo):
+            result["freq_offset_hz"] = float(cfo)
+    return result
 
 
 @runtime_checkable
@@ -35,7 +99,10 @@ class WaveformMode(Protocol):
 
     def encode(self, payload: bytes) -> np.ndarray: ...
 
-    def decode(self, audio: np.ndarray) -> dict: ...
+    # Callers may pass mode-specific acquisition hints -- link_receiver.py
+    # passes freq_hint_hz, streaming.py passes acquisition -- so every mode
+    # must accept and may ignore arbitrary keyword options.
+    def decode(self, audio: np.ndarray, **kwargs) -> dict: ...
 
     def airtime(self, payload_len: int) -> float: ...
 

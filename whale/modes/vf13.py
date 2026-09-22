@@ -647,6 +647,13 @@ class Vf13Mode(waveform.ModeDescription):
         result = {"synced": False, "payload": None, "crc_ok": False,
                   "sync_score": 0.0, "confidence": 0.0,
                   "start_index": None, "tone_snr_db": None, "meta": None}
+        audio_12k = np.asarray(audio_12k, dtype=np.float64)
+        # Every other mode's decode() rejects wrong-shaped audio before it
+        # reaches a windowed correlator; acquire() below did not, and a
+        # (N, 2) capture (an unmixed-down stereo buffer, say) reached
+        # `_mfsk.correlate`'s sliding_window_view and raised.
+        if audio_12k.ndim != 1:
+            return result
         acq = self.acquire(audio_12k)
         result["sync_score"] = acq["score"]
         result["confidence"] = acq["score"]
@@ -722,7 +729,7 @@ class Vf13Mode(waveform.ModeDescription):
 
     def decode(self, audio: np.ndarray, **kwargs) -> dict:
         del kwargs
-        return self.demodulate(audio)
+        return waveform.canonicalize_result(self.demodulate(audio))
 
     def airtime(self, payload_len: int | None = None) -> float:
         return self.frame_seconds(payload_len)

@@ -214,7 +214,11 @@ class Vf12Mode(waveform.ModeDescription):
         block = audio[start:start + count * self.symbol_samples].reshape(count, self.symbol_samples)
         return np.fft.rfft(block[:, self.cp_len:], axis=1)[:, self.active_bins]
 
-    def decode(self, audio):
+    def decode(self, audio, **kwargs):
+        # FM discriminator baseband: no carrier frequency offset to hint at,
+        # so freq_hint_hz/acquisition are accepted and ignored like every
+        # other mode's decode() wrapper.
+        del kwargs
         result = {"synced": False, "payload": None, "crc_ok": False, "confidence": 0.0}
         audio = np.asarray(audio, dtype=float)
         if audio.ndim != 1 or not np.all(np.isfinite(audio)):
