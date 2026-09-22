@@ -88,14 +88,25 @@ def qpsk_points() -> np.ndarray:
 
 @dataclass(frozen=True)
 class ScFdeMode(waveform.ModeDescription):
-    """One SC-FDE rung. Subclasses fix `fec_rate` and the frame budget.
+    """A parametric SC-FDE waveform FAMILY BASE, not itself a shippable mode.
 
     Every rung of this family shares the geometry above and the coherent
-    detection below; they differ only in constellation order and LDPC rate.
+    detection below; a concrete rung (Vfs1Mode, Vfs2Mode, Vfs3Mode, ...)
+    subclasses this and fixes `name`, `mode_id`, the constellation order and
+    the LDPC rate -- that is the entire contributor cost of a new rung.
+
+    `family_base` marks that pattern for tests/test_layering.py: a module in
+    whale/modes/ that only parameterises a class carrying this marker is a
+    legitimate family rung and not a PHY that wandered into the adapters
+    package. `name` and `mode_id` are left as sentinels here on purpose so
+    the bare base cannot be mistaken for a real mode; `__post_init__`
+    refuses to construct one that has not overridden them.
     """
 
-    name: str = "scfde"
-    mode_id: int = 0
+    family_base = True
+
+    name: str = ""
+    mode_id: int = -1
     bits_per_symbol_order: int = 2  # QPSK
     fec_rate: str = "1/2"
     n_codewords: int = 24
@@ -108,6 +119,11 @@ class ScFdeMode(waveform.ModeDescription):
     rx_sample_rate: int = field(default=SAMPLE_RATE, init=False)
 
     def __post_init__(self):
+        if not self.name or self.mode_id < 0:
+            raise ValueError(
+                "ScFdeMode is a parametric waveform family base, not a "
+                "shippable mode -- instantiate a concrete rung (e.g. "
+                "Vfs2Mode) that sets its own name and mode_id")
         if self.bits_per_symbol_order not in (1, 2, 3):
             raise ValueError("SC-FDE family carries BPSK, QPSK or 8PSK")
         if self.fec_rate not in ldpc.INFORMATION_BITS:

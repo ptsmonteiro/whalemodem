@@ -98,15 +98,54 @@ def test_phy_never_imports_modes():
         "sit above the PHYs, not below them:\n  " + "\n  ".join(offenders))
 
 
+def _family_base_classes(root: Path) -> set[str]:
+    """Names of classes under `root` that declare `family_base = True`.
+
+    A parametric waveform family base (e.g. `ScFdeMode`) is a PHY class
+    that a rung in whale/modes/ legitimately subclasses without importing
+    whale.waveform itself -- the marker is a plain class attribute so this
+    check needs no import of whale/ and can't be fooled by a docstring.
+    """
+    names: set[str] = set()
+    for path in _python_files(root):
+        tree = ast.parse(path.read_text(encoding="utf-8"), filename=str(path))
+        for node in ast.walk(tree):
+            if not isinstance(node, ast.ClassDef):
+                continue
+            for stmt in node.body:
+                targets = (stmt.targets if isinstance(stmt, ast.Assign)
+                           else [stmt.target] if isinstance(stmt, ast.AnnAssign)
+                           else [])
+                if any(isinstance(t, ast.Name) and t.id == "family_base"
+                       for t in targets):
+                    names.add(node.name)
+    return names
+
+
+def _imported_names(path: Path) -> set[str]:
+    """Bare names imported by `path` via `from ... import name`."""
+    tree = ast.parse(path.read_text(encoding="utf-8"), filename=str(path))
+    names: set[str] = set()
+    for node in ast.walk(tree):
+        if isinstance(node, ast.ImportFrom):
+            names.update(alias.name for alias in node.names)
+    return names
+
+
 def test_modes_holds_only_link_facing_adapters():
     """A PHY filed under whale/modes/ is invisible to the tests above.
 
     They check the direction of imports, not where a module lives, so a
     complete waveform dropped into the adapters package breaks none of them
     -- which is how whale/modes/{hc0,hc1w,hr0}.py sat there. Every module
-    here presents a `WaveformMode`, so every module here imports the
-    contract; a module that does not is a PHY and belongs in whale/phy/.
+    here is one of: a link-facing adapter that imports whale.waveform, a
+    mode that subclasses a sibling adapter (as vf16 does vf12), or a
+    parameterisation of a declared parametric waveform family from
+    whale/phy/ (a class there marked `family_base = True`, as vfs2 and vfs3
+    are rungs of `whale.phy.scfde.ScFdeMode`). A module that is none of
+    these is a PHY and belongs in whale/phy/.
     """
+    families = _family_base_classes(WHALE / "phy")
     offenders = []
     for path in _python_files(WHALE / "modes"):
         if path.name == "__init__.py":
@@ -117,9 +156,14 @@ def test_modes_holds_only_link_facing_adapters():
         # A mode may instead subclass a sibling adapter, as vf16 does vf12.
         if any(_is_within(module, "whale.modes") for module in modules):
             continue
+        # Or parameterise a declared parametric waveform family from phy/.
+        if _imported_names(path) & families:
+            continue
         offenders.append(str(path))
     assert not offenders, (
         "every module in whale/modes/ is a link-facing WaveformMode adapter "
-        "and imports whale.waveform (or subclasses a sibling that does); "
-        "these import neither, so they are complete waveforms and belong in "
-        "whale/phy/:\n  " + "\n  ".join(offenders))
+        "importing whale.waveform, a mode subclassing a sibling that does, "
+        "or a parameterisation of a declared parametric family from "
+        "whale/phy/ (a class marked family_base = True); these are none of "
+        "those, so they are complete waveforms and belong in whale/phy/:\n  "
+        + "\n  ".join(offenders))
