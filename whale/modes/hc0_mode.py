@@ -68,6 +68,11 @@ class Hc0Mode(waveform.CodecMode):
         return hc0.BANK.symbol_rate
 
     @property
+    def settling_head_variant(self):
+        """Resizable settling head; `hc0` sizes it in its own samples."""
+        return waveform.module_settling_head(hc0, self)
+
+    @property
     def band_hz(self) -> tuple[float, float]:
         """Lowest to highest carrier/tone centre, in Hz."""
         return (float(hc0.TONE_HZ[0]), float(hc0.TONE_HZ[-1]))

@@ -59,7 +59,7 @@ import numpy as np
 
 from .. import dsp, waveform
 from ..dsp import mfsk as _mfsk
-from .vf14 import Vf14Mode, _interleaver_stride
+from ..phy.vf14 import Vf14Waveform, _interleaver_stride
 
 FMHT0_MODE_ID = 30
 
@@ -87,7 +87,7 @@ def _combine(llrs: np.ndarray) -> np.ndarray:
 class _RepeatedCodec:
     """A `PacketCodec` seen through `_expand`/`_combine`.
 
-    Wrapping the codec rather than the mode keeps `Vf14Mode.modulate` and
+    Wrapping the codec rather than the mode keeps `Vf14Waveform.modulate` and
     `.demodulate` untouched: they still call `encode` and `decode_soft`, and
     the repetition lives entirely in this pair of methods.
     """
@@ -110,7 +110,7 @@ class _RepeatedCodec:
 
 
 @dataclass(frozen=True)
-class Fmht0Mode(Vf14Mode):
+class Fmht0Mode(Vf14Waveform):
     """VF14's 4-FSK waveform re-fitted for rung 0: 400 Bd and rate 1/3."""
 
     def _make_codec(self, symbols: int, seed: int) -> _RepeatedCodec:

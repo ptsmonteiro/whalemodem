@@ -139,10 +139,11 @@ def test_modes_holds_only_link_facing_adapters():
     complete waveform dropped into the adapters package breaks none of them
     -- which is how whale/modes/{hc0,hc1w,hr0}.py sat there. Every module
     here is one of: a link-facing adapter that imports whale.waveform, a
-    mode that subclasses a sibling adapter (as vf16 does vf12), or a
-    parameterisation of a declared parametric waveform family from
-    whale/phy/ (a class there marked `family_base = True`, as vfs2 and vfs3
-    are rungs of `whale.phy.scfde.ScFdeMode`). A module that is none of
+    mode that subclasses a sibling adapter, or a parameterisation of a
+    declared parametric waveform family from whale/phy/ (a class there
+    marked `family_base = True`, as vfs2 and vfs3 are rungs of
+    `whale.phy.scfde.ScFdeMode` and vf16 is a rung of
+    `whale.phy.vf12.Vf12Waveform`). A module that is none of
     these is a PHY and belongs in whale/phy/.
     """
     families = _family_base_classes(WHALE / "phy")
@@ -153,7 +154,7 @@ def test_modes_holds_only_link_facing_adapters():
         modules = [module for module, _ in _imported_modules(path)]
         if any(_is_within(module, "whale.waveform") for module in modules):
             continue
-        # A mode may instead subclass a sibling adapter, as vf16 does vf12.
+        # A mode may instead subclass a sibling adapter.
         if any(_is_within(module, "whale.modes") for module in modules):
             continue
         # Or parameterise a declared parametric waveform family from phy/.

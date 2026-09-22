@@ -41,7 +41,8 @@ if str(ROOT) not in sys.path:
 
 from whale import framing, rx_audio  # noqa: E402
 from whale.dsp import bits, ldpc  # noqa: E402
-from whale.modes.vf12 import Vf12Mode, _fit_channel  # noqa: E402
+from whale.modes.vf12 import Vf12Mode  # noqa: E402
+from whale.phy.vf12 import _fit_channel  # noqa: E402
 
 RX_RATE = 12000
 ACQUIRE_WINDOW_S = 2.5

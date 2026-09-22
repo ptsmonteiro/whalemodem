@@ -13,7 +13,7 @@ rung on this PHY takes a frequency hint. Each mode module supplies its own
 
 from __future__ import annotations
 
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, replace
 
 import numpy as np
 
@@ -61,6 +61,13 @@ class Ofdm49Codec:
         return max(self._pad_seconds or 0.0, self.phy.keying_seconds())
 
 
+#: Head-resized PHYs, by (mode name, head length). `dataclasses.replace`
+#: on an OFDM49Mode re-runs a `__post_init__` that builds every reference
+#: constellation, so a sweep that re-encodes per frame must not pay for it
+#: per frame.
+_HEAD_VARIANTS: dict = {}
+
+
 @dataclass(frozen=True)
 class Ofdm49Mode(waveform.CodecMode):
     """A negotiable mode wrapping one `whale.phy.ofdm49.OFDM49Mode`.
@@ -75,6 +82,18 @@ class Ofdm49Mode(waveform.CodecMode):
     @property
     def streaming_phy(self):
         return self.codec.streaming_phy
+
+    @property
+    def settling_head_variant(self):
+        """Resizable settling head; the PHY carries it as `head_seconds`."""
+        def variant(head_seconds):
+            key = (self.name, head_seconds)
+            if key not in _HEAD_VARIANTS:
+                _HEAD_VARIANTS[key] = replace(self.codec.phy,
+                                              head_seconds=head_seconds)
+            phy = _HEAD_VARIANTS[key]
+            return phy.modulate, lambda payload_len: phy.keying_seconds()
+        return variant
 
     @property
     def baud(self) -> float:

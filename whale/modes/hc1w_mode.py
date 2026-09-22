@@ -69,6 +69,11 @@ class Hc1wMode(waveform.CodecMode):
         return hc1w.SAMPLE_RATE / hc1w.SYMBOL_SAMPLES
 
     @property
+    def settling_head_variant(self):
+        """Resizable settling head; `hc1w` sizes it in its own samples."""
+        return waveform.module_settling_head(hc1w, self)
+
+    @property
     def band_hz(self) -> tuple[float, float]:
         """Lowest to highest carrier/tone centre, in Hz."""
         return (float(hc1w.CARRIER_HZ[0]), float(hc1w.CARRIER_HZ[-1]))

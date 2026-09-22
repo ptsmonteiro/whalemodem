@@ -15,13 +15,7 @@ Three layers sit between the link and the sound card:
   `whale/modes/`  the link-facing adapters.  Each `*_mode.py` picks one
                   configuration of one PHY and presents it as the
                   `WaveformMode` (see `whale/waveform.py`) that the link
-                  negotiates. Exception: `vf12.py`, `vf13.py`, `vf14.py`
-                  and `vf16.py` are self-contained -- one parametric
-                  dataclass that is simultaneously the geometry, the
-                  modulation and the `WaveformMode` surface, with a
-                  `mode_for(**kwargs)` factory for variants -- so for
-                  those four there is no separate PHY to pick a
-                  configuration of.
+                  negotiates.
 
   `hr0`           the 32-tone noncoherent FSK short/full control waveform
   `hc0`           16-tone noncoherent FSK
@@ -31,6 +25,10 @@ Three layers sit between the link and the sound card:
   `sc_fast`       `sc` with the fused-FFT acquisition search
   `sc_resilient`  `sc_fast` plus convolutional coding and interleaving
   `ofdm49`        the parametric 49-carrier OFDM PHY (HF6, HF7, HF8, HF9)
+  `scfde`         the parametric SC-FDE PHY for FM (VFS1, VFS2, VFS3)
+  `vf12`          the parametric 50 Hz OFDM PHY for FM (VF12, VF16)
+  `vf13`          the parametric combinatorial MFSK PHY for FM (VF13)
+  `vf14`          the parametric one-tone M-FSK PHY for FM (VF14, FMHT0)
 
 Every module here was developed and qualified under `experiments/`; each
 module docstring names the experiment directory it came from and the
