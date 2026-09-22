@@ -30,9 +30,9 @@ from whale.hw.radios import Radio
 from whale.mode_qualification import registry
 from whale import sweep
 from whale.test_cli import (PreflightError, Setup, Station, Transcript,
-                            build_parser, connect_station, main,
+                            DEFAULT_PAYLOAD_SIZE, build_parser, connect_station, main,
                             modem_argv, preflight, report_name, reserve_ports,
-                            run_exercise, run_interruptibly, run_sweep,
+                            run_exercise, run_interruptibly, run_listener, run_sweep,
                             start_station, stop_modem, stop_station,
                             stop_station_uninterrupted, write_report)
 
@@ -67,16 +67,94 @@ def test_defaults_wait_to_be_called_on_the_fm_channel():
     assert args.channel == "fm"
     assert args.config is None
     assert args.verbose is False
+    assert args.size == 10 * 1024 == DEFAULT_PAYLOAD_SIZE
 
 
 def test_a_callsign_selects_the_calling_side():
-    args = build_parser().parse_args(["STA2", "--channel", "hf", "-v"])
-    assert (args.callsign, args.channel, args.verbose) == ("STA2", "hf", True)
+    args = build_parser().parse_args(
+        ["STA2", "--channel", "hf", "--size", "2048", "-v"])
+    assert (args.callsign, args.channel, args.size, args.verbose) == (
+        "STA2", "hf", 2048, True)
 
 
 def test_the_channel_choices_are_the_configured_channels():
     with pytest.raises(SystemExit):
         build_parser().parse_args(["--channel", "moon"])
+
+
+def test_payload_size_cannot_be_negative():
+    with pytest.raises(SystemExit):
+        build_parser().parse_args(["--size", "-1"])
+
+
+def test_exercise_uses_the_selected_payload_size():
+    class Client:
+        def __init__(self):
+            self.sent = []
+            self.received = []
+
+        def send_cmd(self, line):
+            self.sent.append(line)
+
+        def wait_for(self, prefix, timeout):
+            return prefix
+
+        def open_data(self):
+            pass
+
+        def send_data(self, data):
+            self.sent.append(data)
+
+        def recv_data(self, size, timeout):
+            self.received.append((size, timeout))
+            from acceptance_test import PAYLOAD_TAG_BA, payload
+            return payload(PAYLOAD_TAG_BA, size)
+
+    client = Client()
+    run_exercise(client, "STA1", "STA2", Transcript(), payload_size=37)
+
+    assert [len(item) for item in client.sent if isinstance(item, bytes)] == [37]
+    assert client.received[0][0] == 37
+
+
+def test_listener_returns_after_failed_and_successful_tests(monkeypatch):
+    import whale.test_cli as test_cli
+
+    transcript = Transcript()
+    attempts = []
+
+    class Client:
+        data = None
+
+        def __init__(self):
+            self.commands = []
+
+        def send_cmd(self, line):
+            self.commands.append(line)
+
+        def wait_for(self, prefix, timeout):
+            transcript.on_status("DISCONNECTED")
+            return "DISCONNECTED"
+
+    def exercise(client, mycall, peer, transcript_, connect_timeout,
+                 transfer_timeout, payload_size):
+        attempts.append(payload_size)
+        if len(attempts) == 1:
+            transcript_.on_status(f"CONNECTED {mycall} STA2 0")
+            raise test_cli.TestFailure("payload mismatch")
+        if len(attempts) == 3:
+            raise KeyboardInterrupt
+
+    monkeypatch.setattr(test_cli, "run_exercise", exercise)
+    client = Client()
+    with pytest.raises(KeyboardInterrupt):
+        run_listener(client, "STA1", transcript, payload_size=2048)
+
+    assert attempts == [2048, 2048, 2048]
+    assert client.commands == ["ABORT"]
+    assert sum("Returning to listening" in line for line in transcript.lines) == 2
+    assert any("Test failed: payload mismatch" in line for line in transcript.lines)
+    assert any("Test passed." in line for line in transcript.lines)
 
 
 def test_the_sweep_is_one_flag_on_both_roles():
@@ -87,7 +165,7 @@ def test_the_sweep_is_one_flag_on_both_roles():
     assert build_parser().parse_args([]).sweep is False
 
 
-@pytest.mark.parametrize("extra", [["--cmd-port", "8300"], ["--size", "1024"],
+@pytest.mark.parametrize("extra", [["--cmd-port", "8300"],
                                    ["--chat"], ["STA2", "STA3"]])
 def test_no_other_flags_are_accepted(extra):
     """The small surface is the feature; keep new knobs out by test."""
@@ -511,7 +589,7 @@ def test_ctrl_c_during_the_exercise_stops_the_station_and_reports(tmp_path, monk
     station, client = _stubbed_run(monkeypatch, tmp_path, blocked)
 
     _interrupt_main_after()
-    assert main(["--config", str(_config(tmp_path))]) == 1
+    assert main(["--config", str(_config(tmp_path))]) == 0
 
     assert not station.process.alive, "the modem process was left running"
     assert len(station.process.signals) == 1, "the modem was not asked to stop"
@@ -524,17 +602,25 @@ def test_ctrl_c_during_the_exercise_stops_the_station_and_reports(tmp_path, monk
     assert "Stopping..." in out
     reports = list(tmp_path.glob(f"whale-report-{CALL}-*.txt"))
     assert len(reports) == 1
-    assert "FAIL: stopped by the operator" in reports[0].read_text(encoding="utf-8")
+    assert "Stopped by the operator; no longer listening" in reports[0].read_text(
+        encoding="utf-8")
 
 
 def test_a_pass_with_a_session_still_up_says_goodbye_before_stopping(tmp_path,
                                                                     monkeypatch):
     """The other half of the distinction: a passing run is allowed to key."""
-    def passed(client, mycall, peer, transcript, **kw):
+    selected_sizes = []
+
+    def passed(client, mycall, peer, transcript, connect_timeout,
+               transfer_timeout, payload_size):
+        if selected_sizes:
+            raise KeyboardInterrupt
+        selected_sizes.append(payload_size)
         transcript.on_status(f"CONNECTED {CALL} STA2 0")
 
     station, client = _stubbed_run(monkeypatch, tmp_path, passed)
-    assert main(["--config", str(_config(tmp_path))]) == 0
+    assert main(["--config", str(_config(tmp_path)), "--size", "2048"]) == 0
+    assert selected_sizes == [2048]
     assert client.sent == ["DISCONNECT"]
     assert not station.process.alive
 

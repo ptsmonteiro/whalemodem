@@ -30,9 +30,9 @@ it measures, what a failing mode means and what it exits with -- are in
     whale-test --sweep CALLSIGN     sweep that station
 
 The exercise is exactly the acceptance scenario in ``acceptance_test.py``:
-connect, 100 KB one way, 100 KB back, disconnect, both payloads verified
-byte-for-byte. Its payload and its budgets are imported from there rather
-than restated, so the two drivers cannot drift apart.
+connect, send the requested payload one way and back, disconnect, and verify
+both payloads byte-for-byte. The default payload is 10 KiB; ``--size`` selects
+a different byte count.
 
 Ctrl-C stops the run at any point: at the confirmation prompt nothing has
 been transmitted and nothing is written, and once the station is up it ends
@@ -65,8 +65,8 @@ from datetime import datetime, timezone
 from pathlib import Path
 
 from acceptance_test import (CONNECT_TIMEOUT, PAYLOAD_TAG_AB, PAYLOAD_TAG_BA,
-                             TRANSFER_TIMEOUT, StationClient, _transfer_summary,
-                             payload)
+                             StationClient, _transfer_summary, payload,
+                             transfer_timeout as payload_transfer_timeout)
 from whale import policy, sweep
 from whale.config import app_config, get_radio
 from whale.hw import audio_io
@@ -109,6 +109,17 @@ COMPLAINT_LINES = 3
 #: enough to cost nothing over a multi-minute transfer.
 INTERRUPT_POLL = 0.2
 
+#: Application bytes sent in each direction unless ``--size`` overrides it.
+DEFAULT_PAYLOAD_SIZE = 10 * 1024
+
+
+def _payload_size(value: str) -> int:
+    size = int(value)
+    if size < 0:
+        raise argparse.ArgumentTypeError("payload size must not be negative")
+    return size
+
+
 HARDWARE_DOC = "docs/HARDWARE.md"
 
 
@@ -147,7 +158,7 @@ class Transcript:
     Every step is printed as it happens and kept for the report file, which
     has to stand alone once it is mailed to someone who did not watch the
     run. Modem events are summarised rather than transcribed: a 100 KB
-    transfer keys hundreds of times, and a report full of PTT lines is
+    transfer can key hundreds of times, and a report full of PTT lines is
     harder to read than a count of them.
     """
 
@@ -636,16 +647,24 @@ def _receive(client, transcript: Transcript, expected: bytes, timeout: float) ->
 
 def run_exercise(client, mycall: str, peer: str | None, transcript: Transcript,
                  connect_timeout: float = CONNECT_TIMEOUT,
-                 transfer_timeout: float = TRANSFER_TIMEOUT) -> None:
+                 transfer_timeout: float | None = None,
+                 payload_size: int = DEFAULT_PAYLOAD_SIZE) -> None:
     """Drive one side of the acceptance scenario over an open client.
 
     ``peer`` names the station to call; ``None`` waits to be called. The
     caller is the acceptance test's station A and sends first.
     """
+    if transfer_timeout is None:
+        transfer_timeout = payload_transfer_timeout(payload_size)
+    outbound = payload(PAYLOAD_TAG_AB, payload_size)
+    returning = payload(PAYLOAD_TAG_BA, payload_size)
+
     client.send_cmd(f"MYCALL {mycall}")
     if peer is None:
+        size_option = (f" --size {payload_size}"
+                       if payload_size != DEFAULT_PAYLOAD_SIZE else "")
         transcript.step(f"Listening as {mycall}. Ask the other station to run: "
-                        f"whale-test {mycall}")
+                        f"whale-test{size_option} {mycall}")
         client.send_cmd("LISTEN ON")
     else:
         transcript.step(f"Calling {peer} as {mycall}...")
@@ -654,8 +673,8 @@ def run_exercise(client, mycall: str, peer: str | None, transcript: Transcript,
     client.open_data()
 
     if peer is None:
-        _receive(client, transcript, payload(PAYLOAD_TAG_AB), transfer_timeout)
-        _send(client, transcript, payload(PAYLOAD_TAG_BA))
+        _receive(client, transcript, outbound, transfer_timeout)
+        _send(client, transcript, returning)
         # _send only hands the bytes to the data socket; the transmission
         # itself is still ahead of us, and the caller will not send its
         # DISCONNECT until the whole payload has arrived. So the answering side
@@ -663,8 +682,8 @@ def run_exercise(client, mycall: str, peer: str | None, transcript: Transcript,
         # budget for the disconnect alone and expired mid-transmission.
         disconnect_timeout = transfer_timeout + DISCONNECT_TIMEOUT
     else:
-        _send(client, transcript, payload(PAYLOAD_TAG_AB))
-        _receive(client, transcript, payload(PAYLOAD_TAG_BA), transfer_timeout)
+        _send(client, transcript, outbound)
+        _receive(client, transcript, returning, transfer_timeout)
         transcript.step("Disconnecting.")
         client.send_cmd("DISCONNECT")
         # The calling side has already seen the transfer land and is waiting
@@ -672,6 +691,42 @@ def run_exercise(client, mycall: str, peer: str | None, transcript: Transcript,
         disconnect_timeout = DISCONNECT_TIMEOUT
     client.wait_for("DISCONNECTED", disconnect_timeout)
     transcript.step("Disconnected.")
+
+
+def _close_data(client) -> None:
+    """Close one session's data socket before accepting the next one."""
+    data, client.data = client.data, None
+    if data is not None:
+        try:
+            data.shutdown(socket.SHUT_RDWR)
+        except OSError:
+            pass
+        data.close()
+
+
+def run_listener(client, mycall: str, transcript: Transcript,
+                 connect_timeout: float = CONNECT_TIMEOUT,
+                 payload_size: int = DEFAULT_PAYLOAD_SIZE) -> None:
+    """Answer test sessions until the operator stops the command.
+
+    A failed transfer may leave its link connected. Abort that session before
+    returning to LISTEN so late bytes cannot leak into the next test.
+    """
+    while True:
+        try:
+            run_exercise(client, mycall, None, transcript, connect_timeout,
+                         None, payload_size)
+        except (TestFailure, TimeoutError) as exc:
+            transcript.step(f"Test failed: {exc}")
+            if transcript.connected:
+                transcript.step("Aborting the failed session.")
+                client.send_cmd("ABORT")
+                client.wait_for("DISCONNECTED", DISCONNECT_TIMEOUT)
+        else:
+            transcript.step("Test passed.")
+        finally:
+            _close_data(client)
+        transcript.step("Returning to listening.")
 
 
 # -- the report ------------------------------------------------------------
@@ -853,6 +908,9 @@ def build_parser() -> argparse.ArgumentParser:
                          "session; both stations need it")
     ap.add_argument("--channel", default="fm", choices=sorted(policy.CHANNELS),
                     help="which channel this station is on (default: fm)")
+    ap.add_argument("--size", type=_payload_size, default=DEFAULT_PAYLOAD_SIZE,
+                    metavar="BYTES",
+                    help="payload bytes to send each way (default: 10240)")
     ap.add_argument("--config", help="application configuration TOML (or set WHALE_CONFIG)")
     ap.add_argument("-v", "--verbose", action="store_true")
     return ap
@@ -907,7 +965,12 @@ def main(argv=None) -> int:
         client = connect_station(station, transcript, setup.mycall)
         print("Press Ctrl-C to stop the test; again to stop it without "
               "saying goodbye.", flush=True)
-        run_interruptibly(run_exercise, client, setup.mycall, peer, transcript)
+        if peer is None:
+            run_interruptibly(run_listener, client, setup.mycall, transcript,
+                              CONNECT_TIMEOUT, args.size)
+        else:
+            run_interruptibly(run_exercise, client, setup.mycall, peer, transcript,
+                              CONNECT_TIMEOUT, None, args.size)
     except TestFailure as exc:
         outcome = f"FAIL: {exc}"
     except TimeoutError as exc:
@@ -918,7 +981,10 @@ def main(argv=None) -> int:
         # Printed rather than stepped, because the teardown below can take a
         # few seconds and the operator has just asked for it to be over.
         print("\nStopping...", flush=True)
-        outcome = "FAIL: stopped by the operator"
+        if peer is None:
+            outcome, status = "Stopped by the operator; no longer listening", 0
+        else:
+            outcome = "FAIL: stopped by the operator"
         interrupted = True
     else:
         outcome, status = "PASS", 0

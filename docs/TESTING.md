@@ -98,8 +98,10 @@ python acceptance_test.py \
 
 `whale-test` runs the same scenario between two configured stations with no
 server to start and no ports to choose: the answering station runs
-`whale-test`, the calling station runs `whale-test CALLSIGN`. It takes
-`--channel` and `--config` and nothing else. It starts `whale-server` itself,
+`whale-test`, the calling station runs `whale-test CALLSIGN`. By default it
+sends 10 KiB in each direction; pass the same `--size BYTES` on both stations
+to test another payload size. It also takes `--channel` and `--config`. It
+starts `whale-server` itself,
 as a separate process on loopback ports it picks, and drives it over TCP as
 any client application would; the report's keying, SNR and mode counts are
 the status lines that modem sent on its command port. Before transmitting --
@@ -113,6 +115,8 @@ point: it ends a session still up with a parting DISC, closes the client and
 asks the modem process to stop, which unkeys the radio, and still writes the
 report for the part that ran. A second Ctrl-C, or a goodbye unanswered within
 the grace period, skips the DISC and takes the radio down immediately.
+The answering command returns to listening after every successful or failed
+test and stays available for another caller until Ctrl-C stops it.
 
 `whale-test --sweep` measures the same path one waveform mode at a time
 instead of running a session: the listening station runs `whale-test
