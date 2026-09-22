@@ -11,11 +11,10 @@ from __future__ import annotations
 
 from dataclasses import dataclass, field
 
-import numpy as np
-
 from whale.phy import ofdm49 as hf6
 
 from .. import framing, waveform
+from .ofdm49_mode import Ofdm49Codec, Ofdm49Mode
 
 
 HF6_MODE_ID = 13
@@ -44,70 +43,17 @@ HF6_PHY = hf6.OFDM49Mode(
 CHUNK_SIZE = HF6_PHY.max_payload_bytes - framing.AIR_HEADER_BYTES
 CONFIDENCE_THRESHOLD = 0.12
 
-
-class Hf6Codec:
-    tx_sample_rate = hf6.TX_SAMPLE_RATE
-    rx_sample_rate = hf6.RX_SAMPLE_RATE
-
-    def encode(self, payload: bytes, mode: "Hf6Mode") -> np.ndarray:
-        if len(payload) > HF6_PHY.max_payload_bytes:
-            raise ValueError(
-                f"packet is {len(payload)} bytes; {mode.name} carries at most "
-                f"{HF6_PHY.max_payload_bytes}")
-        return HF6_PHY.modulate(bytes(payload))
-
-    def decode(self, audio, mode: "Hf6Mode", **kwargs) -> dict:
-        del mode
-        if np.asarray(audio).ndim != 1:
-            return {"synced": False, "payload": None}
-        return HF6_PHY.demodulate(audio, **kwargs)
-
-    def airtime(self, payload_len: int, mode: "Hf6Mode") -> float:
-        del payload_len, mode
-        # Air time is the whole keying: settling head plus frame.
-        return HF6_PHY.keying_seconds()
-
-
-HF6_CODEC = Hf6Codec()
+HF6_CODEC = Ofdm49Codec(HF6_PHY)
 
 
 @dataclass(frozen=True)
-class Hf6Mode(waveform.ModeDescription):
+class Hf6Mode(Ofdm49Mode):
     name: str = "hf6"
     mode_id: int = HF6_MODE_ID
     chunk_size: int = CHUNK_SIZE
     confidence_threshold: float = CONFIDENCE_THRESHOLD
     fec_rate: str | None = FEC_RATE
-    supports_frequency_hint: bool = field(default=True, init=False, repr=False)
-    codec: Hf6Codec = field(default=HF6_CODEC, compare=False, repr=False)
-
-    @property
-    def tx_sample_rate(self) -> int:
-        return self.codec.tx_sample_rate
-
-    @property
-    def rx_sample_rate(self) -> int:
-        return self.codec.rx_sample_rate
-
-    @property
-    def baud(self) -> float:
-        return hf6.DESIGN_RATE / HF6_PHY.symbol_len
-
-    def encode(self, payload: bytes):
-        return self.codec.encode(payload, self)
-
-    def decode(self, audio, **kwargs):
-        # Additive canonical snr_db/freq_offset_hz alias; the mode's
-        # own spelling (tone_snr_db/carrier_snr_db/cfo_hz/...) is kept.
-        return waveform.canonicalize_result(self.codec.decode(audio, self, **kwargs))
-
-    def airtime(self, payload_len: int) -> float:
-        return self.codec.airtime(payload_len, self)
-
-    @property
-    def band_hz(self) -> tuple[float, float]:
-        """Lowest to highest carrier/tone centre, in Hz."""
-        return HF6_PHY.band_hz
+    codec: Ofdm49Codec = field(default=HF6_CODEC, compare=False, repr=False)
 
     modulation = "49-carrier 64-QAM OFDM"
     fec = "none"

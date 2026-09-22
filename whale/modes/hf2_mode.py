@@ -69,7 +69,7 @@ HF2_CODEC = Hf2Codec()
 
 
 @dataclass(frozen=True)
-class Hf2Mode(waveform.ModeDescription):
+class Hf2Mode(waveform.CodecMode):
     """One negotiable HF2 setting, shaped like `hc1w_mode.Hc1wMode`."""
 
     name: str = "hf2"
@@ -79,28 +79,9 @@ class Hf2Mode(waveform.ModeDescription):
     codec: Hf2Codec = field(default=HF2_CODEC, compare=False, repr=False)
 
     @property
-    def tx_sample_rate(self) -> int:
-        return self.codec.tx_sample_rate
-
-    @property
-    def rx_sample_rate(self) -> int:
-        return self.codec.rx_sample_rate
-
-    @property
     def baud(self) -> float:
         """HF2's OFDM symbol rate."""
         return hf2.SAMPLE_RATE / hf2.SYMBOL_SAMPLES
-
-    def encode(self, payload: bytes):
-        return self.codec.encode(payload, self)
-
-    def decode(self, audio, **kwargs):
-        # Additive canonical snr_db/freq_offset_hz alias; the mode's
-        # own spelling (tone_snr_db/carrier_snr_db/cfo_hz/...) is kept.
-        return waveform.canonicalize_result(self.codec.decode(audio, self, **kwargs))
-
-    def airtime(self, payload_len: int) -> float:
-        return self.codec.airtime(payload_len, self)
 
     @property
     def band_hz(self) -> tuple[float, float]:

@@ -45,7 +45,7 @@ HF5_CODEC = Hf5Codec()
 
 
 @dataclass(frozen=True)
-class Hf5Mode(waveform.ModeDescription):
+class Hf5Mode(waveform.CodecMode):
     name: str = "hf5"
     mode_id: int = HF5_MODE_ID
     chunk_size: int = CHUNK_SIZE
@@ -54,27 +54,8 @@ class Hf5Mode(waveform.ModeDescription):
     codec: Hf5Codec = field(default=HF5_CODEC, compare=False, repr=False)
 
     @property
-    def tx_sample_rate(self) -> int:
-        return self.codec.tx_sample_rate
-
-    @property
-    def rx_sample_rate(self) -> int:
-        return self.codec.rx_sample_rate
-
-    @property
     def baud(self) -> float:
         return hf5.BAUD
-
-    def encode(self, payload: bytes):
-        return self.codec.encode(payload, self)
-
-    def decode(self, audio, **kwargs):
-        # Additive canonical snr_db/freq_offset_hz alias; the mode's
-        # own spelling (tone_snr_db/carrier_snr_db/cfo_hz/...) is kept.
-        return waveform.canonicalize_result(self.codec.decode(audio, self, **kwargs))
-
-    def airtime(self, payload_len: int) -> float:
-        return self.codec.airtime(payload_len, self)
 
     @property
     def band_hz(self) -> tuple[float, float]:

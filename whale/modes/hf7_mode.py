@@ -44,11 +44,10 @@ from __future__ import annotations
 
 from dataclasses import dataclass, field
 
-import numpy as np
-
 from whale.phy import ofdm49 as hf7
 
 from .. import framing, waveform
+from .ofdm49_mode import Ofdm49Codec, Ofdm49Mode
 
 
 HF7_MODE_ID = 14
@@ -111,84 +110,24 @@ HF7_PHY = hf7.OFDM49Mode(
 CHUNK_SIZE = HF7_PHY.max_payload_bytes - framing.AIR_HEADER_BYTES
 CONFIDENCE_THRESHOLD = 0.12
 
-
-class Hf7Codec:
-    streaming_phy = HF7_PHY
-    tx_sample_rate = hf7.TX_SAMPLE_RATE
-    rx_sample_rate = hf7.RX_SAMPLE_RATE
-
-    def encode(self, payload: bytes, mode: "Hf7Mode") -> np.ndarray:
-        if len(payload) > HF7_PHY.max_payload_bytes:
-            raise ValueError(
-                f"packet is {len(payload)} bytes; {mode.name} carries at most "
-                f"{HF7_PHY.max_payload_bytes}")
-        del mode
-        audio = HF7_PHY.modulate(bytes(payload))
-        target = int(round(5.0 * self.tx_sample_rate))
-        return np.pad(audio, (0, max(0, target - len(audio))))
-
-    def decode(self, audio, mode: "Hf7Mode", **kwargs) -> dict:
-        del mode
-        if np.asarray(audio).ndim != 1:
-            return {"synced": False, "payload": None}
-        # The soft-decision path needs the "repeat" noise estimator: the legacy
-        # estimator fits the preamble against a gain derived from that same
-        # preamble, so its residual is biased low and the LLRs handed to the
-        # LDPC decoder are mis-scaled. Raw BER is identical either way.
-        kwargs.setdefault("noise_estimator", NOISE_ESTIMATOR)
-        kwargs.setdefault("refine_iterations", REFINE_ITERATIONS)
-        return HF7_PHY.demodulate(np.asarray(audio), **kwargs)
-
-    def airtime(self, payload_len: int, mode: "Hf7Mode") -> float:
-        del payload_len, mode
-        # Air time is the whole keying: settling head plus frame.
-        return max(5.0, HF7_PHY.keying_seconds())
-
-
-HF7_CODEC = Hf7Codec()
+# The soft-decision path needs the "repeat" noise estimator: the legacy
+# estimator fits the preamble against a gain derived from that same
+# preamble, so its residual is biased low and the LLRs handed to the LDPC
+# decoder are mis-scaled. Raw BER is identical either way.
+HF7_CODEC = Ofdm49Codec(
+    HF7_PHY, streaming=True, pad_seconds=5.0,
+    decode_kwargs={"noise_estimator": NOISE_ESTIMATOR,
+                   "refine_iterations": REFINE_ITERATIONS})
 
 
 @dataclass(frozen=True)
-class Hf7Mode(waveform.ModeDescription):
+class Hf7Mode(Ofdm49Mode):
     name: str = "hf7"
     mode_id: int = HF7_MODE_ID
     chunk_size: int = CHUNK_SIZE
     confidence_threshold: float = CONFIDENCE_THRESHOLD
     fec_rate: str | None = FEC_RATE
-    supports_frequency_hint: bool = field(default=True, init=False, repr=False)
-    codec: Hf7Codec = field(default=HF7_CODEC, compare=False, repr=False)
-
-    @property
-    def tx_sample_rate(self) -> int:
-        return self.codec.tx_sample_rate
-
-    @property
-    def rx_sample_rate(self) -> int:
-        return self.codec.rx_sample_rate
-
-    @property
-    def streaming_phy(self):
-        return self.codec.streaming_phy
-
-    @property
-    def baud(self) -> float:
-        return hf7.DESIGN_RATE / HF7_PHY.symbol_len
-
-    def encode(self, payload: bytes):
-        return self.codec.encode(payload, self)
-
-    def decode(self, audio, **kwargs):
-        # Additive canonical snr_db/freq_offset_hz alias; the mode's
-        # own spelling (tone_snr_db/carrier_snr_db/cfo_hz/...) is kept.
-        return waveform.canonicalize_result(self.codec.decode(audio, self, **kwargs))
-
-    def airtime(self, payload_len: int) -> float:
-        return self.codec.airtime(payload_len, self)
-
-    @property
-    def band_hz(self) -> tuple[float, float]:
-        """Lowest to highest carrier/tone centre, in Hz."""
-        return HF7_PHY.band_hz
+    codec: Ofdm49Codec = field(default=HF7_CODEC, compare=False, repr=False)
 
     modulation = "49-carrier 32-QAM OFDM"
     fec = "QC-LDPC 3/4"

@@ -4,11 +4,10 @@ from __future__ import annotations
 
 from dataclasses import dataclass, field
 
-import numpy as np
-
 from whale.phy import ofdm49
 
 from .. import framing, waveform
+from .ofdm49_mode import Ofdm49Codec, Ofdm49Mode
 
 
 #: On-air identifier; mode IDs identify one immutable waveform globally.
@@ -45,76 +44,19 @@ HF9_PHY = ofdm49.OFDM49Mode(
 CHUNK_SIZE = HF9_PHY.max_payload_bytes - framing.AIR_HEADER_BYTES
 CONFIDENCE_THRESHOLD = 0.12
 
-
-class Hf9Codec:
-    streaming_phy = HF9_PHY
-    tx_sample_rate = ofdm49.TX_SAMPLE_RATE
-    rx_sample_rate = ofdm49.RX_SAMPLE_RATE
-
-    def encode(self, payload: bytes, mode: "Hf9Mode") -> np.ndarray:
-        if len(payload) > HF9_PHY.max_payload_bytes:
-            raise ValueError(
-                f"packet is {len(payload)} bytes; {mode.name} carries at most "
-                f"{HF9_PHY.max_payload_bytes}")
-        return HF9_PHY.modulate(bytes(payload))
-
-    def decode(self, audio, mode: "Hf9Mode", **kwargs) -> dict:
-        del mode
-        if np.asarray(audio).ndim != 1:
-            return {"synced": False, "payload": None}
-        kwargs.setdefault("noise_estimator", NOISE_ESTIMATOR)
-        return HF9_PHY.demodulate(audio, **kwargs)
-
-    def airtime(self, payload_len: int, mode: "Hf9Mode") -> float:
-        del payload_len, mode
-        # Air time is the whole keying: settling head plus frame.
-        return HF9_PHY.keying_seconds()
-
-
-HF9_CODEC = Hf9Codec()
+HF9_CODEC = Ofdm49Codec(
+    HF9_PHY, streaming=True,
+    decode_kwargs={"noise_estimator": NOISE_ESTIMATOR})
 
 
 @dataclass(frozen=True)
-class Hf9Mode(waveform.ModeDescription):
+class Hf9Mode(Ofdm49Mode):
     name: str = "hf9"
     mode_id: int = HF9_MODE_ID
     chunk_size: int = CHUNK_SIZE
     confidence_threshold: float = CONFIDENCE_THRESHOLD
     fec_rate: str | None = FEC_RATE
-    supports_frequency_hint: bool = field(default=True, init=False, repr=False)
-    codec: Hf9Codec = field(default=HF9_CODEC, compare=False, repr=False)
-
-    @property
-    def tx_sample_rate(self) -> int:
-        return self.codec.tx_sample_rate
-
-    @property
-    def rx_sample_rate(self) -> int:
-        return self.codec.rx_sample_rate
-
-    @property
-    def streaming_phy(self):
-        return self.codec.streaming_phy
-
-    @property
-    def baud(self) -> float:
-        return ofdm49.DESIGN_RATE / HF9_PHY.symbol_len
-
-    def encode(self, payload: bytes):
-        return self.codec.encode(payload, self)
-
-    def decode(self, audio, **kwargs):
-        # Additive canonical snr_db/freq_offset_hz alias; the mode's
-        # own spelling (tone_snr_db/carrier_snr_db/cfo_hz/...) is kept.
-        return waveform.canonicalize_result(self.codec.decode(audio, self, **kwargs))
-
-    def airtime(self, payload_len: int) -> float:
-        return self.codec.airtime(payload_len, self)
-
-    @property
-    def band_hz(self) -> tuple[float, float]:
-        """Lowest to highest carrier/tone centre, in Hz."""
-        return HF9_PHY.band_hz
+    codec: Ofdm49Codec = field(default=HF9_CODEC, compare=False, repr=False)
 
     modulation = "49-carrier QPSK OFDM"
     fec = "QC-LDPC 1/2"

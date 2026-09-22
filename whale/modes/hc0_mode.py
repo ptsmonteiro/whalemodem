@@ -53,7 +53,7 @@ HC0_CODEC = Hc0Codec()
 
 
 @dataclass(frozen=True)
-class Hc0Mode(waveform.ModeDescription):
+class Hc0Mode(waveform.CodecMode):
     """One negotiable HC0 setting, shaped to the `WaveformMode` contract."""
 
     name: str = "hc0"
@@ -63,28 +63,9 @@ class Hc0Mode(waveform.ModeDescription):
     codec: Hc0Codec = field(default=HC0_CODEC, compare=False, repr=False)
 
     @property
-    def tx_sample_rate(self) -> int:
-        return self.codec.tx_sample_rate
-
-    @property
-    def rx_sample_rate(self) -> int:
-        return self.codec.rx_sample_rate
-
-    @property
     def baud(self) -> float:
         """HC0's symbol rate, 93.75 baud -- also its tone spacing."""
         return hc0.BANK.symbol_rate
-
-    def encode(self, payload: bytes):
-        return self.codec.encode(payload, self)
-
-    def decode(self, audio, **kwargs):
-        # Additive canonical snr_db/freq_offset_hz alias; the mode's
-        # own spelling (tone_snr_db/carrier_snr_db/cfo_hz/...) is kept.
-        return waveform.canonicalize_result(self.codec.decode(audio, self, **kwargs))
-
-    def airtime(self, payload_len: int) -> float:
-        return self.codec.airtime(payload_len, self)
 
     @property
     def band_hz(self) -> tuple[float, float]:

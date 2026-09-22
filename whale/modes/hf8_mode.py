@@ -93,11 +93,10 @@ from __future__ import annotations
 
 from dataclasses import dataclass, field
 
-import numpy as np
-
 from whale.phy import ofdm49 as hf8
 
 from .. import framing, waveform
+from .ofdm49_mode import Ofdm49Codec, Ofdm49Mode
 
 
 HF8_MODE_ID = 15
@@ -163,82 +162,24 @@ HF8_PHY = hf8.OFDM49Mode(
 CHUNK_SIZE = HF8_PHY.max_payload_bytes - framing.AIR_HEADER_BYTES
 CONFIDENCE_THRESHOLD = 0.12
 
-
-class Hf8Codec:
-    streaming_phy = HF8_PHY
-    tx_sample_rate = hf8.TX_SAMPLE_RATE
-    rx_sample_rate = hf8.RX_SAMPLE_RATE
-
-    def encode(self, payload: bytes, mode: "Hf8Mode") -> np.ndarray:
-        if len(payload) > HF8_PHY.max_payload_bytes:
-            raise ValueError(
-                f"packet is {len(payload)} bytes; {mode.name} carries at most "
-                f"{HF8_PHY.max_payload_bytes}")
-        del mode
-        return HF8_PHY.modulate(bytes(payload))
-
-    def decode(self, audio, mode: "Hf8Mode", **kwargs) -> dict:
-        del mode
-        if np.asarray(audio).ndim != 1:
-            return {"synced": False, "payload": None}
-        # The soft-decision path needs the "repeat" noise estimator, for the
-        # reason HF7 records: the legacy estimator fits the preamble against a
-        # gain derived from that same preamble, so its residual is biased low
-        # and the LLRs handed to the LDPC decoder are mis-scaled.
-        kwargs.setdefault("noise_estimator", NOISE_ESTIMATOR)
-        kwargs.setdefault("refine_iterations", REFINE_ITERATIONS)
-        return HF8_PHY.demodulate(np.asarray(audio), **kwargs)
-
-    def airtime(self, payload_len: int, mode: "Hf8Mode") -> float:
-        del payload_len, mode
-        # Air time is the whole keying: settling head plus frame.
-        return HF8_PHY.keying_seconds()
-
-
-HF8_CODEC = Hf8Codec()
+# The soft-decision path needs the "repeat" noise estimator, for the reason
+# HF7 records: the legacy estimator fits the preamble against a gain derived
+# from that same preamble, so its residual is biased low and the LLRs handed
+# to the LDPC decoder are mis-scaled.
+HF8_CODEC = Ofdm49Codec(
+    HF8_PHY, streaming=True,
+    decode_kwargs={"noise_estimator": NOISE_ESTIMATOR,
+                   "refine_iterations": REFINE_ITERATIONS})
 
 
 @dataclass(frozen=True)
-class Hf8Mode(waveform.ModeDescription):
+class Hf8Mode(Ofdm49Mode):
     name: str = "hf8"
     mode_id: int = HF8_MODE_ID
     chunk_size: int = CHUNK_SIZE
     confidence_threshold: float = CONFIDENCE_THRESHOLD
     fec_rate: str | None = FEC_RATE
-    supports_frequency_hint: bool = field(default=True, init=False, repr=False)
-    codec: Hf8Codec = field(default=HF8_CODEC, compare=False, repr=False)
-
-    @property
-    def tx_sample_rate(self) -> int:
-        return self.codec.tx_sample_rate
-
-    @property
-    def rx_sample_rate(self) -> int:
-        return self.codec.rx_sample_rate
-
-    @property
-    def streaming_phy(self):
-        return self.codec.streaming_phy
-
-    @property
-    def baud(self) -> float:
-        return hf8.DESIGN_RATE / HF8_PHY.symbol_len
-
-    def encode(self, payload: bytes):
-        return self.codec.encode(payload, self)
-
-    def decode(self, audio, **kwargs):
-        # Additive canonical snr_db/freq_offset_hz alias; the mode's
-        # own spelling (tone_snr_db/carrier_snr_db/cfo_hz/...) is kept.
-        return waveform.canonicalize_result(self.codec.decode(audio, self, **kwargs))
-
-    def airtime(self, payload_len: int) -> float:
-        return self.codec.airtime(payload_len, self)
-
-    @property
-    def band_hz(self) -> tuple[float, float]:
-        """Lowest to highest carrier/tone centre, in Hz."""
-        return HF8_PHY.band_hz
+    codec: Ofdm49Codec = field(default=HF8_CODEC, compare=False, repr=False)
 
     modulation = "49-carrier 8PSK OFDM"
     fec = "QC-LDPC 2/3"

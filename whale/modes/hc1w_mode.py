@@ -54,7 +54,7 @@ HC1W_CODEC = Hc1wCodec()
 
 
 @dataclass(frozen=True)
-class Hc1wMode(waveform.ModeDescription):
+class Hc1wMode(waveform.CodecMode):
     """The default wideband HF differential-QPSK mode."""
 
     name: str = "hc1w"
@@ -64,28 +64,9 @@ class Hc1wMode(waveform.ModeDescription):
     codec: Hc1wCodec = field(default=HC1W_CODEC, compare=False, repr=False)
 
     @property
-    def tx_sample_rate(self) -> int:
-        return self.codec.tx_sample_rate
-
-    @property
-    def rx_sample_rate(self) -> int:
-        return self.codec.rx_sample_rate
-
-    @property
     def baud(self) -> float:
         """HC1W's OFDM symbol rate, 75 symbol/s."""
         return hc1w.SAMPLE_RATE / hc1w.SYMBOL_SAMPLES
-
-    def encode(self, payload: bytes):
-        return self.codec.encode(payload, self)
-
-    def decode(self, audio, **kwargs):
-        # Additive canonical snr_db/freq_offset_hz alias; the mode's
-        # own spelling (tone_snr_db/carrier_snr_db/cfo_hz/...) is kept.
-        return waveform.canonicalize_result(self.codec.decode(audio, self, **kwargs))
-
-    def airtime(self, payload_len: int) -> float:
-        return self.codec.airtime(payload_len, self)
 
     @property
     def band_hz(self) -> tuple[float, float]:

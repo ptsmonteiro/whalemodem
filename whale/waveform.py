@@ -230,6 +230,39 @@ class ModeDescription:
         return format_mode(self)
 
 
+class CodecMode(ModeDescription):
+    """Mixin giving a mode `encode`/`decode`/`airtime`/sample rates via `self.codec`.
+
+    The HF modes each compose a small codec object exposing
+    `encode(payload, mode)`, `decode(audio, mode, **kwargs)`,
+    `airtime(payload_len, mode)`, and the `tx_sample_rate`/`rx_sample_rate`
+    its PHY runs at. This mixin performs that delegation once -- passing the
+    mode itself into each codec call so the codec can read the mode's own
+    fields (`name`, for an oversize-payload error), and wrapping `decode`'s
+    result in `canonicalize_result` -- so a mode module need only build its
+    codec and declare the facts that make it that mode.
+    """
+
+    @property
+    def tx_sample_rate(self) -> int:
+        return self.codec.tx_sample_rate
+
+    @property
+    def rx_sample_rate(self) -> int:
+        return self.codec.rx_sample_rate
+
+    def encode(self, payload: bytes) -> np.ndarray:
+        return self.codec.encode(payload, self)
+
+    def decode(self, audio, **kwargs) -> dict:
+        # Additive canonical snr_db/freq_offset_hz alias; the mode's own
+        # spelling (tone_snr_db/carrier_snr_db/cfo_hz/...) is kept.
+        return canonicalize_result(self.codec.decode(audio, self, **kwargs))
+
+    def airtime(self, payload_len: int) -> float:
+        return self.codec.airtime(payload_len, self)
+
+
 class _SettlingHeadVariant:
     """One mode wearing a settling head of a length it was not shipped with.
 
