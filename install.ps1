@@ -3,6 +3,9 @@ $ErrorActionPreference = 'Stop'
 $Repository = if ($env:WHALE_REPOSITORY) { $env:WHALE_REPOSITORY } else { 'ptsmonteiro/whalemodem' }
 $InstallRoot = if ($env:WHALE_INSTALL_ROOT) { $env:WHALE_INSTALL_ROOT } else { Join-Path $HOME '.local\share\whale' }
 $BinDir = if ($env:WHALE_BIN_DIR) { $env:WHALE_BIN_DIR } else { Join-Path $HOME '.local\bin' }
+$LocalData = if ($env:LOCALAPPDATA) { $env:LOCALAPPDATA } else { Join-Path $HOME 'AppData\Local' }
+$ConfigDir = Join-Path $LocalData 'Whale'
+$StateDir = $ConfigDir
 
 function Get-WhalePlatformTag {
     param([string]$OS,
@@ -38,7 +41,7 @@ $release = Invoke-RestMethod -Headers @{ Accept = 'application/vnd.github+json' 
 $version = [string]$release.tag_name
 if (!$version -or $version -notmatch '^[A-Za-z0-9._+-]+$') { throw "Invalid latest release tag: $version" }
 
-New-Item -ItemType Directory -Force -Path $InstallRoot, $BinDir | Out-Null
+New-Item -ItemType Directory -Force -Path $InstallRoot, $BinDir, $ConfigDir, $StateDir | Out-Null
 $temp = Join-Path ([IO.Path]::GetTempPath()) ("whale-install-" + [guid]::NewGuid())
 New-Item -ItemType Directory -Path $temp | Out-Null
 try {

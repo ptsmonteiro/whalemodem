@@ -71,3 +71,6 @@ experiments/**/hardware/**/.gitkeep
 !experiments/hf16_mfsk_lowsnr/hardware/**
 !experiments/hf16_mfsk_lowsnr/*_run1/*.npy
 .locks/
+
+# Per-install link learning, written beside the active config.
+*.mode-history.json

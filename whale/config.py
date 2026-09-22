@@ -12,9 +12,10 @@ except ModuleNotFoundError:  # pragma: no cover
     import tomli as tomllib
 
 from whale.hw.radios import Radio, _radio, _toml_key, _toml_string, _toml_value
+from whale.paths import CONFIG_NAME, config_path
 
 
-DEFAULT_CONFIG = "config.toml"
+DEFAULT_CONFIG = CONFIG_NAME
 DEFAULT_CMD_PORT = 8300
 DEFAULT_DATA_PORT = 8301
 
@@ -100,7 +101,7 @@ def load_config(path: str | os.PathLike[str]) -> Config:
 
 
 def app_config(path: str | os.PathLike[str] | None = None) -> Config:
-    return load_config(path or os.environ.get("WHALE_CONFIG") or DEFAULT_CONFIG)
+    return load_config(config_path(path))
 
 
 def get_radio(name: str | None, channel: str, path: str | os.PathLike[str] | None = None) -> Radio:
@@ -156,4 +157,6 @@ def save_config(path: str | os.PathLike[str], config: Config) -> None:
         for key, value in radio.ptt_config.items():
             lines.append(f"ptt.{_toml_key(key)} = {_toml_value(value)}")
         lines.append("")
-    Path(path).write_text("\n".join(lines).rstrip("\n") + "\n")
+    target = Path(path)
+    target.parent.mkdir(parents=True, exist_ok=True)
+    target.write_text("\n".join(lines).rstrip("\n") + "\n")

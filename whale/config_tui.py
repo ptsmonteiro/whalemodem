@@ -26,6 +26,7 @@ from typing import Any, Callable, Generic, Protocol, TypeVar
 
 from whale.config import (Config, DEFAULT_CMD_PORT, DEFAULT_CONFIG,
                           DEFAULT_DATA_PORT, load_config, save_config)
+from whale.paths import config_path
 from whale.hw.radios import Radio, RadioInventory, save_radios
 from whale.radio_config_form import FormRow, RadioForm
 
@@ -1268,7 +1269,7 @@ class RadioDetailView(RadioForm):
 # --- CLI entry point -----------------------------------------------------
 
 def _resolve_path(args: argparse.Namespace) -> str:
-    return args.config or os.environ.get("WHALE_CONFIG") or DEFAULT_CONFIG
+    return str(config_path(args.config))
 
 
 def main(argv: list[str] | None = None) -> int:
@@ -1276,8 +1277,7 @@ def main(argv: list[str] | None = None) -> int:
 
     parser = argparse.ArgumentParser(description=__doc__)
     add_version_argument(parser)
-    parser.add_argument("--config", help="application configuration TOML (or set WHALE_CONFIG); "
-                                         f"defaults to {DEFAULT_CONFIG!r} in the current directory")
+    parser.add_argument("--config", help="application configuration TOML (or set WHALE_CONFIG)")
     args = parser.parse_args(argv)
     path = _resolve_path(args)
 

@@ -63,12 +63,18 @@ add_path_to_profile() {
 
 main() {
     tag=$(platform_tag)
+    case "$tag" in
+        linux-*) config_dir=${XDG_CONFIG_HOME:-"$HOME/.config"}/whale
+                 state_dir=${XDG_STATE_HOME:-"$HOME/.local/state"}/whale ;;
+        macos-*) config_dir="$HOME/Library/Application Support/Whale"
+                 state_dir=$config_dir ;;
+    esac
     asset=$(asset_name "$tag")
     version=$(latest_version)
     [ -n "$version" ] || { echo "Could not determine the latest Whale release." >&2; exit 1; }
     case "$version" in *[!A-Za-z0-9._+-]*) echo "Invalid release tag: $version" >&2; exit 1;; esac
 
-    mkdir -p "$INSTALL_ROOT" "$BIN_DIR"
+    mkdir -p "$INSTALL_ROOT" "$BIN_DIR" "$config_dir" "$state_dir"
     tmp=$(mktemp -d "${TMPDIR:-/tmp}/whale-install.XXXXXX")
     trap 'rm -rf "$tmp"' EXIT HUP INT TERM
     curl -fL "$(release_url "$REPOSITORY" "$version" "$asset")" -o "$tmp/$asset"

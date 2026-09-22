@@ -110,8 +110,8 @@ def load_radios(path: str | os.PathLike[str]) -> RadioInventory:
 DEFAULT_RADIO_CONFIG = "config.toml"
 
 def radio_inventory(path: str | os.PathLike[str] | None = None) -> RadioInventory:
-    configured = path or os.environ.get("WHALE_CONFIG") or DEFAULT_RADIO_CONFIG
-    return load_radios(configured)
+    from whale.paths import config_path
+    return load_radios(config_path(path))
 
 def get_radio(name: str | None, path: str | os.PathLike[str] | None = None) -> Radio:
     """Look up ``name`` in the selected inventory; ``None`` resolves to its default radio."""

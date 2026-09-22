@@ -38,7 +38,16 @@ the named radio's `channels` doesn't include the selected `--channel`.
 The server's optional `--radio` value is the radio key (`station-a` above),
 not an audio-device name. Without it, `default_fm_radio` or
 `default_hf_radio` is selected according to `--channel`. `--config` and
-`WHALE_CONFIG` default to `config.toml` in the current directory.
+`WHALE_CONFIG` are followed by `config.toml` in the current directory when it
+exists, then the platform default: `$XDG_CONFIG_HOME/whale/config.toml` on
+Linux (normally `~/.config/whale/config.toml`),
+`~/Library/Application Support/Whale/config.toml` on macOS, or
+`%LOCALAPPDATA%\Whale\config.toml` on Windows.
+The learned fastest working mode is internal state: a local or explicitly
+selected configuration keeps its `config.toml.mode-history.json` sidecar,
+while the platform-default configuration keeps `mode-history.json` in
+`$XDG_STATE_HOME/whale` on Linux and beside the platform configuration on
+macOS and Windows. There is no separate mode-history option.
 The API ports default to 8300 and 8301 when omitted. Logging defaults to
 stderr; set `log_file` to write logs to a file. The corresponding command-line
 options remain one-run overrides.
@@ -51,8 +60,9 @@ whale-configure --config config.toml
 
 A curses terminal UI for the application configuration: edit the station
 callsign, optional SSID, API ports, and log file; choose FM and HF defaults;
-and add, edit, or delete radios. Point it at `--config PATH` or set `WHALE_CONFIG`; with
-neither, it defaults to `config.toml` in the current directory. Pointing it
+and add, edit, or delete radios. Point it at `--config PATH` or set
+`WHALE_CONFIG`; otherwise it edits an existing `config.toml` in the current
+directory, or the platform default described above. Pointing it
 at a path that doesn't exist yet starts from an empty configuration (nothing is written until you save); pointing it at an
 existing-but-malformed file exits with an error rather than overwriting it.
 

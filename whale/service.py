@@ -70,7 +70,8 @@ class ModemService:
 
     @classmethod
     def for_radio(cls, radio_name: str, mycall: str, radio_config=None,
-                  policy=None, mode_registry=None, **kwargs) -> "ModemService":
+                  policy=None, mode_registry=None, mode_history_store=None,
+                  **kwargs) -> "ModemService":
         """Production composition root for the current radio/link stack.
 
         ``policy`` is the :class:`whale.policy.ChannelPolicy` this station
@@ -82,7 +83,8 @@ class ModemService:
         from whale.transport import RadioTransport
 
         link = Link(RadioTransport(radio_name, radio_config), mycall,
-                    policy=policy or FM, mode_registry=mode_registry)
+                    policy=policy or FM, mode_registry=mode_registry,
+                    mode_history_store=mode_history_store)
         return cls(link, **kwargs)
 
     @property

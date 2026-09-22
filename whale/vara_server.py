@@ -67,8 +67,9 @@ import signal
 import socket
 import threading
 
-from whale import policy
+from whale import mode_history, policy
 from whale.config import app_config, get_radio
+from whale.paths import server_paths
 from whale.service import ModemService
 
 logger = logging.getLogger(__name__)
@@ -542,9 +543,10 @@ def main(argv=None):
                     help="run a live curses status dashboard instead of logging to stderr")
     ap.add_argument("--log-file", help="override the configured log file (default: stderr)")
     args = ap.parse_args(argv)
+    effective_config, history_path = server_paths(args.config)
     try:
-        config = app_config(args.config)
-        radio = get_radio(args.radio, args.channel, args.config)
+        config = app_config(effective_config)
+        radio = get_radio(args.radio, args.channel, effective_config)
     except (OSError, ValueError) as exc:
         ap.error(str(exc))
     radio_name = radio.id
@@ -567,12 +569,15 @@ def main(argv=None):
         from whale.mode_qualification import registry
         mode_registry = registry(args.channel, args.mode_level,
                                  channel.max_useful_frame_seconds)
+        history = mode_history.ModeHistory(
+            history_path, namespace=f"{radio_name}:{args.channel}")
         logger.info("channel: %s", channel.name)
         logger.info("mode qualification level: %s; IDs: %s",
                     args.mode_level, mode_registry.supported_ids)
         service = ModemService.for_radio(radio_name, mycall,
-                                         radio_config=args.config,
-                                         policy=channel, mode_registry=mode_registry)
+                                         radio_config=effective_config,
+                                         policy=channel, mode_registry=mode_registry,
+                                         mode_history_store=history)
         server = StationServer(service, mycall, cmd_port, data_port, args.host)
         stop_on_signals(server)
         try:
@@ -595,6 +600,8 @@ def main(argv=None):
     from whale.mode_qualification import registry
     mode_registry = registry(args.channel, args.mode_level,
                              channel.max_useful_frame_seconds)
+    history = mode_history.ModeHistory(
+        history_path, namespace=f"{radio_name}:{args.channel}")
 
     state = modem_tui.TuiState(mycall, radio_name, args.channel, mode_registry=mode_registry)
     handlers = [modem_tui.LogTap(state)]
@@ -610,8 +617,9 @@ def main(argv=None):
                 args.mode_level, mode_registry.supported_ids)
 
     service = ModemService.for_radio(radio_name, mycall,
-                                     radio_config=args.config,
-                                     policy=channel, mode_registry=mode_registry)
+                                     radio_config=effective_config,
+                                     policy=channel, mode_registry=mode_registry,
+                                     mode_history_store=history)
     server = StationServer(service, mycall, cmd_port, data_port, args.host)
     unsubscribe = service.subscribe(state.on_event)
     server_thread = threading.Thread(target=server.serve_forever, name="vara-server", daemon=True)

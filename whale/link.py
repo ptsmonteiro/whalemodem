@@ -1123,6 +1123,7 @@ class Link(_ReceiverMixin, _AdaptationMixin):
                         continue
                     logger.info("[%s] DATA seq=0x%02x acked after %d attempt(s) at %s",
                                 self.mycall, seq, attempt, self.tx_profile.name)
+                    self._remember_working_mode(self.tx_profile.mode_id)
                     return attempt
                 # The peer decoded this very frame and still did not advance
                 # past it, so the two ends disagree about where the sequence
@@ -1143,6 +1144,17 @@ class Link(_ReceiverMixin, _AdaptationMixin):
                                 self.tx_profile.chunk_size)
                     return _RESIZE
         return None
+
+    def _remember_working_mode(self, mode_id):
+        """Retain the fastest mode proved by a DATA ACK on this path."""
+        if self.peer_call is None:
+            return
+        remembered = mode_history.last_good_mode(
+            self.mode_history, self.mycall, self.peer_call)
+        order = list(self.modes.supported_ids)
+        if remembered not in order or order.index(mode_id) > order.index(remembered):
+            mode_history.record_good_mode(
+                self.mode_history, self.mycall, self.peer_call, mode_id)
 
     # -- mid-session speed adaptation ---------------------------------------
 
@@ -1252,8 +1264,6 @@ class Link(_ReceiverMixin, _AdaptationMixin):
         self._last_peer_frame_at = None
 
     def _handle_peer_disc(self):
-        if self.peer_call is not None:
-            mode_history.record_good_mode(self.mode_history, self.mycall, self.peer_call, self.tx_profile.mode_id)
         self.on_event("PTT", on=True)
         self._tx_packet(PT_DISC_ACK, b"")
         self.on_event("PTT", off=True)
@@ -1267,8 +1277,6 @@ class Link(_ReceiverMixin, _AdaptationMixin):
         if self.state != "CONNECTED":
             self.state = "IDLE"
             return True
-        if self.peer_call is not None:
-            mode_history.record_good_mode(self.mode_history, self.mycall, self.peer_call, self.tx_profile.mode_id)
         acknowledged = False
         for attempt in range(1, retries + 1):
             self.on_event("PTT", on=True)
