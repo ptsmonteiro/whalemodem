@@ -23,7 +23,7 @@
 import os
 import sys
 
-from PyInstaller.utils.hooks import copy_metadata
+from PyInstaller.utils.hooks import collect_submodules, copy_metadata
 
 # `SPEC` is injected into this file's globals by PyInstaller at spec-eval
 # time; it holds the path to this very .spec file.
@@ -70,10 +70,11 @@ if TAG.startswith("linux-"):
     )
     datas.append((portaudio_lib, "_vendor_portaudio"))
 
-# Deliberately empty: filled in from actual ModuleNotFoundErrors reported by
-# running the frozen build, not guessed upfront (recent PyInstaller ships
-# numpy/scipy hooks, so this list is expected to stay short).
-hiddenimports = []
+# mode_qualification discovers each module-level LADDER by walking
+# whale.modes at runtime.  That import is deliberately dynamic, so PyInstaller
+# cannot infer the mode modules from the import graph and must be told to
+# bundle the package explicitly.
+hiddenimports = collect_submodules("whale.modes")
 
 a_server = Analysis(
     [os.path.join(REPO_ROOT, "packaging", "pyinstaller", "entrypoint.py")],
