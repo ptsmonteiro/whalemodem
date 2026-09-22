@@ -522,12 +522,27 @@ def test_a_radio_that_will_not_open_ends_the_sweep(tmp_path, monkeypatch):
 
 # -- Ctrl-C ----------------------------------------------------------------
 
-def _interrupt_main_after(delay=0.1):
-    """Deliver a SIGINT to the main thread, exactly as Ctrl-C does."""
-    timer = threading.Timer(delay, _thread.interrupt_main)
-    timer.daemon = True
-    timer.start()
-    return timer
+def _interrupt_main_after(delay=0.1, ready=None):
+    """Deliver a SIGINT to the main thread, exactly as Ctrl-C does.
+
+    ``ready``, when given, is waited on before the interrupt is sent, instead
+    of trusting ``delay`` alone to outlast whatever setup runs before the
+    blocking call this targets. A fixed delay races that setup -- fine on an
+    idle machine, but a loaded one (a shared CI runner, say) can make the
+    setup lose, and the interrupt then lands wherever the main thread
+    happens to be once it is unprotected by any of this module's own
+    KeyboardInterrupt handling, escaping to pytest instead of the test.
+    ``delay`` still applies afterwards, as the wait a real Ctrl-C would be.
+    """
+    def fire():
+        if ready is not None:
+            ready.wait()
+        time.sleep(delay)
+        _thread.interrupt_main()
+
+    thread = threading.Thread(target=fire, daemon=True)
+    thread.start()
+    return thread
 
 
 def test_run_interruptibly_returns_when_the_work_finishes():
@@ -651,17 +666,23 @@ def test_ctrl_c_during_the_exercise_stops_the_station_and_reports(tmp_path, monk
     one more keying, bounded by the grace period -- so that the station
     left listening is not tied up waiting out its inactivity timeout.
     """
-    def blocked(client, mycall, peer, transcript, **kw):
+    ready = threading.Event()
+
+    def blocked(client, mycall, peer, transcript, *args, **kw):
         # Stands in for an exercise waiting on the air with a session up;
         # the interrupt arrives while it is blocked, the case that used to
         # hang -- and the session being up is what a parting DISC would be
-        # sent for.
+        # sent for. ``ready`` marks the point the interrupt must land at or
+        # after: everything before it (preflight, starting the stub station,
+        # connecting) is setup the interrupt must not pre-empt, or it lands
+        # outside main()'s own KeyboardInterrupt handling instead of inside it.
         transcript.on_status(f"CONNECTED {CALL} STA2 0")
+        ready.set()
         threading.Event().wait()
 
     station, client = _stubbed_run(monkeypatch, tmp_path, blocked)
 
-    _interrupt_main_after()
+    _interrupt_main_after(ready=ready)
     assert main(["--config", str(_config(tmp_path))]) == 0
 
     assert not station.process.alive, "the modem process was left running"
