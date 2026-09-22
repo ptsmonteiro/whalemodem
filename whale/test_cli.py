@@ -173,6 +173,7 @@ class Transcript:
     outbound_bytes: int | None = None
     inbound_bytes: int | None = None
     progress_reported: dict[str, int] = field(default_factory=dict)
+    receiving_announced: bool = False
 
     def step(self, text: str) -> None:
         print(text, flush=True)
@@ -210,6 +211,8 @@ class Transcript:
                 mode_id = int(mode_id)
                 key = (mode_id, direction)
                 self.modes[key] = self.modes.get(key, 0) + 1
+                if direction == "RX":
+                    self._announce_receive()
                 current = (mode_id, bitrate)
                 if self.active_modes.get(direction) != current:
                     self.active_modes[direction] = current
@@ -250,6 +253,8 @@ class Transcript:
     def _progress(self, direction: str, transferred: int, total: int, *,
                   force: bool = False) -> None:
         """Print useful increments while ignoring per-frame status noise."""
+        if direction == "RX":
+            self._announce_receive()
         transferred = min(transferred, total)
         previous = self.progress_reported.get(direction, 0)
         if transferred <= previous:
@@ -259,6 +264,12 @@ class Transcript:
             self.progress_reported[direction] = transferred
             verb = "sent" if direction == "TX" else "received"
             self.step(f"{transferred:,} of {total:,} bytes {verb}.")
+
+    def _announce_receive(self) -> None:
+        if self.inbound_bytes is not None and not self.receiving_announced:
+            self.receiving_announced = True
+            self.step(f"Return transfer started: receiving "
+                      f"{self.inbound_bytes:,} bytes.")
 
     def snr_summary(self) -> str:
         if not self.snr_db:
@@ -687,9 +698,9 @@ def _send(client, transcript: Transcript, data: bytes) -> None:
 
 
 def _receive(client, transcript: Transcript, expected: bytes, timeout: float) -> None:
-    transcript.step(f"Waiting to receive {len(expected):,} bytes.")
     transcript.inbound_bytes = len(expected)
     transcript.progress_reported["RX"] = 0
+    transcript.receiving_announced = False
     started = time.perf_counter()
     progress = getattr(client, "recv_data_progress", None)
     if progress is None:

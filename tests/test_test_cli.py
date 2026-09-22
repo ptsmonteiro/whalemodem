@@ -140,6 +140,7 @@ def test_exercise_reports_receive_progress(capsys):
     run_exercise(Client(), "STA1", "STA2", Transcript(), payload_size=100)
 
     output = capsys.readouterr().out
+    assert "Return transfer started: receiving 100 bytes." in output
     assert "50 of 100 bytes received." in output
     assert "100 of 100 bytes received." in output
 
@@ -344,6 +345,7 @@ def test_status_events_become_concise_progress_messages(capsys):
     assert output.count("TX: switched to") == 1
     assert mode.name in output and "700 bit/s" in output
     assert "2,048 of 10,240 bytes sent." in output
+    assert "Return transfer started: receiving 10,240 bytes." in output
     assert "3,072 of 10,240 bytes received." in output
     assert "10,240 of 10,240 bytes sent." in output
     assert output.count("10,240 of 10,240 bytes sent.") == 1
