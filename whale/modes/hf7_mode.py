@@ -195,3 +195,5 @@ class Hf7Mode(waveform.ModeDescription):
 
 
 HF7 = Hf7Mode()
+
+LADDER = (waveform.LadderEntry(HF7, "hf", rank=7),)

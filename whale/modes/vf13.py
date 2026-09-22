@@ -786,3 +786,5 @@ def mode_for(tone_count=16, *, subbands=1, frame_seconds=None,
 
 #: The shipped instance: config A (see module docstring), 1,438.8 net bit/s.
 VF13 = Vf13Mode()
+
+LADDER = (waveform.LadderEntry(VF13, "fm", rank=4),)

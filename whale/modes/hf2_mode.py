@@ -112,3 +112,8 @@ class Hf2Mode(waveform.ModeDescription):
 
 
 HF2 = Hf2Mode()
+
+#: Rank places HF2 above HF7; qualification_level() (see
+#: whale/mode_qualification.py's MANIFEST) keeps it out of every registry()
+#: below EXPERIMENTAL, so this rank only matters there.
+LADDER = (waveform.LadderEntry(HF2, "hf", rank=8),)

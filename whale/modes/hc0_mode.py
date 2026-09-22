@@ -97,6 +97,8 @@ class Hc0Mode(waveform.ModeDescription):
 
 HC0 = Hc0Mode()
 
+LADDER = (waveform.LadderEntry(HC0, "hf", rank=1),)
+
 
 def hf_registry(fast=True):
     """The mode ladder a station on an HF channel runs.

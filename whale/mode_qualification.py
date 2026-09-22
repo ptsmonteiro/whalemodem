@@ -8,8 +8,10 @@ optional modes, while an experimental registry contains every declared mode.
 
 from __future__ import annotations
 
+import pkgutil
 from dataclasses import dataclass
 from enum import IntEnum
+from importlib import import_module
 
 from .waveform import ModeRegistry
 
@@ -48,7 +50,7 @@ MANIFEST = (
     # and dropped from the default ladder by VF14-4 (mode 23, below);
     # demoted to experimental rather than removed so its waveform stays
     # available. Old peers that only know mode 20 no longer interoperate --
-    # see mode_qualification.py's registry() control assignment.
+    # see whale/modes/vf14.py's LADDER, which marks VF14_4 control instead.
     QualificationEntry("fm", 20, QualificationLevel.EXPERIMENTAL),
     # VF14-4 is the FM control mode and the lowest (most robust) rung of the
     # default ladder: the 600-baud 4-FSK DATA rung, mode_id 23.
@@ -135,47 +137,54 @@ def qualification_level(policy: str, mode_id: int) -> QualificationLevel:
     return matches[0]
 
 
+def _discover_ladders() -> dict[str, tuple["LadderEntry", ...]]:
+    """Every mode's declared `LADDER` entries, grouped by policy.
+
+    A mode is declared by adding it to `MANIFEST` above (its qualification
+    evidence) *and* a module-level `LADDER` tuple next to the mode instance
+    itself (its ladder position and, for the one mode per policy that is
+    it, `control=True`) -- see `whale.waveform.LadderEntry`. This function
+    is the only place that walks `whale.modes` to find those declarations,
+    so registering a new mode never touches this file.
+
+    Walks module names in sorted order for determinism and imports each
+    one; a broken mode module's ImportError propagates rather than being
+    swallowed, so a bad mode fails loudly here, at import time, not
+    silently later when some registry() call happens to need it.
+    """
+    from . import modes as modes_pkg
+
+    ladders: dict[str, list["LadderEntry"]] = {}
+    names = sorted(info.name for info in pkgutil.iter_modules(modes_pkg.__path__))
+    for name in names:
+        module = import_module(f"{modes_pkg.__name__}.{name}")
+        for entry in getattr(module, "LADDER", ()):
+            ladders.setdefault(entry.policy, []).append(entry)
+    return {policy: tuple(entries) for policy, entries in ladders.items()}
+
+
 def registry(policy: str, level: QualificationLevel | str =
              QualificationLevel.DEFAULT, budget=None) -> ModeRegistry:
-    """Return the cumulative registry available at ``level`` for ``policy``."""
-    requested = QualificationLevel.parse(level)
-    if policy == "fm":
-        from .modes.vf12 import VF12
-        from .modes.vf13 import VF13
-        from .modes.vf14 import VF14_16, VF14_4, VF14_8
-        from .modes.vf16 import VF16
-        from .modes.fmht0 import FMHT0
-        from .modes.vfs1 import VFS1
-        from .modes.vfs2 import VFS2
-        from .modes.vfs3 import VFS3
-        from .modes.fmht4 import FMHT4
-        # VF14-4 is both the control mode and the lowest (most robust) rung
-        # of the default ladder. `budget` is accepted for interface
-        # symmetry with hf_registry but is unused: every FM waveform here is
-        # fixed-geometry, none derives its payload from a keying budget.
-        del budget
-        candidates, control = (FMHT0, VF14_16, VF14_8, VF14_4, VF13, VFS1, VFS2, VFS3, VF16, VF12, FMHT4), VF14_4
-    elif policy == "hf":
-        from .modes.hr0_mode import HR0
-        from .modes.hc0_mode import HC0
-        from .modes.hc1w_mode import HC1W
-        from .modes.hf5_mode import HF5
-        from .modes.hf6_mode import HF6
-        from .modes.hf7_mode import HF7
-        from .modes.hf8_mode import HF8
-        from .modes.hf9_mode import HF9
-        # Rate order, which is the order _maybe_adapt climbs.
-        candidates, control = (HR0, HC0, HF9, HC1W, HF8, HF5, HF6, HF7), HR0
-        # HF2 remains available only at experimental level as a historical
-        # fallback.
-        if requested >= QualificationLevel.EXPERIMENTAL:
-            from .modes.hf2_mode import HF2
-            candidates += (HF2,)
-    else:
-        raise ValueError(f"unknown channel policy {policy!r}")
+    """Return the cumulative registry available at ``level`` for ``policy``.
 
-    selected = tuple(mode for mode in candidates
-                     if qualification_level(policy, mode.mode_id) <= requested)
+    `budget` is accepted and ignored: every mode on either ladder is
+    fixed-geometry, none derives its payload from a keying-time budget.
+    """
+    del budget
+    requested = QualificationLevel.parse(level)
+    ladders = _discover_ladders()
+    if policy not in ladders:
+        raise ValueError(f"unknown channel policy {policy!r}")
+    entries = sorted(ladders[policy], key=lambda entry: entry.rank)
+    controls = [entry for entry in entries if entry.control]
+    if len(controls) != 1:
+        raise ValueError(
+            f"{policy!r} ladder must declare exactly one control mode, "
+            f"found {len(controls)}")
+    control = controls[0].mode
+
+    selected = tuple(entry.mode for entry in entries
+                     if qualification_level(policy, entry.mode.mode_id) <= requested)
     if policy == "fm":
         from .framing import AIR_HEADER_BYTES
         selected = tuple(sorted(selected, key=lambda mode:
@@ -198,6 +207,30 @@ def validate_manifest() -> None:
     # is allowed only when it denotes the same mode; no current mode does so.
     if any(len(policies) > 1 for policies in mode_policies.values()):
         raise ValueError("qualification manifest reuses a mode ID across policies")
+
+    # A mode is declared in two places: MANIFEST above (its qualification
+    # evidence) and a `LADDER` entry on its own module (its ladder
+    # position). Both must agree on exactly the same set of (policy,
+    # mode_id) pairs -- a mode declared in one but not the other is a
+    # wiring mistake, and this is the only place that would ever notice.
+    ladders = _discover_ladders()
+    discovered_keys = [(entry.policy, entry.mode.mode_id)
+                       for entries in ladders.values() for entry in entries]
+    if len(discovered_keys) != len(set(discovered_keys)):
+        raise ValueError("waveform ladder declares a mode more than once")
+    manifest_keys, discovered_keys = set(keys), set(discovered_keys)
+    if manifest_keys != discovered_keys:
+        raise ValueError(
+            "qualification manifest and waveform ladder disagree -- "
+            f"declared only in MANIFEST: {sorted(manifest_keys - discovered_keys)!r}; "
+            f"declared only in a LADDER: {sorted(discovered_keys - manifest_keys)!r}")
+
+    for policy, entries in ladders.items():
+        controls = [entry for entry in entries if entry.control]
+        if len(controls) != 1:
+            raise ValueError(
+                f"{policy!r} ladder must declare exactly one control mode, "
+                f"found {len(controls)}")
 
 
 validate_manifest()

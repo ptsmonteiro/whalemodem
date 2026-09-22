@@ -114,3 +114,5 @@ class Hf6Mode(waveform.ModeDescription):
 
 
 HF6 = Hf6Mode()
+
+LADDER = (waveform.LadderEntry(HF6, "hf", rank=6),)

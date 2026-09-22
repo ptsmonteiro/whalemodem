@@ -245,3 +245,5 @@ class Hf8Mode(waveform.ModeDescription):
 
 
 HF8 = Hf8Mode()
+
+LADDER = (waveform.LadderEntry(HF8, "hf", rank=4),)

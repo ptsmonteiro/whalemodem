@@ -97,3 +97,5 @@ class Hc1wMode(waveform.ModeDescription):
 
 
 HC1W = Hc1wMode()
+
+LADDER = (waveform.LadderEntry(HC1W, "hf", rank=3),)

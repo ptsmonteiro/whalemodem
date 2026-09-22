@@ -86,3 +86,5 @@ class Hf5Mode(waveform.ModeDescription):
 
 
 HF5 = Hf5Mode()
+
+LADDER = (waveform.LadderEntry(HF5, "hf", rank=5),)

@@ -147,3 +147,4 @@ VFS1 = Vfs1Mode()
 #: This module is the link-facing adapter; the waveform itself is in whale/phy.
 assert isinstance(VFS1, waveform.WaveformMode)
 MODES = (VFS1,)
+LADDER = (waveform.LadderEntry(VFS1, "fm", rank=5),)

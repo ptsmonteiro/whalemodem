@@ -69,3 +69,8 @@ class Hr0Mode(waveform.ModeDescription):
 
 
 HR0 = Hr0Mode()
+
+#: HR0 is the hf control mode and the lowest (most robust) rung of the
+#: ladder; see whale/mode_qualification.py's MANIFEST for its qualification
+#: evidence.
+LADDER = (waveform.LadderEntry(HR0, "hf", rank=0, control=True),)

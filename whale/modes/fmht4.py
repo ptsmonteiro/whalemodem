@@ -465,3 +465,4 @@ def mode_for(**kwargs):
 
 FMHT4 = Fmht4Mode()
 MODES = (FMHT4,)
+LADDER = (waveform.LadderEntry(FMHT4, "fm", rank=10),)

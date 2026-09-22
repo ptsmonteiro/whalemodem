@@ -344,3 +344,4 @@ def mode_for(**kwargs):
 
 VF12 = Vf12Mode()
 MODES = (VF12,)
+LADDER = (waveform.LadderEntry(VF12, "fm", rank=9),)

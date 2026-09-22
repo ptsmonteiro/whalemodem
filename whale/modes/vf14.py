@@ -438,4 +438,12 @@ VF14_8 = Vf14Mode(
     medium_payload_symbols=228,
     confidence_threshold=0.14)
 
+#: VF14_4 is both the control mode and the lowest (most robust) rung of the
+#: default ladder.
+LADDER = (
+    waveform.LadderEntry(VF14_16, "fm", rank=1),
+    waveform.LadderEntry(VF14_8, "fm", rank=2),
+    waveform.LadderEntry(VF14_4, "fm", rank=3, control=True),
+)
+
 PROFILES = {"16": VF14_16, "4": VF14_4, "8": VF14_8}

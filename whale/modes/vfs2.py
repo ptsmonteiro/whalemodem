@@ -12,6 +12,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 
+from whale import waveform
 from whale.phy.scfde import ScFdeMode
 
 MODE_ID = 25
@@ -29,3 +30,4 @@ class Vfs2Mode(ScFdeMode):
 
 VFS2 = Vfs2Mode()
 MODES = (VFS2,)
+LADDER = (waveform.LadderEntry(VFS2, "fm", rank=6),)

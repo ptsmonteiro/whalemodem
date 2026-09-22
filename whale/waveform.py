@@ -157,6 +157,28 @@ class ModeRegistry:
         return self.modes[new_index]
 
 
+@dataclass(frozen=True)
+class LadderEntry:
+    """One mode's declared position in its channel policy's ladder.
+
+    A mode module declares a module-level `LADDER` tuple of these next to
+    the mode instance(s) it defines, so `mode_qualification.registry()`
+    *discovers* the per-policy ladder instead of a shared file hardcoding
+    the import and the candidate order for every mode. `rank` fixes the
+    climb order within `policy` (lowest/most robust first, matching the
+    order `_maybe_adapt` steps through); exactly one entry per policy sets
+    `control=True`, the mode that policy falls back to.
+
+    Declared here, not in `mode_qualification.py`, so a mode module can
+    reference it without importing back into the module that discovers it.
+    """
+
+    mode: WaveformMode
+    policy: str
+    rank: int
+    control: bool = False
+
+
 def _policy_for(mode_id: int) -> str:
     """The channel policy a mode is declared on, or "?" if undeclared.
 

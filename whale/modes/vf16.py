@@ -6,6 +6,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 
+from .. import waveform
 from .vf12 import Vf12Mode
 
 
@@ -44,3 +45,4 @@ def mode_for(**kwargs):
 
 VF16 = Vf16Mode()
 MODES = (VF16,)
+LADDER = (waveform.LadderEntry(VF16, "fm", rank=8),)

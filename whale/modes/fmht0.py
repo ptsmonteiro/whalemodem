@@ -57,7 +57,7 @@ from functools import cached_property
 
 import numpy as np
 
-from .. import dsp
+from .. import dsp, waveform
 from ..dsp import mfsk as _mfsk
 from .vf14 import Vf14Mode, _interleaver_stride
 
@@ -185,3 +185,5 @@ FMHT0 = Fmht0Mode(
     whitener_seed=0x0FB32, short_whitener_seed=0x0FB33,
     medium_whitener_seed=0x0FB34,
     confidence_threshold=0.30)
+
+LADDER = (waveform.LadderEntry(FMHT0, "fm", rank=0),)
