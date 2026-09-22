@@ -64,6 +64,20 @@ def test_clip_and_filter_buys_peak_and_stays_in_band():
     assert np.max(outside) < 0.05 * np.mean(occupied)
 
 
+def test_preamble_length_is_a_parameter_and_both_shapes_round_trip():
+    """The preamble is a robustness knob, so both shapes must actually work."""
+    long_preamble = Fmht4Mode(sync_symbols=9, lead_in_seconds=0.5)
+    assert long_preamble.preamble_symbols == 13
+    assert long_preamble.total_symbols == 13 + long_preamble.payload_symbols
+    # Longer preamble buys robustness out of payload, not out of airtime.
+    assert long_preamble.bits_per_second < FMHT4.bits_per_second
+
+    payload = np.arange(long_preamble.max_payload_bytes, dtype=np.uint8).tobytes()
+    result = long_preamble.decode(rx_audio.downsample(long_preamble.encode(payload)))
+    assert result["payload"] == payload
+    assert result["codewords_ok"] == long_preamble.n_codewords
+
+
 def test_papr_db_is_zero_for_silence():
     assert papr_db(np.zeros(100)) == 0.0
 

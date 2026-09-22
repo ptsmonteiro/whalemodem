@@ -3,10 +3,14 @@
 The top rung of the FM-handheld ladder and the only one that is OFDM: rungs
 1-3 use SC-FDE to dodge peak-to-average ratio entirely. OFDM is affordable
 here because this rung is meant for a line-of-sight path at high audio SNR,
-where the binding constraint is the mic compressor and deviation clipper
-rather than noise -- so the waveform is peak-limited on purpose, by Newman
-phases on every known symbol plus iterative clip-and-filter on the payload,
-and the residual clipping distortion is spent as if it were noise.
+so the waveform is peak-limited on purpose, by Newman phases on every known
+symbol plus iterative clip-and-filter on the payload.
+
+Peak limiting here is a lever on average deviation, not a defence against a
+mic compressor: on radios, clipping and audio drive move the same single
+quantity, and that quantity has an optimum. Under-drive and the path is
+noise-limited; over-clip and the waveform's own distortion becomes the
+ceiling. See `papr_target_db`.
 
 Geometry (shared by the whole FM-handheld family): FFT block 32 ms, 2 ms
 cyclic prefix, 34 ms symbol, 31.25 Hz bin spacing, 64 active bins from
@@ -86,6 +90,10 @@ class Fmht4Mode(waveform.ModeDescription):
     lo_bin: int = 15  # 468.75 Hz
     hi_bin: int = 78  # 2437.5 Hz
     lead_in_seconds: float = 0.25
+    #: Sync symbols ahead of the four channel-training symbols. Together with
+    #: `lead_in_seconds` this is the preamble, and on a handheld it is a
+    #: robustness parameter, not overhead to be minimised: see `encode`.
+    sync_symbols: int = 4
     target_airtime_seconds: float = 4.5
     n_codewords: int | None = None
     confidence_threshold: float = 0.7
@@ -95,13 +103,19 @@ class Fmht4Mode(waveform.ModeDescription):
     #: Filtering regrows peaks, so the PAPR actually achieved lands about
     #: 0.3 dB above this; `modulated_papr_db` is the number that counts.
     #:
-    #: 9 dB, not the 6 dB the family brief asks for, because clipping this
-    #: waveform to 6 dB puts its own in-band distortion floor at 16 dB SINR
-    #: -- below the ~19 dB this rung is meant to open at, which would make
-    #: the transmitter, not the path, the thing that closes the link. 9 dB
-    #: trades 3 dB of peak for a 24 dB floor. Raise the clipping (lower this)
-    #: only against a measured path whose limiter is provably harsher than
-    #: the simulated FM profiles, which it is not on the bench.
+    #: 9 dB, measured on radios on 2026-09-22 (14-cell sweep, both
+    #: directions, IC-705 <-> digirig). Clipping pulls two ways and 9 dB is
+    #: where they balance:
+    #:
+    #:   * it raises average deviation for a fixed peak (+3.5 dB here), which
+    #:     is what rescues a quiet path -- unclipped at half drive delivered
+    #:     0/3 where this setting delivered 3/3 at 24.1 dB SINR; and
+    #:   * it injects in-band distortion with a hard SINR ceiling, which is
+    #:     what sinks an over-clipped one -- 6.5 dB measured 2/3 at 17.2 dB,
+    #:     right at its own loopback distortion floor.
+    #:
+    #: So do not lower it to the 6 dB the family brief asks for: that was
+    #: measured losing frames. Do not raise it to unclipped either.
     papr_target_db: float = 9.0
     papr_iterations: int = 12
     #: Straight-line pre-emphasis of the top bin over the bottom one, applied
@@ -126,6 +140,8 @@ class Fmht4Mode(waveform.ModeDescription):
             raise ValueError("lead_in_seconds must be finite and nonnegative")
         if not np.isfinite(self.target_airtime_seconds) or self.target_airtime_seconds <= 0:
             raise ValueError("target_airtime_seconds must be finite and positive")
+        if not isinstance(self.sync_symbols, int) or self.sync_symbols < 1:
+            raise ValueError("sync_symbols must be an int >= 1")
         if not isinstance(self.pilot_comb_stride, int) or self.pilot_comb_stride < 2:
             raise ValueError("pilot_comb_stride must be an int >= 2")
         if not isinstance(self.pilot_time_span, int) or self.pilot_time_span < 1:
@@ -136,7 +152,8 @@ class Fmht4Mode(waveform.ModeDescription):
             raise ValueError("papr_iterations must be a nonnegative int")
         if self.n_codewords is None:
             available = self.target_airtime_seconds - self.lead_in_seconds - 0.1
-            symbols = int(np.floor(available * RX_RATE / self.symbol_samples)) - 8
+            symbols = (int(np.floor(available * RX_RATE / self.symbol_samples))
+                       - self.preamble_symbols)
             object.__setattr__(self, "n_codewords",
                                symbols * self.bits_per_symbol // ldpc.N)
         if not isinstance(self.n_codewords, int) or self.n_codewords < 1:
@@ -202,8 +219,12 @@ class Fmht4Mode(waveform.ModeDescription):
         return (self.coded_bits + self.bits_per_symbol - 1) // self.bits_per_symbol
 
     @property
+    def preamble_symbols(self):
+        return self.sync_symbols + 4  # sync burst plus four training symbols
+
+    @property
     def total_symbols(self):
-        return 8 + self.payload_symbols
+        return self.preamble_symbols + self.payload_symbols
 
     @property
     def symbol_samples(self):
@@ -230,9 +251,10 @@ class Fmht4Mode(waveform.ModeDescription):
         the receive AGC -- is the lowest-PAPR part of the whole frame.
         """
         sync = _newman(self.n_carriers, root=1)[None, :]
+        signs = 1.0 - 2.0 * bits.pn_bits(self.sync_symbols, 0x4F1D).astype(float)
         training = np.vstack([_newman(self.n_carriers, root=r)
                               for r in (5, 7, 11, 13)])
-        return np.vstack((np.array([1, 1, -1, 1])[:, None] * sync, training))
+        return np.vstack((signs[:, None] * sync, training))
 
     # -- modulation -------------------------------------------------------
 
@@ -326,7 +348,7 @@ class Fmht4Mode(waveform.ModeDescription):
         audio = np.asarray(audio, dtype=float)
         if audio.ndim != 1 or not np.all(np.isfinite(audio)):
             return result
-        reference = self._build(self.header[:4])
+        reference = self._build(self.header[:self.sync_symbols])
         if len(audio) < 2 * len(reference):
             return result
         coarse = int(np.argmax(np.abs(
@@ -334,9 +356,10 @@ class Fmht4Mode(waveform.ModeDescription):
         best = None
         for offset in range(-CP_LEN * 2, CP_LEN // 2 + 1):
             start = coarse + offset
-            observed = self._extract(audio, start + 4 * self.symbol_samples, 4)
+            observed = self._extract(
+                audio, start + self.sync_symbols * self.symbol_samples, 4)
             if observed is not None:
-                _, evm = _fit_channel(observed, self.header[4:])
+                _, evm = _fit_channel(observed, self.header[self.sync_symbols:])
                 if best is None or evm < best[1]:
                     best = (start, evm)
         if best is None:
@@ -347,13 +370,13 @@ class Fmht4Mode(waveform.ModeDescription):
         if confidence < self.confidence_threshold:
             return result
         result["synced"] = True
-        block = self._extract(audio, start + 4 * self.symbol_samples,
+        block = self._extract(audio, start + self.sync_symbols * self.symbol_samples,
                               4 + self.payload_symbols)
         if block is None:
             return result
         # Per-bin equalisation measured from the preamble: the pre-emphasis
         # tilt and group-delay ripple are never modelled, only observed.
-        channel, _ = _fit_channel(block[:4], self.header[4:])
+        channel, _ = _fit_channel(block[:4], self.header[self.sync_symbols:])
         safe = np.where(np.abs(channel) > 1e-12, channel, 1e-12)
         payload = block[4:]
         pilot_idx, data_idx, pv = self.pilot_positions, self.data_positions, self.pilot_values
@@ -414,6 +437,7 @@ class Fmht4Mode(waveform.ModeDescription):
                 "n_codewords": self.n_codewords,
                 "pilot_comb_stride": self.pilot_comb_stride,
                 "pilot_time_span": self.pilot_time_span,
+                "sync_symbols": self.sync_symbols,
                 "papr_target_db": self.papr_target_db,
                 "tx_tilt_db": self.tx_tilt_db,
                 "net_bps": self.bits_per_second}
