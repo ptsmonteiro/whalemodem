@@ -101,19 +101,16 @@ def show_releases() -> None:
 
 def main() -> None:
     parser = argparse.ArgumentParser(
-        description="Update project.version, commit it, and create a vVERSION tag."
+        description=(
+            "Update project.version, commit it, create a vVERSION tag, and push "
+            "the branch and tag to origin."
+        )
     )
     parser.add_argument(
         "version", nargs="?", help="PEP 440 release version, without a leading v"
     )
-    parser.add_argument(
-        "--push", action="store_true",
-        help="push the release commit and its tag to origin after creating them",
-    )
     args = parser.parse_args()
     if args.version is None:
-        if args.push:
-            fail("--push requires a release version")
         show_releases()
         return
     version = args.version
@@ -124,6 +121,9 @@ def main() -> None:
     git("rev-parse", "--is-inside-work-tree", capture=True)
     if git("status", "--porcelain", capture=True):
         fail("working tree is not clean; commit, stash, or discard changes first")
+    branch = git("branch", "--show-current", capture=True)
+    if not branch:
+        fail("HEAD is detached; check out the release branch first")
 
     tag_exists = subprocess.run(
         ("git", "rev-parse", "-q", "--verify", f"refs/tags/{tag}"), cwd=ROOT,
@@ -145,17 +145,9 @@ def main() -> None:
     git("add", "pyproject.toml")
     git("commit", "-m", f"Release {tag}")
     git("tag", "-a", tag, "-m", f"Release {tag}")
+    git("push", "--atomic", "origin", branch, tag)
 
-    if args.push:
-        branch = git("branch", "--show-current", capture=True)
-        if not branch:
-            fail("release was created locally, but HEAD is detached; push it manually")
-        git("push", "origin", branch)
-        git("push", "origin", tag)
-
-    print(f"Created release commit and tag {tag}.")
-    if not args.push:
-        print(f"To publish it: git push origin HEAD {tag}")
+    print(f"Created and pushed release commit and tag {tag}.")
 
 
 if __name__ == "__main__":
