@@ -117,6 +117,33 @@ def test_exercise_uses_the_selected_payload_size():
     assert client.received[0][0] == 37
 
 
+def test_exercise_reports_receive_progress(capsys):
+    class Client:
+        def send_cmd(self, line):
+            pass
+
+        def wait_for(self, prefix, timeout):
+            return prefix
+
+        def open_data(self):
+            pass
+
+        def send_data(self, data):
+            pass
+
+        def recv_data_progress(self, size, timeout, on_progress):
+            from acceptance_test import PAYLOAD_TAG_BA, payload
+            on_progress(size // 2)
+            on_progress(size)
+            return payload(PAYLOAD_TAG_BA, size)
+
+    run_exercise(Client(), "STA1", "STA2", Transcript(), payload_size=100)
+
+    output = capsys.readouterr().out
+    assert "50 of 100 bytes received." in output
+    assert "100 of 100 bytes received." in output
+
+
 def test_listener_returns_after_failed_and_successful_tests(monkeypatch):
     import whale.test_cli as test_cli
 
@@ -293,8 +320,33 @@ def test_the_session_state_follows_the_command_port():
     assert transcript.connected is True
     transcript.on_status("DISCONNECTED")
     assert transcript.connected is False
-    assert [line.split("modem: ")[1] for line in transcript.lines] == [
+    assert [line.split("modem: ")[1] for line in transcript.lines
+            if "modem: " in line] == [
         "CONNECTED peer=STA2", "DISCONNECTED"]
+    assert any("Connected to STA2." in line for line in transcript.lines)
+
+
+def test_status_events_become_concise_progress_messages(capsys):
+    transcript = Transcript(mode_registry=registry(
+        "fm", "default", policy.FM.max_useful_frame_seconds))
+    mode = transcript.mode_registry.modes[0]
+
+    transcript.on_status(f"BITRATE ({mode.mode_id})  700 bps TX")
+    transcript.on_status(f"BITRATE ({mode.mode_id})  700 bps TX")
+    transcript.outbound_bytes = 10_240
+    transcript.inbound_bytes = 10_240
+    transcript.on_status("WHALE PROGRESS TX 2048 10240")
+    transcript.on_status("WHALE PROGRESS RX 3072")
+    transcript.on_status("WHALE PROGRESS TX 10240 10240")
+    transcript.on_status("BUFFER 0")
+
+    output = capsys.readouterr().out
+    assert output.count("TX: switched to") == 1
+    assert mode.name in output and "700 bit/s" in output
+    assert "2,048 of 10,240 bytes sent." in output
+    assert "3,072 of 10,240 bytes received." in output
+    assert "10,240 of 10,240 bytes sent." in output
+    assert output.count("10,240 of 10,240 bytes sent.") == 1
 
 
 def test_an_on_air_failure_exits_1_with_a_report(tmp_path, monkeypatch, capsys):
@@ -894,6 +946,8 @@ def test_two_stations_pass_the_exercise_over_paired_audio(monkeypatch):
         for transcript in transcripts.values():
             assert any("Payload verified" in line for line in transcript.lines)
             assert any("modem: CONNECTED" in line for line in transcript.lines)
+            assert any("of 10,240 bytes sent" in line for line in transcript.lines)
+            assert any("of 10,240 bytes received" in line for line in transcript.lines)
             assert transcript.keyings > 0 and transcript.modes
             assert transcript.snr_db and "observation(s)" in transcript.snr_summary()
     finally:

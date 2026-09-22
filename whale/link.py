@@ -1039,6 +1039,8 @@ class Link(_ReceiverMixin, _AdaptationMixin):
                                 f"after {self._channel('max_retries')} tries")
             logger.info("[%s] TX DATA (%d/%d B) to %s at %s", self.mycall,
                         offset, len(data), self.peer_call, self.tx_profile.name)
+            self.on_event("TRANSFER_PROGRESS", direction="TX",
+                          transferred=offset, total=len(data))
             self._tx_seq = (self._tx_seq + 1) % SEQ_MODULO
             # Always retain the ACK as evidence for the mode that ultimately
             # delivered the chunk. If the retry loop already stepped down,
@@ -1208,6 +1210,10 @@ class Link(_ReceiverMixin, _AdaptationMixin):
             self._partial_rx_buf = bytearray()
         if seq == self._rx_expect_seq:
             self._partial_rx_buf += chunk
+            self.on_event("TRANSFER_PROGRESS", direction="RX",
+                          transferred=len(self._partial_rx_buf),
+                          total=(len(self._partial_rx_buf)
+                                 if flags & EOF_BIT else None))
             self._rx_expect_seq = (seq + 1) % SEQ_MODULO
             if flags & EOF_BIT:
                 message = bytes(self._partial_rx_buf)

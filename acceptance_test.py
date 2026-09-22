@@ -88,8 +88,9 @@ class StationClient:
     -- indistinguishable at a glance from a real problem at that moment.
     """
 
-    def __init__(self, name, host, cmd_port, data_port, on_status=None):
+    def __init__(self, name, host, cmd_port, data_port, on_status=None, echo=True):
         self.name = name
+        self.echo = echo
         # Optional observer of every status line, called on the reader
         # thread as the line arrives. wait_for() consumes lines looking for
         # one prefix and drops the rest, so a caller that wants to keep a
@@ -145,13 +146,15 @@ class StationClient:
                         break
                 text = line.decode("ascii", "replace")
                 if text:
-                    print(f"     [{self.name}] status: {text}")
+                    if self.echo:
+                        print(f"     [{self.name}] status: {text}")
                     if self.on_status is not None:
                         self.on_status(text)
                     self._lines.put(text)
 
     def send_cmd(self, line):
-        print(f"  -> [{self.name}] CMD: {line}")
+        if self.echo:
+            print(f"  -> [{self.name}] CMD: {line}")
         self.cmd.sendall((line + "\r").encode("ascii"))
 
     def wait_for(self, prefix, timeout):
@@ -181,6 +184,10 @@ class StationClient:
         self.data.sendall(payload)
 
     def recv_data(self, nbytes: int, timeout: float) -> bytes:
+        return self.recv_data_progress(nbytes, timeout, None)
+
+    def recv_data_progress(self, nbytes: int, timeout: float, on_progress=None) -> bytes:
+        """Receive exactly as before, optionally reporting delivered bytes."""
         self.data.settimeout(timeout)
         buf = bytearray()
         deadline = time.time() + timeout
@@ -190,6 +197,8 @@ class StationClient:
             if not chunk:
                 break
             buf += chunk
+            if on_progress is not None:
+                on_progress(len(buf))
         return bytes(buf)
 
 

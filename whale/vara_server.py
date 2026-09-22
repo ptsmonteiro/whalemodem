@@ -44,6 +44,8 @@ Status lines pushed back on the command port:
                                 application bit/s (docs/MODES.md), not a
                                 measured channel throughput. Control frames
                                 (ACKs and the handshake) report nothing.
+    WHALE PROGRESS <TX|RX> <bytes> [<total>]
+                                acknowledged TX or decoded RX message progress
     BUFFER 0                   sent after queued application data finishes a
                                 link send; nonzero semantics are unconfirmed
     IAMALIVE                   unsolicited keepalive, sent roughly every 60s
@@ -166,6 +168,12 @@ class StationServer:
             self._send_status(f"BITRATE ({kw['mode_id']})  "
                               f"{round(kw['bits_per_second'])} bps "
                               f"{kw['direction']}")
+        elif name == "TRANSFER_PROGRESS":
+            fields = ["WHALE", "PROGRESS", kw["direction"],
+                      str(kw["transferred"])]
+            if kw.get("total") is not None:
+                fields.append(str(kw["total"]))
+            self._send_status(" ".join(fields))
         elif name == "OUTBOUND_DRAINED":
             # All five captured BUFFER reports were zero and followed the
             # data-bearing TX burst.  Do not invent uncaptured units or a

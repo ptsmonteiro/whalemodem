@@ -651,6 +651,20 @@ def test_vara_adapter_maps_only_confirmed_empty_boundary_to_buffer_zero():
     assert sent == ["BUFFER 0"]
 
 
+def test_vara_adapter_exposes_link_transfer_progress():
+    service = RecordingService()
+    server = StationServer(service, "STA1", 8300, 8301)
+    sent = []
+    server._send_status = lambda line: sent.append(line)
+
+    server._on_modem_event("TRANSFER_PROGRESS", direction="TX",
+                           transferred=512, total=2048)
+    server._on_modem_event("TRANSFER_PROGRESS", direction="RX",
+                           transferred=384, total=None)
+
+    assert sent == ["WHALE PROGRESS TX 512 2048", "WHALE PROGRESS RX 384"]
+
+
 def test_vara_adapter_sends_iamalive_periodically_without_connecting(monkeypatch):
     monkeypatch.setattr(vara_server, "IAMALIVE_INTERVAL", 0.02)
     service = RecordingService()

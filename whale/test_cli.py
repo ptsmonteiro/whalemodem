@@ -168,6 +168,11 @@ class Transcript:
     keyings: int = 0
     modes: dict[tuple[int, str], int] = field(default_factory=dict)
     connected: bool = False
+    mode_registry: object | None = None
+    active_modes: dict[str, tuple[int, int]] = field(default_factory=dict)
+    outbound_bytes: int | None = None
+    inbound_bytes: int | None = None
+    progress_reported: dict[str, int] = field(default_factory=dict)
 
     def step(self, text: str) -> None:
         print(text, flush=True)
@@ -200,13 +205,38 @@ class Transcript:
                 self.snr_db.append(float(line[3:]))
             elif line.startswith("BITRATE ("):
                 mode_id, _, rest = line[len("BITRATE ("):].partition(")")
-                key = (int(mode_id), rest.split()[-1])
+                fields = rest.split()
+                bitrate, direction = int(fields[0]), fields[-1]
+                mode_id = int(mode_id)
+                key = (mode_id, direction)
                 self.modes[key] = self.modes.get(key, 0) + 1
+                current = (mode_id, bitrate)
+                if self.active_modes.get(direction) != current:
+                    self.active_modes[direction] = current
+                    mode = getattr(self.mode_registry, "by_id", {}).get(mode_id)
+                    name = getattr(mode, "name", f"mode {mode_id}")
+                    self.step(f"{direction}: switched to {name} ({_format_rate(bitrate)}).")
+            elif line == "BUFFER 0" and self.outbound_bytes is not None:
+                total, self.outbound_bytes = self.outbound_bytes, None
+                self._progress("TX", total, total, force=True)
+            elif line.startswith("WHALE PROGRESS "):
+                fields = line.split()
+                direction, transferred = fields[2], int(fields[3])
+                if direction == "TX":
+                    total = int(fields[4]) if len(fields) > 4 else self.outbound_bytes
+                else:
+                    total = self.inbound_bytes
+                    if total is None and len(fields) > 4:
+                        total = int(fields[4])
+                if total is not None:
+                    self._progress(direction, transferred, total)
             elif line.startswith("CONNECTED"):
                 # CONNECTED <mycall> <peer> <bandwidth>
                 fields = line.split()
                 self.connected = True
-                self._session("CONNECTED", fields[2] if len(fields) > 2 else None)
+                peer = fields[2] if len(fields) > 2 else None
+                self._session("CONNECTED", peer)
+                self.step(f"Connected{f' to {peer}' if peer else ''}.")
             elif line.startswith("DISCONNECTED"):
                 self.connected = False
                 self._session("DISCONNECTED", None)
@@ -217,6 +247,19 @@ class Transcript:
         self.lines.append(f"[{time.monotonic() - self.started:7.1f}s] modem: {name}"
                           + (f" peer={peer}" if peer else ""))
 
+    def _progress(self, direction: str, transferred: int, total: int, *,
+                  force: bool = False) -> None:
+        """Print useful increments while ignoring per-frame status noise."""
+        transferred = min(transferred, total)
+        previous = self.progress_reported.get(direction, 0)
+        if transferred <= previous:
+            return
+        interval = max(1, total // 10)
+        if force or transferred == total or transferred - previous >= interval:
+            self.progress_reported[direction] = transferred
+            verb = "sent" if direction == "TX" else "received"
+            self.step(f"{transferred:,} of {total:,} bytes {verb}.")
+
     def snr_summary(self) -> str:
         if not self.snr_db:
             return "no decoded DATA bursts reported an SNR"
@@ -224,6 +267,13 @@ class Transcript:
                 f"min {min(self.snr_db):.1f} dB, "
                 f"mean {sum(self.snr_db) / len(self.snr_db):.1f} dB, "
                 f"max {max(self.snr_db):.1f} dB")
+
+
+def _format_rate(bits_per_second: int) -> str:
+    """A compact human rate, without turning sub-kilobit modes into 0 kbps."""
+    if bits_per_second < 1000:
+        return f"{bits_per_second} bit/s"
+    return f"{bits_per_second / 1000:g} kbit/s"
 
 
 # -- preflight -------------------------------------------------------------
@@ -446,7 +496,7 @@ def _modem_env() -> dict:
 
 
 def connect_station(station: Station, transcript: Transcript, mycall: str,
-                    timeout: float = MODEM_START_TIMEOUT):
+                    timeout: float = MODEM_START_TIMEOUT, verbose: bool = False):
     """Connect to the modem's command port the way any client application does.
 
     There is no readiness signal to wait on across a process boundary, so
@@ -462,7 +512,8 @@ def connect_station(station: Station, transcript: Transcript, mycall: str,
                               f"answered.{station.complaint()}")
         try:
             return StationClient(mycall, "127.0.0.1", station.cmd_port,
-                                 station.data_port, on_status=transcript.on_status)
+                                 station.data_port, on_status=transcript.on_status,
+                                 echo=verbose)
         except OSError as exc:
             if time.monotonic() >= deadline:
                 raise TestFailure(
@@ -626,14 +677,34 @@ def run_interruptibly(target, *args, poll: float = INTERRUPT_POLL) -> None:
 # -- the exercise ----------------------------------------------------------
 
 def _send(client, transcript: Transcript, data: bytes) -> None:
-    transcript.step(f"Sending {len(data)} bytes...")
+    transcript.step(f"Starting data transfer: sending {len(data):,} bytes.")
+    transcript.outbound_bytes = len(data)
+    transcript.progress_reported["TX"] = 0
     client.send_data(data)
+    if not data:
+        transcript.outbound_bytes = None
+        transcript.step("0 of 0 bytes sent.")
 
 
 def _receive(client, transcript: Transcript, expected: bytes, timeout: float) -> None:
-    transcript.step(f"Waiting for {len(expected)} bytes...")
+    transcript.step(f"Waiting to receive {len(expected):,} bytes.")
+    transcript.inbound_bytes = len(expected)
+    transcript.progress_reported["RX"] = 0
     started = time.perf_counter()
-    got = client.recv_data(len(expected), timeout)
+    progress = getattr(client, "recv_data_progress", None)
+    if progress is None:
+        got = client.recv_data(len(expected), timeout)
+    else:
+        last_reported = 0
+
+        def report(received: int) -> None:
+            nonlocal last_reported
+            interval = max(1, len(expected) // 10)
+            if received == len(expected) or received - last_reported >= interval:
+                last_reported = received
+                transcript._progress("RX", received, len(expected))
+
+        got = progress(len(expected), timeout, report)
     elapsed = time.perf_counter() - started
     if len(got) != len(expected):
         raise TestFailure(f"received {len(got)} of {len(expected)} bytes "
@@ -643,6 +714,7 @@ def _receive(client, transcript: Transcript, expected: bytes, timeout: float) ->
         raise TestFailure(f"payload mismatch: {wrong} of {len(expected)} bytes differ")
     transcript.step(_transfer_summary("We", len(got), elapsed).strip())
     transcript.step("Payload verified byte-for-byte.")
+    transcript.inbound_bytes = None
 
 
 def run_exercise(client, mycall: str, peer: str | None, transcript: Transcript,
@@ -667,9 +739,9 @@ def run_exercise(client, mycall: str, peer: str | None, transcript: Transcript,
                         f"whale-test{size_option} {mycall}")
         client.send_cmd("LISTEN ON")
     else:
-        transcript.step(f"Calling {peer} as {mycall}...")
+        transcript.step(f"Initiating connection to {peer} as {mycall}...")
         client.send_cmd(f"CONNECT {mycall} {peer}")
-    transcript.step(client.wait_for("CONNECTED", connect_timeout))
+    client.wait_for("CONNECTED", connect_timeout)
     client.open_data()
 
     if peer is None:
@@ -955,14 +1027,17 @@ def main(argv=None) -> int:
         print(path)
         return status
 
-    transcript = Transcript()
+    transcript = Transcript(mode_registry=setup.mode_registry)
     outcome = "FAIL: the run ended before a verdict"
     status = 1
     interrupted = False
     station = client = None
     try:
+        transcript.step("Starting the local modem...")
         station = start_station(setup, args.verbose)
-        client = connect_station(station, transcript, setup.mycall)
+        client = connect_station(station, transcript, setup.mycall,
+                                 verbose=args.verbose)
+        transcript.step("Local modem ready.")
         print("Press Ctrl-C to stop the test; again to stop it without "
               "saying goodbye.", flush=True)
         if peer is None:
