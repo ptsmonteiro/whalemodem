@@ -2,13 +2,22 @@ name: CI
 
 on:
   push:
+    branches:
+      - main
   pull_request:
 
 # The test result from this workflow is the required branch-protection check.
 # Tag releases run the identical suite in standalone-builds.yml before assets
-# can be published.
+# can be published, so this workflow deliberately doesn't also trigger on tag
+# pushes -- that would just duplicate the same run.
 permissions:
   contents: read
+
+# Cancel a still-running run for the same branch/PR when a newer push
+# supersedes it, instead of letting both finish.
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
 
 jobs:
   test:

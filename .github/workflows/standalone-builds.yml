@@ -24,6 +24,12 @@ on:
 permissions:
   contents: read
 
+# Cancel a still-running run for the same tag/ref when a newer push
+# supersedes it, instead of letting both finish.
+concurrency:
+  group: standalone-builds-${{ github.ref }}
+  cancel-in-progress: true
+
 jobs:
   # Publishing must be backed by the same complete test suite used for
   # ordinary push/PR CI.  Keeping this job in the release workflow makes the
